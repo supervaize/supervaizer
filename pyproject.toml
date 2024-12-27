@@ -1,0 +1,37 @@
+[project]
+name = "supervaize-control"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "demjson3>=3.0.6",
+    "fastapi>=0.115.6",
+    "loguru>=0.7.3",
+    "pydantic>=2.10.4",
+    "python-slugify>=8.0.4",
+    "requests>=2.32.3",
+    "rich>=13.9.4",
+    "shortuuid>=1.0.13",
+    "uvicorn>=0.34.0",
+]
+classifiers = ["Private :: Do Not Upload"]
+dynamic = ["version"]
+
+[dependency-groups]
+dev = ["pytest>=8.3.4"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "db: calls to the database",
+    "current: test under development",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool]
+[tool.hatch]
+[tool.hatch.version]
+path = "supervaize_control/__version__.py"

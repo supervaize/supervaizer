@@ -1,0 +1,68 @@
+from typing import ClassVar
+from enum import Enum
+import json
+from pydantic import BaseModel
+
+from .__version__ import EVENT_VERSION, VERSION
+from .agent import Agent
+
+
+class EventType(Enum):
+    AGENT_SEND_REGISTRATION = "agent.send.registration"
+    AGENT_SEND_WAKEUP = "agent.send.wakeup"
+    AGENT_SEND_ANOMALY = "agent.send.anomaly"
+    AGENT_SEND_DELIVERABLE = "agent.send.deliverable"
+    AGENT_SEND_INTERMEDIARY = "agent.send.intermediary"
+
+
+class EventModel(BaseModel):
+    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    EVENT_VERSION: ClassVar[str] = EVENT_VERSION
+    source: str
+    type: EventType
+    details: dict
+
+
+class Event(EventModel):
+    """Base class for all events in the Supervaize Control system.
+
+    Events represent messages sent from agents to the control system to communicate
+    status, anomalies, deliverables and other information.
+
+    Inherits from EventModel which defines the core event attributes:
+        - source: The source/origin of the event (e.g. agent URI)
+        - type: The EventType enum indicating the event category
+        - details: A dictionary containing event-specific details
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @property
+    def payload(self) -> dict:
+        return {
+            "items": [
+                {
+                    "Source": self.source,
+                    "DetailType": self.type.value,
+                    "Detail": json.dumps(self.details),
+                }
+            ]
+        }
+
+
+class AgentSendRegistrationEvent(Event):
+    def __init__(self, agent: "Agent"):
+        super().__init__(
+            type=EventType.AGENT_SEND_REGISTRATION.value,
+            source=agent.uri,
+            details={
+                "name": agent.name,
+                "id": agent.id,
+                "version": agent.version,
+                "author": agent.author,
+                "developer": agent.developer,
+                "description": agent.description,
+                "tags": agent.tags,
+            },
+        )
