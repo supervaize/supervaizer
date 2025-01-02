@@ -1,4 +1,4 @@
-from .agent import Agent, AgentMethod
+from .agent import Agent, AgentMethod, AgentCustomMethodParams, AgentMethodParams
 from .server import Server
 from .account import Account
 from .telemetry import Telemetry, TelemetryType, TelemetryCategory, TelemetrySeverity
@@ -16,4 +16,7 @@ __all__ = [
     Event,
     EventType,
     AgentSendRegistrationEvent,
+    AgentMethod,
+    AgentCustomMethodParams,
+    AgentMethodParams,
 ]

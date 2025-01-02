@@ -1,7 +1,11 @@
 from .__version__ import VERSION
-from fastapi import FastAPI, APIRouter, Depends
-from .agent import Agent
+from fastapi import FastAPI, APIRouter, Depends, status
+from .agent import Agent, AgentMethodParams, AgentCustomMethodParams
 import os
+from .instructions import display_instructions
+from loguru import logger
+
+log = logger
 
 default_router = APIRouter()
 
@@ -30,17 +34,17 @@ class Server:
         self.reload: bool = debug
         self.app = FastAPI(
             title="Supervaize Control API",
-            description="API for controlling and managing Supervaize agents. Documentation ~/redoc",
+            description="API for controlling and managing Supervaize agents. More information at [https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)",
             version=VERSION,
             terms_of_service="https://supervaize.com/terms/",
             contact={
                 "name": "Support Team",
-                "url": "https://example.com/contact/",
-                "email": "support@example.com",
+                "url": "https://supervaize.com/dev_contact/",
+                "email": "integration_support@supervaize.com",
             },
             license_info={
-                "name": "MIT License",
-                "url": "https://opensource.org/licenses/MIT",
+                "name": "License TBD - No responsibility for any issues",
+                "url": "https://TBD.com",
             },
         )
         self.add_route(default_router)
@@ -56,28 +60,83 @@ class Server:
 
     def create_agent_routes(self):
         for agent in self.agents:
-            router = APIRouter(
-                prefix=f"/agent/{agent.slug}", tags=[f"Agent: {agent.name}"]
-            )
+            tags = [f"Agent {agent.name} v{agent.version}"]
+
+            router = APIRouter(prefix=f"/agent/{agent.slug}", tags=tags)
 
             async def get_agent() -> Agent:
                 return agent
 
-            @router.get("/ ")
-            async def agent_info(agent: Agent = Depends(get_agent)):
-                return {
-                    "name": agent.name,
-                    "status": "active",
-                    "type": agent.__class__.__name__,
-                }
+            @router.get(
+                "/info",
+                summary="Get agent information",
+                description="Detailed information about the agent, returned as a JSON object with Agent class fields",
+                response_model=Agent,
+                responses={status.HTTP_200_OK: {"model": Agent}},
+                tags=tags,
+            )
+            async def agent_info(agent: Agent = Depends(get_agent)) -> Agent:
+                log.info(f"Getting agent info for {agent.name}")
+                return agent
 
-            @router.post("/trigger")
-            async def trigger_agent(agent: Agent = Depends(get_agent)):
-                return {"message": f"Triggered agent {agent.name}"}
+            @router.post(
+                "/start",
+                summary="Start the agent",
+                description="Start the agent",
+                responses={
+                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                },
+                tags=tags,
+            )
+            async def start_agent(
+                params: AgentMethodParams | None, agent: Agent = Depends(get_agent)
+            ) -> Agent:
+                log.info(f"Starting agent {agent.name} with params {params}")
+                return agent.start(params)
+
+            @router.post(
+                "/stop",
+                summary="Stop the agent",
+                description="Stop the agent",
+                responses={
+                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                },
+                tags=tags,
+            )
+            async def stop_agent(
+                params: AgentMethodParams | None, agent: Agent = Depends(get_agent)
+            ) -> Agent:
+                log.info(f"Stopping agent {agent.name} with params {params}")
+                return agent.stop(params)
+
+            @router.post(
+                "/custom",
+                summary="Trigger a custom method",
+                description="Trigger a custom method",
+                responses={
+                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                    status.HTTP_405_METHOD_NOT_ALLOWED: {"model": Agent},
+                },
+                tags=tags,
+            )
+            async def custom_method(
+                params: AgentCustomMethodParams, agent: Agent = Depends(get_agent)
+            ):
+                log.info(
+                    f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
+                )
+                return agent.custom_method(params)
 
             self.app.include_router(router)
 
     def launch(self):
         import uvicorn
 
+        self.instructions()
         uvicorn.run(self.app, host=self.host, port=self.port, reload=self.reload)
+
+    def instructions(self):
+        server_url = f"http://{self.host}:{self.port}"
+        display_instructions(
+            server_url, f"Starting server on {server_url} \n Waiting for instructions.."
+        )

@@ -3,8 +3,16 @@ from typing import Any, ClassVar, Dict
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
-
+from enum import Enum
 from .__version__ import AGENT_VERSION, VERSION
+
+
+class MethodType(Enum):
+    START = "start"
+    STOP = "stop"
+    STATUS = "status"
+    CHAT = "chat"
+    CUSTOM = "custom"
 
 
 class AgentMethod(BaseModel):
@@ -12,6 +20,14 @@ class AgentMethod(BaseModel):
     method: str
     params: Dict[str, Any] | None = None
     description: str | None = None
+
+
+class AgentMethodParams(BaseModel):
+    params: Dict[str, Any] | None = None
+
+
+class AgentCustomMethodParams(AgentMethodParams):
+    method_name: str
 
 
 class AgentModel(BaseModel):
@@ -33,6 +49,7 @@ class AgentModel(BaseModel):
 
 class Agent(AgentModel):
     def __init__(self, **kwargs):
+        """Tested in tests/test_agent.py"""
         if kwargs.get("id") != shortuuid.uuid(name=kwargs.get("name")):
             raise ValueError("Agent ID does not match")
         super().__init__(**kwargs)
@@ -75,8 +92,15 @@ class Agent(AgentModel):
         return self._execute(method, params)
 
     def custom(self, method: str):
+        """Tested in tests/test_agent.py"""
         if method not in self.custom_methods:
             raise ValueError(f"Method {method} not found")
         method = self.custom_methods[method].method
         params = self.custom_methods[method].params
         return self._execute(method, params)
+
+    @property
+    def custom_methods_names(self) -> list[str] | None:
+        if self.custom_methods:
+            return list(self.custom_methods.keys())
+        return None

@@ -26,7 +26,10 @@ def agent_fixture(agent_method_fixture):
         stop_method=agent_method_fixture,
         status_method=agent_method_fixture,
         chat_method=agent_method_fixture,
-        custom_methods={"method1": agent_method_fixture},
+        custom_methods={
+            "method1": agent_method_fixture,
+            "method2": agent_method_fixture,
+        },
     )
 
 
@@ -38,6 +41,7 @@ def test_agent(agent_fixture):
     assert isinstance(agent_fixture.chat_method, AgentMethod)
     assert isinstance(agent_fixture.custom_methods, dict)
     assert isinstance(agent_fixture.custom_methods["method1"], AgentMethod)
+    assert isinstance(agent_fixture.custom_methods["method2"], AgentMethod)
 
 
 def test_account_error(agent_method_fixture):
@@ -55,3 +59,7 @@ def test_account_error(agent_method_fixture):
             chat_method=agent_method_fixture,
             custom_methods={"method1": agent_method_fixture},
         )
+
+
+def test_agent_custom_methods(agent_fixture):
+    assert agent_fixture.custom_methods_names == ["method1", "method2"]
