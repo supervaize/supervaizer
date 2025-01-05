@@ -1,9 +1,10 @@
+from enum import Enum
 from typing import Any, ClassVar, Dict
 
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
-from enum import Enum
+
 from .__version__ import AGENT_VERSION, VERSION
 
 
@@ -52,6 +53,7 @@ class Agent(AgentModel):
         """Tested in tests/test_agent.py"""
         if kwargs.get("id") != shortuuid.uuid(name=kwargs.get("name")):
             raise ValueError("Agent ID does not match")
+
         super().__init__(**kwargs)
 
     def __str__(self):

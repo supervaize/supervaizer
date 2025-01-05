@@ -52,7 +52,13 @@ class Event(EventModel):
 
 
 class AgentSendRegistrationEvent(Event):
-    def __init__(self, agent: "Agent"):
+    def __init__(
+        self,
+        agent: "Agent",
+        account: "Account",
+        server: "Server",
+        polling: bool,
+    ):
         super().__init__(
             type=EventType.AGENT_SEND_REGISTRATION.value,
             source=agent.uri,
@@ -64,5 +70,9 @@ class AgentSendRegistrationEvent(Event):
                 "developer": agent.developer,
                 "description": agent.description,
                 "tags": agent.tags,
+                "account": account.id,
+                "server_url": server.url if server else "",
+                "server_environment": server.environment if server else "",
+                "polling": polling,
             },
         )

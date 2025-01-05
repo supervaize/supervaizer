@@ -1,13 +1,12 @@
-from typing import ClassVar
+from typing import ClassVar, overload
 
 import requests
 import shortuuid
 from pydantic import BaseModel
 
 from .__version__ import EVENT_VERSION, TELEMETRY_VERSION, VERSION
-from .agent import Agent
 from .common import ApiError, ApiResult, ApiSuccess
-from .event import AgentSendRegistrationEvent, Event
+from .event import AgentSendRegistrationEvent
 from .telemetry import Telemetry
 
 
@@ -35,7 +34,7 @@ class Account(AccountModel):
             "Content-Type": "application/json",
         }
 
-    def send_event(self, agent: Agent, event: Event) -> ApiResult:
+    def send_event(self, agent: "Agent", event: "Event") -> ApiResult:
         """Send an event to the Supervaize Control API.
 
         Args:
@@ -65,17 +64,29 @@ class Account(AccountModel):
 
         return result
 
-    def send_registration(self, agent: Agent) -> ApiResult:
+    @overload
+    def register_agent(
+        self, agent: "Agent", polling: bool, server: None = None
+    ) -> ApiResult: ...
+
+    def register_agent(
+        self, agent: "Agent", server: "Server", polling: bool = False
+    ) -> ApiResult:
         """Send a registration event to the Supervaize Control API.
 
         Args:
-            agent (Agent): The agent sending the wakeup event
+            agent (Agent): The agent sending the registration event
+            server (Server): The server to register the agent with.
+            polling (bool): If server is not defined, polling will be used.
 
         Returns:
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
-        event = AgentSendRegistrationEvent(agent=agent)
+
+        event = AgentSendRegistrationEvent(
+            agent=agent, account=self, server=server, polling=polling
+        )
         return self.send_event(agent, event)
 
     def send_telemetry(self, telemetry: Telemetry) -> ApiResult:

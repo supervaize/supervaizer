@@ -2,9 +2,13 @@ import pytest
 
 from supervaize_control import AgentSendRegistrationEvent, Event, EventType
 from tests.test_agent import agent_method_fixture, agent_fixture
+from tests.test_account import account_fixture
+from tests.test_server import server_fixture
 
 agent_method_fixture = agent_method_fixture
 agent_fixture = agent_fixture
+account_fixture = account_fixture
+server_fixture = server_fixture
 
 
 @pytest.fixture
@@ -17,8 +21,15 @@ def event_fixture():
 
 
 @pytest.fixture
-def agent_send_registration_event_fixture(agent_fixture):
-    return AgentSendRegistrationEvent(agent=agent_fixture)
+def agent_send_registration_event_fixture(
+    agent_fixture, account_fixture, server_fixture
+):
+    return AgentSendRegistrationEvent(
+        agent=agent_fixture,
+        account=account_fixture,
+        server=server_fixture,
+        polling=False,
+    )
 
 
 def test_event(event_fixture):
@@ -29,7 +40,8 @@ def test_event(event_fixture):
 
 
 def test_agent_send_registration_event(
-    agent_send_registration_event_fixture, agent_fixture
+    agent_send_registration_event_fixture,
+    agent_fixture,
 ):
     assert isinstance(agent_send_registration_event_fixture, AgentSendRegistrationEvent)
     assert isinstance(agent_send_registration_event_fixture, Event)

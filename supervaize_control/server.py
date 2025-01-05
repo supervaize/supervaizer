@@ -1,11 +1,42 @@
-from .__version__ import VERSION
-from fastapi import FastAPI, APIRouter, Depends, status
-from .agent import Agent, AgentMethodParams, AgentCustomMethodParams
 import os
-from .instructions import display_instructions
+from typing import ClassVar
+from fastapi import APIRouter, Depends, FastAPI, status
 from loguru import logger
+from pydantic import BaseModel, field_validator
+from urllib.parse import urlunparse
+from .__version__ import VERSION
+from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .instructions import display_instructions
 
 log = logger
+
+
+class ServerModel(BaseModel):
+    model_config = {
+        "arbitrary_types_allowed": True  # for FastAPI
+    }
+    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    scheme: str
+    host: str
+    port: int
+    environment: str
+    debug: bool
+    agents: list[Agent]
+    app: FastAPI
+    reload: bool
+
+    @field_validator("scheme")
+    def scheme_validator(cls, v: str) -> str:
+        if "://" in v:
+            raise ValueError(f"Scheme should not include '://': {v}")
+        return v
+
+    @field_validator("host")
+    def host_validator(cls, v: str) -> str:
+        if "://" in v:
+            raise ValueError(f"Host should not include '://': {v}")
+        return v
+
 
 default_router = APIRouter()
 
@@ -17,24 +48,39 @@ def read_root(agents: list[Agent]):
     }
 
 
-class Server:
-    PORT = int(os.getenv("SUPERVIZE_CONTROL_PORT", 8001))
-    HOST = os.getenv("SUPERVIZE_CONTROL_HOST", "0.0.0.0")
-
+class Server(ServerModel):
     def __init__(
         self,
-        agents: list[Agent],
-        host: str = HOST,
-        port: int = PORT,
+        scheme: str = "http",
+        environment: str = os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev"),
+        host: str = os.getenv("SUPERVAIZE_CONTROL_HOST", "0.0.0.0"),
+        port: int = int(os.getenv("SUPERVAIZE_CONTROL_PORT", 8001)),
         debug: bool = False,
+        reload: bool = False,
+        **kwargs,
     ):
-        self.agents: list[Agent] = agents
-        self.host: str = host
-        self.port: int = port
-        self.reload: bool = debug
-        self.app = FastAPI(
+        """Initialize the API server.
+
+        Args:
+            scheme (str, optional): The scheme to use for the server (e.g. 'http', 'https'). Defaults to "http".
+            environment (str, optional): The environment to use for the server (e.g. 'dev', 'staging', 'production'). Defaults to os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev").
+            host (str, optional): The host to use for the server (without '://'). Defaults to 0.0.0.0 if no value in Env "SUPERVAIZE_CONTROL_HOST".
+            port (int, optional): The port to use for the server. Defaults 8001 if no value in Env "SUPERVAIZE_CONTROL_PORT".
+            debug (bool, optional): Whether to run in debug mode. Defaults to False.
+            reload (bool, optional): Whether to reload the server on code changes. Defaults to False.
+        """
+        kwargs["scheme"] = scheme
+        kwargs["host"] = host
+        kwargs["port"] = port
+        kwargs["environment"] = environment
+        kwargs["debug"] = debug
+        kwargs["app"] = FastAPI(
+            debug=debug,
             title="Supervaize Control API",
-            description="API for controlling and managing Supervaize agents. More information at [https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)",
+            description=(
+                "API for controlling and managing Supervaize agents. More information at "
+                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)"
+            ),
             version=VERSION,
             terms_of_service="https://supervaize.com/terms/",
             contact={
@@ -47,13 +93,14 @@ class Server:
                 "url": "https://TBD.com",
             },
         )
+        kwargs["reload"] = reload
+        super().__init__(**kwargs)
         self.add_route(default_router)
         self.create_agent_routes()
-        self.debug = debug
 
     @property
-    def uri(self):
-        return f"server:{self.host}:{self.port}:app:{self.app}"
+    def url(self):
+        return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
 
     def add_route(self, route: str):
         self.app.include_router(route)
@@ -82,14 +129,14 @@ class Server:
             @router.post(
                 "/start",
                 summary="Start the agent",
-                description="Start the agent",
+                description="Start the agent with optional parameters",
                 responses={
                     status.HTTP_202_ACCEPTED: {"model": Agent},
                 },
                 tags=tags,
             )
             async def start_agent(
-                params: AgentMethodParams | None, agent: Agent = Depends(get_agent)
+                params=AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> Agent:
                 log.info(f"Starting agent {agent.name} with params {params}")
                 return agent.start(params)
@@ -104,7 +151,7 @@ class Server:
                 tags=tags,
             )
             async def stop_agent(
-                params: AgentMethodParams | None, agent: Agent = Depends(get_agent)
+                params: AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> Agent:
                 log.info(f"Stopping agent {agent.name} with params {params}")
                 return agent.stop(params)

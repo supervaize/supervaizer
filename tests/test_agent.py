@@ -13,6 +13,14 @@ def agent_method_fixture():
     )
 
 
+def test_agent_method_fixture(agent_method_fixture):
+    """Test that the fixture itself is working"""
+    assert agent_method_fixture.name == "start"
+    assert agent_method_fixture.method == "start"
+    assert agent_method_fixture.params == {"param1": "value1"}
+    assert agent_method_fixture.description == "Start the agent"
+
+
 @pytest.fixture
 def agent_fixture(agent_method_fixture):
     return Agent(
@@ -46,6 +54,9 @@ def test_agent(agent_fixture):
 
 def test_account_error(agent_method_fixture):
     with pytest.raises(ValueError):
+        """
+        Test that the agent ID does not match the name
+        """
         Agent(
             id="WILLFAIL",
             name="agentName",
