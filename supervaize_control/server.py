@@ -1,6 +1,6 @@
 import os
 from typing import ClassVar
-from fastapi import APIRouter, Depends, FastAPI, status
+from fastapi import APIRouter, Depends, FastAPI, status, Body
 from loguru import logger
 from pydantic import BaseModel, field_validator
 from urllib.parse import urlunparse
@@ -134,11 +134,13 @@ class Server(ServerModel):
                     status.HTTP_202_ACCEPTED: {"model": Agent},
                 },
                 tags=tags,
+                response_model=Agent,
+                status_code=status.HTTP_202_ACCEPTED,
             )
             async def start_agent(
-                params=AgentMethodParams, agent: Agent = Depends(get_agent)
+                params: AgentMethodParams = Body(...), agent: Agent = Depends(get_agent)
             ) -> Agent:
-                log.info(f"Starting agent {agent.name} with params {params}")
+                log.info(f"Starting agent {agent.name} with params {params} ")
                 return agent.start(params)
 
             @router.post(

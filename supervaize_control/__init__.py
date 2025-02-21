@@ -3,6 +3,7 @@ from .server import Server
 from .account import Account
 from .telemetry import Telemetry, TelemetryType, TelemetryCategory, TelemetrySeverity
 from .event import Event, EventType, AgentSendRegistrationEvent
+from .common import ApiResult, ApiSuccess, ApiError
 
 __all__ = [
     Agent,
@@ -19,4 +20,7 @@ __all__ = [
     AgentMethod,
     AgentCustomMethodParams,
     AgentMethodParams,
+    ApiResult,
+    ApiSuccess,
+    ApiError,
 ]

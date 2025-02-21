@@ -73,17 +73,17 @@ class Agent(AgentModel):
         method = getattr(module, func_name)
         return method(**params)
 
-    def start(self):
+    def start(self, params: Dict[str, Any] = {}):
         method = self.start_method.method
         params = self.start_method.params
         return self._execute(method, params)
 
-    def stop(self):
+    def stop(self, params: Dict[str, Any] = {}):
         method = self.stop_method.method
         params = self.stop_method.params
         return self._execute(method, params)
 
-    def status(self):
+    def status(self, params: Dict[str, Any] = {}):
         method = self.status_method.method
         params = self.status_method.params
         return self._execute(method, params)
@@ -93,7 +93,7 @@ class Agent(AgentModel):
         params = {"context": context, "message": message}
         return self._execute(method, params)
 
-    def custom(self, method: str):
+    def custom(self, method: str, params: Dict[str, Any] = {}):
         """Tested in tests/test_agent.py"""
         if method not in self.custom_methods:
             raise ValueError(f"Method {method} not found")
