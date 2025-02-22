@@ -1,13 +1,16 @@
-from typing import ClassVar, overload
+from typing import ClassVar
 
 import requests
 import shortuuid
 from pydantic import BaseModel
 
-from .__version__ import EVENT_VERSION, TELEMETRY_VERSION, VERSION
+from .__version__ import TELEMETRY_VERSION, VERSION
 from .common import ApiError, ApiResult, ApiSuccess
-from .event import AgentSendRegistrationEvent
 from .telemetry import Telemetry
+from rich import print
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class AccountModel(BaseModel):
@@ -30,30 +33,32 @@ class Account(AccountModel):
     @property
     def api_headers(self):
         return {
-            "x-api-key": self.api_key,
-            "Content-Type": "application/json",
+            "Authorization": f"Api-Key {self.api_key}",
+            "accept": "application/json",
         }
 
-    def send_event(self, agent: "Agent", event: "Event") -> ApiResult:
+    def send_event(self, sender: "Agent | Server", event: "Event") -> ApiResult:
         """Send an event to the Supervaize Control API.
 
         Args:
-            agent (Agent): The agent sending the event
+            sender (Agent | Server): The sender of the event
             event (Event): The event to be sent
 
         Returns:
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
-        url = f"{self.api_url}/{EVENT_VERSION}/event"
+
+        url = f"{self.api_url}/api/v1/ctrl-events/"
+        log.info(f"Sending event {event.type.name} to {url}")
         headers = self.api_headers
-        event.details |= {"tenantId": self.id, "agentId": agent.id}
         try:
-            response = requests.post(url, headers=headers, json=event.payload)
+            response = requests.post(url, headers=headers, data=event.payload)
             response.raise_for_status()
             result = ApiSuccess(
                 message=f"Event posted {event.type.name}", detail=response.text
             )
+            log.info(f"Event posted {event.type.name} : event_id={result.id}")
         except requests.exceptions.RequestException as e:
             result = ApiError(
                 message=f"Error sending event {event.type.name}",
@@ -61,32 +66,40 @@ class Account(AccountModel):
                 payload=event.payload,
                 exception=e,
             )
-
+            log.error(result.dict)
+            print(result.dict)
+            raise e
         return result
 
-    @overload
-    def register_agent(
-        self, agent: "Agent", polling: bool, server: None = None
-    ) -> ApiResult: ...
-
-    def register_agent(
-        self, agent: "Agent", server: "Server", polling: bool = False
-    ) -> ApiResult:
-        """Send a registration event to the Supervaize Control API.
+    def register_server(self, server: "server") -> ApiResult:
+        """Register a server with the Supervaize Control API.
 
         Args:
+            server (Server): The server to register.
+
+        Returns:
+            ApiResult: ApiSuccess with response details if successful,
+                      ApiError with error details if request fails
+        """
+        from .event import ServerSendRegistrationEvent
+
+        event = ServerSendRegistrationEvent(server=server, account=self)
+        return self.send_event(server, event)
+
+    def register_agent(self, agent: "Agent", polling: bool = True) -> ApiResult:
+        """Send a registration event to the Supervaize Control API.
+            This will be used for polling, when the agent is registered without a server.
+        Args:
             agent (Agent): The agent sending the registration event
-            server (Server): The server to register the agent with.
             polling (bool): If server is not defined, polling will be used.
 
         Returns:
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
+        from .event import AgentSendRegistrationEvent
 
-        event = AgentSendRegistrationEvent(
-            agent=agent, account=self, server=server, polling=polling
-        )
+        event = AgentSendRegistrationEvent(agent=agent, account=self, polling=polling)
         return self.send_event(agent, event)
 
     def send_telemetry(self, telemetry: Telemetry) -> ApiResult:

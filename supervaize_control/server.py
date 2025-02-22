@@ -1,12 +1,16 @@
 import os
+import uuid
 from typing import ClassVar
-from fastapi import APIRouter, Depends, FastAPI, status, Body
+from urllib.parse import urlunparse
+
+from fastapi import APIRouter, Body, Depends, FastAPI, status
 from loguru import logger
 from pydantic import BaseModel, field_validator
-from urllib.parse import urlunparse
+
 from .__version__ import VERSION
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
 from .instructions import display_instructions
+from .account import Account
 
 log = logger
 
@@ -20,10 +24,12 @@ class ServerModel(BaseModel):
     host: str
     port: int
     environment: str
+    mac_addr: str
     debug: bool
     agents: list[Agent]
     app: FastAPI
     reload: bool
+    account: Account
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -51,6 +57,7 @@ def read_root(agents: list[Agent]):
 class Server(ServerModel):
     def __init__(
         self,
+        account: Account,
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZE_CONTROL_HOST", "0.0.0.0"),
@@ -62,6 +69,7 @@ class Server(ServerModel):
         """Initialize the API server.
 
         Args:
+            account (Account): The account to use for the server.
             scheme (str, optional): The scheme to use for the server (e.g. 'http', 'https'). Defaults to "http".
             environment (str, optional): The environment to use for the server (e.g. 'dev', 'staging', 'production'). Defaults to os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev").
             host (str, optional): The host to use for the server (without '://'). Defaults to 0.0.0.0 if no value in Env "SUPERVAIZE_CONTROL_HOST".
@@ -69,6 +77,7 @@ class Server(ServerModel):
             debug (bool, optional): Whether to run in debug mode. Defaults to False.
             reload (bool, optional): Whether to reload the server on code changes. Defaults to False.
         """
+        kwargs["account"] = account
         kwargs["scheme"] = scheme
         kwargs["host"] = host
         kwargs["port"] = port
@@ -94,6 +103,9 @@ class Server(ServerModel):
             },
         )
         kwargs["reload"] = reload
+        kwargs["mac_addr"] = "-".join(
+            ("%012X" % uuid.getnode())[i : i + 2] for i in range(0, 12, 2)
+        )
         super().__init__(**kwargs)
         self.add_route(default_router)
         self.create_agent_routes()
@@ -101,6 +113,19 @@ class Server(ServerModel):
     @property
     def url(self):
         return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
+
+    @property
+    def uri(self):
+        return f"server:{self.mac_addr}"
+
+    @property
+    def registration_info(self):
+        return {
+            "url": self.url,
+            "uri": self.uri,
+            "environment": self.environment,
+            "agents": [agent.registration_info for agent in self.agents],
+        }
 
     def add_route(self, route: str):
         self.app.include_router(route)
@@ -179,9 +204,12 @@ class Server(ServerModel):
             self.app.include_router(router)
 
     def launch(self):
+        log.info("SUPERVAIZE CONTROL SERVER LAUNCHING")
         import uvicorn
 
-        self.instructions()
+        # self.instructions()
+        log.info(f"Registering {self.uri} with account {self.account.id}")
+        self.account.register_server(server=self)
         uvicorn.run(self.app, host=self.host, port=self.port, reload=self.reload)
 
     def instructions(self):

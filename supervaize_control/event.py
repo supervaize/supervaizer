@@ -1,14 +1,15 @@
 from typing import ClassVar
 from enum import Enum
-import json
 from pydantic import BaseModel
 
 from .__version__ import EVENT_VERSION, VERSION
 from .agent import Agent
+from .account import Account
 
 
 class EventType(Enum):
     AGENT_SEND_REGISTRATION = "agent.send.registration"
+    SERVER_SEND_REGISTRATION = "server.send.registration"
     AGENT_SEND_WAKEUP = "agent.send.wakeup"
     AGENT_SEND_ANOMALY = "agent.send.anomaly"
     AGENT_SEND_DELIVERABLE = "agent.send.deliverable"
@@ -19,6 +20,7 @@ class EventModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     EVENT_VERSION: ClassVar[str] = EVENT_VERSION
     source: str
+    account: Account
     type: EventType
     details: dict
 
@@ -30,8 +32,9 @@ class Event(EventModel):
     status, anomalies, deliverables and other information.
 
     Inherits from EventModel which defines the core event attributes:
-        - source: The source/origin of the event (e.g. agent URI)
+        - source: The source/origin of the event (e.g. agent/server URI)
         - type: The EventType enum indicating the event category
+        - account: The account that the event belongs to
         - details: A dictionary containing event-specific details
     """
 
@@ -41,13 +44,11 @@ class Event(EventModel):
     @property
     def payload(self) -> dict:
         return {
-            "items": [
-                {
-                    "Source": self.source,
-                    "DetailType": self.type.value,
-                    "Detail": json.dumps(self.details),
-                }
-            ]
+            "name": f"{self.type.value} {self.source}",
+            "source": self.source,
+            "account": self.account.id,
+            "event_type": self.type.value,
+            "detail": self.details,
         }
 
 
@@ -56,23 +57,25 @@ class AgentSendRegistrationEvent(Event):
         self,
         agent: "Agent",
         account: "Account",
-        server: "Server",
-        polling: bool,
+        polling: bool = True,
     ):
         super().__init__(
             type=EventType.AGENT_SEND_REGISTRATION.value,
+            account=account,
             source=agent.uri,
-            details={
-                "name": agent.name,
-                "id": agent.id,
-                "version": agent.version,
-                "author": agent.author,
-                "developer": agent.developer,
-                "description": agent.description,
-                "tags": agent.tags,
-                "account": account.id,
-                "server_url": server.url if server else "",
-                "server_environment": server.environment if server else "",
-                "polling": polling,
-            },
+            details=agent.registration_info,
+        )
+
+
+class ServerSendRegistrationEvent(Event):
+    def __init__(
+        self,
+        account: "Account",
+        server: "Server",
+    ):
+        super().__init__(
+            type=EventType.SERVER_SEND_REGISTRATION.value,
+            account=account,
+            source=server.uri,
+            details=server.registration_info,
         )

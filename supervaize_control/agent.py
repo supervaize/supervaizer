@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Any, ClassVar, Dict
 
 import shortuuid
@@ -6,14 +5,6 @@ from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
-
-
-class MethodType(Enum):
-    START = "start"
-    STOP = "stop"
-    STATUS = "status"
-    CHAT = "chat"
-    CUSTOM = "custom"
 
 
 class AgentMethod(BaseModel):
@@ -66,6 +57,18 @@ class Agent(AgentModel):
     @property
     def slug(self):
         return slugify(self.name)
+
+    @property
+    def registration_info(self):
+        return {
+            "name": self.name,
+            "id": self.id,
+            "version": self.version,
+            "author": self.author,
+            "developer": self.developer,
+            "description": self.description,
+            "tags": self.tags,
+        }
 
     def _execute(self, method: str, params: Dict[str, Any] = {}):
         module_name, func_name = method.rsplit(".", 1)

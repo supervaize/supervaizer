@@ -26,8 +26,8 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT",
     },
 )
-PORT = int(os.getenv("SUPERVIZE_CONTROL_PORT", 8001))
-IP = os.getenv("SUPERVIZE_CONTROL_IP", "0.0.0.0")
+PORT = int(os.getenv("SUPERVAIZE_CONTROL_PORT", 8001))
+IP = os.getenv("SUPERVAIZE_CONTROL_IP", "0.0.0.0")
 
 
 class AnalysisRequest(BaseModel):

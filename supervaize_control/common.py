@@ -30,6 +30,8 @@ class ApiSuccess(ApiResult):
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
             self.detail = result.object
+            self.id = result.object.get("id") or None
+
         else:
             self.detail = detail
 
