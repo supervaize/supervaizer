@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 from typing import ClassVar
 from urllib.parse import urlunparse
@@ -77,6 +78,10 @@ class Server(ServerModel):
             debug (bool, optional): Whether to run in debug mode. Defaults to False.
             reload (bool, optional): Whether to reload the server on code changes. Defaults to False.
         """
+        # Set appropriate log level based on debug mode
+        log_level = "DEBUG" if debug else "ERROR"
+        logger.configure(handlers=[{"sink": "sys.stderr", "level": log_level}])
+
         kwargs["account"] = account
         kwargs["scheme"] = scheme
         kwargs["host"] = host
@@ -203,14 +208,36 @@ class Server(ServerModel):
 
             self.app.include_router(router)
 
-    def launch(self):
-        log.info("SUPERVAIZE CONTROL SERVER LAUNCHING")
+    def launch(self, log_level: str | None = "info"):
+        """_summary_
+
+        Args:
+            log_level (str | None, optional): _description_. Defaults to "INFO". If explicitly set to None, the handler is not added.
+        """
+        log.remove()
+        if log_level:
+            log.add(
+                sys.stderr,
+                colorize=True,
+                format="<green>{time}</green>|<level> {level}</level> | <level>{message}</level>",
+                level=log_level,
+            )
+            log_level = (
+                log_level.lower()
+            )  # needs to be lower case of uvicorn and uppercase of loguru
+
         import uvicorn
 
         # self.instructions()
         log.info(f"Registering {self.uri} with account {self.account.id}")
         self.account.register_server(server=self)
-        uvicorn.run(self.app, host=self.host, port=self.port, reload=self.reload)
+        uvicorn.run(
+            self.app,
+            host=self.host,
+            port=self.port,
+            reload=self.reload,
+            log_level=log_level,
+        )
 
     def instructions(self):
         server_url = f"http://{self.host}:{self.port}"

@@ -48,7 +48,7 @@ class Event(EventModel):
             "source": self.source,
             "account": self.account.id,
             "event_type": self.type.value,
-            "detail": self.details,
+            "details": self.details,
         }
 
 

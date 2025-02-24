@@ -31,9 +31,10 @@ class ApiSuccess(ApiResult):
             result = demjson3.decode(detail, return_errors=True)
             self.detail = result.object
             self.id = result.object.get("id") or None
-
+            self.log_message = f"✅ {message} : {self.id}"
         else:
             self.detail = detail
+            self.log_message = f"✅ {message}"
 
 
 class ApiError(ApiResult):
@@ -50,13 +51,14 @@ class ApiError(ApiResult):
         self.exception = exception
         self.url = url
         self.payload = payload
+        self.log_message = f"❌ {message} : {self.exception}"
 
     @property
     def dict(self) -> dict:
         if self.exception:
             exception_dict = {
-                "message": str(self.exception),
                 "type": type(self.exception).__name__,
+                "message": str(self.exception),
                 "traceback": traceback.format_exc(),
                 "attributes": {},
             }

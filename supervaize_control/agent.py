@@ -62,7 +62,6 @@ class Agent(AgentModel):
     def registration_info(self):
         return {
             "name": self.name,
-            "id": self.id,
             "version": self.version,
             "author": self.author,
             "developer": self.developer,

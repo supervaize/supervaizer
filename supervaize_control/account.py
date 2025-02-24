@@ -7,10 +7,9 @@ from pydantic import BaseModel
 from .__version__ import TELEMETRY_VERSION, VERSION
 from .common import ApiError, ApiResult, ApiSuccess
 from .telemetry import Telemetry
-from rich import print
-import logging
+from loguru import logger
 
-log = logging.getLogger(__name__)
+log = logger
 
 
 class AccountModel(BaseModel):
@@ -50,15 +49,17 @@ class Account(AccountModel):
         """
 
         url = f"{self.api_url}/api/v1/ctrl-events/"
-        log.info(f"Sending event {event.type.name} to {url}")
+        log.debug(f"Sending event {event.type.name} to {url}")
         headers = self.api_headers
         try:
+            log.debug(f"Event payload: {event.payload}")
             response = requests.post(url, headers=headers, data=event.payload)
             response.raise_for_status()
             result = ApiSuccess(
-                message=f"Event posted {event.type.name}", detail=response.text
+                message=f"Event {event.type.name} sent", detail=response.text
             )
-            log.info(f"Event posted {event.type.name} : event_id={result.id}")
+
+            log.success(result.log_message)
         except requests.exceptions.RequestException as e:
             result = ApiError(
                 message=f"Error sending event {event.type.name}",
@@ -66,8 +67,8 @@ class Account(AccountModel):
                 payload=event.payload,
                 exception=e,
             )
-            log.error(result.dict)
-            print(result.dict)
+            log.debug(result.dict)
+            log.error(result.log_message)
             raise e
         return result
 
