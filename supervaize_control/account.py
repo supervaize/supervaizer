@@ -51,9 +51,11 @@ class Account(AccountModel):
         url = f"{self.api_url}/api/v1/ctrl-events/"
         log.debug(f"Sending event {event.type.name} to {url}")
         headers = self.api_headers
+        payload = event.payload
         try:
-            log.debug(f"Event payload: {event.payload}")
-            response = requests.post(url, headers=headers, data=event.payload)
+            log.debug(f"Event payload: {payload}")
+            response = requests.post(url, headers=headers, json=payload)
+            log.debug(f"Response: {response.text}")
             response.raise_for_status()
             result = ApiSuccess(
                 message=f"Event {event.type.name} sent", detail=response.text
@@ -67,7 +69,7 @@ class Account(AccountModel):
                 payload=event.payload,
                 exception=e,
             )
-            log.debug(result.dict)
+            log.error(f"Error details: {result.dict}")
             log.error(result.log_message)
             raise e
         return result
