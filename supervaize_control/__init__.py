@@ -4,6 +4,7 @@ from .account import Account
 from .telemetry import Telemetry, TelemetryType, TelemetryCategory, TelemetrySeverity
 from .event import Event, EventType, AgentSendRegistrationEvent
 from .common import ApiResult, ApiSuccess, ApiError
+from .job import JobResponse, Job, JobStatus
 
 __all__ = [
     Agent,
@@ -23,4 +24,7 @@ __all__ = [
     ApiResult,
     ApiSuccess,
     ApiError,
+    JobResponse,
+    Job,
+    JobStatus,
 ]

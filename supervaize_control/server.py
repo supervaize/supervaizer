@@ -1,7 +1,7 @@
 import os
 import sys
 import uuid
-from typing import ClassVar
+from typing import ClassVar, Dict, Any
 from urllib.parse import urlunparse
 
 from fastapi import APIRouter, Body, Depends, FastAPI, status
@@ -10,6 +10,7 @@ from pydantic import BaseModel, field_validator
 
 from .__version__ import VERSION
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .job import Job
 from .instructions import display_instructions
 from .account import Account
 
@@ -139,7 +140,7 @@ class Server(ServerModel):
         for agent in self.agents:
             tags = [f"Agent {agent.name} v{agent.version}"]
 
-            router = APIRouter(prefix=f"/agent/{agent.slug}", tags=tags)
+            router = APIRouter(prefix=f"/agents/{agent.slug}", tags=tags)
 
             async def get_agent() -> Agent:
                 return agent
@@ -157,21 +158,36 @@ class Server(ServerModel):
                 return agent
 
             @router.post(
-                "/start",
-                summary="Start the agent",
-                description="Start the agent with optional parameters",
+                "/jobs",
+                summary=f"Start a job with agent : {agent.name}",
+                description=f"{agent.start_method.description}",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                    status.HTTP_202_ACCEPTED: {"model": agent.start_method},
                 },
                 tags=tags,
-                response_model=Agent,
+                response_model=Job,
                 status_code=status.HTTP_202_ACCEPTED,
+                openapi_extra={
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "default": {
+                                        "summary": "Default parameters",
+                                        "value": agent.start_method.fields_dict,
+                                    },
+                                }
+                            }
+                        }
+                    }
+                },
             )
-            async def start_agent(
-                params: AgentMethodParams = Body(...), agent: Agent = Depends(get_agent)
-            ) -> Agent:
-                log.info(f"Starting agent {agent.name} with params {params} ")
-                return agent.start(params)
+            async def start_job(
+                body_params: Dict[str, Any] = Body(...),
+                agent: Agent = Depends(get_agent),
+            ) -> Job:
+                log.info(f"Starting agent {agent.name} with params {body_params} ")
+                return agent.start(body_params)
 
             @router.post(
                 "/stop",
@@ -187,6 +203,21 @@ class Server(ServerModel):
             ) -> Agent:
                 log.info(f"Stopping agent {agent.name} with params {params}")
                 return agent.stop(params)
+
+            @router.post(
+                "/status",
+                summary="Status the agent",
+                description="Get the status of the agent",
+                responses={
+                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                },
+                tags=tags,
+            )
+            async def status_agent(
+                params: AgentMethodParams, agent: Agent = Depends(get_agent)
+            ) -> Agent:
+                log.info(f"Getting status of agent {agent.name} with params {params}")
+                return agent.status(params)
 
             @router.post(
                 "/custom",
@@ -226,11 +257,13 @@ class Server(ServerModel):
                 log_level.lower()
             )  # needs to be lower case of uvicorn and uppercase of loguru
 
-        import uvicorn
+        log.info(f"Starting Supervaize Control API v{VERSION}")
 
         # self.instructions()
         log.info(f"Registering {self.uri} with account {self.account.id}")
         self.account.register_server(server=self)
+        import uvicorn
+
         uvicorn.run(
             self.app,
             host=self.host,

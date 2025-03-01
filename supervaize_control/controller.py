@@ -151,3 +151,6 @@ def controller_start():
     import uvicorn
 
     uvicorn.run("controller:app", host=IP, port=PORT, reload=True)
+    log.success(f"Supervaize Control API is running on {IP}:{PORT}")
+    log.info(f"API Documentation: http://{IP}:{PORT}/docs")
+    log.info(f"API Redoc: http://{IP}:{PORT}/redoc")

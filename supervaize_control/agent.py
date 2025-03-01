@@ -1,5 +1,5 @@
-from typing import Any, ClassVar, Dict
-
+from typing import Any, ClassVar, Dict, List
+from .job import Job
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
@@ -8,13 +8,76 @@ from .__version__ import AGENT_VERSION, VERSION
 
 
 class AgentMethod(BaseModel):
+    """
+    Represents a method that can be called on an agent.
+
+    Attributes:
+        name: Display name of the method
+        method: Name of the actual method in the project's codebase that will be called with the provided parameters
+        params: see below
+        fields: see below
+        description: Optional description of what the method does
+
+
+    1. params : Dictionary format
+       A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs.
+       Example:
+       {
+           "verbose": True,
+           "timeout": 60,
+           "max_retries": 3
+       }
+
+    2. fields : Form fields format
+       These are the values that will be requested from the user in the Supervaize UI and also passed as kwargs to the AgentMethod.method.
+       A list of field specifications for generating forms/UI, following the django.forms.fields definition
+       see : https://docs.djangoproject.com/en/5.1/ref/forms/fields/
+       Each field is a dictionary with properties like:
+       - name: Field identifier
+       - type: Field type (e.g. ChoiceField, TextField)
+       - choices: For choice fields, list of [value, label] pairs
+       - widget: UI widget to use (e.g. RadioSelect, TextInput)
+       - required: Whether field is required
+
+
+       Example:
+       [
+           {
+                "name": "color",
+                "type": "ChoiceField",
+                "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
+                "widget": "RadioSelect",
+                "required": True,
+            },
+            {
+                "name": "age",
+                "type": "IntegerField",
+                "widget": "NumberInput",
+                "required": False,
+            },
+       ]
+
+    """
+
     name: str
     method: str
     params: Dict[str, Any] | None = None
+    fields: List[Dict[str, Any]] | None = None
     description: str | None = None
+
+    @property
+    def fields_dict(self) -> dict:
+        if self.fields:
+            return {field["name"]: field["type"] for field in self.fields}
+        return {}
 
 
 class AgentMethodParams(BaseModel):
+    """
+    Method parameters for agent operations.
+
+    """
+
     params: Dict[str, Any] | None = None
 
 
@@ -75,10 +138,11 @@ class Agent(AgentModel):
         method = getattr(module, func_name)
         return method(**params)
 
-    def start(self, params: Dict[str, Any] = {}):
+    def start(self, call_params: Dict[str, Any] = {}):
         method = self.start_method.method
-        params = self.start_method.params
-        return self._execute(method, params)
+        params = self.start_method.params | call_params
+        new_job = Job.new(response=self._execute(method, params))
+        return new_job
 
     def stop(self, params: Dict[str, Any] = {}):
         method = self.stop_method.method

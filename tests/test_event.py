@@ -12,22 +12,20 @@ server_fixture = server_fixture
 
 
 @pytest.fixture
-def event_fixture():
+def event_fixture(account_fixture):
     return Event(
         type=EventType.AGENT_SEND_WAKEUP,
         source="test",
         details={"test": "value"},
+        account=account_fixture,
     )
 
 
 @pytest.fixture
-def agent_send_registration_event_fixture(
-    agent_fixture, account_fixture, server_fixture
-):
+def agent_send_registration_event_fixture(agent_fixture, account_fixture):
     return AgentSendRegistrationEvent(
         agent=agent_fixture,
         account=account_fixture,
-        server=server_fixture,
         polling=False,
     )
 

@@ -2,23 +2,26 @@ import pytest
 
 from supervaize_control import Server
 from tests.test_agent import agent_fixture, agent_method_fixture
+from tests.test_account import account_fixture
 
 agent_fixture = agent_fixture
 agent_method_fixture = agent_method_fixture
+account_fixture = account_fixture
 
 
 @pytest.fixture
-def server_fixture(agent_fixture):
+def server_fixture(agent_fixture, account_fixture):
     return Server(
         agents=[agent_fixture],
         host="localhost",
         port=8001,
         environment="test",
         debug=True,
+        account=account_fixture,
     )
 
 
-def test_server_scheme_validator(server_fixture, agent_fixture):
+def test_server_scheme_validator(server_fixture, agent_fixture, account_fixture):
     with pytest.raises(ValueError):
         Server(
             agents=[agent_fixture],
@@ -27,10 +30,11 @@ def test_server_scheme_validator(server_fixture, agent_fixture):
             port=8001,
             environment="test",
             debug=True,
+            account=account_fixture,
         )
 
 
-def test_server_host_validator(server_fixture):
+def test_server_host_validator(server_fixture, account_fixture):
     with pytest.raises(ValueError):
         Server(
             agents=[agent_fixture],
@@ -39,6 +43,7 @@ def test_server_host_validator(server_fixture):
             port=8001,
             environment="test",
             debug=True,
+            account=account_fixture,
         )
 
 
