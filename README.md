@@ -1,4 +1,4 @@
-# SUPERVAIZE Control
+# SUPERVAIZE Controller
 
 A Python library for managing and controlling SUPERVAIZE agents and services.
 
@@ -7,7 +7,7 @@ A Python library for managing and controlling SUPERVAIZE agents and services.
 
 ## Description
 
-SUPERVAIZE Control is a powerful Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
+SUPERVAIZE Controller is a powerful Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
 
 ## Features
 

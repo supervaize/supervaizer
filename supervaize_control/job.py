@@ -5,6 +5,16 @@ from datetime import datetime
 from .__version__ import VERSION
 
 
+class JobContextModel(BaseModel):
+    workspace_id: str
+    job_id: str
+    started_by: str
+    started_at: datetime
+    mission_id: str
+    mission_name: str
+    mission_context: Any = None
+
+
 class JobStatus(Enum):
     FINAL = "final"
     INTERMEDIARY = "intermediary"
@@ -22,13 +32,11 @@ class JobResponse(BaseModel):
 
 class JobModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
-    name: str
-    id: str
-    started_at: datetime
+    job_context: JobContextModel
+    result: Any
     finished_at: datetime | None = None
-    status: JobStatus
     error: str | None = None
-    result: Any | None = None
+    status: JobStatus
 
 
 class Job(JobModel):
@@ -45,12 +53,9 @@ class Job(JobModel):
             self.error = response.message
 
     @classmethod
-    def new(cls, response: JobResponse):
-        print(response)
+    def new(cls, job_context: "JobContextModel", response: JobResponse):
         job = cls(
-            name=f"Job {response.job_ref}",
-            id=response.job_ref,
-            started_at=datetime.now(),
+            job_context=job_context,
             status=response.status,
             result=response.payload,
         )

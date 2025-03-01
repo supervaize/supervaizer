@@ -1,10 +1,24 @@
 from typing import Any, ClassVar, Dict, List
-from .job import Job
+
 import shortuuid
+from loguru import logger
 from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
+from .job import Job, JobContextModel
+
+
+log = logger.bind(module="agent")
+
+
+class AgentJobContextBase(BaseModel):
+    """
+    Base model for agent job context parameters
+    """
+
+    job_context: JobContextModel
+    job_fields: Dict[str, Any]
 
 
 class AgentMethod(BaseModel):
@@ -34,7 +48,8 @@ class AgentMethod(BaseModel):
        see : https://docs.djangoproject.com/en/5.1/ref/forms/fields/
        Each field is a dictionary with properties like:
        - name: Field identifier
-       - type: Field type (e.g. ChoiceField, TextField)
+       - type: Python type of the field for pydantic validation - used for API validation
+       - field_type: Field type (e.g. ChoiceField, TextField) - used in API response (to build forms)
        - choices: For choice fields, list of [value, label] pairs
        - widget: UI widget to use (e.g. RadioSelect, TextInput)
        - required: Whether field is required
@@ -44,14 +59,16 @@ class AgentMethod(BaseModel):
        [
            {
                 "name": "color",
-                "type": "ChoiceField",
+                "type": list[str],
+                "field_type": "MultipleChoiceField",
                 "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
                 "widget": "RadioSelect",
                 "required": True,
             },
             {
                 "name": "age",
-                "type": "IntegerField",
+                "type": int,
+                "field_type": "IntegerField",
                 "widget": "NumberInput",
                 "required": False,
             },
@@ -66,10 +83,73 @@ class AgentMethod(BaseModel):
     description: str | None = None
 
     @property
-    def fields_dict(self) -> dict:
+    def fields_definitions(self) -> list[dict]:
+        """
+        Returns a list of the fields without the type key.
+        Used for the API response.
+        """
         if self.fields:
-            return {field["name"]: field["type"] for field in self.fields}
-        return {}
+            return [
+                {k: v for k, v in field.items() if k != "type"} for field in self.fields
+            ]
+        return []
+
+    @property
+    def fields_annotations(self) -> type[BaseModel]:
+        """
+        Creates and returns a dynamic Pydantic model class based on the field definitions.
+        """
+        if not self.fields:
+            return type("EmptyFieldsModel", (BaseModel,), {"to_dict": lambda self: {}})
+
+        field_annotations = {}
+        for field in self.fields:
+            field_name = field["name"]
+            field_type = field["type"]
+            field_annotations[field_name] = field_type
+
+        def to_dict(self):
+            return {
+                field_name: getattr(self, field_name)
+                for field_name in self.__annotations__
+            }
+
+        return type(
+            "DynamicFieldsModel",
+            (BaseModel,),
+            {"__annotations__": field_annotations, "to_dict": to_dict},
+        )
+
+    @property
+    def job_model(self) -> type[AgentJobContextBase]:
+        """
+        Creates and returns a dynamic Pydantic model class combining job context and job fields.
+        """
+        fields_model = self.fields_annotations
+
+        return type(
+            "AgentJobModel",
+            (AgentJobContextBase,),
+            {
+                "__annotations__": {
+                    "job_context": JobContextModel,
+                    "job_fields": fields_model,
+                }
+            },
+        )
+
+    @property
+    def registration_info(self) -> dict:
+        """
+        Returns a JSON-serializable dictionary representation of the AgentMethod.
+        """
+        return {
+            "name": self.name,
+            "method": str(self.method),
+            "params": self.params,
+            "fields": self.fields_definitions,
+            "description": self.description,
+        }
 
 
 class AgentMethodParams(BaseModel):
@@ -129,6 +209,17 @@ class Agent(AgentModel):
             "author": self.author,
             "developer": self.developer,
             "description": self.description,
+            "start_method": self.start_method.registration_info,
+            "stop_method": self.stop_method.registration_info,
+            "status_method": self.status_method.registration_info,
+            "chat_method": (
+                self.chat_method.registration_info if self.chat_method else {}
+            ),
+            "custom_methods": {
+                k: v.registration_info or None for k, v in self.custom_methods.items()
+            }
+            if self.custom_methods
+            else {},
             "tags": self.tags,
         }
 
@@ -136,12 +227,18 @@ class Agent(AgentModel):
         module_name, func_name = method.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
+        log.info(f"Executing method {method.__name__} with params {params}")
         return method(**params)
 
-    def start(self, call_params: Dict[str, Any] = {}):
+    def start(self, call_params: AgentJobContextBase):
         method = self.start_method.method
-        params = self.start_method.params | call_params
-        new_job = Job.new(response=self._execute(method, params))
+        job_context = call_params.job_context
+        job_fields = call_params.job_fields.to_dict()
+
+        params = self.start_method.params | job_fields
+        new_job = Job.new(
+            job_context=job_context, response=self._execute(method, params)
+        )
         return new_job
 
     def stop(self, params: Dict[str, Any] = {}):

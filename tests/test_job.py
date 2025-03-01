@@ -1,8 +1,23 @@
 from datetime import datetime
 from supervaize_control.job import Job, JobStatus, JobResponse
+from supervaize_control.job import JobContextModel
+
+
+def create_test_job_context():
+    return JobContextModel(
+        workspace_id="test-workspace",
+        job_id="test123",
+        started_by="test-user",
+        started_at=datetime.now(),
+        mission_id="test-mission",
+        mission_name="Test Mission",
+        mission_context={"test": "context"},
+    )
 
 
 def test_job_creation():
+    job_context = create_test_job_context()
+
     response = JobResponse(
         job_ref="test123",
         status=JobStatus.START,
@@ -10,22 +25,23 @@ def test_job_creation():
         payload={"test": "data"},
     )
 
-    job = Job.new(response)
+    job = Job.new(job_context=job_context, response=response)
 
-    assert job.id == "test123"
+    assert job.job_context == job_context
     assert job.status == JobStatus.START
-    assert isinstance(job.started_at, datetime)
     assert job.finished_at is None
     assert job.error is None
     assert job.result == {"test": "data"}
 
 
 def test_job_add_response():
+    job_context = create_test_job_context()
+
     # Create initial job
     start_response = JobResponse(
         job_ref="test123", status=JobStatus.START, message="Starting job", payload=None
     )
-    job = Job.new(start_response)
+    job = Job.new(job_context=job_context, response=start_response)
 
     # Add intermediary response
     inter_response = JobResponse(
@@ -54,11 +70,13 @@ def test_job_add_response():
 
 
 def test_job_error_response():
+    job_context = create_test_job_context()
+
     # Create job and add error response
     start_response = JobResponse(
         job_ref="test123", status=JobStatus.START, message="Starting job", payload=None
     )
-    job = Job.new(start_response)
+    job = Job.new(job_context=job_context, response=start_response)
 
     error_response = JobResponse(
         job_ref="test123",
@@ -74,6 +92,8 @@ def test_job_error_response():
 
 
 def test_job_human_request():
+    job_context = create_test_job_context()
+
     response = JobResponse(
         job_ref="test123",
         status=JobStatus.HUM,
@@ -81,7 +101,7 @@ def test_job_human_request():
         payload={"question": "What next?"},
     )
 
-    job = Job.new(response)
+    job = Job.new(job_context=job_context, response=response)
 
     assert job.status == JobStatus.HUM
     assert job.finished_at is None

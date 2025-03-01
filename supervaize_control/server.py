@@ -1,7 +1,7 @@
 import os
 import sys
 import uuid
-from typing import ClassVar, Dict, Any
+from typing import ClassVar
 from urllib.parse import urlunparse
 
 from fastapi import APIRouter, Body, Depends, FastAPI, status
@@ -167,23 +167,9 @@ class Server(ServerModel):
                 tags=tags,
                 response_model=Job,
                 status_code=status.HTTP_202_ACCEPTED,
-                openapi_extra={
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "examples": {
-                                    "default": {
-                                        "summary": "Default parameters",
-                                        "value": agent.start_method.fields_dict,
-                                    },
-                                }
-                            }
-                        }
-                    }
-                },
             )
             async def start_job(
-                body_params: Dict[str, Any] = Body(...),
+                body_params: agent.start_method.job_model = Body(...),
                 agent: Agent = Depends(get_agent),
             ) -> Job:
                 log.info(f"Starting agent {agent.name} with params {body_params} ")
