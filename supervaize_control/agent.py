@@ -230,16 +230,11 @@ class Agent(AgentModel):
         log.info(f"Executing method {method.__name__} with params {params}")
         return method(**params)
 
-    def start(self, call_params: AgentJobContextBase):
+    def start(self, job: Job, job_fields: dict):
         method = self.start_method.method
-        job_context = call_params.job_context
-        job_fields = call_params.job_fields.to_dict()
-
         params = self.start_method.params | job_fields
-        new_job = Job.new(
-            job_context=job_context, response=self._execute(method, params)
-        )
-        return new_job
+        job.result = self._execute(method, params)
+        return job
 
     def stop(self, params: Dict[str, Any] = {}):
         method = self.stop_method.method

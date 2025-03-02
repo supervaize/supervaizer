@@ -33,7 +33,7 @@ class JobResponse(BaseModel):
 class JobModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     job_context: JobContextModel
-    result: Any
+    result: Any | None = None
     finished_at: datetime | None = None
     error: str | None = None
     status: JobStatus
@@ -53,10 +53,9 @@ class Job(JobModel):
             self.error = response.message
 
     @classmethod
-    def new(cls, job_context: "JobContextModel", response: JobResponse):
+    def new(cls, job_context: "JobContextModel"):
         job = cls(
             job_context=job_context,
-            status=response.status,
-            result=response.payload,
+            status=JobStatus.START,
         )
         return job

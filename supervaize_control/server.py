@@ -4,7 +4,7 @@ import uuid
 from typing import ClassVar
 from urllib.parse import urlunparse
 
-from fastapi import APIRouter, Body, Depends, FastAPI, status
+from fastapi import APIRouter, Body, Depends, FastAPI, status, BackgroundTasks
 from loguru import logger
 from pydantic import BaseModel, field_validator
 
@@ -13,6 +13,7 @@ from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
 from .job import Job
 from .instructions import display_instructions
 from .account import Account
+from rich import inspect
 
 log = logger
 
@@ -169,11 +170,19 @@ class Server(ServerModel):
                 status_code=status.HTTP_202_ACCEPTED,
             )
             async def start_job(
+                background_tasks: BackgroundTasks,
                 body_params: agent.start_method.job_model = Body(...),
                 agent: Agent = Depends(get_agent),
             ) -> Job:
                 log.info(f"Starting agent {agent.name} with params {body_params} ")
-                return agent.start(body_params)
+                job_context = body_params.job_context
+                job_fields = body_params.job_fields.to_dict()
+                new_job = Job.new(
+                    job_context=job_context,
+                )
+                background_tasks.add_task(agent.start, new_job, job_fields)
+                inspect(background_tasks)
+                return new_job
 
             @router.post(
                 "/stop",
