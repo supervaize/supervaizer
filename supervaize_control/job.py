@@ -16,11 +16,12 @@ class JobContextModel(BaseModel):
 
 
 class JobStatus(Enum):
-    FINAL = "final"
-    INTERMEDIARY = "intermediary"
-    START = "start"
-    HUM = "Request Human"
-    ERROR = "error"
+    STOPPED = "stopped"
+    IN_PROGRESS = "in_progress"
+    PAUSED = "paused"
+    WAITING = "waiting"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class JobResponse(BaseModel):
