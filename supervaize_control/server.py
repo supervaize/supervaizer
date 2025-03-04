@@ -175,12 +175,12 @@ class Server(ServerModel):
                 agent: Agent = Depends(get_agent),
             ) -> Job:
                 log.info(f"Starting agent {agent.name} with params {body_params} ")
-                job_context = body_params.job_context
+                supervaize_context = body_params.supervaize_context
                 job_fields = body_params.job_fields.to_dict()
                 new_job = Job.new(
-                    job_context=job_context,
+                    supervaize_context=supervaize_context,
                 )
-                background_tasks.add_task(agent.start, new_job, job_fields)
+                background_tasks.add_task(agent.job_start, new_job, job_fields)
                 inspect(background_tasks)
                 return new_job
 

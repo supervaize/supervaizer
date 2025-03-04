@@ -5,7 +5,7 @@ from datetime import datetime
 from .__version__ import VERSION
 
 
-class JobContextModel(BaseModel):
+class SupervaizeContextModel(BaseModel):
     workspace_id: str
     job_id: str
     started_by: str
@@ -33,8 +33,9 @@ class JobResponse(BaseModel):
 
 class JobModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
-    job_context: JobContextModel
+    supervaize_context: SupervaizeContextModel
     result: Any | None = None
+    payload: Any | None = None
     finished_at: datetime | None = None
     error: str | None = None
     status: JobStatus
@@ -46,17 +47,18 @@ class Job(JobModel):
 
     def add_response(self, response: JobResponse):
         self.status = response.status
-        if response.status == JobStatus.FINAL:
+        self.payload = response.payload
+        if response.status == JobStatus.COMPLETED:
             self.result = response.payload
             self.finished_at = datetime.now()
-        if response.status == JobStatus.ERROR:
+        if response.status == JobStatus.FAILED:
             self.finished_at = datetime.now()
             self.error = response.message
 
     @classmethod
-    def new(cls, job_context: "JobContextModel"):
+    def new(cls, supervaize_context: "SupervaizeContextModel"):
         job = cls(
-            job_context=job_context,
-            status=JobStatus.START,
+            supervaize_context=supervaize_context,
+            status=JobStatus.IN_PROGRESS,
         )
         return job

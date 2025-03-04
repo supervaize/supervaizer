@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 from supervaize_control import Agent, AgentMethod
-from supervaize_control.job import JobContextModel
+from supervaize_control.job import SupervaizeContextModel
 
 
 @pytest.fixture
@@ -229,15 +229,15 @@ def test_job_model_dynamic_model():
     assert issubclass(JobModel, BaseModel)
 
     # Test 2: Check the structure of the model
-    assert "job_context" in JobModel.__annotations__
+    assert "supervaize_context" in JobModel.__annotations__
     assert "job_fields" in JobModel.__annotations__
-    assert JobModel.__annotations__["job_context"] == JobContextModel
+    assert JobModel.__annotations__["supervaize_context"] == SupervaizeContextModel
 
     # Test 3: Create a valid instance
     from datetime import datetime
 
     valid_data = {
-        "job_context": {
+        "supervaize_context": {
             "workspace_id": "ws-123",
             "job_id": "job-456",
             "started_by": "user-789",
@@ -250,15 +250,15 @@ def test_job_model_dynamic_model():
     model_instance = JobModel(**valid_data)
 
     # Verify we can access the fields
-    assert model_instance.job_context.workspace_id == "ws-123"
-    assert model_instance.job_context.job_id == "job-456"
+    assert model_instance.supervaize_context.workspace_id == "ws-123"
+    assert model_instance.supervaize_context.job_id == "job-456"
     assert model_instance.job_fields.full_name == "John Doe"
     assert model_instance.job_fields.age == 30
 
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
         JobModel(
-            job_context={
+            supervaize_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
                 "started_by": "user-789",
@@ -275,7 +275,7 @@ def test_job_model_dynamic_model():
     # Test 5: Missing required fields in context
     with pytest.raises(ValidationError):
         JobModel(
-            job_context={
+            supervaize_context={
                 # missing required fields
                 "workspace_id": "ws-123"
             },
@@ -285,7 +285,7 @@ def test_job_model_dynamic_model():
     # Test 6: Missing required fields in job_fields
     with pytest.raises(ValidationError):
         JobModel(
-            job_context={
+            supervaize_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
                 "started_by": "user-789",
@@ -310,7 +310,7 @@ def test_job_model_dynamic_model():
 
     # Create a valid instance with empty fields
     empty_valid_data = {
-        "job_context": {
+        "supervaize_context": {
             "workspace_id": "ws-123",
             "job_id": "job-456",
             "started_by": "user-789",
@@ -322,4 +322,4 @@ def test_job_model_dynamic_model():
     }
     empty_instance = EmptyJobModel(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
-    assert empty_instance.job_context.workspace_id == "ws-123"
+    assert empty_instance.supervaize_context.workspace_id == "ws-123"

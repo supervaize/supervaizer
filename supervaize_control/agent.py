@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
-from .job import Job, JobContextModel
+from .job import Job, SupervaizeContextModel
 
 
 log = logger.bind(module="agent")
@@ -17,7 +17,7 @@ class AgentJobContextBase(BaseModel):
     Base model for agent job context parameters
     """
 
-    job_context: JobContextModel
+    supervaize_context: SupervaizeContextModel
     job_fields: Dict[str, Any]
 
 
@@ -132,7 +132,7 @@ class AgentMethod(BaseModel):
             (AgentJobContextBase,),
             {
                 "__annotations__": {
-                    "job_context": JobContextModel,
+                    "supervaize_context": SupervaizeContextModel,
                     "job_fields": fields_model,
                 }
             },
@@ -230,7 +230,7 @@ class Agent(AgentModel):
         log.info(f"Executing method {method.__name__} with params {params}")
         return method(**params)
 
-    def start(self, job: Job, job_fields: dict):
+    def job_start(self, job: Job, job_fields: dict):
         method = self.start_method.method
         params = self.start_method.params | job_fields
         job.result = self._execute(method, params)
