@@ -2,6 +2,22 @@ import json
 import traceback
 import demjson3
 
+from pydantic import BaseModel
+
+
+class SvBaseModel(BaseModel):
+    """
+    Base model for all Supervaize models.
+    """
+
+    @property
+    def to_dict(self):
+        return self.model_dump()
+
+    @property
+    def to_json(self):
+        return self.model_dump_json()
+
 
 class ApiResult:
     def __init__(self, message: str, detail: dict | str, code: str):

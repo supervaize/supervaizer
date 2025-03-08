@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 from supervaize_control import Agent, AgentMethod
-from supervaize_control.job import SupervaizeContextModel
+from supervaize_control.job import JobContext
 
 
 @pytest.fixture
@@ -231,7 +231,7 @@ def test_job_model_dynamic_model():
     # Test 2: Check the structure of the model
     assert "supervaize_context" in JobModel.__annotations__
     assert "job_fields" in JobModel.__annotations__
-    assert JobModel.__annotations__["supervaize_context"] == SupervaizeContextModel
+    assert JobModel.__annotations__["supervaize_context"] == JobContext
 
     # Test 3: Create a valid instance
     from datetime import datetime

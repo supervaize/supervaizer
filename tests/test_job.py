@@ -1,10 +1,10 @@
 from datetime import datetime
 from supervaize_control.job import Job, JobStatus, JobResponse
-from supervaize_control.job import SupervaizeContextModel
+from supervaize_control.job import JobContext
 
 
 def create_test_supervaize_context():
-    return SupervaizeContextModel(
+    return JobContext(
         workspace_id="test-workspace",
         job_id="test123",
         started_by="test-user",

@@ -3,20 +3,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 
-from pydantic import BaseModel
 
 from .__version__ import VERSION
-from .common import singleton
-
-
-class SupervaizeContextModel(BaseModel):
-    workspace_id: str
-    job_id: str
-    started_by: str
-    started_at: datetime
-    mission_id: str
-    mission_name: str
-    mission_context: Any = None
+from .common import singleton, SvBaseModel
 
 
 @singleton
@@ -86,6 +75,37 @@ class Jobs:
         return any(job_id in jobs for jobs in self.jobs_by_agent.values())
 
 
+class JobConditions(SvBaseModel):
+    max_cases: int | None = None
+    max_duration: int | None = None  # in seconds
+    max_cost: float | None = None
+    stop_on_warning: bool = False
+    stop_on_error: bool = False
+
+    def check(self, cases: int, duration: int, cost: float) -> tuple[bool, str]:
+        if self.max_cases and cases >= self.max_cases:
+            return (False, f"Max cases {self.max_cases} reached")
+
+        if self.max_duration and duration >= self.max_duration:
+            return (False, f"Max duration {self.max_duration} seconds reached")
+
+        if self.max_cost and cost >= self.max_cost:
+            return (False, f"Max cost {self.max_cost} reached")
+
+        return (True, "")
+
+
+class JobContext(SvBaseModel):
+    workspace_id: str
+    job_id: str
+    started_by: str
+    started_at: datetime
+    mission_id: str
+    mission_name: str
+    mission_context: Any = None
+    job_conditions: JobConditions = None
+
+
 class JobStatus(Enum):
     STOPPED = "stopped"
     IN_PROGRESS = "in_progress"
@@ -95,24 +115,25 @@ class JobStatus(Enum):
     FAILED = "failed"
 
 
-class JobResponse(BaseModel):
+class JobResponse(SvBaseModel):
     job_id: str
     status: JobStatus
     message: str
     payload: Any
 
 
-class JobModel(BaseModel):
+class JobModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     id: str
     agent_name: str
-    supervaize_context: SupervaizeContextModel
+    supervaize_context: JobContext
     result: Any | None = None
     payload: Any | None = None
     finished_at: datetime | None = None
     error: str | None = None
     status: JobStatus | None = None
     responses: list[JobResponse] = []
+    cost: float | None = None
 
 
 class Job(JobModel):
@@ -134,7 +155,7 @@ class Job(JobModel):
         self.responses.append(response)
 
     @classmethod
-    def new(cls, supervaize_context: "SupervaizeContextModel", agent_name: str):
+    def new(cls, supervaize_context: "JobContext", agent_name: str):
         job_id = supervaize_context.job_id or str(uuid.uuid4())
         job = cls(
             id=job_id,
@@ -145,15 +166,29 @@ class Job(JobModel):
         return job
 
 
-class CaseModel(BaseModel):
-    case_id: str
-    case_name: str
-    case_description: str
-    case_status: JobStatus
-    case_result: Any
+class CaseStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
-class Case(CaseModel):
+class CaseResult(SvBaseModel):
+    status: CaseStatus
+    message: str
+    payload: Any
+    cost: float
+
+
+class CaseModel(SvBaseModel):
+    id: str
+    name: str
+    description: str
+    status: CaseStatus
+    result: CaseResult
+
+
+class Case(SvBaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

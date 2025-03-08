@@ -12,8 +12,16 @@ class EventType(Enum):
     SERVER_SEND_REGISTRATION = "server.send.registration"
     AGENT_SEND_WAKEUP = "agent.send.wakeup"
     AGENT_SEND_ANOMALY = "agent.send.anomaly"
-    AGENT_SEND_DELIVERABLE = "agent.send.deliverable"
     AGENT_SEND_INTERMEDIARY = "agent.send.intermediary"
+    AGENT_SEND_JOB_START = "agent.send.job.start"
+    AGENT_SEND_JOB_END = "agent.send.job.end"
+    AGENT_SEND_JOB_STATUS = "agent.send.job.status"
+    AGENT_SEND_JOB_RESULT = "agent.send.job.result"
+    AGENT_SEND_JOB_ERROR = "agent.send.job.error"
+    AGENT_SEND_CASE_START = "agent.send.case.start"
+    AGENT_SEND_CASE_END = "agent.send.case.end"
+    AGENT_SEND_CASE_STATUS = "agent.send.case.status"
+    AGENT_SEND_CASE_RESULT = "agent.send.case.result"
 
 
 class EventModel(BaseModel):
@@ -78,4 +86,19 @@ class ServerSendRegistrationEvent(Event):
             account=account,
             source=server.uri,
             details=server.registration_info,
+        )
+
+
+class AgentSendCaseStartEvent(Event):
+    def __init__(self, agent: "Agent", account: "Account"):
+        super().__init__(
+            type=EventType.AGENT_SEND_CASE_START.value,
+            account=account,
+            source=agent.uri,
+            details={
+                "job_id": job.id,
+                "case_id": case.id,
+                "case_name": case.name,
+                "case_description": case.description,
+            },
         )

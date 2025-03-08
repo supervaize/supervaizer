@@ -1,7 +1,7 @@
 import os
 import sys
 import uuid
-from typing import ClassVar, List
+from typing import ClassVar, List, Annotated
 from urllib.parse import urlunparse
 from datetime import datetime
 from enum import Enum
@@ -23,7 +23,7 @@ from pydantic import BaseModel, field_validator
 
 from .__version__ import VERSION
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
-from .job import Job, SupervaizeContextModel, Jobs, JobStatus
+from .job import Job, JobContext, Jobs, JobStatus
 from .instructions import display_instructions
 from .account import Account
 
@@ -105,6 +105,9 @@ def read_root(agents: list[Agent]):
     }
 
 
+# Server = ForwardRef("Server")
+
+
 @default_router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
 def get_job_status(job_id: str):
     """Get the status of a job by its ID
@@ -164,6 +167,57 @@ def get_all_jobs(
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=jsonable_encoder(error_response),
+        )
+
+
+async def get_server() -> "Server":
+    """Dependency to get the current server instance"""
+    # This will be replaced with the actual server instance at runtime
+    # through the Server class's create_agent_routes method
+    return None
+
+
+@default_router.get("/agents", tags=["Agents"], response_model=List[Agent])
+async def get_all_agents(
+    skip: int = Query(default=0, ge=0, description="Number of agents to skip"),
+    limit: int = Query(
+        default=100, ge=1, le=1000, description="Number of agents to return"
+    ),
+    server: Annotated["Server", Depends(get_server)] = None,
+) -> List[Agent]:
+    """Get all registered agents with pagination"""
+    try:
+        res = [a.registration_info for a in server.agents[skip : skip + limit]]
+        return res
+    except Exception as e:
+        return create_error_response(
+            ErrorType.INTERNAL_ERROR,
+            f"Failed to retrieve agents: {str(e)}",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@default_router.get("/agent/{agent_id}", tags=["Agents"], response_model=Agent)
+async def get_agent_details(
+    agent_id: str,
+    server: Annotated["Server", Depends(get_server)] = None,
+) -> dict | JSONResponse:
+    """Get details of a specific agent by ID"""
+    try:
+        for agent in server.agents:
+            if agent.id == agent_id:
+                return agent.registration_info
+
+        return create_error_response(
+            ErrorType.AGENT_NOT_FOUND,
+            f"Agent with ID '{agent_id}' not found",
+            status.HTTP_404_NOT_FOUND,
+        )
+    except Exception as e:
+        return create_error_response(
+            ErrorType.INTERNAL_ERROR,
+            f"Failed to retrieve agent details: {str(e)}",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
@@ -227,6 +281,13 @@ class Server(ServerModel):
         self.add_route(default_router)
         self.create_agent_routes()
 
+        # Override the get_server dependency to return this instance
+        async def get_current_server() -> "Server":
+            return self
+
+        # Update the dependency
+        self.app.dependency_overrides[get_server] = get_current_server
+
     @property
     def url(self):
         return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
@@ -257,7 +318,7 @@ class Server(ServerModel):
                 return agent
 
             @router.get(
-                "/info",
+                "/",
                 summary="Get agent information",
                 description="Detailed information about the agent, returned as a JSON object with Agent class fields",
                 response_model=Agent,
@@ -266,7 +327,7 @@ class Server(ServerModel):
             )
             async def agent_info(agent: Agent = Depends(get_agent)) -> Agent:
                 log.info(f"Getting agent info for {agent.name}")
-                return agent
+                return agent.registration_info
 
             @router.post(
                 "/jobs",
@@ -289,7 +350,7 @@ class Server(ServerModel):
                 """Start a new job for this agent"""
                 try:
                     log.info(f"Starting agent {agent.name} with params {body_params}")
-                    sv_context: SupervaizeContextModel = body_params.supervaize_context
+                    sv_context: JobContext = body_params.supervaize_context
                     job_fields = body_params.job_fields.to_dict()
 
                     # Create and prepare the job
@@ -298,7 +359,9 @@ class Server(ServerModel):
                     )
 
                     # Schedule the background execution
-                    background_tasks.add_task(agent.job_start, new_job, job_fields)
+                    background_tasks.add_task(
+                        agent.job_start, new_job, job_fields, sv_context
+                    )
 
                     return new_job
                 except ValueError as e:

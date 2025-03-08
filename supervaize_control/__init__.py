@@ -9,7 +9,7 @@ from .account import Account
 from .telemetry import Telemetry, TelemetryType, TelemetryCategory, TelemetrySeverity
 from .event import Event, EventType, AgentSendRegistrationEvent
 from .common import ApiResult, ApiSuccess, ApiError
-from .job import SupervaizeContextModel, JobResponse, Job, JobStatus
+from .job import JobContext, JobResponse, Job, JobStatus, JobConditions
 
 __all__ = [
     Agent,
@@ -32,5 +32,6 @@ __all__ = [
     JobResponse,
     Job,
     JobStatus,
-    SupervaizeContextModel,
+    JobContext,
+    JobConditions,
 ]

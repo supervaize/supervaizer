@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
-from .job import Job, SupervaizeContextModel, JobResponse, JobStatus
+from .job import Job, JobContext, JobResponse, JobStatus
 
 
 log = logger.bind(module="agent")
@@ -17,7 +17,7 @@ class AgentJobContextBase(BaseModel):
     Base model for agent job context parameters
     """
 
-    supervaize_context: SupervaizeContextModel
+    supervaize_context: JobContext
     job_fields: Dict[str, Any]
 
 
@@ -132,7 +132,7 @@ class AgentMethod(BaseModel):
             (AgentJobContextBase,),
             {
                 "__annotations__": {
-                    "supervaize_context": SupervaizeContextModel,
+                    "supervaize_context": JobContext,
                     "job_fields": fields_model,
                 }
             },
@@ -203,50 +203,68 @@ class Agent(AgentModel):
 
     @property
     def registration_info(self):
+        """Returns a JSON-serializable dictionary representation of the agent.
+        Used for API responses and registration.
+        """
         return {
             "name": self.name,
-            "version": self.version,
+            "id": self.id,
             "author": self.author,
             "developer": self.developer,
+            "version": self.version,
             "description": self.description,
+            "tags": self.tags,
+            "uri": self.uri,
+            "slug": self.slug,
             "job_start_method": self.job_start_method.registration_info,
             "job_stop_method": self.job_stop_method.registration_info,
             "job_status_method": self.job_status_method.registration_info,
-            "chat_method": (
-                self.chat_method.registration_info if self.chat_method else {}
-            ),
+            "chat_method": self.chat_method.registration_info
+            if self.chat_method
+            else None,
             "custom_methods": {
-                k: v.registration_info or None for k, v in self.custom_methods.items()
-            }
-            if self.custom_methods
-            else {},
-            "tags": self.tags,
+                k: v.registration_info for k, v in (self.custom_methods or {}).items()
+            },
         }
 
-    def _execute(self, method: str, params: Dict[str, Any] = {}):
-        module_name, func_name = method.rsplit(".", 1)
+    def _execute(self, action: str, params: Dict[str, Any] = {}):
+        module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
         log.info(f"Executing method {method.__name__} with params {params}")
-        return method(**params)
+        return method(
+            **params,
+        )
 
-    def job_start(self, job: Job, job_fields: dict):
+    def job_start(self, job: Job, job_fields: dict, context: JobContext):
         """Execute the agent's start method in the background
 
         Args:
             job (Job): The job instance to execute
             job_fields (dict): The job-specific parameters
-
+            context (SupervaizeContextModel): The context of the job
         Returns:
             Job: The updated job instance
         """
         try:
             # Mark job as in progress when execution starts
+            job.add_response(
+                JobResponse(
+                    job_id=job.id,
+                    status=JobStatus.IN_PROGRESS,
+                    message="Starting job execution",
+                    payload=None,
+                )
+            )
 
             # Execute the method
-            method = self.job_start_method.method
-            params = self.job_start_method.params | job_fields
-            result = self._execute(method, params)
+            action = self.job_start_method.method
+            params = (
+                self.job_start_method.params
+                | {"fields": job_fields}
+                | {"context": context}
+            )
+            result = self._execute(action, params)
 
             # Store result and mark as completed
             job.add_response(
@@ -273,8 +291,8 @@ class Agent(AgentModel):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}):
-        method = self.stop_method.method
-        params = self.stop_method.params
+        method = self.job_stop_method.method
+        params = self.job_stop_method.params
         return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}):
