@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
-from .job import Job, SupervaizeContextModel
+from .job import Job, SupervaizeContextModel, JobResponse, JobStatus
 
 
 log = logger.bind(module="agent")
@@ -175,9 +175,9 @@ class AgentModel(BaseModel):
     version: str
     description: str
     tags: list[str] | None = None
-    start_method: AgentMethod
-    stop_method: AgentMethod
-    status_method: AgentMethod
+    job_start_method: AgentMethod
+    job_stop_method: AgentMethod
+    job_status_method: AgentMethod
     chat_method: AgentMethod | None = None
     custom_methods: dict[str, AgentMethod] | None = None
 
@@ -209,9 +209,9 @@ class Agent(AgentModel):
             "author": self.author,
             "developer": self.developer,
             "description": self.description,
-            "start_method": self.start_method.registration_info,
-            "stop_method": self.stop_method.registration_info,
-            "status_method": self.status_method.registration_info,
+            "job_start_method": self.job_start_method.registration_info,
+            "job_stop_method": self.job_stop_method.registration_info,
+            "job_status_method": self.job_status_method.registration_info,
             "chat_method": (
                 self.chat_method.registration_info if self.chat_method else {}
             ),
@@ -231,19 +231,55 @@ class Agent(AgentModel):
         return method(**params)
 
     def job_start(self, job: Job, job_fields: dict):
-        method = self.start_method.method
-        params = self.start_method.params | job_fields
-        job.result = self._execute(method, params)
+        """Execute the agent's start method in the background
+
+        Args:
+            job (Job): The job instance to execute
+            job_fields (dict): The job-specific parameters
+
+        Returns:
+            Job: The updated job instance
+        """
+        try:
+            # Mark job as in progress when execution starts
+
+            # Execute the method
+            method = self.job_start_method.method
+            params = self.job_start_method.params | job_fields
+            result = self._execute(method, params)
+
+            # Store result and mark as completed
+            job.add_response(
+                JobResponse(
+                    job_id=job.id,
+                    status=JobStatus.COMPLETED,
+                    message="Job completed successfully",
+                    payload=result,
+                )
+            )
+        except Exception as e:
+            # Handle any execution errors
+            error_msg = f"Job execution failed: {str(e)}"
+            job.add_response(
+                JobResponse(
+                    job_id=job.id,
+                    status=JobStatus.FAILED,
+                    message=error_msg,
+                    payload=None,
+                )
+            )
+            log.error(error_msg)
+
         return job
 
-    def stop(self, params: Dict[str, Any] = {}):
+    def job_stop(self, params: Dict[str, Any] = {}):
         method = self.stop_method.method
         params = self.stop_method.params
         return self._execute(method, params)
 
-    def status(self, params: Dict[str, Any] = {}):
-        method = self.status_method.method
-        params = self.status_method.params
+    def job_status(self, params: Dict[str, Any] = {}):
+        method = self.job_status_method.method
+        params = self.job_status_method.params
         return self._execute(method, params)
 
     def chat(self, context: str, message: str):

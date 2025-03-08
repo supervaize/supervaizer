@@ -1,19 +1,30 @@
 import os
 import sys
 import uuid
-from typing import ClassVar
+from typing import ClassVar, List
 from urllib.parse import urlunparse
+from datetime import datetime
+from enum import Enum
 
-from fastapi import APIRouter, Body, Depends, FastAPI, status, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    FastAPI,
+    status,
+    BackgroundTasks,
+    HTTPException,
+    Query,
+)
+from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import BaseModel, field_validator
 
 from .__version__ import VERSION
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
-from .job import Job
+from .job import Job, SupervaizeContextModel, Jobs, JobStatus
 from .instructions import display_instructions
 from .account import Account
-from rich import inspect
 
 log = logger
 
@@ -47,6 +58,39 @@ class ServerModel(BaseModel):
         return v
 
 
+class ErrorType(str, Enum):
+    """Enumeration of possible error types"""
+
+    JOB_NOT_FOUND = "job_not_found"
+    JOB_ALREADY_EXISTS = "job_already_exists"
+    AGENT_NOT_FOUND = "agent_not_found"
+    INVALID_REQUEST = "invalid_request"
+    INTERNAL_ERROR = "internal_error"
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response model"""
+
+    error: str
+    error_type: ErrorType
+    detail: str | None = None
+    timestamp: datetime = datetime.now()
+    status_code: int
+
+
+def create_error_response(
+    error_type: ErrorType, detail: str, status_code: int
+) -> JSONResponse:
+    """Helper function to create consistent error responses"""
+    error_response = ErrorResponse(
+        error=error_type.value.replace("_", " ").title(),
+        error_type=error_type,
+        detail=detail,
+        status_code=status_code,
+    )
+    return JSONResponse(status_code=status_code, content=error_response.model_dump())
+
+
 default_router = APIRouter()
 
 
@@ -55,6 +99,67 @@ def read_root(agents: list[Agent]):
     return {
         "message": f"Welcome to the Supervaize Control API v{VERSION}. Use the /trigger endpoint to run the analysis."
     }
+
+
+@default_router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
+def get_job_status(job_id: str):
+    """Get the status of a job by its ID
+
+    Args:
+        job_id (str): The ID of the job to get status for
+
+    Returns:
+        Job: The job object if found
+
+    Raises:
+        HTTPException: If job not found
+    """
+    job = Jobs().get_job(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with ID {job_id} not found",
+        )
+    return job
+
+
+@default_router.get("/jobs", tags=["Jobs"], response_model=dict[str, List[Job]])
+def get_all_jobs(
+    skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
+    limit: int = Query(
+        default=100, ge=1, le=1000, description="Number of jobs to return"
+    ),
+    status: JobStatus | None = Query(default=None, description="Filter jobs by status"),
+):
+    """Get all jobs across all agents with pagination and optional status filtering"""
+    try:
+        jobs_registry = Jobs()
+        all_jobs = {}
+
+        for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
+            filtered_jobs = list(agent_jobs.values())
+
+            # Apply status filter if specified
+            if status:
+                filtered_jobs = [job for job in filtered_jobs if job.status == status]
+
+            # Apply pagination
+            filtered_jobs = filtered_jobs[skip : skip + limit]
+
+            if filtered_jobs:  # Only include agents that have jobs after filtering
+                all_jobs[agent_name] = filtered_jobs
+
+        return all_jobs
+    except Exception as e:
+        error_response = ErrorResponse(
+            error="Failed to retrieve jobs",
+            detail=str(e),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=error_response.model_dump(),
+        )
 
 
 class Server(ServerModel):
@@ -161,9 +266,11 @@ class Server(ServerModel):
             @router.post(
                 "/jobs",
                 summary=f"Start a job with agent : {agent.name}",
-                description=f"{agent.start_method.description}",
+                description=f"{agent.job_start_method.description}",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": agent.start_method},
+                    status.HTTP_202_ACCEPTED: {"model": agent.job_start_method},
+                    status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
                 },
                 tags=tags,
                 response_model=Job,
@@ -171,18 +278,120 @@ class Server(ServerModel):
             )
             async def start_job(
                 background_tasks: BackgroundTasks,
-                body_params: agent.start_method.job_model = Body(...),
+                body_params: agent.job_start_method.job_model = Body(...),
                 agent: Agent = Depends(get_agent),
-            ) -> Job:
-                log.info(f"Starting agent {agent.name} with params {body_params} ")
-                supervaize_context = body_params.supervaize_context
-                job_fields = body_params.job_fields.to_dict()
-                new_job = Job.new(
-                    supervaize_context=supervaize_context,
-                )
-                background_tasks.add_task(agent.job_start, new_job, job_fields)
-                inspect(background_tasks)
-                return new_job
+            ) -> Job | JSONResponse:
+                """Start a new job for this agent"""
+                try:
+                    log.info(f"Starting agent {agent.name} with params {body_params}")
+                    sv_context: SupervaizeContextModel = body_params.supervaize_context
+                    job_fields = body_params.job_fields.to_dict()
+
+                    # Create and prepare the job
+                    new_job = Job.new(
+                        supervaize_context=sv_context, agent_name=agent.name
+                    )
+
+                    # Schedule the background execution
+                    background_tasks.add_task(agent.job_start, new_job, job_fields)
+
+                    return new_job
+                except ValueError as e:
+                    if "already exists" in str(e):
+                        return create_error_response(
+                            ErrorType.JOB_ALREADY_EXISTS,
+                            str(e),
+                            status.HTTP_409_CONFLICT,
+                        )
+                    return create_error_response(
+                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                    )
+                except Exception as e:
+                    return create_error_response(
+                        ErrorType.INTERNAL_ERROR,
+                        str(e),
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
+            @router.get(
+                "/jobs",
+                summary=f"Get all jobs for agent: {agent.name}",
+                description="Get all jobs for this agent with pagination and optional status filtering",
+                response_model=List[Job],
+                responses={
+                    status.HTTP_200_OK: {"model": List[Job]},
+                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+                },
+                tags=tags,
+            )
+            async def get_agent_jobs(
+                agent: Agent = Depends(get_agent),
+                skip: int = Query(
+                    default=0, ge=0, description="Number of jobs to skip"
+                ),
+                limit: int = Query(
+                    default=100, ge=1, le=1000, description="Number of jobs to return"
+                ),
+                status: JobStatus | None = Query(
+                    default=None, description="Filter jobs by status"
+                ),
+            ) -> List[Job] | JSONResponse:
+                """Get all jobs for this agent"""
+                try:
+                    jobs = list(Jobs().get_agent_jobs(agent.name).values())
+
+                    # Apply status filter if specified
+                    if status:
+                        jobs = [job for job in jobs if job.status == status]
+
+                    # Apply pagination
+                    return jobs[skip : skip + limit]
+                except ValueError as e:
+                    return create_error_response(
+                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                    )
+                except Exception as e:
+                    return create_error_response(
+                        ErrorType.INTERNAL_ERROR,
+                        str(e),
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
+            @router.get(
+                "/jobs/{job_id}",
+                summary=f"Get job status for agent: {agent.name}",
+                description="Get the status and details of a specific job",
+                response_model=Job,
+                responses={
+                    status.HTTP_200_OK: {"model": Job},
+                    status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+                },
+                tags=tags,
+            )
+            async def get_job_status(
+                job_id: str, agent: Agent = Depends(get_agent)
+            ) -> Job | JSONResponse:
+                """Get the status of a job by its ID for this specific agent"""
+                try:
+                    job = Jobs().get_job(job_id, agent_name=agent.name)
+                    if not job:
+                        return create_error_response(
+                            ErrorType.JOB_NOT_FOUND,
+                            f"Job with ID {job_id} not found for agent {agent.name}",
+                            status.HTTP_404_NOT_FOUND,
+                        )
+                    return job
+                except ValueError as e:
+                    return create_error_response(
+                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                    )
+                except Exception as e:
+                    return create_error_response(
+                        ErrorType.INTERNAL_ERROR,
+                        str(e),
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
             @router.post(
                 "/stop",

@@ -31,9 +31,9 @@ def agent_fixture(agent_method_fixture):
         developer="Dev",
         version="1.0.0",
         description="description",
-        start_method=agent_method_fixture,
-        stop_method=agent_method_fixture,
-        status_method=agent_method_fixture,
+        job_start_method=agent_method_fixture,
+        job_stop_method=agent_method_fixture,
+        job_status_method=agent_method_fixture,
         chat_method=agent_method_fixture,
         custom_methods={
             "method1": agent_method_fixture,
@@ -44,9 +44,9 @@ def agent_fixture(agent_method_fixture):
 
 def test_agent(agent_fixture):
     assert isinstance(agent_fixture, Agent)
-    assert isinstance(agent_fixture.start_method, AgentMethod)
-    assert isinstance(agent_fixture.stop_method, AgentMethod)
-    assert isinstance(agent_fixture.status_method, AgentMethod)
+    assert isinstance(agent_fixture.job_start_method, AgentMethod)
+    assert isinstance(agent_fixture.job_stop_method, AgentMethod)
+    assert isinstance(agent_fixture.job_status_method, AgentMethod)
     assert isinstance(agent_fixture.chat_method, AgentMethod)
     assert isinstance(agent_fixture.custom_methods, dict)
     assert isinstance(agent_fixture.custom_methods["method1"], AgentMethod)

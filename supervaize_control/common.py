@@ -99,3 +99,15 @@ class ApiError(ApiResult):
         if self.exception:
             result["exception"] = exception_dict
         return result
+
+
+def singleton(cls):
+    """Decorator to create a singleton class"""
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
