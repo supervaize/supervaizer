@@ -3,6 +3,9 @@ import traceback
 import demjson3
 
 from pydantic import BaseModel
+from loguru import logger
+
+log = logger.bind(module="supervaize")
 
 
 class SvBaseModel(BaseModel):

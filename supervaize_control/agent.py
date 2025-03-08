@@ -1,15 +1,12 @@
 from typing import Any, ClassVar, Dict, List
 
 import shortuuid
-from loguru import logger
+from .common import log
 from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import AGENT_VERSION, VERSION
 from .job import Job, JobContext, JobResponse, JobStatus
-
-
-log = logger.bind(module="agent")
 
 
 class AgentJobContextBase(BaseModel):
@@ -246,47 +243,46 @@ class Agent(AgentModel):
         Returns:
             Job: The updated job instance
         """
-        try:
-            # Mark job as in progress when execution starts
-            job.add_response(
-                JobResponse(
-                    job_id=job.id,
-                    status=JobStatus.IN_PROGRESS,
-                    message="Starting job execution",
-                    payload=None,
-                )
-            )
 
-            # Execute the method
-            action = self.job_start_method.method
-            params = (
-                self.job_start_method.params
-                | {"fields": job_fields}
-                | {"context": context}
+        # Mark job as in progress when execution starts
+        job.add_response(
+            JobResponse(
+                job_id=job.id,
+                status=JobStatus.IN_PROGRESS,
+                message="Starting job execution",
+                payload=None,
             )
+        )
+
+        # Execute the method
+        action = self.job_start_method.method
+        params = (
+            self.job_start_method.params | {"fields": job_fields} | {"context": context}
+        )
+        try:
             result = self._execute(action, params)
 
             # Store result and mark as completed
-            job.add_response(
-                JobResponse(
-                    job_id=job.id,
-                    status=JobStatus.COMPLETED,
-                    message="Job completed successfully",
-                    payload=result,
-                )
+
+            job_response = JobResponse(
+                job_id=job.id,
+                status=JobStatus.COMPLETED,
+                message="Job completed successfully",
+                payload=result,
             )
+
         except Exception as e:
             # Handle any execution errors
             error_msg = f"Job execution failed: {str(e)}"
-            job.add_response(
-                JobResponse(
-                    job_id=job.id,
-                    status=JobStatus.FAILED,
-                    message=error_msg,
-                    payload=None,
-                )
+            job_response = JobResponse(
+                job_id=job.id,
+                status=JobStatus.FAILED,
+                message=error_msg,
+                payload=None,
             )
             log.error(error_msg)
+
+        job.add_response(job_response)
 
         return job
 

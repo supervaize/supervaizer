@@ -1,11 +1,11 @@
+import time
 import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 
-
 from .__version__ import VERSION
-from .common import singleton, SvBaseModel
+from .common import SvBaseModel, singleton
 
 
 @singleton
@@ -80,12 +80,23 @@ class JobConditions(SvBaseModel):
     max_duration: int | None = None  # in seconds
     max_cost: float | None = None
     stop_on_warning: bool = False
-    stop_on_error: bool = False
+    stop_on_error: bool = True
 
-    def check(self, cases: int, duration: int, cost: float) -> tuple[bool, str]:
+    def check(self, cases: int, start_time: float, cost: float) -> tuple[bool, str]:
+        """Check if the job conditions are met
+
+        Args:
+            cases (int): Number of cases processed so far
+            start_time (float): Start time of the job - using time.perf_counter()
+            cost (float): Cost incurred so far
+
+        Returns:
+            tuple[bool, str]: True if the job conditions are met, the job can continue, False otherwise, with explanation
+        """
         if self.max_cases and cases >= self.max_cases:
             return (False, f"Max cases {self.max_cases} reached")
 
+        duration = time.perf_counter() - start_time
         if self.max_duration and duration >= self.max_duration:
             return (False, f"Max duration {self.max_duration} seconds reached")
 
@@ -164,41 +175,3 @@ class Job(JobModel):
             status=JobStatus.IN_PROGRESS,
         )
         return job
-
-
-class CaseStatus(Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-class CaseResult(SvBaseModel):
-    status: CaseStatus
-    message: str
-    payload: Any
-    cost: float
-
-
-class CaseModel(SvBaseModel):
-    id: str
-    name: str
-    description: str
-    status: CaseStatus
-    result: CaseResult
-
-
-class Case(SvBaseModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    @classmethod
-    def new(cls, case_id: str, case_name: str, case_description: str):
-        case = cls(
-            case_id=case_id,
-            case_name=case_name,
-            case_description=case_description,
-            case_status=JobStatus.IN_PROGRESS,
-        )
-
-        return case

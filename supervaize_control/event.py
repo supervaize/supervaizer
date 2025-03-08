@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from .__version__ import EVENT_VERSION, VERSION
 from .agent import Agent
 from .account import Account
+from .case import Case
 
 
 class EventType(Enum):
@@ -12,16 +13,16 @@ class EventType(Enum):
     SERVER_SEND_REGISTRATION = "server.send.registration"
     AGENT_SEND_WAKEUP = "agent.send.wakeup"
     AGENT_SEND_ANOMALY = "agent.send.anomaly"
-    AGENT_SEND_INTERMEDIARY = "agent.send.intermediary"
-    AGENT_SEND_JOB_START = "agent.send.job.start"
-    AGENT_SEND_JOB_END = "agent.send.job.end"
-    AGENT_SEND_JOB_STATUS = "agent.send.job.status"
-    AGENT_SEND_JOB_RESULT = "agent.send.job.result"
-    AGENT_SEND_JOB_ERROR = "agent.send.job.error"
-    AGENT_SEND_CASE_START = "agent.send.case.start"
-    AGENT_SEND_CASE_END = "agent.send.case.end"
-    AGENT_SEND_CASE_STATUS = "agent.send.case.status"
-    AGENT_SEND_CASE_RESULT = "agent.send.case.result"
+    INTERMEDIARY = "agent.send.intermediary"
+    JOB_START = "agent.send.job.start"
+    JOB_END = "agent.send.job.end"
+    JOB_STATUS = "agent.send.job.status"
+    JOB_RESULT = "agent.send.job.result"
+    JOB_ERROR = "agent.send.job.error"
+    CASE_START = "agent.send.case.start"
+    CASE_END = "agent.send.case.end"
+    CASE_STATUS = "agent.send.case.status"
+    CASE_RESULT = "agent.send.case.result"
 
 
 class EventModel(BaseModel):
@@ -89,16 +90,22 @@ class ServerSendRegistrationEvent(Event):
         )
 
 
-class AgentSendCaseStartEvent(Event):
-    def __init__(self, agent: "Agent", account: "Account"):
+class CaseStartEvent(Event):
+    def __init__(self, case: "Case", account: "Account"):
+        print(f"CASE_START_EVENT {case} - {account}")
         super().__init__(
-            type=EventType.AGENT_SEND_CASE_START.value,
+            type=EventType.CASE_START.value,
             account=account,
-            source=agent.uri,
-            details={
-                "job_id": job.id,
-                "case_id": case.id,
-                "case_name": case.name,
-                "case_description": case.description,
-            },
+            source=case,
+            details=case.to_dict,
+        )
+
+
+class CaseUpdateEvent(Event):
+    def __init__(self, case: "Case", account: "Account"):
+        super().__init__(
+            type=EventType.CASE_UPDATE.value,
+            account=account,
+            source=case,
+            details=case.to_dict,
         )

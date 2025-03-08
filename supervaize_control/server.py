@@ -1,33 +1,31 @@
 import os
 import sys
 import uuid
-from typing import ClassVar, List, Annotated
-from urllib.parse import urlunparse
 from datetime import datetime
 from enum import Enum
+from typing import Annotated, ClassVar, List
+from urllib.parse import urlunparse
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Body,
     Depends,
     FastAPI,
-    status,
-    BackgroundTasks,
     HTTPException,
     Query,
+    status,
 )
-from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from loguru import logger
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
+from .common import log
 from .__version__ import VERSION
-from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
-from .job import Job, JobContext, Jobs, JobStatus
-from .instructions import display_instructions
 from .account import Account
-
-log = logger
+from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .instructions import display_instructions
+from .job import Job, JobContext, Jobs, JobStatus
 
 
 class ServerModel(BaseModel):
@@ -246,7 +244,7 @@ class Server(ServerModel):
         """
         # Set appropriate log level based on debug mode
         log_level = "DEBUG" if debug else "ERROR"
-        logger.configure(handlers=[{"sink": "sys.stderr", "level": log_level}])
+        # log.configure(handlers=[{"sink": "sys.stderr", "level": log_level}])
 
         kwargs["account"] = account
         kwargs["scheme"] = scheme

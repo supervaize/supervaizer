@@ -1,18 +1,24 @@
-from typing import ClassVar
+from typing import ClassVar, TYPE_CHECKING
 
 import requests
 import shortuuid
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .__version__ import TELEMETRY_VERSION, VERSION
 from .common import ApiError, ApiResult, ApiSuccess
 from .telemetry import Telemetry
-from loguru import logger
+from .common import log
 
-log = logger
+if TYPE_CHECKING:
+    from .agent import Agent
+    from .case import Case, CaseNodeUpdate
+    from .server import Server
+    from .event import Event
 
 
 class AccountModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
@@ -27,7 +33,7 @@ class Account(AccountModel):
         super().__init__(**kwargs)
 
     def __str__(self):
-        return f"{self.api_url} - v{self.version}"
+        return f"{self.api_url} - {self.name}"
 
     @property
     def api_headers(self):
@@ -74,7 +80,7 @@ class Account(AccountModel):
             raise e
         return result
 
-    def register_server(self, server: "server") -> ApiResult:
+    def register_server(self, server: "Server") -> ApiResult:
         """Register a server with the Supervaize Control API.
 
         Args:
@@ -104,6 +110,18 @@ class Account(AccountModel):
 
         event = AgentSendRegistrationEvent(agent=agent, account=self, polling=polling)
         return self.send_event(agent, event)
+
+    def start_case(self, case: "Case") -> ApiResult:
+        from .event import CaseStartEvent
+
+        event = CaseStartEvent(case=case, account=self)
+        return self.send_event(case, event)
+
+    def update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
+        from .event import CaseUpdateEvent
+
+        event = CaseUpdateEvent(case=case, update=update, account=self)
+        return self.send_event(update, event)
 
     def send_telemetry(self, telemetry: Telemetry) -> ApiResult:
         """Send telemetry data to the Supervaize Control API.
