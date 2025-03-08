@@ -17,6 +17,7 @@ from fastapi import (
     Query,
 )
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from loguru import logger
 from pydantic import BaseModel, field_validator
 
@@ -88,7 +89,10 @@ def create_error_response(
         detail=detail,
         status_code=status_code,
     )
-    return JSONResponse(status_code=status_code, content=error_response.model_dump())
+    return JSONResponse(
+        status_code=status_code,
+        content=jsonable_encoder(error_response),
+    )
 
 
 default_router = APIRouter()
@@ -153,12 +157,13 @@ def get_all_jobs(
     except Exception as e:
         error_response = ErrorResponse(
             error="Failed to retrieve jobs",
+            error_type=ErrorType.INTERNAL_ERROR,
             detail=str(e),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=error_response.model_dump(),
+            content=jsonable_encoder(error_response),
         )
 
 
