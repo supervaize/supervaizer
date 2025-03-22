@@ -26,3 +26,14 @@ repos:
           - .github/LICENSE.txt # Update this path to your license file
           - --comment-style
           - "#"
+
+  - repo: https://github.com/ljnsn/cz-conventional-gitmoji
+    rev: v0.6.1
+    hooks:
+      - id: conventional-gitmoji
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.29.0
+    hooks:
+      - id: commitizen
+        additional_dependencies: [cz-conventional-gitmoji]

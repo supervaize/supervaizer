@@ -54,3 +54,6 @@ path = "supervaize_control/__version__.py"
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-wrap-aliases = true
+
+[tool.commitizen]
+name = "cz_gitmoji"
