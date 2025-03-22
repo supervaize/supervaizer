@@ -3,11 +3,11 @@
 A Python library for managing and controlling SUPERVAIZE agents and services.
 
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/yourusername/supervaize_control)
+[![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/supervaize/supervaize_control)
 
 ## Description
 
-SUPERVAIZE Controller is a powerful Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
+SUPERVAIZE Controller is a Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
 
 ## Features
 
@@ -141,4 +141,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Mozilla Public License 2.0](LICENSE.md) License.

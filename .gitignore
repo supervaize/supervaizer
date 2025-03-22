@@ -1,6 +1,6 @@
 # File created using '.gitignore Generator' for Visual Studio Code: https://bit.ly/vscode-gig
-# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,python
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,macos,python
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,macos
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,macos
 
 ### macOS ###
 # General
@@ -226,11 +226,13 @@ pyrightconfig.json
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,python
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,macos
 
 # Custom rules (everything added below won't be overriden by 'Generate .gitignore File' if you use 'Update' option)
 
 .envrc
 .vscode
 
-fix
+/supervaize_control/.cursorrules
+/CLAUDE.md
+/fix

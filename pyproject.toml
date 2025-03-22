@@ -15,6 +15,7 @@ dependencies = [
     "shortuuid>=1.0.13",
     "uvicorn>=0.34.0",
 ]
+license = "MPL-2.0"
 classifiers = ["Private :: Do Not Upload"]
 dynamic = ["version"]
 
@@ -36,3 +37,11 @@ build-backend = "hatchling.build"
 [tool.hatch]
 [tool.hatch.version]
 path = "supervaize_control/__version__.py"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]             # unused imports
+"tests/*" = ["N802", "N803", "N806"] # test function naming
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
