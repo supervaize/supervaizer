@@ -37,7 +37,7 @@ class ApiResult:
         return self.json_return
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__} {self.json_return}"
+        return f"{self.__class__.__name__} ({self.message})"
 
     @property
     def dict(self) -> dict:
@@ -49,19 +49,37 @@ class ApiResult:
 
 
 class ApiSuccess(ApiResult):
+    """
+    ApiSuccess is a class that extends ApiResult.
+    It is used to return a success response from the API.
+
+    Tested in tests/test_common.py
+    """
+
     def __init__(self, message: str, detail: dict | str, code: str = 200):
         super().__init__(message, detail, code)
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
             self.detail = result.object
+            print(f"result.object: {result.object}")
             self.id = result.object.get("id") or None
-            self.log_message = f"✅ {message} : {self.id}"
+            self.log_message = (
+                f"✅ {message} : {self.id}" if self.id else f"✅ {message}"
+            )
         else:
             self.detail = detail
             self.log_message = f"✅ {message}"
 
 
 class ApiError(ApiResult):
+    """
+    ApiError is a class that extends ApiResult.
+    It can be used to return an error response from the API.
+    Note : not really useful for the moment, as API errors raise exception.
+
+    Tested in tests/test_common.py
+    """
+
     def __init__(
         self,
         message: str,
@@ -126,7 +144,9 @@ class ApiError(ApiResult):
 
 
 def singleton(cls):
-    """Decorator to create a singleton class"""
+    """Decorator to create a singleton class
+    Tested in tests/test_common.py
+    """
     instances = {}
 
     def get_instance(*args, **kwargs):

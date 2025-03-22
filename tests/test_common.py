@@ -5,9 +5,31 @@
 
 import json
 
-from supervaize_control.common import ApiError, ApiSuccess
+import pytest
+from pydantic import Field
+
+from supervaize_control.common import ApiError, ApiSuccess, SvBaseModel, singleton
 
 
+def test_sv_base_model():
+    """Test SvBaseModel functionality"""
+
+    class TestModel(SvBaseModel):
+        name: str = Field(default="test")
+        value: int = Field(default=42)
+
+    model = TestModel()
+
+    # Test to_dict property
+    dict_data = model.to_dict
+    assert dict_data == {"name": "test", "value": 42}
+
+    # Test to_json property
+    json_data = json.loads(model.to_json)
+    assert json_data == {"name": "test", "value": 42}
+
+
+@pytest.mark.current
 def test_api_success_basic():
     """Test basic ApiSuccess functionality"""
     success = ApiSuccess(detail={"test": "data"}, message="success message")
@@ -20,6 +42,9 @@ def test_api_success_basic():
     json_data = json.loads(success.json_return)
     assert json_data["detail"] == {"test": "data"}
     assert json_data["message"] == "success message"
+    assert json_data["log_message"] == "✅ success message"
+
+    assert repr(success) == "ApiSuccess (success message)"
 
 
 def test_api_error_basic():
@@ -66,3 +91,104 @@ def test_api_success_with_json_string_detail():
     json_data = json.loads(success.json_return)
     assert json_data["detail"]["message"] == 'Test "quoted" message'
     assert json_data["detail"]["data"] == 'value with "quotes"'
+
+
+def test_api_success():
+    """Test ApiSuccess with ID in detail string"""
+    detail = '{"id": "123", "data": "test"}'
+    success = ApiSuccess(message="success", detail=detail)
+    assert success.id == "123"
+    assert success.log_message == "✅ success : 123"
+
+    """Test ApiSuccess with empty JSON string"""
+    success = ApiSuccess(message="success", detail="{}")
+    assert getattr(success, "id", None) is None
+    assert success.log_message == "✅ success"
+
+    """Test ApiSuccess with JSON without ID"""
+    json_detail = {"data": "test"}
+    success = ApiSuccess(message="success", detail=json_detail)
+    assert success.log_message == "✅ success"
+
+    """Test ApiSuccess with dict detail"""
+    detail = {"data": "test"}
+    success = ApiSuccess(message="success", detail=detail)
+    assert success.log_message == "✅ success"
+
+
+def test_api_error():
+    """Test ApiError"""
+    error = ApiError(message="error message", detail={"error": "details"}, code="400")
+    assert error.message == "error message"
+    assert error.detail == {"error": "details"}
+    assert error.code == "400"
+
+    # Test the dict property
+    json_data = error.dict
+    assert json_data["message"] == "error message"
+    assert json_data["detail"] == {"error": "details"}
+    assert json_data["code"] == "400"
+    assert json_data["url"] == ""
+    assert json_data["payload"] == {}
+
+    # Test with an exception that has custom attributes
+    class CustomException(Exception):
+        def __init__(self):
+            self.custom_attr = '{"key": "value"}'
+            self.response = None
+
+    exc = CustomException()
+    error = ApiError(message="error", exception=exc)
+
+    # Verify exception attributes are captured
+    assert error.dict["exception"]["attributes"]["custom_attr"] == {"key": "value"}
+    assert error.dict["exception"]["type"] == "CustomException"
+    assert error.dict["exception"]["message"] == ""
+
+    """Test ApiError with exception containing response"""
+
+    class ResponseException(Exception):
+        def __init__(self, status_code, response_text):
+            self.response = type(
+                "Response", (), {"status_code": status_code, "text": response_text}
+            )
+            super().__init__("API Error")
+
+    # Test with JSON response
+    exc = ResponseException(404, '{"error": "not found"}')
+    error = ApiError(message="error", exception=exc)
+    json_data = json.loads(error.json_return)
+
+    assert error.code == "404"
+    assert json_data["exception"]["response"] == {"error": "not found"}
+
+    # Test with non-JSON response
+    exc = ResponseException(500, "Internal Server Error")
+    error = ApiError(message="error", exception=exc)
+    json_data = json.loads(error.json_return)
+
+    assert error.code == "500"
+    assert "response" not in json_data["exception"]
+
+    """Test ApiError with empty exception message"""
+    error = ApiError(message="error", exception=Exception())
+    assert error.log_message == "❌ error : "
+
+
+def test_singleton():
+    """Test singleton decorator"""
+
+    @singleton
+    class TestClass:
+        def __init__(self):
+            self.value = 0
+
+    # Should return same instance
+    instance1 = TestClass()
+    instance2 = TestClass()
+
+    assert instance1 is instance2
+
+    # Should share state
+    instance1.value = 42
+    assert instance2.value == 42
