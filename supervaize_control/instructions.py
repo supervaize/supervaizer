@@ -3,15 +3,15 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from rich import box
+from art import text2art
+from rich import box, print
 from rich.align import Align
 from rich.console import Console, Group
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
-from rich import print
-from art import text2art
+
 from supervaize_control.__version__ import VERSION
 
 console = Console()

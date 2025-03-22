@@ -6,11 +6,11 @@
 from typing import Any, ClassVar, Dict, List
 
 import shortuuid
-from .common import log
 from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import VERSION
+from .common import log
 from .job import Job, JobContext, JobResponse, JobStatus
 
 

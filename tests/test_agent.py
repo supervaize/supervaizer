@@ -5,6 +5,7 @@
 
 import pytest
 from pydantic import BaseModel, ValidationError
+
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.job import JobContext
 

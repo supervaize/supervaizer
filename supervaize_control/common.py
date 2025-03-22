@@ -5,10 +5,10 @@
 
 import json
 import traceback
-import demjson3
 
-from pydantic import BaseModel
+import demjson3
 from loguru import logger
+from pydantic import BaseModel
 
 log = logger.bind(module="supervaize")
 

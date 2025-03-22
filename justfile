@@ -11,6 +11,10 @@ YYYYMMDD:= `date +%Y%m%d`
 pre-commit-manual:
     pre-commit run --all-files --verbose
 
+# Run pre-commit autoupdate (when pre-commit-config.yaml is updated)
+pre-commit-autoupdate:
+    pre-commit autoupdate
+
 # Run tests without coverage
 test-no-cov:
     pytest --no-cov

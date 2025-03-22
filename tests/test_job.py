@@ -4,11 +4,11 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 from datetime import datetime
-
 from uuid import uuid4
+
 import pytest
-from supervaize_control.job import Job, JobStatus, JobResponse
-from supervaize_control.job import JobContext
+
+from supervaize_control.job import Job, JobContext, JobResponse, JobStatus
 
 
 @pytest.fixture

@@ -25,15 +25,19 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
-from .common import log
 from .__version__ import VERSION
 from .account import Account
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .common import SvBaseModel, log
 from .instructions import display_instructions
 from .job import Job, JobContext, Jobs, JobStatus
 
 
-class ServerModel(BaseModel):
+class ServerModel(SvBaseModel):
+    """
+    API Server for the Supervaize Control.
+    """
+
     model_config = {
         "arbitrary_types_allowed": True  # for FastAPI
     }

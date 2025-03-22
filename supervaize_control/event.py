@@ -3,32 +3,33 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from typing import ClassVar
 from enum import Enum
+from typing import ClassVar
+
 from pydantic import BaseModel
 
 from .__version__ import VERSION
-from .agent import Agent
-from .server import Server
 from .account import Account
+from .agent import Agent
 from .case import Case
+from .server import Server
 
 
 class EventType(Enum):
-    AGENT_SEND_REGISTRATION = "agent.send.registration"
-    SERVER_SEND_REGISTRATION = "server.send.registration"
-    AGENT_SEND_WAKEUP = "agent.send.wakeup"
-    AGENT_SEND_ANOMALY = "agent.send.anomaly"
-    INTERMEDIARY = "agent.send.intermediary"
-    JOB_START = "agent.send.job.start"
-    JOB_END = "agent.send.job.end"
-    JOB_STATUS = "agent.send.job.status"
-    JOB_RESULT = "agent.send.job.result"
-    JOB_ERROR = "agent.send.job.error"
-    CASE_START = "agent.send.case.start"
-    CASE_END = "agent.send.case.end"
-    CASE_STATUS = "agent.send.case.status"
-    CASE_RESULT = "agent.send.case.result"
+    AGENT_REGISTER = "agent.register"
+    SERVER_REGISTER = "server.register"
+    AGENT_WAKEUP = "agent.wakeup"
+    AGENT_SEND_ANOMALY = "agent.anomaly"
+    INTERMEDIARY = "agent.intermediary"
+    JOB_START = "agent.job.start"
+    JOB_END = "agent.job.end"
+    JOB_STATUS = "agent.job.status"
+    JOB_RESULT = "agent.job.result"
+    JOB_ERROR = "agent.job.error"
+    CASE_START = "agent.case.start"
+    CASE_END = "agent.case.end"
+    CASE_STATUS = "agent.case.status"
+    CASE_RESULT = "agent.case.result"
 
 
 class EventModel(BaseModel):
@@ -74,7 +75,7 @@ class AgentSendRegistrationEvent(Event):
         polling: bool = True,
     ):
         super().__init__(
-            type=EventType.AGENT_SEND_REGISTRATION.value,
+            type=EventType.AGENT_REGISTER.value,
             account=account,
             source=agent.uri,
             details=agent.registration_info,
@@ -88,7 +89,7 @@ class ServerSendRegistrationEvent(Event):
         server: "Server",
     ):
         super().__init__(
-            type=EventType.SERVER_SEND_REGISTRATION.value,
+            type=EventType.SERVER_REGISTER.value,
             account=account,
             source=server.uri,
             details=server.registration_info,
@@ -97,7 +98,6 @@ class ServerSendRegistrationEvent(Event):
 
 class CaseStartEvent(Event):
     def __init__(self, case: "Case", account: "Account"):
-        print(f"CASE_START_EVENT {case} - {account}")
         super().__init__(
             type=EventType.CASE_START.value,
             account=account,
