@@ -1,9 +1,15 @@
+# Copyright (c) 2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 from typing import ClassVar
 from enum import Enum
 from pydantic import BaseModel
 
 from .__version__ import VERSION
 from .agent import Agent
+from .server import Server
 from .account import Account
 from .case import Case
 

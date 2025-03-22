@@ -1,3 +1,8 @@
+# Copyright (c) 2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import os
 import sys
 import uuid
@@ -243,7 +248,8 @@ class Server(ServerModel):
             reload (bool, optional): Whether to reload the server on code changes. Defaults to False.
         """
         # Set appropriate log level based on debug mode
-        log_level = "DEBUG" if debug else "ERROR"
+        # log_level = "DEBUG" if debug else "ERROR"
+
         # log.configure(handlers=[{"sink": "sys.stderr", "level": log_level}])
 
         kwargs["account"] = account
@@ -267,8 +273,8 @@ class Server(ServerModel):
                 "email": "integration_support@supervaize.com",
             },
             license_info={
-                "name": "License TBD - No responsibility for any issues",
-                "url": "https://TBD.com",
+                "name": "Mozilla Public License 2.0",
+                "url": "https://mozilla.org/MPL/2.0/",
             },
         )
         kwargs["reload"] = reload
