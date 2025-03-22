@@ -4,63 +4,71 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 
-import pytest
-
-from supervaize_control import AgentSendRegistrationEvent, Event, EventType
+from supervaize_control import (
+    AgentRegisterEvent,
+    CaseStartEvent,
+    CaseUpdateEvent,
+    Event,
+    EventType,
+    ServerRegisterEvent,
+)
 
 
 def test_event(event_fixture):
     assert isinstance(event_fixture, Event)
-    assert event_fixture.type.value == EventType.AGENT_WAKEUP.value
+    assert event_fixture.type == EventType.AGENT_WAKEUP
     assert event_fixture.source == "test"
     assert event_fixture.details == {"test": "value"}
+    assert list(event_fixture.payload.keys()) == [
+        "name",
+        "source",
+        "account",
+        "event_type",
+        "details",
+    ]
 
 
-def test_AGENT_REGISTER_event(
-    AGENT_REGISTER_event_fixture,
-    agent_fixture,
-):
-    assert isinstance(AGENT_REGISTER_event_fixture, AgentSendRegistrationEvent)
-    assert isinstance(AGENT_REGISTER_event_fixture, Event)
-    assert AGENT_REGISTER_event_fixture.source == agent_fixture.uri
-    assert AGENT_REGISTER_event_fixture.type == EventType.AGENT_REGISTER
-    assert AGENT_REGISTER_event_fixture.details["name"] == agent_fixture.name
-
-
-@pytest.mark.parametrize(
-    "event_class,event_type,source,details",
-    [
-        (Event, EventType.AGENT_WAKEUP, "test", {"test": "value"}),
-        (
-            AgentSendRegistrationEvent,
-            EventType.AGENT_REGISTER,
-            "agent:123",
-            {"name": "test_agent"},
-        ),
-        (
-            ServerSendRegistrationEvent,
-            EventType.SERVER_REGISTER,
-            "server:123",
-            {"url": "http://test"},
-        ),
-        (CaseStartEvent, EventType.CASE_START, "case:123", {"case_id": "123"}),
-        (CaseUpdateEvent, EventType.CASE_UPDATE, "case:123", {"status": "updated"}),
-    ],
-)
-def test_events(event_class, event_type, source, details, account_fixture):
-    event = event_class(
-        type=event_type, source=source, details=details, account=account_fixture
+def test_agent_register_event(agent_fixture, account_fixture):
+    agent_register_event = AgentRegisterEvent(
+        agent=agent_fixture,
+        account=account_fixture,
+        polling=False,
     )
+    assert isinstance(agent_register_event, AgentRegisterEvent)
+    assert agent_register_event.type == EventType.AGENT_REGISTER
+    assert agent_register_event.source.split(":")[0] == "agent"
+    assert agent_register_event.details["name"] == "agentName"
+    assert agent_register_event.details["polling"] is False
 
-    assert isinstance(event, Event)
-    assert event.type == event_type
-    assert event.source == source
-    assert event.details == details
-    assert event.account == account_fixture
 
-    payload = event.payload
-    assert payload["name"] == f"{event_type.value} {source}"
-    assert payload["source"] == source
-    assert payload["account"] == account_fixture.id
-    assert payload["event_type"] == event_type.value
-    assert payload["details"] == details
+def test_server_register_event(server_fixture, account_fixture):
+    server_register_event = ServerRegisterEvent(
+        server=server_fixture,
+        account=account_fixture,
+    )
+    assert isinstance(server_register_event, ServerRegisterEvent)
+    assert server_register_event.type == EventType.SERVER_REGISTER
+    assert server_register_event.source.split(":")[0] == "server"
+    assert server_register_event.details == server_fixture.registration_info
+
+
+def test_case_start_event(case_fixture, account_fixture):
+    case_start_event = CaseStartEvent(
+        case=case_fixture,
+        account=account_fixture,
+    )
+    assert isinstance(case_start_event, CaseStartEvent)
+    assert case_start_event.type == EventType.CASE_START
+    assert case_start_event.source.split(":")[0] == "case"
+    assert case_start_event.details == case_fixture.to_dict
+
+
+def test_case_update_event(case_fixture, account_fixture):
+    case_update_event = CaseUpdateEvent(
+        case=case_fixture,
+        account=account_fixture,
+    )
+    assert isinstance(case_update_event, CaseUpdateEvent)
+    assert case_update_event.type == EventType.CASE_UPDATE
+    assert case_update_event.source.split(":")[0] == "case"
+    assert case_update_event.details == case_fixture.to_dict

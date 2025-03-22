@@ -15,7 +15,7 @@ from .case import Case
 from .server import Server
 
 
-class EventType(Enum):
+class EventType(str, Enum):
     AGENT_REGISTER = "agent.register"
     SERVER_REGISTER = "server.register"
     AGENT_WAKEUP = "agent.wakeup"
@@ -30,6 +30,7 @@ class EventType(Enum):
     CASE_END = "agent.case.end"
     CASE_STATUS = "agent.case.status"
     CASE_RESULT = "agent.case.result"
+    CASE_UPDATE = "agent.case.update"
 
 
 class EventModel(BaseModel):
@@ -51,6 +52,8 @@ class Event(EventModel):
         - type: The EventType enum indicating the event category
         - account: The account that the event belongs to
         - details: A dictionary containing event-specific details
+
+    Tests in tests/test_event.py
     """
 
     def __init__(self, **kwargs):
@@ -67,7 +70,12 @@ class Event(EventModel):
         }
 
 
-class AgentSendRegistrationEvent(Event):
+class AgentRegisterEvent(Event):
+    """Event sent when an agent registers with the control system.
+
+    Test in tests/test_agent_register_event.py
+    """
+
     def __init__(
         self,
         agent: "Agent",
@@ -78,11 +86,11 @@ class AgentSendRegistrationEvent(Event):
             type=EventType.AGENT_REGISTER.value,
             account=account,
             source=agent.uri,
-            details=agent.registration_info,
+            details=agent.registration_info | {"polling": polling},
         )
 
 
-class ServerSendRegistrationEvent(Event):
+class ServerRegisterEvent(Event):
     def __init__(
         self,
         account: "Account",
@@ -101,7 +109,7 @@ class CaseStartEvent(Event):
         super().__init__(
             type=EventType.CASE_START.value,
             account=account,
-            source=case,
+            source=case.uri,
             details=case.to_dict,
         )
 
@@ -111,6 +119,6 @@ class CaseUpdateEvent(Event):
         super().__init__(
             type=EventType.CASE_UPDATE.value,
             account=account,
-            source=case,
+            source=case.uri,
             details=case.to_dict,
         )

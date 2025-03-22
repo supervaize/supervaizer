@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import VERSION
-from .common import log
+from .common import SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
 
 
@@ -167,7 +167,7 @@ class AgentCustomMethodParams(AgentMethodParams):
     method_name: str
 
 
-class AgentModel(BaseModel):
+class AgentModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     name: str
     id: str

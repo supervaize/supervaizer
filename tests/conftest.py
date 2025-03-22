@@ -13,7 +13,9 @@ from supervaize_control import (
     Account,
     Agent,
     AgentMethod,
-    AgentSendRegistrationEvent,
+    Case,
+    CaseNode,
+    CaseStatus,
     Event,
     EventType,
     Server,
@@ -30,8 +32,8 @@ def account_fixture():
     return Account(
         name="CUSTOMERFIRST",
         id="o34Z484gY9Nxz8axgTAdiH",
-        api_key="1234567890",
-        api_url="https://test.supervaize.com",
+        api_key="zYx680h5.73IZfE7c1tPNr6rvdeNwV3IahI6VzHYj",
+        api_url="https://ample-strong-coyote.ngrok-free.app",
     )
 
 
@@ -106,15 +108,6 @@ def event_fixture(account_fixture):
 
 
 @pytest.fixture
-def AGENT_REGISTER_event_fixture(agent_fixture, account_fixture):
-    return AgentSendRegistrationEvent(
-        agent=agent_fixture,
-        account=account_fixture,
-        polling=False,
-    )
-
-
-@pytest.fixture
 def telemetry_fixture():
     return Telemetry(
         agentId="123",
@@ -122,4 +115,24 @@ def telemetry_fixture():
         category=TelemetryCategory.SYSTEM,
         severity=TelemetrySeverity.INFO,
         details={"message": "Test message"},
+    )
+
+
+@pytest.fixture
+def case_node_fixture():
+    return CaseNode(
+        name="Test Node", description="Test Node Description", type="node_type"
+    )
+
+
+@pytest.fixture
+def case_fixture(account_fixture, case_node_fixture):
+    return Case(
+        id=str(uuid4()),
+        job_id="job123",
+        account=account_fixture,
+        status=CaseStatus.IN_PROGRESS,
+        name="Test Case",
+        description="Test Case Description",
+        nodes=[case_node_fixture],
     )

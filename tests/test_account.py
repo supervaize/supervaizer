@@ -93,7 +93,6 @@ def test_account_send_event_url_error(
         account_fixture.send_event(sender=server_fixture, event=event_fixture)
 
 
-@pytest.mark.current
 def test_account_register_server_success(account_fixture, server_fixture, mocker):
     mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = 200

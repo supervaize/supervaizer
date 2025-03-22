@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .__version__ import VERSION
 
 
-class TelemetryType(Enum):
+class TelemetryType(str, Enum):
     LOGS = "logs"
     METRICS = "metrics"
     EVENTS = "events"
@@ -21,7 +21,7 @@ class TelemetryType(Enum):
     CUSTOM = "custom"
 
 
-class TelemetryCategory(Enum):
+class TelemetryCategory(str, Enum):
     SYSTEM = "system"
     APPLICATION = "application"
     USER_INTERACTION = "user_interaction"
@@ -32,7 +32,7 @@ class TelemetryCategory(Enum):
     CUSTOM = "custom"
 
 
-class TelemetrySeverity(Enum):
+class TelemetrySeverity(str, Enum):
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"

@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 import requests
 import shortuuid
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from .__version__ import TELEMETRY_VERSION, VERSION
-from .common import ApiError, ApiResult, ApiSuccess, log
+from .common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
 from .telemetry import Telemetry
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .server import Server
 
 
-class AccountModel(BaseModel):
+class AccountModel(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
@@ -111,9 +111,9 @@ class Account(AccountModel):
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
-        from .event import ServerSendRegistrationEvent
+        from .event import ServerRegisterEvent
 
-        event = ServerSendRegistrationEvent(server=server, account=self)
+        event = ServerRegisterEvent(server=server, account=self)
         return self.send_event(server, event)
 
     def register_agent(self, agent: "Agent", polling: bool = True) -> ApiResult:
@@ -127,18 +127,18 @@ class Account(AccountModel):
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
-        from .event import AgentSendRegistrationEvent
+        from .event import AgentRegisterEvent
 
-        event = AgentSendRegistrationEvent(agent=agent, account=self, polling=polling)
+        event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
         return self.send_event(agent, event)
 
-    def start_case(self, case: "Case") -> ApiResult:
+    def send_start_case(self, case: "Case") -> ApiResult:
         from .event import CaseStartEvent
 
         event = CaseStartEvent(case=case, account=self)
         return self.send_event(case, event)
 
-    def update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
+    def send_update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
         from .event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)

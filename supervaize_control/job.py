@@ -122,7 +122,7 @@ class JobContext(SvBaseModel):
     job_conditions: JobConditions = None
 
 
-class JobStatus(Enum):
+class JobStatus(str, Enum):
     STOPPED = "stopped"
     IN_PROGRESS = "in_progress"
     PAUSED = "paused"

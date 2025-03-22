@@ -6,6 +6,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from pydantic import ConfigDict
 
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from .account import Account
 
 
-class CaseStatus(Enum):
+class CaseStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -52,14 +53,18 @@ class Case(CaseModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    @property
+    def uri(self):
+        return f"case:{self.id}"
+
     def update(self, update: CaseNodeUpdate, **kwargs) -> None:
         log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
-        self.account.update_case(self, update)
+        self.account.send_update_case(self, update)
         self.updates.append(update)
 
     def human_input(self, update: CaseNodeUpdate, message: str, **kwargs) -> None:
         log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
-        self.account.update_case(self, update)
+        self.account.send_update_case(self, update)
         self.updates.append(update)
 
     def resume(self, **kwargs):
@@ -71,7 +76,6 @@ class Case(CaseModel):
     @classmethod
     def start(
         cls,
-        case_id: str,
         job_id: str,
         account: "Account",
         name: str,
@@ -92,9 +96,7 @@ class Case(CaseModel):
         Returns:
             Case: The case
         """
-        log.info(
-            f"CONTROLLER : Starting case {case_id} for job {job_id} with account {account.name}"
-        )
+        case_id = str(uuid4())
 
         case = cls(
             id=case_id,
@@ -107,6 +109,7 @@ class Case(CaseModel):
         )
         log.info(f"CONTROLLER : Case {case.id} created")
 
-        account.start_case(case=case)
+        # Send case startvent to Supervaize SaaS.
+        account.send_start_case(case=case)
 
         return case

@@ -10,9 +10,16 @@ from .agent import (
     AgentMethod,
     AgentMethodParams,
 )
-from .case import Case, CaseNode, CaseNodeUpdate
+from .case import Case, CaseNode, CaseNodeUpdate, CaseStatus
 from .common import ApiError, ApiResult, ApiSuccess
-from .event import AgentSendRegistrationEvent, Event, EventType
+from .event import (
+    AgentRegisterEvent,
+    CaseStartEvent,
+    CaseUpdateEvent,
+    Event,
+    EventType,
+    ServerRegisterEvent,
+)
 from .job import Job, JobConditions, JobContext, JobResponse, JobStatus
 from .server import Server
 from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
@@ -28,7 +35,7 @@ __all__ = [
     TelemetrySeverity,
     Event,
     EventType,
-    AgentSendRegistrationEvent,
+    AgentRegisterEvent,
     AgentMethod,
     AgentCustomMethodParams,
     AgentMethodParams,
@@ -44,6 +51,10 @@ __all__ = [
     CaseNodeUpdate,
     CaseNode,
     CaseNodeUpdate,
+    CaseStartEvent,
+    CaseUpdateEvent,
+    CaseStatus,
+    ServerRegisterEvent,
 ]
 
 # Rebuild models to resolve forward references after all imports are done
