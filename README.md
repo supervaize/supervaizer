@@ -120,11 +120,13 @@ This project uses [just](https://github.com/casey/just) as a command runner. Her
 ### Setup Development Environment
 
 1. Clone the repository
-2. Set up a virtual environment: `python -m venv .venv`
-3. Activate the environment:
+2. Install uv: `pip install uv`
+3. Create and activate a virtual environment:
+   - `uv venv`
    - Windows: `.venv\Scripts\activate`
    - Unix/MacOS: `source .venv/bin/activate`
-4. Install development dependencies: `pip install -e ".[dev]"`
+4. Install development dependencies: `uv pip install -e ".[dev]"`
+5. Install pre-commit hooks: `pre-commit install`
 
 ### Running Tests
 

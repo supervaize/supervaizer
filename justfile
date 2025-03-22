@@ -4,16 +4,24 @@ set shell := ["bash", "-uc"]
 nowts:=`date +%Y%m%d_%H%M%S`
 YYYYMMDD:= `date +%Y%m%d`
 
+
+# Development
+
+# Run pre-commit hooks manually
+pre-commit-manual:
+    pre-commit run --all-files --verbose
+
+
 # Sync dependencies
 env_sync:
     uv sync
 
 # build
-build: 
+build:
     hatch build
 
 # Increase 0.0.1
-build_fix: 
+build_fix:
     hatch version fix
     hatch build
 
@@ -30,4 +38,6 @@ build_major:
 
 # API documentation @http://127.0.0.1:8000/redoc
 unicorn:
-    uvicorn controller:app --reload 
+    uvicorn controller:app --reload
+
+#
