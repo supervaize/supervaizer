@@ -4,6 +4,9 @@ set shell := ["bash", "-uc"]
 nowts:=`date +%Y%m%d_%H%M%S`
 YYYYMMDD:= `date +%Y%m%d`
 
+# Sync dependencies
+env_sync:
+    uv sync
 
 # build
 build: 

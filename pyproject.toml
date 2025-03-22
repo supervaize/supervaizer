@@ -1,8 +1,11 @@
 [project]
 name = "supervaize-control"
-description = "Add your description here"
+description = "Controller system for Supervaize"
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [
+    { name = "Alain Prasquier - Supervaize", email = "alain@supervaize.com" },
+]
 dependencies = [
     "art>=6.4",
     "demjson3>=3.0.6",
@@ -16,11 +19,17 @@ dependencies = [
     "uvicorn>=0.34.0",
 ]
 license = "MPL-2.0"
-classifiers = ["Private :: Do Not Upload"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
 dynamic = ["version"]
 
 [dependency-groups]
-dev = ["pytest>=8.3.4"]
+dev = ["pytest>=8.3.4", "pre-commit>=3.7.0", "ruff>=0.3.4", "hatch>=1.9.3"]
 
 [tool.pytest.ini_options]
 markers = [

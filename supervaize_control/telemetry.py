@@ -3,7 +3,7 @@ from typing import ClassVar
 from enum import Enum
 from pydantic import BaseModel
 
-from .__version__ import TELEMETRY_VERSION, VERSION
+from .__version__ import VERSION
 
 
 class TelemetryType(Enum):
@@ -37,7 +37,6 @@ class TelemetrySeverity(Enum):
 
 class TelemetryModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
-    TELEMETRY_VERSION: ClassVar[str] = TELEMETRY_VERSION
     agentId: str
     type: TelemetryType
     category: TelemetryCategory

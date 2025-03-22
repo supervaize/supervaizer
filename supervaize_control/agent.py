@@ -5,7 +5,7 @@ from .common import log
 from pydantic import BaseModel
 from slugify import slugify
 
-from .__version__ import AGENT_VERSION, VERSION
+from .__version__ import VERSION
 from .job import Job, JobContext, JobResponse, JobStatus
 
 
@@ -164,7 +164,6 @@ class AgentCustomMethodParams(AgentMethodParams):
 
 class AgentModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
-    AGENT_VERSION: ClassVar[str] = AGENT_VERSION
     name: str
     id: str
     author: str

@@ -236,3 +236,6 @@ pyrightconfig.json
 /supervaize_control/.cursorrules
 /CLAUDE.md
 /fix
+
+# Pre-commit
+.pre-commit-cache/

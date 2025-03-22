@@ -2,7 +2,7 @@ from typing import ClassVar
 from enum import Enum
 from pydantic import BaseModel
 
-from .__version__ import EVENT_VERSION, VERSION
+from .__version__ import VERSION
 from .agent import Agent
 from .account import Account
 from .case import Case
@@ -27,7 +27,6 @@ class EventType(Enum):
 
 class EventModel(BaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
-    EVENT_VERSION: ClassVar[str] = EVENT_VERSION
     source: str
     account: Account
     type: EventType

@@ -113,6 +113,10 @@ if job.status == JobStatus.COMPLETED:
 
 ## Development
 
+This project uses [just](https://github.com/casey/just) as a command runner. Here are the available commands:
+
+`just -l`
+
 ### Setup Development Environment
 
 1. Clone the repository
