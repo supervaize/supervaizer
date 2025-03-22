@@ -4,14 +4,18 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 from datetime import datetime
+
+from uuid import uuid4
+import pytest
 from supervaize_control.job import Job, JobStatus, JobResponse
 from supervaize_control.job import JobContext
 
 
-def create_test_supervaize_context():
+@pytest.fixture
+def context_fixture():
     return JobContext(
         workspace_id="test-workspace",
-        job_id="test123",
+        job_id=str(uuid4()),
         started_by="test-user",
         started_at=datetime.now(),
         mission_id="test-mission",
@@ -20,17 +24,21 @@ def create_test_supervaize_context():
     )
 
 
-def test_job_creation():
-    supervaize_context = create_test_supervaize_context()
+@pytest.fixture
+def job_fixture(context_fixture):
+    return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
 
+
+def test_job_creation(context_fixture, job_fixture):
+    supervaize_context = context_fixture
+    job = job_fixture
+    job_id = job.id
     response = JobResponse(
-        job_ref="test123",
+        job_id=job_id,
         status=JobStatus.IN_PROGRESS,
         message="Starting job",
         payload={"test": "data"},
     )
-
-    job = Job.new(supervaize_context=supervaize_context)
 
     job.add_response(response)
     assert job.supervaize_context == supervaize_context
@@ -40,16 +48,12 @@ def test_job_creation():
     assert job.payload == {"test": "data"}
 
 
-def test_job_add_response():
-    supervaize_context = create_test_supervaize_context()
-
-    # Create initial job
-
-    job = Job.new(supervaize_context=supervaize_context)
-
+def test_job_add_response(job_fixture):
+    job = job_fixture
+    job_id = job.id
     # Add intermediary response
     inter_response = JobResponse(
-        job_ref="test123",
+        job_id=job_id,
         status=JobStatus.PAUSED,
         message="Processing",
         payload={"progress": "50%"},
@@ -61,7 +65,7 @@ def test_job_add_response():
 
     # Add final response
     final_response = JobResponse(
-        job_ref="test123",
+        job_id=job_id,
         status=JobStatus.COMPLETED,
         message="Complete",
         payload={"result": "success"},
@@ -73,14 +77,12 @@ def test_job_add_response():
     assert isinstance(job.finished_at, datetime)
 
 
-def test_job_error_response():
-    supervaize_context = create_test_supervaize_context()
-
+def test_job_error_response(job_fixture):
     # Create job and add error response
-    job = Job.new(supervaize_context=supervaize_context)
-
+    job = job_fixture
+    job_id = job.id
     error_response = JobResponse(
-        job_ref="test123",
+        job_id=job_id,
         status=JobStatus.FAILED,
         message="Something went wrong",
         payload=None,
@@ -92,13 +94,12 @@ def test_job_error_response():
     assert isinstance(job.finished_at, datetime)
 
 
-def test_job_human_request():
-    supervaize_context = create_test_supervaize_context()
-    job = Job.new(supervaize_context=supervaize_context)
+def test_job_human_request(job_fixture):
+    job = job_fixture
     assert job.status == JobStatus.IN_PROGRESS
-
+    job_id = job.id
     response = JobResponse(
-        job_ref="test123",
+        job_id=job_id,
         status=JobStatus.WAITING,
         message="Need human input",
         payload={"question": "What next?"},

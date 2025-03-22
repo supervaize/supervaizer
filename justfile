@@ -11,6 +11,9 @@ YYYYMMDD:= `date +%Y%m%d`
 pre-commit-manual:
     pre-commit run --all-files --verbose
 
+# Run tests without coverage
+test-no-cov:
+    pytest --no-cov
 
 # Sync dependencies
 env_sync:
