@@ -15,16 +15,18 @@ from supervaize_control import (
     AgentMethod,
     Case,
     CaseNode,
+    CaseNodeUpdate,
     CaseStatus,
     Event,
     EventType,
+    Job,
+    JobContext,
     Server,
     Telemetry,
     TelemetryCategory,
     TelemetrySeverity,
     TelemetryType,
 )
-from supervaize_control.job import Job, JobContext
 
 
 @pytest.fixture
@@ -135,4 +137,13 @@ def case_fixture(account_fixture, case_node_fixture):
         name="Test Case",
         description="Test Case Description",
         nodes=[case_node_fixture],
+    )
+
+
+@pytest.fixture
+def case_node_update_fixture():
+    return CaseNodeUpdate(
+        payload={"test": "value"},
+        is_final=True,
+        cost=10.0,
     )

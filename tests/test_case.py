@@ -3,7 +3,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from supervaize_control.case import Case
+from supervaize_control.case import Case, CaseNodeUpdate, CaseStatus
 
 
 def test_case(case_fixture, case_node_fixture):
@@ -62,3 +62,59 @@ def test_case_start(account_fixture, case_node_fixture, requests_mock):
     )
 
     assert isinstance(new_case, Case)
+
+
+def test_case_close(account_fixture, requests_mock, case_fixture):
+    # Setup
+
+    case = case_fixture
+    case_result = {"status": "success"}
+    final_cost = 10.0
+
+    # simulate successful event update
+    requests_mock.post(
+        f"{account_fixture.api_url}/api/v1/ctrl-events/",
+        status_code=200,
+        json={
+            "details": {
+                "id": "6be515d3-8f5d-4194-9043-146f17463ee4",
+            }
+        },
+    )
+    # Execute
+    case.close(case_result=case_result, final_cost=final_cost)
+
+    # Assert
+    assert case.status == CaseStatus.COMPLETED
+    assert case.total_cost == final_cost
+    assert case.final_delivery == case_result
+
+
+def test_case_close_without_final_cost(account_fixture, requests_mock, case_fixture):
+    # Setup
+    case = case_fixture
+
+    # Add some updates with costs
+    case.updates = [
+        CaseNodeUpdate(cost=5.0, payload={}),
+        CaseNodeUpdate(cost=3.0, payload={}),
+    ]
+    case_result = {"status": "success"}
+
+    # simulate successful event update
+    requests_mock.post(
+        f"{account_fixture.api_url}/api/v1/ctrl-events/",
+        status_code=200,
+        json={
+            "details": {
+                "id": "6be515d3-8f5d-4194-9043-146f17463ee4",
+            }
+        },
+    )
+    # Execute
+    case.close(case_result=case_result, final_cost=None)
+
+    # Assert
+    assert case.status == CaseStatus.COMPLETED
+    assert case.total_cost == 8.0  # Sum of update costs
+    assert case.final_delivery == case_result

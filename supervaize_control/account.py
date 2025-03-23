@@ -73,7 +73,7 @@ class Account(AccountModel):
         Returns:
             ApiResult: ApiSuccess with response details if successful,
         Raises:
-            ApiError: If the request fails
+            Request exception if the request fails.
         """
 
         log.debug(f"Sending event {event.type.name} to {self.url_event}")

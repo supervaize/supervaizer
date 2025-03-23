@@ -63,12 +63,13 @@ def test_case_start_event(case_fixture, account_fixture):
     assert case_start_event.details == case_fixture.to_dict
 
 
-def test_case_update_event(case_fixture, account_fixture):
+def test_case_update_event(case_fixture, account_fixture, case_node_update_fixture):
     case_update_event = CaseUpdateEvent(
         case=case_fixture,
         account=account_fixture,
+        update=case_node_update_fixture,
     )
     assert isinstance(case_update_event, CaseUpdateEvent)
     assert case_update_event.type == EventType.CASE_UPDATE
     assert case_update_event.source.split(":")[0] == "case"
-    assert case_update_event.details == case_fixture.to_dict
+    assert case_update_event.details == case_node_update_fixture.to_dict

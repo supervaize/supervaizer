@@ -3,7 +3,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -24,8 +23,8 @@ class CaseStatus(str, Enum):
 
 
 class CaseNodeUpdate(SvBaseModel):
-    timestamp: datetime
-    cost: float = 0.0
+    cost: float | None = None
+    # Todo: test with non-serializable objects. Make sure it works.
     payload: dict | None = None
     is_final: bool = False
     question: dict | None = None
@@ -47,6 +46,8 @@ class CaseModel(SvBaseModel):
     status: CaseStatus
     nodes: list[CaseNode] = []
     updates: list[CaseNodeUpdate] = []
+    total_cost: float = 0.0
+    final_delivery: dict | None = None
 
 
 class Case(CaseModel):
@@ -56,6 +57,10 @@ class Case(CaseModel):
     @property
     def uri(self):
         return f"case:{self.id}"
+
+    @property
+    def calculated_cost(self):
+        return sum(update.cost for update in self.updates)
 
     def update(self, update: CaseNodeUpdate, **kwargs) -> None:
         log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
@@ -70,8 +75,24 @@ class Case(CaseModel):
     def resume(self, **kwargs):
         pass
 
-    def close(self, **kwargs):
-        pass
+    def close(self, case_result: dict, final_cost: float | None, **kwargs):
+        """
+        Close the case and send the final update to the account.
+        """
+        if final_cost:
+            self.total_cost = final_cost
+        else:
+            self.total_cost = self.calculated_cost
+        log.info(
+            f"CONTROLLER : Closing case {self.id} with result {case_result} - Case cost is {self.total_cost}"
+        )
+        self.status = CaseStatus.COMPLETED
+        update = CaseNodeUpdate(
+            payload=case_result,
+            is_final=True,
+        )
+        self.final_delivery = case_result
+        self.account.send_update_case(self, update)
 
     @classmethod
     def start(
@@ -81,6 +102,7 @@ class Case(CaseModel):
         name: str,
         description: str,
         nodes: list[CaseNode],
+        case_id: str = str(uuid4()),
     ):
         """
         Start a new case
@@ -96,7 +118,6 @@ class Case(CaseModel):
         Returns:
             Case: The case
         """
-        case_id = str(uuid4())
 
         case = cls(
             id=case_id,

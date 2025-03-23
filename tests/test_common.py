@@ -45,6 +45,10 @@ def test_api_success_basic():
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
+    assert (
+        str(success)
+        == '{"message": "success message", "code": "200", "detail": {"test": "data"}, "log_message": "\\u2705 success message"}'
+    )
 
 
 def test_api_error_basic():

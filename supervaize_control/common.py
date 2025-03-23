@@ -5,6 +5,7 @@
 
 import json
 import traceback
+from datetime import datetime
 
 import demjson3
 from loguru import logger
@@ -17,6 +18,10 @@ class SvBaseModel(BaseModel):
     """
     Base model for all Supervaize models.
     """
+
+    model_config = {
+        "json_schema_serialization_defaults": {datetime: lambda x: x.isoformat()}
+    }
 
     @property
     def to_dict(self):
@@ -34,7 +39,7 @@ class ApiResult:
         self.detail = detail
 
     def __str__(self) -> str:
-        return self.json_return
+        return f"{self.json_return}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.message})"

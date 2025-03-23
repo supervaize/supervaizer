@@ -6,12 +6,11 @@
 from enum import Enum
 from typing import ClassVar
 
-from pydantic import BaseModel
-
 from .__version__ import VERSION
 from .account import Account
 from .agent import Agent
-from .case import Case
+from .case import Case, CaseNodeUpdate
+from .common import SvBaseModel
 from .server import Server
 
 
@@ -33,7 +32,7 @@ class EventType(str, Enum):
     CASE_UPDATE = "agent.case.update"
 
 
-class EventModel(BaseModel):
+class EventModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     source: str
     account: Account
@@ -61,11 +60,15 @@ class Event(EventModel):
 
     @property
     def payload(self) -> dict:
+        """
+        Returns the payload for the event.
+        This must be a dictionary that can be serialized to JSON to be sent in the request body.
+        """
         return {
             "name": f"{self.type.value} {self.source}",
-            "source": self.source,
-            "account": self.account.id,
-            "event_type": self.type.value,
+            "source": f"{self.source}",
+            "account": f"{self.account.id}",
+            "event_type": f"{self.type.value}",
             "details": self.details,
         }
 
@@ -115,10 +118,10 @@ class CaseStartEvent(Event):
 
 
 class CaseUpdateEvent(Event):
-    def __init__(self, case: "Case", account: "Account"):
+    def __init__(self, case: "Case", account: "Account", update: "CaseNodeUpdate"):
         super().__init__(
             type=EventType.CASE_UPDATE.value,
             account=account,
             source=case.uri,
-            details=case.to_dict,
+            details=update.to_dict,
         )
