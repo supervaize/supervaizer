@@ -3,21 +3,16 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaize_control import Agent, AgentMethod
+from supervaize_control import Agent, AgentMethod, Secrets
 from supervaize_control.job import JobContext
-
-
-@pytest.fixture
-def agent_method_fixture():
-    return AgentMethod(
-        name="start",
-        method="start",
-        params={"param1": "value1"},
-        description="Start the agent",
-    )
 
 
 def test_agent_method_fixture(agent_method_fixture):
@@ -26,26 +21,6 @@ def test_agent_method_fixture(agent_method_fixture):
     assert agent_method_fixture.method == "start"
     assert agent_method_fixture.params == {"param1": "value1"}
     assert agent_method_fixture.description == "Start the agent"
-
-
-@pytest.fixture
-def agent_fixture(agent_method_fixture):
-    return Agent(
-        id="LMKyPAS2Q8sKWBY34DS37a",
-        name="agentName",
-        author="authorName",
-        developer="Dev",
-        version="1.0.0",
-        description="description",
-        job_start_method=agent_method_fixture,
-        job_stop_method=agent_method_fixture,
-        job_status_method=agent_method_fixture,
-        chat_method=agent_method_fixture,
-        custom_methods={
-            "method1": agent_method_fixture,
-            "method2": agent_method_fixture,
-        },
-    )
 
 
 def test_agent(agent_fixture):
@@ -329,3 +304,18 @@ def test_job_model_dynamic_model():
     empty_instance = EmptyJobModel(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
     assert empty_instance.supervaize_context.workspace_id == "ws-123"
+
+
+def test_agent_secrets(agent_fixture):
+    assert agent_fixture.secrets is not None
+    assert isinstance(agent_fixture.secrets, Secrets)
+    assert len(agent_fixture.secrets.secrets) == 2
+    assert agent_fixture.secrets.get_secret("secret1").value == "value1"
+    assert agent_fixture.secrets.get_secret("secret2").value == "value2"
+    assert agent_fixture.secrets.get_secret("secret2").description == "desc2"
+    assert agent_fixture.secrets.get_secret("secret1").description is None
+
+
+def test_agent_secrets_not_found(agent_fixture):
+    with pytest.raises(KeyError):
+        agent_fixture.secrets.get_secret("nonexistent")

@@ -21,6 +21,8 @@ from supervaize_control import (
     EventType,
     Job,
     JobContext,
+    Secret,
+    Secrets,
     Server,
     Telemetry,
     TelemetryCategory,
@@ -50,26 +52,6 @@ def agent_method_fixture():
 
 
 @pytest.fixture
-def agent_fixture(agent_method_fixture):
-    return Agent(
-        id="LMKyPAS2Q8sKWBY34DS37a",
-        name="agentName",
-        author="authorName",
-        developer="Dev",
-        version="1.0.0",
-        description="description",
-        job_start_method=agent_method_fixture,
-        job_stop_method=agent_method_fixture,
-        job_status_method=agent_method_fixture,
-        chat_method=agent_method_fixture,
-        custom_methods={
-            "method1": agent_method_fixture,
-            "method2": agent_method_fixture,
-        },
-    )
-
-
-@pytest.fixture
 def context_fixture():
     return JobContext(
         workspace_id="test-workspace",
@@ -85,18 +67,6 @@ def context_fixture():
 @pytest.fixture
 def job_fixture(context_fixture):
     return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
-
-
-@pytest.fixture
-def server_fixture(agent_fixture, account_fixture):
-    return Server(
-        agents=[agent_fixture],
-        host="localhost",
-        port=8001,
-        environment="test",
-        debug=True,
-        account=account_fixture,
-    )
 
 
 @pytest.fixture
@@ -146,4 +116,57 @@ def case_node_update_fixture():
         payload={"test": "value"},
         is_final=True,
         cost=10.0,
+    )
+
+
+@pytest.fixture
+def secret_fixture():
+    return Secret(
+        name="test_secret", value="test_value", description="test description"
+    )
+
+
+@pytest.fixture
+def secrets_list_fixture():
+    return [
+        Secret(name="secret1", value="value1"),
+        Secret(name="secret2", value="value2", description="desc2"),
+    ]
+
+
+@pytest.fixture
+def secrets_fixture(secrets_list_fixture):
+    return Secrets(secrets=secrets_list_fixture)
+
+
+@pytest.fixture
+def agent_fixture(agent_method_fixture, secrets_fixture):
+    return Agent(
+        id="LMKyPAS2Q8sKWBY34DS37a",
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        job_start_method=agent_method_fixture,
+        job_stop_method=agent_method_fixture,
+        job_status_method=agent_method_fixture,
+        chat_method=agent_method_fixture,
+        custom_methods={
+            "method1": agent_method_fixture,
+            "method2": agent_method_fixture,
+        },
+        secrets=secrets_fixture,
+    )
+
+
+@pytest.fixture
+def server_fixture(agent_fixture, account_fixture):
+    return Server(
+        agents=[agent_fixture],
+        host="localhost",
+        port=8001,
+        environment="test",
+        debug=True,
+        account=account_fixture,
     )

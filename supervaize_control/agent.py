@@ -12,6 +12,7 @@ from slugify import slugify
 from .__version__ import VERSION
 from .common import SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
+from .secret import Secrets
 
 
 class AgentJobContextBase(BaseModel):
@@ -181,6 +182,7 @@ class AgentModel(SvBaseModel):
     job_status_method: AgentMethod
     chat_method: AgentMethod | None = None
     custom_methods: dict[str, AgentMethod] | None = None
+    secrets: Secrets | None = None
 
 
 class Agent(AgentModel):

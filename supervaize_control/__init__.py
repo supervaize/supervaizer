@@ -21,6 +21,7 @@ from .event import (
     ServerRegisterEvent,
 )
 from .job import Job, JobConditions, JobContext, JobResponse, JobStatus
+from .secret import Secret, Secrets
 from .server import Server
 from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
 
@@ -55,6 +56,8 @@ __all__ = [
     CaseUpdateEvent,
     CaseStatus,
     ServerRegisterEvent,
+    Secret,
+    Secrets,
 ]
 
 # Rebuild models to resolve forward references after all imports are done
