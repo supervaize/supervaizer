@@ -12,7 +12,7 @@ from slugify import slugify
 from .__version__ import VERSION
 from .common import SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
-from .secret import Secrets
+from .parameter import Parameters
 
 
 class AgentJobContextBase(BaseModel):
@@ -182,7 +182,7 @@ class AgentModel(SvBaseModel):
     job_status_method: AgentMethod
     chat_method: AgentMethod | None = None
     custom_methods: dict[str, AgentMethod] | None = None
-    secrets: Secrets | None = None
+    parameters: Parameters | None = None
 
 
 class Agent(AgentModel):
@@ -228,6 +228,9 @@ class Agent(AgentModel):
             "custom_methods": {
                 k: v.registration_info for k, v in (self.custom_methods or {}).items()
             },
+            "parameters": self.parameters.registration_info
+            if self.parameters
+            else None,
         }
 
     def _execute(self, action: str, params: Dict[str, Any] = {}):

@@ -11,7 +11,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaize_control import Agent, AgentMethod, Secrets
+from supervaize_control import Agent, AgentMethod, Parameters
 from supervaize_control.job import JobContext
 
 
@@ -306,16 +306,16 @@ def test_job_model_dynamic_model():
     assert empty_instance.supervaize_context.workspace_id == "ws-123"
 
 
-def test_agent_secrets(agent_fixture):
-    assert agent_fixture.secrets is not None
-    assert isinstance(agent_fixture.secrets, Secrets)
-    assert len(agent_fixture.secrets.secrets) == 2
-    assert agent_fixture.secrets.get_secret("secret1").value == "value1"
-    assert agent_fixture.secrets.get_secret("secret2").value == "value2"
-    assert agent_fixture.secrets.get_secret("secret2").description == "desc2"
-    assert agent_fixture.secrets.get_secret("secret1").description is None
+def test_agent_parameters(agent_fixture):
+    assert agent_fixture.parameters is not None
+    assert isinstance(agent_fixture.parameters, Parameters)
+    assert len(agent_fixture.parameters.parameters) == 2
+    assert agent_fixture.parameters.get_parameter("parameter1").value == "value1"
+    assert agent_fixture.parameters.get_parameter("parameter2").value == "value2"
+    assert agent_fixture.parameters.get_parameter("parameter2").description == "desc2"
+    assert agent_fixture.parameters.get_parameter("parameter1").description is None
 
 
 def test_agent_secrets_not_found(agent_fixture):
     with pytest.raises(KeyError):
-        agent_fixture.secrets.get_secret("nonexistent")
+        agent_fixture.parameters.get_parameter("nonexistent")

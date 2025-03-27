@@ -21,8 +21,8 @@ from supervaize_control import (
     EventType,
     Job,
     JobContext,
-    Secret,
-    Secrets,
+    Parameter,
+    Parameters,
     Server,
     Telemetry,
     TelemetryCategory,
@@ -120,27 +120,27 @@ def case_node_update_fixture():
 
 
 @pytest.fixture
-def secret_fixture():
-    return Secret(
-        name="test_secret", value="test_value", description="test description"
+def parameter_fixture():
+    return Parameter(
+        name="test_parameter", value="test_value", description="test description"
     )
 
 
 @pytest.fixture
-def secrets_list_fixture():
+def parameters_list_fixture():
     return [
-        Secret(name="secret1", value="value1"),
-        Secret(name="secret2", value="value2", description="desc2"),
+        Parameter(name="parameter1", value="value1"),
+        Parameter(name="parameter2", value="value2", description="desc2"),
     ]
 
 
 @pytest.fixture
-def secrets_fixture(secrets_list_fixture):
-    return Secrets(secrets=secrets_list_fixture)
+def parameters_fixture(parameters_list_fixture):
+    return Parameters(parameters=parameters_list_fixture)
 
 
 @pytest.fixture
-def agent_fixture(agent_method_fixture, secrets_fixture):
+def agent_fixture(agent_method_fixture, parameters_fixture):
     return Agent(
         id="LMKyPAS2Q8sKWBY34DS37a",
         name="agentName",
@@ -156,7 +156,7 @@ def agent_fixture(agent_method_fixture, secrets_fixture):
             "method1": agent_method_fixture,
             "method2": agent_method_fixture,
         },
-        secrets=secrets_fixture,
+        parameters=parameters_fixture,
     )
 
 
