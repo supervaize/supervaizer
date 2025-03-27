@@ -5,10 +5,17 @@
 
 import json
 
-import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
 
-from supervaize_control.common import ApiError, ApiSuccess, SvBaseModel, singleton
+from supervaize_control.common import (
+    ApiError,
+    ApiSuccess,
+    SvBaseModel,
+    decrypt_value,
+    encrypt_value,
+    singleton,
+)
 
 
 def test_sv_base_model():
@@ -29,7 +36,6 @@ def test_sv_base_model():
     assert json_data == {"name": "test", "value": 42}
 
 
-@pytest.mark.current
 def test_api_success_basic():
     """Test basic ApiSuccess functionality"""
     success = ApiSuccess(detail={"test": "data"}, message="success message")
@@ -196,3 +202,24 @@ def test_singleton():
     # Should share state
     instance1.value = 42
     assert instance2.value == 42
+
+
+def test_encrypt_decrypt():
+    """Test encryption and decryption of values"""
+    # Generate test keys
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+
+    # Test string to encrypt
+    test_value = "secret message"
+
+    # Test encryption
+    encrypted = encrypt_value(test_value, public_key)
+    assert encrypted is not None
+    assert isinstance(encrypted, str)
+    assert encrypted != test_value
+    assert len(encrypted) > len(test_value)
+
+    # Test decryption
+    decrypted = decrypt_value(encrypted, private_key)
+    assert decrypted == test_value

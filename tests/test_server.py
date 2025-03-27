@@ -42,3 +42,14 @@ def test_server(server_fixture):
     assert server_fixture.environment == "test"
     assert server_fixture.debug
     assert len(server_fixture.agents) == 1
+
+
+def test_server_decrypt(server_fixture):
+    unencrypted_parameters = str({"KEY": "VALUE"})
+    encrypted_parameters = server_fixture.encrypt(unencrypted_parameters)
+    assert encrypted_parameters is not None
+    assert isinstance(encrypted_parameters, str)
+    assert len(encrypted_parameters) > len(unencrypted_parameters)
+
+    decrypted_parameters = server_fixture.decrypt(encrypted_parameters)
+    assert decrypted_parameters == unencrypted_parameters

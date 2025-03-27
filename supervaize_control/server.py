@@ -11,6 +11,9 @@ from enum import Enum
 from typing import Annotated, ClassVar, List
 from urllib.parse import urlunparse
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -28,9 +31,10 @@ from pydantic import BaseModel, field_validator
 from .__version__ import VERSION
 from .account import Account
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
-from .common import SvBaseModel, log
+from .common import SvBaseModel, decrypt_value, encrypt_value, log
 from .instructions import display_instructions
 from .job import Job, JobContext, Jobs, JobStatus
+from .parameter import Parameters
 
 
 class ServerModel(SvBaseModel):
@@ -52,6 +56,8 @@ class ServerModel(SvBaseModel):
     app: FastAPI
     reload: bool
     account: Account
+    private_key: rsa.RSAPrivateKey = None
+    public_key: rsa.RSAPublicKey = None
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -74,6 +80,7 @@ class ErrorType(str, Enum):
     AGENT_NOT_FOUND = "agent_not_found"
     INVALID_REQUEST = "invalid_request"
     INTERNAL_ERROR = "internal_error"
+    INVALID_PARAMETERS = "invalid_parameters"
 
 
 class ErrorResponse(BaseModel):
@@ -103,16 +110,6 @@ def create_error_response(
 
 
 default_router = APIRouter()
-
-
-@default_router.get("/", tags=["Public"])
-def read_root(agents: list[Agent]):
-    return {
-        "message": f"Welcome to the Supervaize Control API v{VERSION}. Use the /trigger endpoint to run the analysis."
-    }
-
-
-# Server = ForwardRef("Server")
 
 
 @default_router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
@@ -285,8 +282,14 @@ class Server(ServerModel):
         kwargs["mac_addr"] = "-".join(
             ("%012X" % uuid.getnode())[i : i + 2] for i in range(0, 12, 2)
         )
+
+        kwargs["private_key"] = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        kwargs["public_key"] = kwargs["private_key"].public_key()
         super().__init__(**kwargs)
         self.add_route(default_router)
+        self.create_utils_routes()
         self.create_agent_routes()
 
         # Override the get_server dependency to return this instance
@@ -315,6 +318,34 @@ class Server(ServerModel):
 
     def add_route(self, route: str):
         self.app.include_router(route)
+
+    def create_utils_routes(self):
+        router = APIRouter(prefix="/utils", tags=["Utils"])
+
+        @router.get(
+            "/public_key",
+            summary="Get server's public key",
+            description="Returns the server's public key in PEM format",
+            response_model=str,
+        )
+        async def get_public_key() -> str:
+            pem = self.public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            return pem.decode("utf-8")
+
+        @router.post(
+            "/encrypt",
+            summary="Encrypt a string",
+            description="Encrypts a string using the server's public key. Example: {'key':'value'}",
+            response_model=str,
+            response_description="The encrypted string",
+        )
+        async def encrypt_string(text: str = Body(...)) -> str:
+            return self.encrypt(text)
+
+        self.app.include_router(router)
 
     def create_agent_routes(self):
         for agent in self.agents:
@@ -361,9 +392,28 @@ class Server(ServerModel):
                     sv_context: JobContext = body_params.supervaize_context
                     job_fields = body_params.job_fields.to_dict()
 
+                    # Get agent encrypted parameters if available
+                    encrypted_agent_parameters = getattr(
+                        body_params, "encrypted_agent_parameters", None
+                    )
+                    log.debug(
+                        f"Encrypted agent parameters: {encrypted_agent_parameters}"
+                    )
+
+                    # If agent has parameters_setup defined, validate parameters
+                    if agent.parameters_setup and encrypted_agent_parameters:
+                        agent_parameters = Parameters.from_str(
+                            self.decrypt(encrypted_agent_parameters)
+                        )
+                        log.debug(
+                            f"Decrypted agent parameters: {agent_parameters}"
+                        )  # TODO REMOVE ASAP
+
                     # Create and prepare the job
                     new_job = Job.new(
-                        supervaize_context=sv_context, agent_name=agent.name
+                        supervaize_context=sv_context,
+                        agent_name=agent.name,
+                        parameters=agent_parameters,
                     )
 
                     # Schedule the background execution
@@ -541,6 +591,9 @@ class Server(ServerModel):
 
         # self.instructions()
         log.info(f"Registering {self.uri} with account {self.account.id}")
+        log.info(
+            f"RSA Public key:\n{self.public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')}"
+        )
         self.account.register_server(server=self)
         import uvicorn
 
@@ -557,3 +610,9 @@ class Server(ServerModel):
         display_instructions(
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."
         )
+
+    def decrypt(self, encrypted_parameters: str) -> str:
+        return decrypt_value(encrypted_parameters, self.private_key)
+
+    def encrypt(self, parameters: str) -> str:
+        return encrypt_value(parameters, self.public_key)

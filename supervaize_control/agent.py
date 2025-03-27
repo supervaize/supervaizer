@@ -12,7 +12,7 @@ from slugify import slugify
 from .__version__ import VERSION
 from .common import SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
-from .parameter import Parameters
+from .parameter import Parameters, ParametersSetup
 
 
 class AgentJobContextBase(BaseModel):
@@ -22,6 +22,7 @@ class AgentJobContextBase(BaseModel):
 
     supervaize_context: JobContext
     job_fields: Dict[str, Any]
+    agent_parameters: Parameters | None = None
 
 
 class AgentMethod(BaseModel):
@@ -137,6 +138,7 @@ class AgentMethod(BaseModel):
                 "__annotations__": {
                     "supervaize_context": JobContext,
                     "job_fields": fields_model,
+                    "encrypted_agent_parameters": str,
                 }
             },
         )
@@ -182,7 +184,7 @@ class AgentModel(SvBaseModel):
     job_status_method: AgentMethod
     chat_method: AgentMethod | None = None
     custom_methods: dict[str, AgentMethod] | None = None
-    parameters: Parameters | None = None
+    parameters_setup: ParametersSetup | None = None
 
 
 class Agent(AgentModel):
@@ -228,8 +230,8 @@ class Agent(AgentModel):
             "custom_methods": {
                 k: v.registration_info for k, v in (self.custom_methods or {}).items()
             },
-            "parameters": self.parameters.registration_info
-            if self.parameters
+            "parameters_setup": self.parameters_setup.registration_info
+            if self.parameters_setup
             else None,
         }
 

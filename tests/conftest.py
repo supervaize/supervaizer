@@ -23,6 +23,7 @@ from supervaize_control import (
     JobContext,
     Parameter,
     Parameters,
+    ParametersSetup,
     Server,
     Telemetry,
     TelemetryCategory,
@@ -120,27 +121,24 @@ def case_node_update_fixture():
 
 
 @pytest.fixture
-def parameter_fixture():
+def parameter_fixture() -> Parameter:
     return Parameter(
         name="test_parameter", value="test_value", description="test description"
     )
 
 
 @pytest.fixture
-def parameters_list_fixture():
-    return [
-        Parameter(name="parameter1", value="value1"),
-        Parameter(name="parameter2", value="value2", description="desc2"),
-    ]
+def parameters_setup_fixture() -> ParametersSetup:
+    return ParametersSetup.from_list(
+        parameter_list=[
+            Parameter(name="parameter1", value="value1"),
+            Parameter(name="parameter2", value="value2", description="desc2"),
+        ]
+    )
 
 
 @pytest.fixture
-def parameters_fixture(parameters_list_fixture):
-    return Parameters(parameters=parameters_list_fixture)
-
-
-@pytest.fixture
-def agent_fixture(agent_method_fixture, parameters_fixture):
+def agent_fixture(agent_method_fixture, parameters_setup_fixture) -> Agent:
     return Agent(
         id="LMKyPAS2Q8sKWBY34DS37a",
         name="agentName",
@@ -156,7 +154,7 @@ def agent_fixture(agent_method_fixture, parameters_fixture):
             "method1": agent_method_fixture,
             "method2": agent_method_fixture,
         },
-        parameters=parameters_fixture,
+        parameters_setup=parameters_setup_fixture,
     )
 
 
@@ -170,3 +168,8 @@ def server_fixture(agent_fixture, account_fixture):
         debug=True,
         account=account_fixture,
     )
+
+
+@pytest.fixture
+def parameters_fixture(parameters_setup_fixture):
+    return Parameters(values={"parameter1": "value1", "parameter2": "value2"})

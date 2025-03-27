@@ -3,11 +3,14 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import base64
 import json
 import traceback
 from datetime import datetime
 
 import demjson3
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from loguru import logger
 from pydantic import BaseModel
 
@@ -160,3 +163,59 @@ def singleton(cls):
         return instances[cls]
 
     return get_instance
+
+
+def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
+    """Encrypt the parameter value with the public key.
+
+    Args:
+        public_key (rsa.RSAPublicKey): The public key to encrypt with
+
+    Returns:
+        str: Base64 encoded encrypted value
+    """
+    if not value_to_encrypt:
+        return None
+
+    # Convert string to bytes and encrypt
+    encrypted = public_key.encrypt(
+        value_to_encrypt.encode("utf-8"),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None,
+        ),
+    )
+
+    # Return base64 encoded string for transmission
+    return base64.b64encode(encrypted).decode("utf-8")
+
+
+def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
+    """Decrypt an encrypted parameter value using the private key.
+
+    Args:
+        encrypted_value (str): Base64 encoded encrypted value
+        private_key (rsa.RSAPrivateKey): The private key to decrypt with
+
+    Returns:
+        str: Decrypted value as string
+    """
+    if not encrypted_value:
+        return None
+
+    # Decode base64 string to bytes
+    encrypted_bytes = base64.b64decode(encrypted_value)
+
+    # Decrypt the value
+    decrypted = private_key.decrypt(
+        encrypted_bytes,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None,
+        ),
+    )
+
+    # Return decoded string
+    return decrypted.decode("utf-8")

@@ -11,8 +11,9 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaize_control import Agent, AgentMethod, Parameters
+from supervaize_control import Agent, AgentMethod
 from supervaize_control.job import JobContext
+from supervaize_control.parameter import ParametersSetup
 
 
 def test_agent_method_fixture(agent_method_fixture):
@@ -227,6 +228,7 @@ def test_job_model_dynamic_model():
             "mission_name": "Test Mission",
         },
         "job_fields": {"full_name": "John Doe", "age": 30},
+        "encrypted_agent_parameters": "encrypted_agent_parameters",
     }
     model_instance = JobModel(**valid_data)
 
@@ -300,6 +302,7 @@ def test_job_model_dynamic_model():
             "mission_name": "Test Mission",
         },
         "job_fields": {},
+        "encrypted_agent_parameters": "encrypted_agent_parameters",
     }
     empty_instance = EmptyJobModel(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
@@ -307,15 +310,17 @@ def test_job_model_dynamic_model():
 
 
 def test_agent_parameters(agent_fixture):
-    assert agent_fixture.parameters is not None
-    assert isinstance(agent_fixture.parameters, Parameters)
-    assert len(agent_fixture.parameters.parameters) == 2
-    assert agent_fixture.parameters.get_parameter("parameter1").value == "value1"
-    assert agent_fixture.parameters.get_parameter("parameter2").value == "value2"
-    assert agent_fixture.parameters.get_parameter("parameter2").description == "desc2"
-    assert agent_fixture.parameters.get_parameter("parameter1").description is None
+    assert agent_fixture.parameters_setup is not None
+    assert isinstance(agent_fixture.parameters_setup, ParametersSetup)
+    assert len(agent_fixture.parameters_setup.definitions) == 2
+    assert agent_fixture.parameters_setup.definitions["parameter1"].value == "value1"
+    assert agent_fixture.parameters_setup.definitions["parameter2"].value == "value2"
+    assert (
+        agent_fixture.parameters_setup.definitions["parameter2"].description == "desc2"
+    )
+    assert agent_fixture.parameters_setup.definitions["parameter1"].description is None
 
 
 def test_agent_secrets_not_found(agent_fixture):
     with pytest.raises(KeyError):
-        agent_fixture.parameters.get_parameter("nonexistent")
+        agent_fixture.parameters_setup.definitions["nonexistent"]

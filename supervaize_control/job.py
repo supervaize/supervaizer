@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 
 from .__version__ import VERSION
 from .common import SvBaseModel, singleton
+from .parameter import Parameters
 
 
 @singleton
@@ -142,14 +143,14 @@ class JobModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     id: str
     agent_name: str
-    supervaize_context: JobContext
-    result: Any | None = None
+    status: "JobStatus"
+    supervaize_context: "JobContext"
     payload: Any | None = None
-    finished_at: datetime | None = None
+    result: Any | None = None
     error: str | None = None
-    status: JobStatus | None = None
-    responses: list[JobResponse] = []
-    cost: float | None = None
+    responses: list["JobResponse"] = []
+    finished_at: datetime | None = None
+    parameters: Parameters | None = None
 
 
 class Job(JobModel):
@@ -171,12 +172,28 @@ class Job(JobModel):
         self.responses.append(response)
 
     @classmethod
-    def new(cls, supervaize_context: "JobContext", agent_name: str):
+    def new(
+        cls,
+        supervaize_context: "JobContext",
+        agent_name: str,
+        parameters: Parameters | None = None,
+    ):
+        """Create a new job
+
+        Args:
+            supervaize_context (JobContext): The context of the job
+            agent_name (str): The name of the agent
+            parameters (Parameters, optional): Unencrypted parameters for the job
+
+        Returns:
+            Job: The new job
+        """
         job_id = supervaize_context.job_id or str(uuid.uuid4())
         job = cls(
             id=job_id,
             agent_name=agent_name,
             supervaize_context=supervaize_context,
             status=JobStatus.IN_PROGRESS,
+            agent_parameters=parameters,
         )
         return job

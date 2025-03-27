@@ -21,7 +21,7 @@ from .event import (
     ServerRegisterEvent,
 )
 from .job import Job, JobConditions, JobContext, JobResponse, JobStatus
-from .parameter import Parameter, Parameters
+from .parameter import Parameter, Parameters, ParametersSetup
 from .server import Server
 from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
 
@@ -58,6 +58,7 @@ __all__ = [
     ServerRegisterEvent,
     Parameter,
     Parameters,
+    ParametersSetup,
 ]
 
 # Rebuild models to resolve forward references after all imports are done
