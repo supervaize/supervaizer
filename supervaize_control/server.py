@@ -6,8 +6,6 @@
 import os
 import sys
 import uuid
-from datetime import datetime
-from enum import Enum
 from typing import Annotated, ClassVar, List
 from urllib.parse import urlunparse
 
@@ -26,7 +24,7 @@ from fastapi import (
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
 from .__version__ import VERSION
 from .account import Account
@@ -35,6 +33,7 @@ from .common import SvBaseModel, decrypt_value, encrypt_value, log
 from .instructions import display_instructions
 from .job import Job, JobContext, Jobs, JobStatus
 from .parameter import Parameters
+from .server_utils import ErrorResponse, ErrorType, create_error_response
 
 
 class ServerModel(SvBaseModel):
@@ -70,43 +69,6 @@ class ServerModel(SvBaseModel):
         if "://" in v:
             raise ValueError(f"Host should not include '://': {v}")
         return v
-
-
-class ErrorType(str, Enum):
-    """Enumeration of possible error types"""
-
-    JOB_NOT_FOUND = "job_not_found"
-    JOB_ALREADY_EXISTS = "job_already_exists"
-    AGENT_NOT_FOUND = "agent_not_found"
-    INVALID_REQUEST = "invalid_request"
-    INTERNAL_ERROR = "internal_error"
-    INVALID_PARAMETERS = "invalid_parameters"
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response model"""
-
-    error: str
-    error_type: ErrorType
-    detail: str | None = None
-    timestamp: datetime = datetime.now()
-    status_code: int
-
-
-def create_error_response(
-    error_type: ErrorType, detail: str, status_code: int
-) -> JSONResponse:
-    """Helper function to create consistent error responses"""
-    error_response = ErrorResponse(
-        error=error_type.value.replace("_", " ").title(),
-        error_type=error_type,
-        detail=detail,
-        status_code=status_code,
-    )
-    return JSONResponse(
-        status_code=status_code,
-        content=jsonable_encoder(error_response),
-    )
 
 
 default_router = APIRouter()
@@ -229,6 +191,7 @@ class Server(ServerModel):
     def __init__(
         self,
         account: Account,
+        agents: list[Agent],
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZE_CONTROL_HOST", "0.0.0.0"),
@@ -241,6 +204,7 @@ class Server(ServerModel):
 
         Args:
             account (Account): The account to use for the server.
+            agents (list[Agent]): The list of agents to use for the server.
             scheme (str, optional): The scheme to use for the server (e.g. 'http', 'https'). Defaults to "http".
             environment (str, optional): The environment to use for the server (e.g. 'dev', 'staging', 'production'). Defaults to os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev").
             host (str, optional): The host to use for the server (without '://'). Defaults to 0.0.0.0 if no value in Env "SUPERVAIZE_CONTROL_HOST".
@@ -287,6 +251,7 @@ class Server(ServerModel):
             public_exponent=65537, key_size=2048, backend=default_backend()
         )
         kwargs["public_key"] = kwargs["private_key"].public_key()
+        kwargs["agents"] = agents
         super().__init__(**kwargs)
         self.add_route(default_router)
         self.create_utils_routes()
@@ -569,7 +534,7 @@ class Server(ServerModel):
 
             self.app.include_router(router)
 
-    def launch(self, log_level: str | None = "info"):
+    def launch(self, log_level: str | None = "INFO"):
         """_summary_
 
         Args:
@@ -594,7 +559,18 @@ class Server(ServerModel):
         log.info(
             f"RSA Public key:\n{self.public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')}"
         )
-        self.account.register_server(server=self)
+        try:
+            server_registration = self.account.register_server(server=self)
+        except Exception as e:
+            log.error(f"Error registering server: {e}")
+            raise ValueError(f"Error registering server: {e}")
+        # Check that server registration contains the correct agent parameters
+        if not self.validate_agents(server_registration):
+            log.error(f"Server registration is invalid : \n {server_registration}")
+            raise ValueError(
+                f"Server registration is invalid : \n {server_registration}"
+            )
+
         import uvicorn
 
         uvicorn.run(
@@ -604,6 +580,35 @@ class Server(ServerModel):
             reload=self.reload,
             log_level=log_level,
         )
+
+    def validate_agents(self, server_registration) -> bool:
+        try:
+            registered_agents = server_registration.get("details").get("agents")
+            result = False
+            for registered_agent in registered_agents:
+                registered_agent_name = registered_agent.get("name")
+                # Test that agent exists in the server
+                for agent_server in self.agents:
+                    if registered_agent_name == agent_server.name:
+                        log.debug(
+                            f"Agent {registered_agent_name} found in server registration"
+                        )
+                        # Test that agent is valid
+                        if agent_server.validate_agent(registered_agent, server=self):
+                            log.debug(f"Agent {registered_agent_name} is valid")
+                            result = True
+                            break
+                        else:
+                            log.error(f"Agent {registered_agent_name} is not valid")
+                            result = False
+
+                return result
+
+        except Exception as e:
+            log.error(f"Error getting registered agents: {e}")
+            return False
+
+        return True
 
     def instructions(self):
         server_url = f"http://{self.host}:{self.port}"

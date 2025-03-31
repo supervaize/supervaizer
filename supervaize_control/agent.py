@@ -235,6 +235,47 @@ class Agent(AgentModel):
             else None,
         }
 
+    def validate_agent(self, agent_registration: dict, server: "Server") -> bool:
+        """
+        Validate the agent against the registration information.
+        Example of agent_registration data is available in mock_api_responses.py
+
+        Server is used to decrypt parameters if needed
+        """
+        if not agent_registration.get("name") == self.name:
+            log.error(
+                f"Agent name mismatch: {agent_registration.get('name')} != {self.name}"
+            )
+            return False
+
+        # Check that agent_registration has encrypted_agent_parameters
+        if self.parameters_setup:
+            if encrypted_agent_parameters := agent_registration.get(
+                "agent_parameters_encrypted"
+            ):
+                try:
+                    decrypted_agent_parameters = server.decrypt(
+                        encrypted_agent_parameters
+                    )
+                    result = True
+                except Exception as e:
+                    log.error(f"Error decrypting agent parameters: {e}")
+                    return False
+
+                print(self.parameters_setup)
+                print(decrypted_agent_parameters)
+                for param, value in decrypted_agent_parameters.items():
+                    try:
+                        self.parameters_setup.definitions[param].value = value
+                        result &= True
+                    except Exception as e:
+                        log.error(f"Error setting parameter {param} to {value}: {e}")
+                        return False
+                    if param not in self.parameters_setup.definitions:
+                        log.error(f"Parameter {param} not found in parameters_setup")
+                result &= True
+        return result
+
     def _execute(self, action: str, params: Dict[str, Any] = {}):
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])

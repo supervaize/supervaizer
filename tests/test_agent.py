@@ -14,6 +14,9 @@ from pydantic import BaseModel, ValidationError
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.job import JobContext
 from supervaize_control.parameter import ParametersSetup
+from tests.mock_api_responses import (
+    AGENT_INFO_EXAMPLE,
+)
 
 
 def test_agent_method_fixture(agent_method_fixture):
@@ -324,3 +327,36 @@ def test_agent_parameters(agent_fixture):
 def test_agent_secrets_not_found(agent_fixture):
     with pytest.raises(KeyError):
         agent_fixture.parameters_setup.definitions["nonexistent"]
+
+
+def test_agent_validate_agent(agent_fixture, server_fixture, monkeypatch):
+    # Decrypt method is called and fails
+    # No patching will create an error in the decryption method.
+    assert not agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
+
+    # Simulate that decrypt method is called and returns the registered values
+    monkeypatch.setattr(
+        server_fixture.__class__,
+        "decrypt",
+        lambda self, encrypted_parameters: {
+            "parameter1": "registered_value1",
+            "parameter2": "registered_value2",
+        },
+    )
+    assert agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
+    assert (
+        agent_fixture.parameters_setup.definitions["parameter1"].value
+        == "registered_value1"
+    )
+    assert (
+        agent_fixture.parameters_setup.definitions["parameter2"].value
+        == "registered_value2"
+    )
+
+    # Simulate that decrypt returns an invalid parameter name
+    monkeypatch.setattr(
+        server_fixture.__class__,
+        "decrypt",
+        lambda self, encrypted_parameters: {"invalid_parameter": "invalid_value1"},
+    )
+    assert not agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
