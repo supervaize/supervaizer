@@ -8,6 +8,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from supervaize_control import (
     Account,
@@ -52,11 +53,11 @@ def agent_method_fixture():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def context_fixture():
     return JobContext(
         workspace_id="test-workspace",
-        job_id=str(uuid4()),
+        job_id="test-job-id",
         started_by="test-user",
         started_at=datetime.now(),
         mission_id="test-mission",
@@ -65,7 +66,7 @@ def context_fixture():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def job_fixture(context_fixture):
     return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
 
@@ -159,14 +160,26 @@ def agent_fixture(agent_method_fixture, parameters_setup_fixture) -> Agent:
 
 
 @pytest.fixture
-def server_fixture(agent_fixture, account_fixture):
+def server_fixture(account_fixture, agent_fixture):
+    """Create a server fixture."""
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
     return Server(
-        agents=[agent_fixture],
+        scheme="http",
         host="localhost",
         port=8001,
         environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
         debug=True,
+        agent_timeout=10,
+        jobs=[],
+        private_key=private_key,
+        public_key=public_key,
         account=account_fixture,
+        agents=[agent_fixture],
     )
 
 

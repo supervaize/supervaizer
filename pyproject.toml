@@ -37,6 +37,7 @@ dev = [
     "ruff>=0.3.4",
     "hatch>=1.9.3",
     "pytest-sugar>=1.0.0",
+    "pytest-asyncio>=0.26.0",
     "pytest-mock>=3.14.0",
     "requests-mock>=1.12.1",
 ]
@@ -48,6 +49,7 @@ markers = [
     "current: test under development",
 ]
 addopts = "--cov=supervaize_control --cov-report=term-missing --cov-report=html"
+asyncio_default_fixture_loop_scope = "function"
 
 [build-system]
 requires = ["hatchling"]
