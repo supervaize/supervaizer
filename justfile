@@ -6,6 +6,9 @@ YYYYMMDD:= `date +%Y%m%d`
 
 
 # Development
+# Show all available commands (default)
+default:
+    @just --list
 
 # Run pre-commit hooks manually
 pre-commit-manual:

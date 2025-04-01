@@ -3,6 +3,7 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import os
 
 from supervaize_control.parameter import Parameter, ParametersSetup
 
@@ -12,6 +13,7 @@ def test_parameter_creation():
     assert parameter.name == "test"
     assert parameter.value is None
     assert parameter.description is None
+    assert parameter.is_environment is False
 
 
 def test_parameter_with_all_fields(parameter_fixture):
@@ -38,3 +40,23 @@ def test_parameters_initialization(parameters_setup_fixture):
     )
     assert "parameter1" in parameters_setup_fixture.definitions
     assert "parameter2" in parameters_setup_fixture.definitions
+
+
+def test_parameter_set_value(parameter_fixture):
+    assert parameter_fixture.is_environment is False
+    assert parameter_fixture.name == "test_parameter"
+    assert parameter_fixture.value == "test_value"
+    assert parameter_fixture.description == "test description"
+
+    # Set value
+    parameter_fixture.set_value("new_value")
+    assert parameter_fixture.value == "new_value"
+    assert "test_parameter" not in os.environ
+
+
+def test_parameter_set_value_in_environment(parameter_fixture):
+    parameter_fixture.is_environment = True
+    parameter_fixture.set_value("newer_value")
+    assert parameter_fixture.value == "newer_value"
+    assert "test_parameter" in os.environ
+    assert os.environ["test_parameter"] == "newer_value"

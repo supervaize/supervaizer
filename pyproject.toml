@@ -10,6 +10,7 @@ dependencies = [
     "art>=6.4",
     "cryptography>=44.0.2",
     "demjson3>=3.0.6",
+    "deprecated>=1.2.18",
     "fastapi>=0.115.6",
     "loguru>=0.7.3",
     "pydantic>=2.10.4",

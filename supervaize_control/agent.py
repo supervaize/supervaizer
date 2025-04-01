@@ -12,7 +12,7 @@ from slugify import slugify
 from .__version__ import VERSION
 from .common import SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
-from .parameter import Parameters, ParametersSetup
+from .parameter import ParametersSetup
 
 
 class AgentJobContextBase(BaseModel):
@@ -22,7 +22,6 @@ class AgentJobContextBase(BaseModel):
 
     supervaize_context: JobContext
     job_fields: Dict[str, Any]
-    agent_parameters: Parameters | None = None
 
 
 class AgentMethod(BaseModel):
@@ -138,7 +137,6 @@ class AgentMethod(BaseModel):
                 "__annotations__": {
                     "supervaize_context": JobContext,
                     "job_fields": fields_model,
-                    "encrypted_agent_parameters": str,
                 }
             },
         )
@@ -266,7 +264,7 @@ class Agent(AgentModel):
                 print(decrypted_agent_parameters)
                 for param, value in decrypted_agent_parameters.items():
                     try:
-                        self.parameters_setup.definitions[param].value = value
+                        self.parameters_setup.definitions[param].set_value(value)
                         result &= True
                     except Exception as e:
                         log.error(f"Error setting parameter {param} to {value}: {e}")

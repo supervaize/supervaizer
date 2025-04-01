@@ -239,3 +239,4 @@ pyrightconfig.json
 
 # Pre-commit
 .pre-commit-cache/
+*.code-workspace

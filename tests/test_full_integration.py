@@ -32,9 +32,11 @@ def test_agent_setup(agent_fixture, job_fixture):
             Parameter(
                 name="OPEN_API_KEY",
                 description="OpenAPI Key",
-                is_secret=True,
+                is_environment=True,
             ),
-            Parameter(name="SERPER_API", description="Server API key", is_secret=True),
+            Parameter(
+                name="SERPER_API", description="Server API key", is_environment=True
+            ),
         ]
     )
 

@@ -124,7 +124,10 @@ def case_node_update_fixture():
 @pytest.fixture
 def parameter_fixture() -> Parameter:
     return Parameter(
-        name="test_parameter", value="test_value", description="test description"
+        name="test_parameter",
+        value="test_value",
+        description="test description",
+        is_environment=False,
     )
 
 
@@ -132,7 +135,7 @@ def parameter_fixture() -> Parameter:
 def parameters_setup_fixture() -> ParametersSetup:
     return ParametersSetup.from_list(
         parameter_list=[
-            Parameter(name="parameter1", value="value1"),
+            Parameter(name="parameter1", value="value1", is_environment=True),
             Parameter(name="parameter2", value="value2", description="desc2"),
         ]
     )
