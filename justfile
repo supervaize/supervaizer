@@ -30,20 +30,23 @@ env_sync:
 build:
     hatch build
 
+
 # Increase 0.0.1
 build_fix:
-    hatch version fix
-    hatch build
+    just _bump_version fix
 
 # Increase 0.1.0
 build_minor:
-    hatch version minor
-    hatch build
+    just _bump_version minor
 
 # Increase 1.0.0
 build_major:
-    hatch version major
-    hatch build
+    just _bump_version major
+
+# Push tags to remote
+push_tags:
+    git push origin --tags
+    echo "Tags pushed to remote"
 
 
 # API documentation @http://127.0.0.1:8000/redoc
@@ -51,3 +54,8 @@ unicorn:
     uvicorn controller:app --reload
 
 #
+# Reusable recipe to bump version and create git tag
+_bump_version bump_type:
+    hatch version {{bump_type}}
+    hatch build
+    bash -c "VERSION=\$(grep '^VERSION = ' supervaize_control/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
