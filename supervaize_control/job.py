@@ -150,7 +150,6 @@ class JobModel(SvBaseModel):
     error: str | None = None
     responses: list["JobResponse"] = []
     finished_at: datetime | None = None
-    parameters: Parameters | None = None
 
 
 class Job(JobModel):
@@ -183,7 +182,6 @@ class Job(JobModel):
         Args:
             supervaize_context (JobContext): The context of the job
             agent_name (str): The name of the agent
-            parameters (Parameters, optional): Unencrypted parameters for the job
 
         Returns:
             Job: The new job
@@ -194,6 +192,5 @@ class Job(JobModel):
             agent_name=agent_name,
             supervaize_context=supervaize_context,
             status=JobStatus.IN_PROGRESS,
-            agent_parameters=parameters,
         )
         return job

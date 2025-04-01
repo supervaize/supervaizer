@@ -30,6 +30,10 @@ env_sync:
 build:
     hatch build
 
+# Reusable recipe to bump version
+_bump_version bump_type:
+    hatch version {{bump_type}}
+    hatch build
 
 # Increase 0.0.1
 build_fix:
@@ -53,9 +57,6 @@ push_tags:
 unicorn:
     uvicorn controller:app --reload
 
-#
-# Reusable recipe to bump version and create git tag
-_bump_version bump_type:
-    hatch version {{bump_type}}
-    hatch build
+# Create git tag for current version - Automated done in post-commit hook
+tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' supervaize_control/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
