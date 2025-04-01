@@ -37,14 +37,3 @@ repos:
     hooks:
       - id: commitizen
         additional_dependencies: [cz-conventional-gitmoji]
-
-  # Local hook for version tagging
-  - repo: local
-    hooks:
-      - id: version-tag
-        name: Version Tag
-        entry: bash -c 'VERSION=$(grep "^VERSION = " supervaize_control/__version__.py | cut -d'"' -f2) && git tag -a "v${VERSION}" -m "Version ${VERSION}" && echo "Created tag v${VERSION}"'
-        language: system
-        types: [python]
-        files: ^supervaize_control/__version__\.py$
-        stages: [post-commit]

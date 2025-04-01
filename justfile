@@ -50,8 +50,17 @@ build_major:
 # Push tags to remote
 push_tags:
     git push origin --tags
-    echo "Tags pushed to remote"
+    @echo "Tags pushed to remote"
 
+# Install Git hooks
+install-hooks:
+    # First unset any existing hooksPath
+    @git config --unset-all core.hooksPath || true
+    # Install pre-commit hooks
+    @pre-commit install
+    # Set up our custom hooks
+    @git config core.hooksPath .githooks
+    # Git hooks installed
 
 # API documentation @http://127.0.0.1:8000/redoc
 unicorn:

@@ -126,7 +126,7 @@ This project uses [just](https://github.com/casey/just) as a command runner. Her
    - Windows: `.venv\Scripts\activate`
    - Unix/MacOS: `source .venv/bin/activate`
 4. Install development dependencies: `uv pip install -e ".[dev]"`
-5. Install pre-commit hooks: `pre-commit install`
+5. Install Git hooks: `just install-hooks`
 
 ### Running Tests
 

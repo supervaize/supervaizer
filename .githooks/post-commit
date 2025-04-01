@@ -1,0 +1,15 @@
+#!/bin/bash
+# Install using `just install-hooks` whenever this is changed
+
+# Change to the project root directory
+cd "$(git rev-parse --show-toplevel)"
+
+# Get the current version from __version__.py
+VERSION=$(grep '^VERSION = ' supervaize_control/__version__.py | cut -d'"' -f2)
+
+# Check if this commit is a version bump
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "supervaize_control/__version__.py"; then
+    # Create the tag
+    git tag -a "v${VERSION}" -m "Version ${VERSION}"
+    echo "Created tag v${VERSION}"
+fi 
