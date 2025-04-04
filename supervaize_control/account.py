@@ -114,7 +114,66 @@ class Account(AccountModel):
         from .event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        return self.send_event(server, event)
+        return self.send_event(sender=server, event=event)
+
+    def get_agent_by_id(self, agent_id: str) -> ApiResult:
+        """Get an agent from the Supervaize Control API.
+
+        Args:
+            agent_id (str): The ID of the agent to get.
+
+        Returns:
+            ApiResult: ApiSuccess with response details if successful,ApiError with error details if request fails
+        """
+        headers = self.api_headers
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return ApiSuccess(
+                message=f"Agent {agent_id} retrieved", detail=response.json()
+            )
+        except requests.exceptions.RequestException as e:
+            return ApiError(
+                message=f"Error getting agent {agent_id}",
+                url=url,
+                payload=None,
+                exception=e,
+            )
+
+    def get_agent_by(
+        self, agent_id: str | None = None, agent_name: str | None = None
+    ) -> ApiResult:
+        """Get an agent from the Supervaize Control API.
+
+        Args:
+            agent_name (str): The name of the agent to get.
+
+        Returns:
+            ApiResult: ApiSuccess with response details if successful,ApiError with error details if request fails
+
+        """
+        if agent_id:
+            url = f"{self.api_url}/agents/v1/id/{agent_id}"
+        elif agent_name:
+            url = f"{self.api_url}/agents/name/{agent_name}"
+        else:
+            raise ValueError("No agent ID or name provided")
+
+        headers = self.api_headers
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return ApiSuccess(
+                message=f"Agent {agent_name or agent_id} retrieved",
+                detail=response.json(),
+            )
+        except requests.exceptions.RequestException as e:
+            return ApiError(
+                message=f"Error getting agent {agent_name or agent_id}",
+                url=url,
+                payload=None,
+                exception=e,
+            )
 
     def register_agent(self, agent: "Agent", polling: bool = True) -> ApiResult:
         """Send a registration event to the Supervaize Control API.

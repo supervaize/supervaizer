@@ -30,7 +30,7 @@ class Parameter(ParameterModel):
         return {
             "name": self.name,
             "description": self.description,
-            "is_secret": self.is_environment,
+            "is_environment": self.is_environment,
         }
 
     def set_value(self, value: str):
@@ -54,12 +54,8 @@ class ParametersSetup(SvBaseModel):
         )
 
     @property
-    def registration_info(self) -> dict:
-        return {
-            "parameters": [
-                parameter.registration_info for parameter in self.definitions.values()
-            ],
-        }
+    def registration_info(self) -> list[dict]:
+        return [parameter.registration_info for parameter in self.definitions.values()]
 
 
 @deprecated(

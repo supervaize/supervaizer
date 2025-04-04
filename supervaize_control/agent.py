@@ -3,14 +3,15 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from typing import Any, ClassVar, Dict, List
+from asyncio import Server
+from typing import Any, ClassVar, Dict, List, Union
 
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
 
 from .__version__ import VERSION
-from .common import SvBaseModel, log
+from .common import ApiSuccess, SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
 from .parameter import ParametersSetup
 
@@ -183,6 +184,11 @@ class AgentModel(SvBaseModel):
     chat_method: AgentMethod | None = None
     custom_methods: dict[str, AgentMethod] | None = None
     parameters_setup: ParametersSetup | None = None
+    server_agent_id: str | None = None
+    server_agent_status: str | None = None
+    server_agent_onboarding_status: str | None = None
+    server_encrypted_parameters: str | None = None
+    server_decrypted_parameters: str | None = None
 
 
 class Agent(AgentModel):
@@ -233,46 +239,41 @@ class Agent(AgentModel):
             else None,
         }
 
-    def validate_agent(self, agent_registration: dict, server: "Server") -> bool:
+    def update_agent_from_server(self, server: "Server") -> Union["Agent", None]:
         """
         Validate the agent against the registration information.
         Example of agent_registration data is available in mock_api_responses.py
 
         Server is used to decrypt parameters if needed
         """
-        if not agent_registration.get("name") == self.name:
-            log.error(
-                f"Agent name mismatch: {agent_registration.get('name')} != {self.name}"
+        if self.server_agent_id:
+            from_server = server.account.get_agent_by(agent_id=self.server_agent_id)
+        else:
+            from_server = server.account.get_agent_by(agent_name=self.name)
+        if not isinstance(from_server, ApiSuccess):
+            log.error(f"Failed to get agent details: {from_server}")
+            return
+
+        agent_from_server = from_server.detail
+        server_agent_id = agent_from_server.get("id")
+        if self.server_agent_id and self.server_agent_id != server_agent_id:
+            message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
+            raise ValueError(message)
+        self.server_agent_id = server_agent_id
+        self.server_agent_status = agent_from_server.get("status")
+        self.server_agent_onboarding_status = agent_from_server.get("onboarding_status")
+        if self.server_agent_onboarding_status == "onboarded":
+            log.debug("Agent is onboarded, getting encrypted parameters")
+            self.server_encrypted_parameters = agent_from_server.get(
+                "encrypted_parameters"
             )
-            return False
+            self.server_decrypted_parameters = server.decrypt(
+                self.server_encrypted_parameters
+            )
+        else:
+            log.debug("Agent is not onboarded, skipping encrypted parameters")
 
-        # Check that agent_registration has encrypted_agent_parameters
-        if self.parameters_setup:
-            if encrypted_agent_parameters := agent_registration.get(
-                "agent_parameters_encrypted"
-            ):
-                try:
-                    decrypted_agent_parameters = server.decrypt(
-                        encrypted_agent_parameters
-                    )
-                    result = True
-                except Exception as e:
-                    log.error(f"Error decrypting agent parameters: {e}")
-                    return False
-
-                print(self.parameters_setup)
-                print(decrypted_agent_parameters)
-                for param, value in decrypted_agent_parameters.items():
-                    try:
-                        self.parameters_setup.definitions[param].set_value(value)
-                        result &= True
-                    except Exception as e:
-                        log.error(f"Error setting parameter {param} to {value}: {e}")
-                        return False
-                    if param not in self.parameters_setup.definitions:
-                        log.error(f"Parameter {param} not found in parameters_setup")
-                result &= True
-        return result
+        return self
 
     def _execute(self, action: str, params: Dict[str, Any] = {}):
         module_name, func_name = action.rsplit(".", 1)

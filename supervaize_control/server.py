@@ -8,7 +8,6 @@ import sys
 import uuid
 from typing import Annotated, ClassVar, List
 from urllib.parse import urlunparse
-
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -25,15 +24,24 @@ from fastapi import (
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import field_validator
-
 from .__version__ import VERSION
 from .account import Account
 from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
-from .common import SvBaseModel, decrypt_value, encrypt_value, log
+from .common import (
+    ApiResult,
+    ApiSuccess,
+    decrypt_value,
+    encrypt_value,
+    log,
+    SvBaseModel,
+)
 from .instructions import display_instructions
 from .job import Job, JobContext, Jobs, JobStatus
 from .parameter import Parameters
 from .server_utils import ErrorResponse, ErrorType, create_error_response
+from rich import inspect
+
+insp = inspect
 
 
 class ServerModel(SvBaseModel):
@@ -69,6 +77,12 @@ class ServerModel(SvBaseModel):
         if "://" in v:
             raise ValueError(f"Host should not include '://': {v}")
         return v
+
+    def get_agent_by_name(self, agent_name: str) -> Agent | None:
+        for agent in self.agents:
+            if agent.name == agent_name:
+                return agent
+        return None
 
 
 default_router = APIRouter()
@@ -278,6 +292,10 @@ class Server(ServerModel):
             "url": self.url,
             "uri": self.uri,
             "environment": self.environment,
+            "public_key": self.public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            ).decode("utf-8"),
             "agents": [agent.registration_info for agent in self.agents],
         }
 
@@ -559,18 +577,18 @@ class Server(ServerModel):
         log.info(
             f"RSA Public key:\n{self.public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')}"
         )
-        try:
-            server_registration = self.account.register_server(server=self)
-        except Exception as e:
-            log.error(f"Error registering server: {e}")
-            raise ValueError(f"Error registering server: {e}")
-        # Check that server registration contains the correct agent parameters
-        if not self.validate_agents(server_registration):
-            log.error(f"Server registration is invalid : \n {server_registration}")
-            raise ValueError(
-                f"Server registration is invalid : \n {server_registration}"
-            )
+        server_registration_result: ApiResult = self.account.register_server(
+            server=self
+        )
+        assert isinstance(
+            server_registration_result, ApiSuccess
+        )  # If ApiError, exception should have been raised before
 
+        for agent in self.agents:
+            updated_agent = agent.update_agent_from_server(self)
+            if updated_agent:
+                log.info(f"Updated agent {updated_agent.name}")
+                inspect(updated_agent)
         import uvicorn
 
         uvicorn.run(
@@ -580,35 +598,6 @@ class Server(ServerModel):
             reload=self.reload,
             log_level=log_level,
         )
-
-    def validate_agents(self, server_registration) -> bool:
-        try:
-            registered_agents = server_registration.get("details").get("agents")
-            result = False
-            for registered_agent in registered_agents:
-                registered_agent_name = registered_agent.get("name")
-                # Test that agent exists in the server
-                for agent_server in self.agents:
-                    if registered_agent_name == agent_server.name:
-                        log.debug(
-                            f"Agent {registered_agent_name} found in server registration"
-                        )
-                        # Test that agent is valid
-                        if agent_server.validate_agent(registered_agent, server=self):
-                            log.debug(f"Agent {registered_agent_name} is valid")
-                            result = True
-                            break
-                        else:
-                            log.error(f"Agent {registered_agent_name} is not valid")
-                            result = False
-
-                return result
-
-        except Exception as e:
-            log.error(f"Error getting registered agents: {e}")
-            return False
-
-        return True
 
     def instructions(self):
         server_url = f"http://{self.host}:{self.port}"
