@@ -14,9 +14,8 @@ from pydantic import BaseModel, ValidationError
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.job import JobContext
 from supervaize_control.parameter import ParametersSetup
-from tests.mock_api_responses import (
-    AGENT_INFO_EXAMPLE,
-)
+from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
+from supervaize_control.common import ApiSuccess
 
 
 def test_agent_method_fixture(agent_method_fixture):
@@ -329,11 +328,8 @@ def test_agent_secrets_not_found(agent_fixture):
         agent_fixture.parameters_setup.definitions["nonexistent"]
 
 
-def test_agent_validate_agent(agent_fixture, server_fixture, monkeypatch):
-    # Decrypt method is called and fails
-    # No patching will create an error in the decryption method.
-    assert not agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
-
+@pytest.mark.current
+def test_agent_update_agent_from_server(agent_fixture, server_fixture, monkeypatch):
     # Simulate that decrypt method is called and returns the registered values
     monkeypatch.setattr(
         server_fixture.__class__,
@@ -343,9 +339,21 @@ def test_agent_validate_agent(agent_fixture, server_fixture, monkeypatch):
             "parameter2": "registered_value2",
         },
     )
-    assert agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
+    # Simulate server.account.get_agent_by() returns agent details
+    monkeypatch.setattr(
+        server_fixture.account.__class__,
+        "get_agent_by",
+        lambda agent_id="LMKyPAS2Q8sKWBY34DS37a", agent_name=None: ApiSuccess(
+            message="Success",
+            detail=GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL,
+            code=200,
+        ),
+    )
+    updated_agent = agent_fixture.update_agent_from_server(server_fixture)
+    assert isinstance(updated_agent, Agent)
+
     assert (
-        agent_fixture.parameters_setup.definitions["parameter1"].value
+        updated_agent.parameters_setup.definitions["parameter1"].value
         == "registered_value1"
     )
     assert (
@@ -359,4 +367,4 @@ def test_agent_validate_agent(agent_fixture, server_fixture, monkeypatch):
         "decrypt",
         lambda self, encrypted_parameters: {"invalid_parameter": "invalid_value1"},
     )
-    assert not agent_fixture.validate_agent(AGENT_INFO_EXAMPLE, server_fixture)
+    assert not agent_fixture.update_agent_from_server(server_fixture)

@@ -6,7 +6,7 @@
 import os
 import sys
 import uuid
-from typing import Annotated, ClassVar, List
+from typing import Annotated, ClassVar, List, Union
 from urllib.parse import urlunparse
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -570,13 +570,10 @@ class Server(ServerModel):
                 log_level.lower()
             )  # needs to be lower case of uvicorn and uppercase of loguru
 
-        log.info(f"Starting Supervaize Control API v{VERSION}")
+        log.info(f"Starting Supervaize Control API v{VERSION} - Log : {log_level} ")
 
         # self.instructions()
-        log.info(f"Registering {self.uri} with account {self.account.id}")
-        log.info(
-            f"RSA Public key:\n{self.public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')}"
-        )
+
         server_registration_result: ApiResult = self.account.register_server(
             server=self
         )
@@ -588,7 +585,6 @@ class Server(ServerModel):
             updated_agent = agent.update_agent_from_server(self)
             if updated_agent:
                 log.info(f"Updated agent {updated_agent.name}")
-                inspect(updated_agent)
         import uvicorn
 
         uvicorn.run(
@@ -605,8 +601,12 @@ class Server(ServerModel):
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."
         )
 
-    def decrypt(self, encrypted_parameters: str) -> str:
+    def decrypt(self, encrypted_parameters: str) -> Union[str, None]:
+        print("decrypt")
+        print(encrypted_parameters)
+        res = decrypt_value(encrypted_parameters, self.private_key)
+        print(res)
         return decrypt_value(encrypted_parameters, self.private_key)
 
-    def encrypt(self, parameters: str) -> str:
+    def encrypt(self, parameters: str) -> Union[str, None]:
         return encrypt_value(parameters, self.public_key)

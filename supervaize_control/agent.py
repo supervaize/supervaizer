@@ -5,7 +5,7 @@
 
 from asyncio import Server
 from typing import Any, ClassVar, Dict, List, Union
-
+import json
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
@@ -188,7 +188,6 @@ class AgentModel(SvBaseModel):
     server_agent_status: str | None = None
     server_agent_onboarding_status: str | None = None
     server_encrypted_parameters: str | None = None
-    server_decrypted_parameters: str | None = None
 
 
 class Agent(AgentModel):
@@ -203,12 +202,12 @@ class Agent(AgentModel):
         return f"{self.name} - v{self.version}"
 
     @property
-    def uri(self):
-        return f"agent:{self.id}"
+    def slug(self):
+        return slugify(f"{self.name}-v{self.version}")
 
     @property
-    def slug(self):
-        return slugify(self.name)
+    def uri(self):
+        return f"agent:{self.slug}"
 
     @property
     def registration_info(self):
@@ -239,37 +238,51 @@ class Agent(AgentModel):
             else None,
         }
 
-    def update_agent_from_server(self, server: "Server") -> Union["Agent", None]:
+    def update_agent_from_server(self, server: Server) -> Union["Agent", None]:
         """
-        Validate the agent against the registration information.
+        Update agent attributes and parameters from server registration information.
         Example of agent_registration data is available in mock_api_responses.py
 
         Server is used to decrypt parameters if needed
+        Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
         if self.server_agent_id:
+            # Get agent by ID from SaaS Server
             from_server = server.account.get_agent_by(agent_id=self.server_agent_id)
         else:
+            # Get agent by name from SaaS Server
             from_server = server.account.get_agent_by(agent_name=self.name)
         if not isinstance(from_server, ApiSuccess):
             log.error(f"Failed to get agent details: {from_server}")
             return
-
         agent_from_server = from_server.detail
         server_agent_id = agent_from_server.get("id")
+
+        # This should not happen, but just in case
         if self.server_agent_id and self.server_agent_id != server_agent_id:
             message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
             raise ValueError(message)
+
+        # Update agent attributes
         self.server_agent_id = server_agent_id
         self.server_agent_status = agent_from_server.get("status")
         self.server_agent_onboarding_status = agent_from_server.get("onboarding_status")
-        if self.server_agent_onboarding_status == "onboarded":
-            log.debug("Agent is onboarded, getting encrypted parameters")
-            self.server_encrypted_parameters = agent_from_server.get(
-                "encrypted_parameters"
-            )
-            self.server_decrypted_parameters = server.decrypt(
-                self.server_encrypted_parameters
-            )
+
+        # If agent is configured, get encrypted parameters
+        if self.server_agent_onboarding_status == "configured":
+            log.debug("Agent is configured, getting encrypted parameters")
+            if server_encrypted_parameters := agent_from_server.get(
+                "parameters_encrypted"
+            ):
+                self.server_encrypted_parameters = server_encrypted_parameters
+                print("server_encrypted_parameters")
+                print(type(self.server_encrypted_parameters))
+                print(self.server_encrypted_parameters)
+                decrypted_str = server.decrypt(self.server_encrypted_parameters)
+                decrypted_list = json.loads(decrypted_str)
+                self.parameters_setup.update_values_from_server(decrypted_list)
+            else:
+                log.debug("No encrypted parameters found")
         else:
             log.debug("Agent is not onboarded, skipping encrypted parameters")
 

@@ -22,6 +22,14 @@ pre-commit-autoupdate:
 test-no-cov:
     pytest --no-cov
 
+# Run only previously failed tests
+test-failed:
+    pytest --lf --no-cov
+
+# Run mypy type checking
+mypy:
+    pre-commit run mypy --all-files
+
 # Sync dependencies
 env_sync:
     uv sync

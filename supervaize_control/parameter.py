@@ -14,7 +14,7 @@ import os
 
 from deprecated import deprecated
 
-from .common import SvBaseModel
+from .common import SvBaseModel, log
 
 
 class ParameterModel(SvBaseModel):
@@ -41,6 +41,7 @@ class Parameter(ParameterModel):
         """
         self.value = value
         if self.is_environment:
+            log.debug(f"♻️ Setting environment variable for {self.name}")
             os.environ[self.name] = value
 
 
@@ -56,6 +57,20 @@ class ParametersSetup(SvBaseModel):
     @property
     def registration_info(self) -> list[dict]:
         return [parameter.registration_info for parameter in self.definitions.values()]
+
+    def update_values_from_server(
+        self, server_parameters_setup: list[dict]
+    ) -> "ParametersSetup":
+        for parameter in server_parameters_setup:
+            if parameter["name"] in self.definitions:
+                def_parameter = self.definitions[parameter["name"]]
+                def_parameter.set_value(parameter["value"])
+            else:
+                message = f"Parameter {parameter['name']} not found in definitions"
+                log.error(message)
+                raise ValueError(message)
+
+        return self
 
 
 @deprecated(

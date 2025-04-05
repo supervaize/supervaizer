@@ -114,7 +114,6 @@ def test_server_validate_agents(server_fixture, monkeypatch):
     assert server_fixture.validate_agents(SERVER_REGISTER_RESPONSE)
 
 
-@pytest.mark.current
 def test_get_job_status_endpoint(server_fixture, job_fixture):
     """Test the get_job_status endpoint"""
     client = TestClient(server_fixture.app)

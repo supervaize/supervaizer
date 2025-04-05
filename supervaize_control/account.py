@@ -80,9 +80,8 @@ class Account(AccountModel):
         headers = self.api_headers
         payload = event.payload
         try:
-            log.debug(f"Event payload: {payload}")
+            # log.debug(f"Event payload: {payload}")
             response = requests.post(self.url_event, headers=headers, json=payload)
-            log.debug(f"Response: {response.text}")
             response.raise_for_status()
             result = ApiSuccess(
                 message=f"Event {event.type.name} sent", detail=response.text

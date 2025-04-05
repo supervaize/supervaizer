@@ -7,10 +7,12 @@ import base64
 import json
 import traceback
 from datetime import datetime
-
+from typing import Union
 import demjson3
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import os
 from loguru import logger
 from pydantic import BaseModel
 
@@ -69,7 +71,6 @@ class ApiSuccess(ApiResult):
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
             self.detail = result.object
-            print(f"result.object: {result.object}")
             self.id = result.object.get("id") or None
             self.log_message = (
                 f"✅ {message} : {self.id}" if self.id else f"✅ {message}"
@@ -166,20 +167,25 @@ def singleton(cls):
 
 
 def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
-    """Encrypt the parameter value with the public key.
+    """Encrypt using hybrid RSA+AES encryption to handle messages of any size.
 
     Args:
-        public_key (rsa.RSAPublicKey): The public key to encrypt with
+        value_to_encrypt (str): Value to encrypt
+        public_key (rsa.RSAPublicKey): RSA public key
 
     Returns:
-        str: Base64 encoded encrypted value
+        str: Base64 encoded encrypted value containing both the encrypted AES key and encrypted data
     """
     if not value_to_encrypt:
         return None
 
-    # Convert string to bytes and encrypt
-    encrypted = public_key.encrypt(
-        value_to_encrypt.encode("utf-8"),
+    # Generate random AES key and IV
+    aes_key = os.urandom(32)  # 256-bit key
+    iv = os.urandom(16)
+
+    # Encrypt the AES key with RSA
+    encrypted_key = public_key.encrypt(
+        aes_key,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
@@ -187,16 +193,33 @@ def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
         ),
     )
 
-    # Return base64 encoded string for transmission
-    return base64.b64encode(encrypted).decode("utf-8")
+    # Create AES cipher
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+
+    # Pad data to block size
+    value_bytes = value_to_encrypt.encode("utf-8")
+    pad_length = 16 - (len(value_bytes) % 16)
+    value_bytes += bytes([pad_length]) * pad_length
+
+    # Encrypt data with AES
+    encrypted_data = encryptor.update(value_bytes) + encryptor.finalize()
+
+    # Combine encrypted key, IV and data
+    combined = encrypted_key + iv + encrypted_data
+
+    # Return base64 encoded result
+    return base64.b64encode(combined).decode("utf-8")
 
 
-def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
-    """Decrypt an encrypted parameter value using the private key.
+def decrypt_value(
+    encrypted_value: str, private_key: rsa.RSAPrivateKey
+) -> Union[str, None]:
+    """Decrypt using hybrid RSA+AES decryption.
 
     Args:
         encrypted_value (str): Base64 encoded encrypted value
-        private_key (rsa.RSAPrivateKey): The private key to decrypt with
+        private_key (rsa.RSAPrivateKey): RSA private key
 
     Returns:
         str: Decrypted value as string
@@ -204,12 +227,17 @@ def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
     if not encrypted_value:
         return None
 
-    # Decode base64 string to bytes
-    encrypted_bytes = base64.b64decode(encrypted_value)
+    # Decode base64
+    combined = base64.b64decode(encrypted_value)
 
-    # Decrypt the value
-    decrypted = private_key.decrypt(
-        encrypted_bytes,
+    # Extract components - first 256 bytes are RSA encrypted key
+    encrypted_key = combined[:256]  # RSA-2048 output is 256 bytes
+    iv = combined[256:272]  # 16 bytes IV
+    encrypted_data = combined[272:]  # Rest is encrypted data
+
+    # Decrypt AES key
+    aes_key = private_key.decrypt(
+        encrypted_key,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
@@ -217,5 +245,15 @@ def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
         ),
     )
 
-    # Return decoded string
+    # Create AES cipher
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+
+    # Decrypt data
+    decrypted_padded = decryptor.update(encrypted_data) + decryptor.finalize()
+
+    # Remove padding
+    pad_length = decrypted_padded[-1]
+    decrypted = decrypted_padded[:-pad_length]
+
     return decrypted.decode("utf-8")

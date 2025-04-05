@@ -211,7 +211,7 @@ def test_encrypt_decrypt():
     public_key = private_key.public_key()
 
     # Test string to encrypt
-    test_value = "secret message"
+    test_value = "secret message" * 100
 
     # Test encryption
     encrypted = encrypt_value(test_value, public_key)
