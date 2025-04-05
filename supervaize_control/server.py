@@ -1,16 +1,26 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 import os
 import sys
 import uuid
-from typing import Annotated, ClassVar, List, Union
+from typing import (
+    ClassVar,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    Any,
+    Dict,
+)
 from urllib.parse import urlunparse
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
+from cryptography.hazmat.primitives import serialization
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -19,39 +29,37 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Query,
-    status,
+    status as http_status,
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import field_validator
 from .__version__ import VERSION
 from .account import Account
-from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .agent import Agent, AgentMethodParams, AgentCustomMethodParams
 from .common import (
-    ApiResult,
     ApiSuccess,
+    log,
     decrypt_value,
     encrypt_value,
-    log,
     SvBaseModel,
+    ApiResult,
 )
 from .instructions import display_instructions
-from .job import Job, JobContext, Jobs, JobStatus
-from .parameter import Parameters
+from .job import Job, Jobs, JobStatus, JobContext
 from .server_utils import ErrorResponse, ErrorType, create_error_response
 from rich import inspect
+from .parameter import Parameters
 
 insp = inspect
 
+T = TypeVar("T")
+
 
 class ServerModel(SvBaseModel):
-    """
-    API Server for the Supervaize Control.
-    """
+    """API Server for the Supervaize Control."""
 
-    model_config = {
-        "arbitrary_types_allowed": True  # for FastAPI
-    }
+    model_config = {"arbitrary_types_allowed": True}  # for FastAPI
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     scheme: str
     host: str
@@ -59,12 +67,12 @@ class ServerModel(SvBaseModel):
     environment: str
     mac_addr: str
     debug: bool
-    agents: list[Agent]
+    agents: List[Agent]
     app: FastAPI
     reload: bool
     account: Account
-    private_key: rsa.RSAPrivateKey = None
-    public_key: rsa.RSAPublicKey = None
+    private_key: Optional[RSAPrivateKey] = None
+    public_key: Optional[RSAPublicKey] = None
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -78,7 +86,7 @@ class ServerModel(SvBaseModel):
             raise ValueError(f"Host should not include '://': {v}")
         return v
 
-    def get_agent_by_name(self, agent_name: str) -> Agent | None:
+    def get_agent_by_name(self, agent_name: str) -> Optional[Agent]:
         for agent in self.agents:
             if agent.name == agent_name:
                 return agent
@@ -89,39 +97,31 @@ default_router = APIRouter()
 
 
 @default_router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
-def get_job_status(job_id: str):
-    """Get the status of a job by its ID
-
-    Args:
-        job_id (str): The ID of the job to get status for
-
-    Returns:
-        Job: The job object if found
-
-    Raises:
-        HTTPException: If job not found
-    """
+def get_job_status(job_id: str) -> Job:
+    """Get the status of a job by its ID"""
     job = Jobs().get_job(job_id)
     if not job:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Job with ID {job_id} not found",
         )
     return job
 
 
-@default_router.get("/jobs", tags=["Jobs"], response_model=dict[str, List[Job]])
+@default_router.get("/jobs", tags=["Jobs"], response_model=Dict[str, List[Job]])
 def get_all_jobs(
     skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
     limit: int = Query(
         default=100, ge=1, le=1000, description="Number of jobs to return"
     ),
-    status: JobStatus | None = Query(default=None, description="Filter jobs by status"),
-):
+    status: Optional[JobStatus] = Query(
+        default=None, description="Filter jobs by status"
+    ),
+) -> Union[Dict[str, List[Job]], JSONResponse]:
     """Get all jobs across all agents with pagination and optional status filtering"""
     try:
         jobs_registry = Jobs()
-        all_jobs = {}
+        all_jobs: Dict[str, List[Job]] = {}
 
         for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
             filtered_jobs = list(agent_jobs.values())
@@ -142,15 +142,15 @@ def get_all_jobs(
             error="Failed to retrieve jobs",
             error_type=ErrorType.INTERNAL_ERROR,
             detail=str(e),
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
         return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=jsonable_encoder(error_response),
         )
 
 
-async def get_server() -> "Server":
+async def get_server() -> Optional["Server"]:
     """Dependency to get the current server instance"""
     # This will be replaced with the actual server instance at runtime
     # through the Server class's create_agent_routes method
@@ -159,31 +159,35 @@ async def get_server() -> "Server":
 
 @default_router.get("/agents", tags=["Agents"], response_model=List[Agent])
 async def get_all_agents(
-    skip: int = Query(default=0, ge=0, description="Number of agents to skip"),
+    skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
     limit: int = Query(
-        default=100, ge=1, le=1000, description="Number of agents to return"
+        default=100, ge=1, le=1000, description="Number of jobs to return"
     ),
-    server: Annotated["Server", Depends(get_server)] = None,
-) -> List[Agent]:
+    server: Optional["Server"] = Depends(get_server),
+) -> Union[List[Dict[str, Any]], JSONResponse]:
     """Get all registered agents with pagination"""
     try:
+        if not server:
+            raise ValueError("Server instance not found")
         res = [a.registration_info for a in server.agents[skip : skip + limit]]
         return res
     except Exception as e:
         return create_error_response(
             ErrorType.INTERNAL_ERROR,
             f"Failed to retrieve agents: {str(e)}",
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 @default_router.get("/agent/{agent_id}", tags=["Agents"], response_model=Agent)
 async def get_agent_details(
     agent_id: str,
-    server: Annotated["Server", Depends(get_server)] = None,
-) -> dict | JSONResponse:
+    server: Optional["Server"] = Depends(get_server),
+) -> Union[Dict[str, Any], JSONResponse]:
     """Get details of a specific agent by ID"""
     try:
+        if not server:
+            raise ValueError("Server instance not found")
         for agent in server.agents:
             if agent.id == agent_id:
                 return agent.registration_info
@@ -191,13 +195,13 @@ async def get_agent_details(
         return create_error_response(
             ErrorType.AGENT_NOT_FOUND,
             f"Agent with ID '{agent_id}' not found",
-            status.HTTP_404_NOT_FOUND,
+            http_status.HTTP_404_NOT_FOUND,
         )
     except Exception as e:
         return create_error_response(
             ErrorType.INTERNAL_ERROR,
             f"Failed to retrieve agent details: {str(e)}",
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
@@ -205,39 +209,25 @@ class Server(ServerModel):
     def __init__(
         self,
         account: Account,
-        agents: list[Agent],
+        agents: List[Agent],
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZE_CONTROL_HOST", "0.0.0.0"),
         port: int = int(os.getenv("SUPERVAIZE_CONTROL_PORT", 8001)),
         debug: bool = False,
         reload: bool = False,
-        **kwargs,
-    ):
-        """Initialize the API server.
-
-        Args:
-            account (Account): The account to use for the server.
-            agents (list[Agent]): The list of agents to use for the server.
-            scheme (str, optional): The scheme to use for the server (e.g. 'http', 'https'). Defaults to "http".
-            environment (str, optional): The environment to use for the server (e.g. 'dev', 'staging', 'production'). Defaults to os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev").
-            host (str, optional): The host to use for the server (without '://'). Defaults to 0.0.0.0 if no value in Env "SUPERVAIZE_CONTROL_HOST".
-            port (int, optional): The port to use for the server. Defaults 8001 if no value in Env "SUPERVAIZE_CONTROL_PORT".
-            debug (bool, optional): Whether to run in debug mode. Defaults to False.
-            reload (bool, optional): Whether to reload the server on code changes. Defaults to False.
-        """
-        # Set appropriate log level based on debug mode
-        # log_level = "DEBUG" if debug else "ERROR"
-
-        # log.configure(handlers=[{"sink": "sys.stderr", "level": log_level}])
-
-        kwargs["account"] = account
-        kwargs["scheme"] = scheme
-        kwargs["host"] = host
-        kwargs["port"] = port
-        kwargs["environment"] = environment
-        kwargs["debug"] = debug
-        kwargs["app"] = FastAPI(
+        mac_addr: str = "-".join(
+            ("%012X" % uuid.getnode())[i : i + 2] for i in range(0, 12, 2)
+        ),
+        private_key: Optional[RSAPrivateKey] = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend(),
+        ),
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the server with the given configuration."""
+        app = FastAPI(
             debug=debug,
             title="Supervaize Control API",
             description=(
@@ -256,17 +246,25 @@ class Server(ServerModel):
                 "url": "https://mozilla.org/MPL/2.0/",
             },
         )
-        kwargs["reload"] = reload
-        kwargs["mac_addr"] = "-".join(
-            ("%012X" % uuid.getnode())[i : i + 2] for i in range(0, 12, 2)
+        # Generate RSA key pair for parameter encryption
+
+        super().__init__(
+            scheme=scheme,
+            host=host,
+            port=port,
+            environment=environment,
+            mac_addr=mac_addr,
+            debug=debug,
+            agents=agents,
+            app=app,
+            reload=reload,
+            account=account,
+            private_key=private_key,
+            public_key=private_key.public_key(),
+            **kwargs,
         )
 
-        kwargs["private_key"] = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        kwargs["public_key"] = kwargs["private_key"].public_key()
-        kwargs["agents"] = agents
-        super().__init__(**kwargs)
+        # Create routes
         self.add_route(default_router)
         self.create_utils_routes()
         self.create_agent_routes()
@@ -279,15 +277,18 @@ class Server(ServerModel):
         self.app.dependency_overrides[get_server] = get_current_server
 
     @property
-    def url(self):
+    def url(self) -> str:
+        """Get the server's base URL."""
         return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
 
     @property
-    def uri(self):
+    def uri(self) -> str:
+        """Get the server's URI."""
         return f"server:{self.mac_addr}"
 
     @property
-    def registration_info(self):
+    def registration_info(self) -> Dict[str, Any]:
+        """Get registration info for the server."""
         return {
             "url": self.url,
             "uri": self.uri,
@@ -299,10 +300,12 @@ class Server(ServerModel):
             "agents": [agent.registration_info for agent in self.agents],
         }
 
-    def add_route(self, route: str):
+    def add_route(self, route: APIRouter) -> None:
+        """Add a route to the server."""
         self.app.include_router(route)
 
-    def create_utils_routes(self):
+    def create_utils_routes(self) -> None:
+        """Create utility routes."""
         router = APIRouter(prefix="/utils", tags=["Utils"])
 
         @router.get(
@@ -330,7 +333,8 @@ class Server(ServerModel):
 
         self.app.include_router(router)
 
-    def create_agent_routes(self):
+    def create_agent_routes(self) -> None:
+        """Create agent-specific routes."""
         for agent in self.agents:
             tags = [f"Agent {agent.name} v{agent.version}"]
 
@@ -344,7 +348,7 @@ class Server(ServerModel):
                 summary="Get agent information",
                 description="Detailed information about the agent, returned as a JSON object with Agent class fields",
                 response_model=Agent,
-                responses={status.HTTP_200_OK: {"model": Agent}},
+                responses={http_status.HTTP_200_OK: {"model": Agent}},
                 tags=tags,
             )
             async def agent_info(agent: Agent = Depends(get_agent)) -> Agent:
@@ -356,13 +360,15 @@ class Server(ServerModel):
                 summary=f"Start a job with agent : {agent.name}",
                 description=f"{agent.job_start_method.description}",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": agent.job_start_method},
-                    status.HTTP_409_CONFLICT: {"model": ErrorResponse},
-                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+                    http_status.HTTP_202_ACCEPTED: {"model": agent.job_start_method},
+                    http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
+                    http_status.HTTP_500_INTERNAL_SERVER_ERROR: {
+                        "model": ErrorResponse
+                    },
                 },
                 tags=tags,
                 response_model=Job,
-                status_code=status.HTTP_202_ACCEPTED,
+                status_code=http_status.HTTP_202_ACCEPTED,
             )
             async def start_job(
                 background_tasks: BackgroundTasks,
@@ -410,16 +416,18 @@ class Server(ServerModel):
                         return create_error_response(
                             ErrorType.JOB_ALREADY_EXISTS,
                             str(e),
-                            status.HTTP_409_CONFLICT,
+                            http_status.HTTP_409_CONFLICT,
                         )
                     return create_error_response(
-                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                        ErrorType.INVALID_REQUEST,
+                        str(e),
+                        http_status.HTTP_400_BAD_REQUEST,
                     )
                 except Exception as e:
                     return create_error_response(
                         ErrorType.INTERNAL_ERROR,
                         str(e),
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
             @router.get(
@@ -428,8 +436,10 @@ class Server(ServerModel):
                 description="Get all jobs for this agent with pagination and optional status filtering",
                 response_model=List[Job],
                 responses={
-                    status.HTTP_200_OK: {"model": List[Job]},
-                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+                    http_status.HTTP_200_OK: {"model": List[Job]},
+                    http_status.HTTP_500_INTERNAL_SERVER_ERROR: {
+                        "model": ErrorResponse
+                    },
                 },
                 tags=tags,
             )
@@ -457,13 +467,15 @@ class Server(ServerModel):
                     return jobs[skip : skip + limit]
                 except ValueError as e:
                     return create_error_response(
-                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                        ErrorType.INVALID_REQUEST,
+                        str(e),
+                        http_status.HTTP_400_BAD_REQUEST,
                     )
                 except Exception as e:
                     return create_error_response(
                         ErrorType.INTERNAL_ERROR,
                         str(e),
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
             @router.get(
@@ -472,9 +484,11 @@ class Server(ServerModel):
                 description="Get the status and details of a specific job",
                 response_model=Job,
                 responses={
-                    status.HTTP_200_OK: {"model": Job},
-                    status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-                    status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+                    http_status.HTTP_200_OK: {"model": Job},
+                    http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+                    http_status.HTTP_500_INTERNAL_SERVER_ERROR: {
+                        "model": ErrorResponse
+                    },
                 },
                 tags=tags,
             )
@@ -488,18 +502,20 @@ class Server(ServerModel):
                         return create_error_response(
                             ErrorType.JOB_NOT_FOUND,
                             f"Job with ID {job_id} not found for agent {agent.name}",
-                            status.HTTP_404_NOT_FOUND,
+                            http_status.HTTP_404_NOT_FOUND,
                         )
                     return job
                 except ValueError as e:
                     return create_error_response(
-                        ErrorType.INVALID_REQUEST, str(e), status.HTTP_400_BAD_REQUEST
+                        ErrorType.INVALID_REQUEST,
+                        str(e),
+                        http_status.HTTP_400_BAD_REQUEST,
                     )
                 except Exception as e:
                     return create_error_response(
                         ErrorType.INTERNAL_ERROR,
                         str(e),
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
             @router.post(
@@ -507,7 +523,7 @@ class Server(ServerModel):
                 summary="Stop the agent",
                 description="Stop the agent",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
                 },
                 tags=tags,
             )
@@ -522,7 +538,7 @@ class Server(ServerModel):
                 summary="Status the agent",
                 description="Get the status of the agent",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
                 },
                 tags=tags,
             )
@@ -537,8 +553,8 @@ class Server(ServerModel):
                 summary="Trigger a custom method",
                 description="Trigger a custom method",
                 responses={
-                    status.HTTP_202_ACCEPTED: {"model": Agent},
-                    status.HTTP_405_METHOD_NOT_ALLOWED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
+                    http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": Agent},
                 },
                 tags=tags,
             )
@@ -552,12 +568,7 @@ class Server(ServerModel):
 
             self.app.include_router(router)
 
-    def launch(self, log_level: str | None = "INFO"):
-        """_summary_
-
-        Args:
-            log_level (str | None, optional): _description_. Defaults to "INFO". If explicitly set to None, the handler is not added.
-        """
+    def launch(self, log_level: Optional[str] = "INFO") -> None:
         log.remove()
         if log_level:
             log.add(
@@ -601,12 +612,14 @@ class Server(ServerModel):
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."
         )
 
-    def decrypt(self, encrypted_parameters: str) -> Union[str, None]:
-        print("decrypt")
-        print(encrypted_parameters)
-        res = decrypt_value(encrypted_parameters, self.private_key)
-        print(res)
-        return decrypt_value(encrypted_parameters, self.private_key)
+    def decrypt(self, encrypted_parameters: str) -> Optional[str]:
+        """Decrypt parameters using the server's private key."""
+        return (
+            decrypt_value(encrypted_parameters, self.private_key)
+            if self.private_key
+            else None
+        )
 
-    def encrypt(self, parameters: str) -> Union[str, None]:
-        return encrypt_value(parameters, self.public_key)
+    def encrypt(self, parameters: str) -> Optional[str]:
+        """Encrypt parameters using the server's public key."""
+        return encrypt_value(parameters, self.public_key) if self.public_key else None

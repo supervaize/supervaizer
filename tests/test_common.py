@@ -1,9 +1,11 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 import json
+from typing import Any, Dict, Optional
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
@@ -18,7 +20,7 @@ from supervaize_control.common import (
 )
 
 
-def test_sv_base_model():
+def test_sv_base_model() -> None:
     """Test SvBaseModel functionality"""
 
     class TestModel(SvBaseModel):
@@ -36,7 +38,7 @@ def test_sv_base_model():
     assert json_data == {"name": "test", "value": 42}
 
 
-def test_api_success_basic():
+def test_api_success_basic() -> None:
     """Test basic ApiSuccess functionality"""
     success = ApiSuccess(detail={"test": "data"}, message="success message")
 
@@ -51,13 +53,14 @@ def test_api_success_basic():
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    assert (
-        str(success)
-        == '{"message": "success message", "code": "200", "detail": {"test": "data"}, "log_message": "\\u2705 success message"}'
+    json_str = (
+        '{"message": "success message", "code": "200", "detail": {"test": "data"}, '
+        '"log_message": "\\u2705 success message"}'
     )
+    assert str(success) == json_str
 
 
-def test_api_error_basic():
+def test_api_error_basic() -> None:
     """Test basic ApiError functionality"""
     error = ApiError(message="error message", detail={"error": "details"}, code="400")
 
@@ -71,7 +74,7 @@ def test_api_error_basic():
     assert json_data["detail"] == {"error": "details"}
 
 
-def test_api_error_with_exception():
+def test_api_error_with_exception() -> None:
     """Test ApiError with exception handling"""
     test_exception = ValueError("test error")
     error = ApiError(message="error occurred", exception=test_exception)
@@ -83,7 +86,7 @@ def test_api_error_with_exception():
     assert "traceback" in json_data["exception"]
 
 
-def test_api_success_with_json_string_detail():
+def test_api_success_with_json_string_detail() -> None:
     """Test ApiSuccess with JSON string detail containing escaped quotes"""
     # Test with a JSON string containing escaped quotes
     json_detail = (
@@ -103,7 +106,7 @@ def test_api_success_with_json_string_detail():
     assert json_data["detail"]["data"] == 'value with "quotes"'
 
 
-def test_api_success():
+def test_api_success() -> None:
     """Test ApiSuccess with ID in detail string"""
     detail = '{"id": "123", "data": "test"}'
     success = ApiSuccess(message="success", detail=detail)
@@ -116,7 +119,7 @@ def test_api_success():
     assert success.log_message == "✅ success"
 
     """Test ApiSuccess with JSON without ID"""
-    json_detail = {"data": "test"}
+    json_detail: Dict[str, str] = {"data": "test"}
     success = ApiSuccess(message="success", detail=json_detail)
     assert success.log_message == "✅ success"
 
@@ -126,7 +129,7 @@ def test_api_success():
     assert success.log_message == "✅ success"
 
 
-def test_api_error():
+def test_api_error() -> None:
     """Test ApiError"""
     error = ApiError(message="error message", detail={"error": "details"}, code="400")
     assert error.message == "error message"
@@ -139,13 +142,14 @@ def test_api_error():
     assert json_data["detail"] == {"error": "details"}
     assert json_data["code"] == "400"
     assert json_data["url"] == ""
-    assert json_data["payload"] == {}
+    assert json_data["payload"] is None
 
     # Test with an exception that has custom attributes
     class CustomException(Exception):
-        def __init__(self):
+        def __init__(self) -> None:
+            super().__init__()
             self.custom_attr = '{"key": "value"}'
-            self.response = None
+            self.response: Optional[Any] = None
 
     exc = CustomException()
     error = ApiError(message="error", exception=exc)
@@ -157,12 +161,12 @@ def test_api_error():
 
     """Test ApiError with exception containing response"""
 
-    class ResponseException(Exception):
-        def __init__(self, status_code, response_text):
+    class ResponseException(CustomException):
+        def __init__(self, status_code: int, response_text: str) -> None:
+            super().__init__()
             self.response = type(
                 "Response", (), {"status_code": status_code, "text": response_text}
             )
-            super().__init__("API Error")
 
     # Test with JSON response
     exc = ResponseException(404, '{"error": "not found"}')
@@ -185,12 +189,12 @@ def test_api_error():
     assert error.log_message == "❌ error : "
 
 
-def test_singleton():
+def test_singleton() -> None:
     """Test singleton decorator"""
 
     @singleton
     class TestClass:
-        def __init__(self):
+        def __init__(self) -> None:
             self.value = 0
 
     # Should return same instance
@@ -204,7 +208,7 @@ def test_singleton():
     assert instance2.value == 42
 
 
-def test_encrypt_decrypt():
+def test_encrypt_decrypt() -> None:
     """Test encryption and decryption of values"""
     # Generate test keys
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

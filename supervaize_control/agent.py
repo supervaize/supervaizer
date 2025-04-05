@@ -1,19 +1,22 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License,
+# v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from asyncio import Server
-from typing import Any, ClassVar, Dict, List, Union
-import json
+from typing import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
 import shortuuid
 from pydantic import BaseModel
+import json
 from slugify import slugify
 
 from .__version__ import VERSION
 from .common import ApiSuccess, SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
 from .parameter import ParametersSetup
+
+if TYPE_CHECKING:
+    from .server import Server
 
 
 class AgentJobContextBase(BaseModel):
@@ -38,7 +41,8 @@ class AgentMethod(BaseModel):
 
 
     1. params : Dictionary format
-       A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs.
+       A simple key-value dictionary of parameters what will be passed to the
+       AgentMethod.method as kwargs.
        Example:
        {
            "verbose": True,
@@ -47,13 +51,15 @@ class AgentMethod(BaseModel):
        }
 
     2. fields : Form fields format
-       These are the values that will be requested from the user in the Supervaize UI and also passed as kwargs to the AgentMethod.method.
-       A list of field specifications for generating forms/UI, following the django.forms.fields definition
+       These are the values that will be requested from the user in the Supervaize UI
+       and also passed as kwargs to the AgentMethod.method.
+       A list of field specifications for generating forms/UI, following the
+       django.forms.fields definition
        see : https://docs.djangoproject.com/en/5.1/ref/forms/fields/
        Each field is a dictionary with properties like:
        - name: Field identifier
-       - type: Python type of the field for pydantic validation - used for API validation
-       - field_type: Field type (e.g. ChoiceField, TextField) - used in API response (to build forms)
+       - type: Python type of the field for pydantic validation
+       - field_type: Field type (e.g. ChoiceField, TextField)
        - choices: For choice fields, list of [value, label] pairs
        - widget: UI widget to use (e.g. RadioSelect, TextInput)
        - required: Whether field is required
@@ -87,7 +93,7 @@ class AgentMethod(BaseModel):
     description: str | None = None
 
     @property
-    def fields_definitions(self) -> list[dict]:
+    def fields_definitions(self) -> list[Dict[str, Any]]:
         """
         Returns a list of the fields without the type key.
         Used for the API response.
@@ -112,7 +118,7 @@ class AgentMethod(BaseModel):
             field_type = field["type"]
             field_annotations[field_name] = field_type
 
-        def to_dict(self):
+        def to_dict(self: BaseModel) -> Dict[str, Any]:
             return {
                 field_name: getattr(self, field_name)
                 for field_name in self.__annotations__
@@ -143,7 +149,7 @@ class AgentMethod(BaseModel):
         )
 
     @property
-    def registration_info(self) -> dict:
+    def registration_info(self) -> Dict[str, Any]:
         """
         Returns a JSON-serializable dictionary representation of the AgentMethod.
         """
@@ -191,29 +197,27 @@ class AgentModel(SvBaseModel):
 
 
 class Agent(AgentModel):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Tested in tests/test_agent.py"""
         if kwargs.get("id") != shortuuid.uuid(name=kwargs.get("name")):
             raise ValueError("Agent ID does not match")
 
         super().__init__(**kwargs)
 
-    def __str__(self):
-        return f"{self.name} - v{self.version}"
+    def __str__(self) -> str:
+        return f"{self.name} ({self.id})"
 
     @property
-    def slug(self):
-        return slugify(f"{self.name}-v{self.version}")
+    def slug(self) -> str:
+        return slugify(self.name)
 
     @property
-    def uri(self):
-        return f"agent:{self.slug}"
+    def uri(self) -> str:
+        return f"agent://{self.slug}"
 
     @property
-    def registration_info(self):
-        """Returns a JSON-serializable dictionary representation of the agent.
-        Used for API responses and registration.
-        """
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the agent"""
         return {
             "name": self.name,
             "id": self.id,
@@ -222,8 +226,6 @@ class Agent(AgentModel):
             "version": self.version,
             "description": self.description,
             "tags": self.tags,
-            "uri": self.uri,
-            "slug": self.slug,
             "job_start_method": self.job_start_method.registration_info,
             "job_stop_method": self.job_stop_method.registration_info,
             "job_status_method": self.job_status_method.registration_info,
@@ -231,14 +233,15 @@ class Agent(AgentModel):
             if self.chat_method
             else None,
             "custom_methods": {
-                k: v.registration_info for k, v in (self.custom_methods or {}).items()
+                name: method.registration_info
+                for name, method in (self.custom_methods or {}).items()
             },
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,
         }
 
-    def update_agent_from_server(self, server: Server) -> Union["Agent", None]:
+    def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
         """
         Update agent attributes and parameters from server registration information.
         Example of agent_registration data is available in mock_api_responses.py
@@ -255,10 +258,11 @@ class Agent(AgentModel):
         if not isinstance(from_server, ApiSuccess):
             log.error(f"Failed to get agent details: {from_server}")
             return
+
         agent_from_server = from_server.detail
         server_agent_id = agent_from_server.get("id")
 
-        # This should not happen, but just in case
+        # This should never happen, but just in case
         if self.server_agent_id and self.server_agent_id != server_agent_id:
             message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
             raise ValueError(message)
@@ -270,17 +274,12 @@ class Agent(AgentModel):
 
         # If agent is configured, get encrypted parameters
         if self.server_agent_onboarding_status == "configured":
-            log.debug("Agent is configured, getting encrypted parameters")
-            if server_encrypted_parameters := agent_from_server.get(
-                "parameters_encrypted"
-            ):
+            log.debug(f"Agent {self.name} is configured, getting encrypted parameters")
+            server_encrypted_parameters = agent_from_server.get("parameters_encrypted")
+            if server_encrypted_parameters:
                 self.server_encrypted_parameters = server_encrypted_parameters
-                print("server_encrypted_parameters")
-                print(type(self.server_encrypted_parameters))
-                print(self.server_encrypted_parameters)
-                decrypted_str = server.decrypt(self.server_encrypted_parameters)
-                decrypted_list = json.loads(decrypted_str)
-                self.parameters_setup.update_values_from_server(decrypted_list)
+                decrypted = server.decrypt(self.server_encrypted_parameters)
+                self.parameters_setup.update_values_from_server(json.loads(decrypted))
             else:
                 log.debug("No encrypted parameters found")
         else:

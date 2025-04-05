@@ -12,7 +12,7 @@ from supervaize_control import (
 )
 
 
-def test_telemetry(telemetry_fixture):
+def test_telemetry(telemetry_fixture: Telemetry) -> None:
     assert isinstance(telemetry_fixture, Telemetry)
     assert telemetry_fixture.agentId == "123"
     assert telemetry_fixture.type == TelemetryType.LOGS

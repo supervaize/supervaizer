@@ -1,13 +1,14 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License,
+# v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import time
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Optional
 
 from .__version__ import VERSION
 from .common import SvBaseModel, singleton
@@ -18,7 +19,7 @@ from .parameter import Parameters
 class Jobs:
     """Global registry for all jobs, organized by agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Structure: {agent_name: {job_id: Job}}
         self.jobs_by_agent: dict[str, dict[str, "Job"]] = {}
 
@@ -120,7 +121,7 @@ class JobContext(SvBaseModel):
     mission_id: str
     mission_name: str
     mission_context: Any = None
-    job_conditions: JobConditions = None
+    job_conditions: Optional[JobConditions] = None
 
 
 class JobStatus(str, Enum):
@@ -153,13 +154,13 @@ class JobModel(SvBaseModel):
 
 
 class Job(JobModel):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         Jobs().add_job(
             job=self,
         )
 
-    def add_response(self, response: JobResponse):
+    def add_response(self, response: JobResponse) -> None:
         self.status = response.status
         self.payload = response.payload
         if response.status == JobStatus.COMPLETED:
@@ -175,13 +176,14 @@ class Job(JobModel):
         cls,
         supervaize_context: "JobContext",
         agent_name: str,
-        parameters: Parameters | None = None,
-    ):
+        parameters: Optional[Parameters] = None,
+    ) -> "Job":
         """Create a new job
 
         Args:
             supervaize_context (JobContext): The context of the job
             agent_name (str): The name of the agent
+            parameters (Parameters | None): Optional parameters for the job
 
         Returns:
             Job: The new job

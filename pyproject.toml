@@ -41,6 +41,9 @@ dev = [
     "pytest-asyncio>=0.26.0",
     "pytest-mock>=3.14.0",
     "requests-mock>=1.12.1",
+    "mypy>=1.15.0",
+    "types-requests>=2.32.0.20250328",
+    "types-deprecated>=1.2.15.20250304",
 ]
 
 [tool.pytest.ini_options]
@@ -71,3 +74,11 @@ force-wrap-aliases = true
 
 [tool.commitizen]
 name = "cz_gitmoji"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_unused_ignores = false
+no_implicit_optional = true

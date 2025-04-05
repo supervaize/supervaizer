@@ -1,10 +1,11 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Dict, Any
 
 from pydantic import BaseModel
 
@@ -46,7 +47,7 @@ class TelemetryModel(BaseModel):
     type: TelemetryType
     category: TelemetryCategory
     severity: TelemetrySeverity
-    details: dict
+    details: Dict[str, Any]
 
 
 class Telemetry(TelemetryModel):
@@ -63,11 +64,11 @@ class Telemetry(TelemetryModel):
         - details: A dictionary containing telemetry-specific details
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
     @property
-    def payload(self) -> dict:
+    def payload(self) -> Dict[str, Any]:
         return {
             "agentId": self.agentId,
             "eventType": self.type.value,

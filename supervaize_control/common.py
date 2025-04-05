@@ -1,22 +1,25 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 import base64
 import json
 import traceback
-from datetime import datetime
-from typing import Union
+from typing import Any, Dict, Optional, TypeVar, Callable, Union
 import demjson3
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import os
 from loguru import logger
-from pydantic import BaseModel
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
 log = logger.bind(module="supervaize")
+
+T = TypeVar("T")
 
 
 class SvBaseModel(BaseModel):
@@ -24,21 +27,19 @@ class SvBaseModel(BaseModel):
     Base model for all Supervaize models.
     """
 
-    model_config = {
-        "json_schema_serialization_defaults": {datetime: lambda x: x.isoformat()}
-    }
+    model_config = ConfigDict(json_encoders={datetime: lambda x: x.isoformat()})
 
     @property
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()
 
     @property
-    def to_json(self):
+    def to_json(self) -> str:
         return self.model_dump_json()
 
 
 class ApiResult:
-    def __init__(self, message: str, detail: dict | str, code: str):
+    def __init__(self, message: str, detail: Union[Dict[str, Any], str], code: str):
         self.message = message
         self.code = str(code)
         self.detail = detail
@@ -50,7 +51,7 @@ class ApiResult:
         return f"{self.__class__.__name__} ({self.message})"
 
     @property
-    def dict(self) -> dict:
+    def dict(self) -> Dict[str, Any]:
         return {key: value for key, value in self.__dict__.items()}
 
     @property
@@ -66,12 +67,14 @@ class ApiSuccess(ApiResult):
     Tested in tests/test_common.py
     """
 
-    def __init__(self, message: str, detail: dict | str, code: str = 200):
-        super().__init__(message, detail, code)
+    def __init__(
+        self, message: str, detail: Union[Dict[str, Any], str], code: int = 200
+    ):
+        super().__init__(message, detail, str(code))
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
             self.detail = result.object
-            self.id = result.object.get("id") or None
+            self.id: Optional[str] = result.object.get("id") or None
             self.log_message = (
                 f"✅ {message} : {self.id}" if self.id else f"✅ {message}"
             )
@@ -93,10 +96,10 @@ class ApiError(ApiResult):
         self,
         message: str,
         code: str = "",
-        detail: dict = {},
-        exception: Exception | None = None,
+        detail: Dict[str, Any] = {},
+        exception: Optional[Exception] = None,
         url: str = "",
-        payload: dict = {},
+        payload: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message, detail, code)
         self.exception = exception
@@ -105,9 +108,9 @@ class ApiError(ApiResult):
         self.log_message = f"❌ {message} : {self.exception}"
 
     @property
-    def dict(self) -> dict:
+    def dict(self) -> Dict[str, Any]:
         if self.exception:
-            exception_dict = {
+            exception_dict: Dict[str, Any] = {
                 "type": type(self.exception).__name__,
                 "message": str(self.exception),
                 "traceback": traceback.format_exc(),
@@ -140,7 +143,7 @@ class ApiError(ApiResult):
                 except Exception:
                     pass
 
-        result = {
+        result: Dict[str, Any] = {
             "message": self.message,
             "code": self.code,
             "url": self.url,
@@ -152,13 +155,13 @@ class ApiError(ApiResult):
         return result
 
 
-def singleton(cls):
+def singleton(cls: type[T]) -> Callable[..., T]:
     """Decorator to create a singleton class
     Tested in tests/test_common.py
     """
-    instances = {}
+    instances: Dict[type[T], T] = {}
 
-    def get_instance(*args, **kwargs):
+    def get_instance(*args: Any, **kwargs: Any) -> T:
         if cls not in instances:
             instances[cls] = cls(*args, **kwargs)
         return instances[cls]
@@ -166,7 +169,7 @@ def singleton(cls):
     return get_instance
 
 
-def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
+def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> Optional[str]:
     """Encrypt using hybrid RSA+AES encryption to handle messages of any size.
 
     Args:
@@ -174,7 +177,7 @@ def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
         public_key (rsa.RSAPublicKey): RSA public key
 
     Returns:
-        str: Base64 encoded encrypted value containing both the encrypted AES key and encrypted data
+        Optional[str]: Base64 encoded encrypted value containing both the encrypted AES key and encrypted data
     """
     if not value_to_encrypt:
         return None
@@ -214,7 +217,7 @@ def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
 
 def decrypt_value(
     encrypted_value: str, private_key: rsa.RSAPrivateKey
-) -> Union[str, None]:
+) -> Optional[str]:
     """Decrypt using hybrid RSA+AES decryption.
 
     Args:

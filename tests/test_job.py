@@ -12,7 +12,7 @@ from supervaize_control.job import Job, JobContext, JobResponse, JobStatus
 
 
 @pytest.fixture
-def context_fixture():
+def context_fixture() -> JobContext:
     return JobContext(
         workspace_id="test-workspace",
         job_id=str(uuid4()),
@@ -25,11 +25,11 @@ def context_fixture():
 
 
 @pytest.fixture
-def job_fixture(context_fixture):
+def job_fixture(context_fixture: JobContext) -> Job:
     return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
 
 
-def test_job_creation(context_fixture, job_fixture):
+def test_job_creation(context_fixture: JobContext, job_fixture: Job) -> None:
     supervaize_context = context_fixture
     job = job_fixture
     job_id = job.id
@@ -48,7 +48,7 @@ def test_job_creation(context_fixture, job_fixture):
     assert job.payload == {"test": "data"}
 
 
-def test_job_add_response(job_fixture):
+def test_job_add_response(job_fixture: Job) -> None:
     job = job_fixture
     job_id = job.id
     # Add intermediary response
@@ -77,7 +77,7 @@ def test_job_add_response(job_fixture):
     assert isinstance(job.finished_at, datetime)
 
 
-def test_job_error_response(job_fixture):
+def test_job_error_response(job_fixture: Job) -> None:
     # Create job and add error response
     job = job_fixture
     job_id = job.id
@@ -94,7 +94,7 @@ def test_job_error_response(job_fixture):
     assert isinstance(job.finished_at, datetime)
 
 
-def test_job_human_request(job_fixture):
+def test_job_human_request(job_fixture: Job) -> None:
     job = job_fixture
     assert job.status == JobStatus.IN_PROGRESS
     job_id = job.id

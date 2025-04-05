@@ -1,20 +1,26 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 
 from supervaize_control import (
+    Account,
+    Agent,
+    Case,
+    CaseNodeUpdate,
     AgentRegisterEvent,
     CaseStartEvent,
     CaseUpdateEvent,
     Event,
     EventType,
+    Server,
     ServerRegisterEvent,
 )
 
 
-def test_event(event_fixture):
+def test_event(event_fixture: Event) -> None:
     assert isinstance(event_fixture, Event)
     assert event_fixture.type == EventType.AGENT_WAKEUP
     assert event_fixture.source == "test"
@@ -28,7 +34,7 @@ def test_event(event_fixture):
     ]
 
 
-def test_agent_register_event(agent_fixture, account_fixture):
+def test_agent_register_event(agent_fixture: Agent, account_fixture: Account) -> None:
     agent_register_event = AgentRegisterEvent(
         agent=agent_fixture,
         account=account_fixture,
@@ -41,7 +47,9 @@ def test_agent_register_event(agent_fixture, account_fixture):
     assert agent_register_event.details["polling"] is False
 
 
-def test_server_register_event(server_fixture, account_fixture):
+def test_server_register_event(
+    server_fixture: Server, account_fixture: Account
+) -> None:
     server_register_event = ServerRegisterEvent(
         server=server_fixture,
         account=account_fixture,
@@ -52,7 +60,7 @@ def test_server_register_event(server_fixture, account_fixture):
     assert server_register_event.details == server_fixture.registration_info
 
 
-def test_case_start_event(case_fixture, account_fixture):
+def test_case_start_event(case_fixture: Case, account_fixture: Account) -> None:
     case_start_event = CaseStartEvent(
         case=case_fixture,
         account=account_fixture,
@@ -63,7 +71,11 @@ def test_case_start_event(case_fixture, account_fixture):
     assert case_start_event.details == case_fixture.to_dict
 
 
-def test_case_update_event(case_fixture, account_fixture, case_node_update_fixture):
+def test_case_update_event(
+    case_fixture: Case,
+    account_fixture: Account,
+    case_node_update_fixture: CaseNodeUpdate,
+) -> None:
     case_update_event = CaseUpdateEvent(
         case=case_fixture,
         account=account_fixture,

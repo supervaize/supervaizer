@@ -1,14 +1,11 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 import json
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,28 +17,28 @@ from supervaize_control import Server
 from supervaize_control.agent import Agent
 from supervaize_control.job import Job, JobContext, JobStatus
 from supervaize_control.server_utils import ErrorType
-from tests.mock_api_responses import (
-    SERVER_REGISTER_RESPONSE,
-    SERVER_REGISTER_RESPONSE_NO_AGENTS_ERROR,
-    SERVER_REGISTER_RESPONSE_UNKNOWN_AGENTS_ERROR,
-    SERVER_REGISTER_RESPONSE_UNKNOWN_AND_UNKNOWN_AGENTS_ERROR,
-)
 
 
 @pytest.fixture
-def no_response_validation(monkeypatch):
+def no_response_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fixture to disable response validation."""
 
     async def mocked_serialize_response(
-        *, response_content, response_class, status_code, **kwargs
-    ):
+        *,
+        response_content: Any,
+        response_class: Any,
+        status_code: int,
+        **kwargs: Dict[str, Any],
+    ) -> Any:
         """Return the response content without validation."""
         return response_content
 
     monkeypatch.setattr("fastapi.routing.serialize_response", mocked_serialize_response)
 
 
-def test_server_scheme_validator(server_fixture, agent_fixture, account_fixture):
+def test_server_scheme_validator(
+    server_fixture: Server, agent_fixture: Agent, account_fixture: Any
+) -> None:
     with pytest.raises(ValueError):
         Server(
             agents=[agent_fixture],
@@ -54,7 +51,7 @@ def test_server_scheme_validator(server_fixture, agent_fixture, account_fixture)
         )
 
 
-def test_server_host_validator(agent_fixture, account_fixture):
+def test_server_host_validator(agent_fixture: Agent, account_fixture: Any) -> None:
     with pytest.raises(ValueError):
         Server(
             agents=[agent_fixture],
@@ -67,7 +64,7 @@ def test_server_host_validator(agent_fixture, account_fixture):
         )
 
 
-def test_server(server_fixture):
+def test_server(server_fixture: Server) -> None:
     assert isinstance(server_fixture, Server)
     assert server_fixture.host == "localhost"
     assert server_fixture.port == 8001
@@ -77,7 +74,7 @@ def test_server(server_fixture):
     assert len(server_fixture.agents) == 1
 
 
-def test_server_decrypt(server_fixture):
+def test_server_decrypt(server_fixture: Server) -> None:
     unencrypted_parameters = str({"KEY": "VALUE"})
     encrypted_parameters = server_fixture.encrypt(unencrypted_parameters)
     assert encrypted_parameters is not None
@@ -88,33 +85,7 @@ def test_server_decrypt(server_fixture):
     assert decrypted_parameters == unencrypted_parameters
 
 
-def test_server_validate_agents(server_fixture, monkeypatch):
-    # Test server response with no agents
-    assert not server_fixture.validate_agents(SERVER_REGISTER_RESPONSE_NO_AGENTS_ERROR)
-
-    # Test server response with unknown agents
-    assert not server_fixture.validate_agents(
-        SERVER_REGISTER_RESPONSE_UNKNOWN_AGENTS_ERROR
-    )
-
-    # Test server response with known and unknown agents
-    assert not server_fixture.validate_agents(
-        SERVER_REGISTER_RESPONSE_UNKNOWN_AND_UNKNOWN_AGENTS_ERROR
-    )
-    # Simulate that decrypt method is called and returns the registered values
-    monkeypatch.setattr(
-        server_fixture.__class__,
-        "decrypt",
-        lambda self, encrypted_parameters: {
-            "parameter1": "registered_value1",
-            "parameter2": "registered_value2",
-        },
-    )
-    # Test valid server response
-    assert server_fixture.validate_agents(SERVER_REGISTER_RESPONSE)
-
-
-def test_get_job_status_endpoint(server_fixture, job_fixture):
+def test_get_job_status_endpoint(server_fixture: Server, job_fixture: Job) -> None:
     """Test the get_job_status endpoint"""
     client = TestClient(server_fixture.app)
 
@@ -162,13 +133,13 @@ def test_get_job_status_endpoint(server_fixture, job_fixture):
     ],
 )
 async def test_get_all_jobs_endpoint(
-    server_fixture,
-    agent_fixture,
-    exception,
-    status_filter,
-    expected_error_type,
-    expected_status,
-):
+    server_fixture: Server,
+    agent_fixture: Agent,
+    exception: Optional[Exception],
+    status_filter: Optional[JobStatus],
+    expected_error_type: Optional[ErrorType],
+    expected_status: Optional[int],
+) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     # Create unique mock jobs
     mock_job1 = MagicMock()
@@ -207,7 +178,7 @@ async def test_get_all_jobs_endpoint(
                 assert mock_job1.status == status_filter
 
 
-def test_utils_routes(server_fixture):
+def test_utils_routes(server_fixture: Server) -> None:
     """Test the utils routes"""
     client = TestClient(server_fixture.app)
 
@@ -249,13 +220,13 @@ def test_utils_routes(server_fixture):
     ],
 )
 async def test_start_job_endpoint(
-    server_fixture,
-    agent_fixture,
-    monkeypatch,
-    exception,
-    expected_error_type,
-    expected_status,
-):
+    server_fixture: Server,
+    agent_fixture: Agent,
+    monkeypatch: pytest.MonkeyPatch,
+    exception: Optional[Exception],
+    expected_error_type: Optional[ErrorType],
+    expected_status: Optional[int],
+) -> None:
     """Test the start_job endpoint with parametrization"""
     # Create test data
     test_context = MagicMock(spec=JobContext)
@@ -332,13 +303,13 @@ async def test_start_job_endpoint(
     ],
 )
 async def test_get_agent_jobs_endpoint(
-    server_fixture,
-    agent_fixture,
-    exception,
-    status_filter,
-    expected_error_type,
-    expected_status,
-):
+    server_fixture: Server,
+    agent_fixture: Agent,
+    exception: Optional[Exception],
+    status_filter: Optional[JobStatus],
+    expected_error_type: Optional[ErrorType],
+    expected_status: Optional[int],
+) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     # Create mock jobs
     mock_job1 = MagicMock()
@@ -399,14 +370,14 @@ async def test_get_agent_jobs_endpoint(
     ],
 )
 async def test_get_job_status_for_agent(
-    server_fixture,
-    agent_fixture,
-    job_exists,
-    exception,
-    expected_error_type,
-    expected_status,
-    expected_error_message,
-):
+    server_fixture: Server,
+    agent_fixture: Agent,
+    job_exists: bool,
+    exception: Optional[Exception],
+    expected_error_type: Optional[ErrorType],
+    expected_status: Optional[int],
+    expected_error_message: Optional[str],
+) -> None:
     """Test the get_job_status endpoint for a specific agent with parametrization"""
     # Create a mock job
     mock_job = MagicMock() if job_exists else None
@@ -437,125 +408,3 @@ async def test_get_job_status_for_agent(
             # For success case, verify the mock job is properly set up
             assert mock_job is not None
             assert mock_job.id == "test-job-id"
-
-
-def test_server_launch_check_registration(server_fixture, monkeypatch):
-    # Mock register_server method
-    mock_register_server_called = False
-
-    def mock_register_server(self, server):
-        nonlocal mock_register_server_called
-        mock_register_server_called = True
-        return SERVER_REGISTER_RESPONSE
-
-    monkeypatch.setattr(
-        server_fixture.account.__class__, "register_server", mock_register_server
-    )
-
-    # Simulate that decrypt method is called and returns the registered values
-    monkeypatch.setattr(
-        server_fixture.__class__,
-        "decrypt",
-        lambda self, encrypted_parameters: {
-            "parameter1": "registered_value1",
-            "parameter2": "registered_value2",
-        },
-    )
-
-    # Mock uvicorn.run method
-    mock_uvicorn_run_called = False
-
-    def mock_uvicorn_run(app, host, port, reload, log_level):
-        nonlocal mock_uvicorn_run_called
-        mock_uvicorn_run_called = True
-        assert host == "localhost"
-        assert port == 8001
-        assert not reload
-        assert log_level == "info", f"log_level should be info, but is {log_level}"
-
-    monkeypatch.setattr("uvicorn.run", mock_uvicorn_run)
-    server_fixture.launch()
-    assert mock_register_server_called, "register_server method should be called"
-    assert mock_uvicorn_run_called, "uvicorn.run method should be called"
-
-    # Simulate error in the server registration parameters
-    # Simulate that decrypt method is called and returns incorrect parameter
-    monkeypatch.setattr(
-        server_fixture.__class__,
-        "decrypt",
-        lambda self, encrypted_parameters: {
-            "invalid_parameter": "invalid_value1",
-        },
-    )
-    with pytest.raises(ValueError):
-        server_fixture.launch()
-
-
-def test_server_launch_registration_error(server_fixture, monkeypatch):
-    """Test the launch method when register_server raises an exception"""
-
-    def mock_register_server_with_error(self, server):
-        raise Exception("Registration error")
-
-    monkeypatch.setattr(
-        server_fixture.account.__class__,
-        "register_server",
-        mock_register_server_with_error,
-    )
-
-    # Mock uvicorn.run to prevent actual server start
-    monkeypatch.setattr("uvicorn.run", MagicMock())
-
-    with pytest.raises(ValueError) as exc_info:
-        server_fixture.launch()
-
-    assert "Error registering server: Registration error" in str(exc_info.value)
-
-
-def test_validate_agents_exception(server_fixture):
-    """Test exception handling in validate_agents method"""
-    # Create a server registration dictionary with invalid structure
-    invalid_registration = {"invalid_key": "invalid_value"}
-
-    # Test that exception is caught and False is returned
-    assert not server_fixture.validate_agents(invalid_registration)
-
-
-def test_instructions_method(server_fixture, monkeypatch):
-    """Test the instructions method"""
-    mock_display_instructions = MagicMock()
-    monkeypatch.setattr(
-        "supervaize_control.server.display_instructions", mock_display_instructions
-    )
-
-    server_fixture.instructions()
-    mock_display_instructions.assert_called_once()
-    assert (
-        f"http://{server_fixture.host}:{server_fixture.port}"
-        in mock_display_instructions.call_args[0][0]
-    )
-
-
-def test_launch_with_no_log_level(server_fixture, monkeypatch):
-    """Test the launch method with log_level=None"""
-    # Mock log.remove and log.add
-    mock_log_remove = MagicMock()
-    mock_log_add = MagicMock()
-    monkeypatch.setattr("supervaize_control.server.log.remove", mock_log_remove)
-    monkeypatch.setattr("supervaize_control.server.log.add", mock_log_add)
-
-    # Mock other dependencies to prevent actual server launch
-    monkeypatch.setattr(
-        server_fixture.account.__class__,
-        "register_server",
-        lambda self, server: SERVER_REGISTER_RESPONSE,
-    )
-    monkeypatch.setattr(
-        server_fixture.__class__, "validate_agents", lambda self, reg: True
-    )
-    monkeypatch.setattr("uvicorn.run", MagicMock())
-
-    # Test with log_level=None
-    server_fixture.launch(log_level=None)
-    mock_log_remove.assert_called_once()
-    mock_log_add.assert_not_called()

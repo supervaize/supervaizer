@@ -8,7 +8,7 @@ import os
 from supervaize_control.parameter import Parameter, ParametersSetup
 
 
-def test_parameter_creation():
+def test_parameter_creation() -> None:
     parameter = Parameter(name="test")
     assert parameter.name == "test"
     assert parameter.value is None
@@ -16,13 +16,13 @@ def test_parameter_creation():
     assert parameter.is_environment is False
 
 
-def test_parameter_with_all_fields(parameter_fixture):
+def test_parameter_with_all_fields(parameter_fixture: Parameter) -> None:
     assert parameter_fixture.name == "test_parameter"
     assert parameter_fixture.value == "test_value"
     assert parameter_fixture.description == "test description"
 
 
-def test_parameters_setup_creation():
+def test_parameters_setup_creation() -> None:
     parameters_setup = ParametersSetup.from_list(
         parameter_list=[
             Parameter(name="parameter1", value="value1"),
@@ -33,7 +33,7 @@ def test_parameters_setup_creation():
     assert parameters_setup.definitions.keys() == {"parameter1", "parameter2"}
 
 
-def test_parameters_initialization(parameters_setup_fixture):
+def test_parameters_initialization(parameters_setup_fixture: ParametersSetup) -> None:
     assert len(parameters_setup_fixture.definitions) == 2
     assert all(
         isinstance(p, Parameter) for p in parameters_setup_fixture.definitions.values()
@@ -42,7 +42,7 @@ def test_parameters_initialization(parameters_setup_fixture):
     assert "parameter2" in parameters_setup_fixture.definitions
 
 
-def test_parameter_set_value(parameter_fixture):
+def test_parameter_set_value(parameter_fixture: Parameter) -> None:
     assert parameter_fixture.is_environment is False
     assert parameter_fixture.name == "test_parameter"
     assert parameter_fixture.value == "test_value"
@@ -54,9 +54,24 @@ def test_parameter_set_value(parameter_fixture):
     assert "test_parameter" not in os.environ
 
 
-def test_parameter_set_value_in_environment(parameter_fixture):
+def test_parameter_set_value_in_environment(parameter_fixture: Parameter) -> None:
     parameter_fixture.is_environment = True
     parameter_fixture.set_value("newer_value")
     assert parameter_fixture.value == "newer_value"
     assert "test_parameter" in os.environ
     assert os.environ["test_parameter"] == "newer_value"
+
+
+def test_parameters_setup_update_values_from_server(
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    parameters_setup_fixture.update_values_from_server(
+        server_parameters_setup=[
+            {"name": "parameter1", "value": "new_value1"},
+            {"name": "parameter2", "value": "new_value2"},
+        ]
+    )
+    assert isinstance(parameters_setup_fixture.definitions["parameter1"], Parameter)
+    assert isinstance(parameters_setup_fixture.definitions["parameter2"], Parameter)
+    assert parameters_setup_fixture.definitions["parameter1"].value == "new_value1"
+    assert parameters_setup_fixture.definitions["parameter2"].value == "new_value2"

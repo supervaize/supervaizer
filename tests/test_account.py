@@ -5,8 +5,15 @@
 
 
 import pytest
+from pytest_mock import MockerFixture
+from requests.exceptions import (
+    HTTPError,
+    ConnectionError,
+)
 
 from supervaize_control import Account, ApiSuccess
+from supervaize_control.server import Server
+from supervaize_control.event import Event
 
 from . import (
     AUTH_ERROR_RESPONSE,
@@ -15,13 +22,13 @@ from . import (
 )
 
 
-def test_account(account_fixture):
+def test_account(account_fixture: Account) -> None:
     assert isinstance(account_fixture, Account)
     assert account_fixture.name == "CUSTOMERFIRST"
     assert account_fixture.id == "o34Z484gY9Nxz8axgTAdiH"
 
 
-def test_account_error():
+def test_account_error() -> None:
     with pytest.raises(ValueError):
         Account(
             name="CUSTOMERFIRST",
@@ -31,7 +38,7 @@ def test_account_error():
         )
 
 
-def test_account_api_headers(account_fixture):
+def test_account_api_headers(account_fixture: Account) -> None:
     apikey = account_fixture.api_key
     assert account_fixture.api_headers == {
         "Authorization": f"Api-Key {apikey}",
@@ -39,14 +46,17 @@ def test_account_api_headers(account_fixture):
     }
 
 
-def test_account_url_event(account_fixture):
+def test_account_url_event(account_fixture: Account) -> None:
     apiurl = account_fixture.api_url
     assert account_fixture.url_event == f"{apiurl}/api/v1/ctrl-events/"
 
 
 def test_account_send_event_success(
-    account_fixture, event_fixture, server_fixture, mocker
-):
+    account_fixture: Account,
+    event_fixture: Event,
+    server_fixture: Server,
+    mocker: MockerFixture,
+) -> None:
     mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = 200
     mock_post.return_value.text = str(WAKEUP_EVENT_RESPONSE)
@@ -57,13 +67,14 @@ def test_account_send_event_success(
 
 
 def test_account_send_event_auth_error(
-    account_fixture, event_fixture, server_fixture, mocker
-):
+    account_fixture: Account,
+    event_fixture: Event,
+    server_fixture: Server,
+    mocker: MockerFixture,
+) -> None:
     mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = 403
     mock_post.return_value.text = str(AUTH_ERROR_RESPONSE)
-    from requests.exceptions import HTTPError
-
     mock_post.side_effect = HTTPError(
         "403 Client Error: Forbidden for url: https://api.example.com"
     )
@@ -73,19 +84,22 @@ def test_account_send_event_auth_error(
 
 
 def test_account_send_event_url_error(
-    account_fixture, event_fixture, server_fixture, mocker
-):
+    account_fixture: Account,
+    event_fixture: Event,
+    server_fixture: Server,
+    mocker: MockerFixture,
+) -> None:
     mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = ""
-    from requests.exceptions import ConnectionError
-
     mock_post.side_effect = ConnectionError("HTTPSConnectionPool(host='...")
 
     with pytest.raises(ConnectionError, match="HTTPSConnectionPool"):
         account_fixture.send_event(sender=server_fixture, event=event_fixture)
 
 
-def test_account_register_server_success(account_fixture, server_fixture, mocker):
+def test_account_register_server_success(
+    account_fixture: Account, server_fixture: Server, mocker: MockerFixture
+) -> None:
     mock_post = mocker.patch("requests.post")
     mock_post.return_value.status_code = 200
     mock_post.return_value.text = str(SERVER_REGISTER_RESPONSE)

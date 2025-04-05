@@ -1,10 +1,11 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License,
+# v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at https://mozilla.org/MPL/2.0/.
 
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Any, Optional
 from uuid import uuid4
 
 from pydantic import ConfigDict
@@ -25,9 +26,9 @@ class CaseStatus(str, Enum):
 class CaseNodeUpdate(SvBaseModel):
     cost: float | None = None
     # Todo: test with non-serializable objects. Make sure it works.
-    payload: dict | None = None
+    payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
-    question: dict | None = None
+    question: Optional[Dict[str, Any]] = None
 
 
 class CaseNode(SvBaseModel):
@@ -44,38 +45,40 @@ class CaseModel(SvBaseModel):
     account: "Account"  # type: ignore
     description: str
     status: CaseStatus
-    nodes: list[CaseNode] = []
-    updates: list[CaseNodeUpdate] = []
+    nodes: List[CaseNode] = []
+    updates: List[CaseNodeUpdate] = []
     total_cost: float = 0.0
-    final_delivery: dict | None = None
+    final_delivery: Optional[Dict[str, Any]] = None
 
 
 class Case(CaseModel):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
     @property
-    def uri(self):
+    def uri(self) -> str:
         return f"case:{self.id}"
 
     @property
-    def calculated_cost(self):
-        return sum(update.cost for update in self.updates)
+    def calculated_cost(self) -> float:
+        return sum(update.cost or 0.0 for update in self.updates)
 
-    def update(self, update: CaseNodeUpdate, **kwargs) -> None:
+    def update(self, update: CaseNodeUpdate, **kwargs: Any) -> None:
         log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
         self.account.send_update_case(self, update)
         self.updates.append(update)
 
-    def human_input(self, update: CaseNodeUpdate, message: str, **kwargs) -> None:
+    def human_input(self, update: CaseNodeUpdate, message: str, **kwargs: Any) -> None:
         log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
         self.account.send_update_case(self, update)
         self.updates.append(update)
 
-    def resume(self, **kwargs):
+    def resume(self, **kwargs: Any) -> None:
         pass
 
-    def close(self, case_result: dict, final_cost: float | None, **kwargs):
+    def close(
+        self, case_result: Dict[str, Any], final_cost: Optional[float], **kwargs: Any
+    ) -> None:
         """
         Close the case and send the final update to the account.
         """
@@ -101,9 +104,9 @@ class Case(CaseModel):
         account: "Account",
         name: str,
         description: str,
-        nodes: list[CaseNode],
+        nodes: List[CaseNode],
         case_id: str = str(uuid4()),
-    ):
+    ) -> "Case":
         """
         Start a new case
 

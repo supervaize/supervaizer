@@ -1,10 +1,11 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 from enum import Enum
-from typing import ClassVar
+from typing import Any, ClassVar, Dict
 
 from .__version__ import VERSION
 from .account import Account
@@ -37,7 +38,7 @@ class EventModel(SvBaseModel):
     source: str
     account: Account
     type: EventType
-    details: dict
+    details: Dict[str, Any]
 
 
 class Event(EventModel):
@@ -55,11 +56,11 @@ class Event(EventModel):
     Tests in tests/test_event.py
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
     @property
-    def payload(self) -> dict:
+    def payload(self) -> Dict[str, Any]:
         """
         Returns the payload for the event.
         This must be a dictionary that can be serialized to JSON to be sent in the request body.
@@ -84,9 +85,9 @@ class AgentRegisterEvent(Event):
         agent: "Agent",
         account: "Account",
         polling: bool = True,
-    ):
+    ) -> None:
         super().__init__(
-            type=EventType.AGENT_REGISTER.value,
+            type=EventType.AGENT_REGISTER,
             account=account,
             source=agent.uri,
             details=agent.registration_info | {"polling": polling},
@@ -98,9 +99,9 @@ class ServerRegisterEvent(Event):
         self,
         account: "Account",
         server: "Server",
-    ):
+    ) -> None:
         super().__init__(
-            type=EventType.SERVER_REGISTER.value,
+            type=EventType.SERVER_REGISTER,
             account=account,
             source=server.uri,
             details=server.registration_info,
@@ -108,9 +109,9 @@ class ServerRegisterEvent(Event):
 
 
 class CaseStartEvent(Event):
-    def __init__(self, case: "Case", account: "Account"):
+    def __init__(self, case: "Case", account: "Account") -> None:
         super().__init__(
-            type=EventType.CASE_START.value,
+            type=EventType.CASE_START,
             account=account,
             source=case.uri,
             details=case.to_dict,
@@ -118,9 +119,11 @@ class CaseStartEvent(Event):
 
 
 class CaseUpdateEvent(Event):
-    def __init__(self, case: "Case", account: "Account", update: "CaseNodeUpdate"):
+    def __init__(
+        self, case: "Case", account: "Account", update: "CaseNodeUpdate"
+    ) -> None:
         super().__init__(
-            type=EventType.CASE_UPDATE.value,
+            type=EventType.CASE_UPDATE,
             account=account,
             source=case.uri,
             details=update.to_dict,

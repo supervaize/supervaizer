@@ -20,12 +20,8 @@ repos:
     rev: v1.9.0
     hooks:
       - id: mypy
-        args: [--strict]
-        additional_dependencies:
-          - types-PyYAML
-          - types-requests
-          - types-setuptools
-          - pydantic>=2.0.0
+        language: python
+        additional_dependencies: [".[dev]"]
 
   # Add copyright headers to files
   - repo: https://github.com/Lucas-C/pre-commit-hooks

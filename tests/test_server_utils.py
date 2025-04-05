@@ -1,7 +1,8 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 from datetime import datetime
 
@@ -14,16 +15,16 @@ from supervaize_control.server_utils import (
 )
 
 
-def test_error_type_enum():
-    assert ErrorType.JOB_NOT_FOUND == "job_not_found"
-    assert ErrorType.JOB_ALREADY_EXISTS == "job_already_exists"
-    assert ErrorType.AGENT_NOT_FOUND == "agent_not_found"
-    assert ErrorType.INVALID_REQUEST == "invalid_request"
-    assert ErrorType.INTERNAL_ERROR == "internal_error"
-    assert ErrorType.INVALID_PARAMETERS == "invalid_parameters"
+def test_error_type_enum() -> None:
+    assert ErrorType.JOB_NOT_FOUND.value == "job_not_found"
+    assert ErrorType.JOB_ALREADY_EXISTS.value == "job_already_exists"
+    assert ErrorType.AGENT_NOT_FOUND.value == "agent_not_found"
+    assert ErrorType.INVALID_REQUEST.value == "invalid_request"
+    assert ErrorType.INTERNAL_ERROR.value == "internal_error"
+    assert ErrorType.INVALID_PARAMETERS.value == "invalid_parameters"
 
 
-def test_error_response_model():
+def test_error_response_model() -> None:
     error = ErrorResponse(
         error="Test Error",
         error_type=ErrorType.INVALID_REQUEST,
@@ -38,7 +39,7 @@ def test_error_response_model():
     assert isinstance(error.timestamp, datetime)
 
 
-def test_create_error_response():
+def test_create_error_response() -> None:
     response = create_error_response(
         error_type=ErrorType.JOB_NOT_FOUND, detail="Job 123 not found", status_code=404
     )
@@ -46,19 +47,21 @@ def test_create_error_response():
     assert isinstance(response, JSONResponse)
     assert response.status_code == 404
 
-    content = response.body.decode()
+    content = response.body.decode("utf-8")
     assert "Job Not Found" in content
     assert "Job 123 not found" in content
     assert "job_not_found" in content
 
 
-def test_create_error_response_without_detail():
+def test_create_error_response_without_detail() -> None:
     response = create_error_response(
-        error_type=ErrorType.INTERNAL_ERROR, detail=None, status_code=500
+        error_type=ErrorType.INTERNAL_ERROR,
+        detail="Internal server error",
+        status_code=500,
     )
 
     assert isinstance(response, JSONResponse)
     assert response.status_code == 500
 
-    content = response.body.decode()
+    content = response.body.decode("utf-8")
     assert "Internal Error" in content

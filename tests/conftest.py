@@ -1,14 +1,15 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 from datetime import datetime
 from uuid import uuid4
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from typing_extensions import Annotated
 
 from supervaize_control import (
     Account,
@@ -34,7 +35,7 @@ from supervaize_control import (
 
 
 @pytest.fixture
-def account_fixture():
+def account_fixture() -> Annotated[Account, "fixture"]:
     return Account(
         name="CUSTOMERFIRST",
         id="o34Z484gY9Nxz8axgTAdiH",
@@ -44,7 +45,7 @@ def account_fixture():
 
 
 @pytest.fixture
-def agent_method_fixture():
+def agent_method_fixture() -> Annotated[AgentMethod, "fixture"]:
     return AgentMethod(
         name="start",
         method="start",
@@ -54,7 +55,7 @@ def agent_method_fixture():
 
 
 @pytest.fixture(scope="session")
-def context_fixture():
+def context_fixture() -> Annotated[JobContext, "fixture"]:
     return JobContext(
         workspace_id="test-workspace",
         job_id="test-job-id",
@@ -67,12 +68,12 @@ def context_fixture():
 
 
 @pytest.fixture(scope="session")
-def job_fixture(context_fixture):
+def job_fixture(context_fixture: JobContext) -> Annotated[Job, "fixture"]:
     return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
 
 
 @pytest.fixture
-def event_fixture(account_fixture):
+def event_fixture(account_fixture: Account) -> Annotated[Event, "fixture"]:
     return Event(
         type=EventType.AGENT_WAKEUP,
         source="test",
@@ -82,7 +83,7 @@ def event_fixture(account_fixture):
 
 
 @pytest.fixture
-def telemetry_fixture():
+def telemetry_fixture() -> Annotated[Telemetry, "fixture"]:
     return Telemetry(
         agentId="123",
         type=TelemetryType.LOGS,
@@ -93,14 +94,16 @@ def telemetry_fixture():
 
 
 @pytest.fixture
-def case_node_fixture():
+def case_node_fixture() -> Annotated[CaseNode, "fixture"]:
     return CaseNode(
         name="Test Node", description="Test Node Description", type="node_type"
     )
 
 
 @pytest.fixture
-def case_fixture(account_fixture, case_node_fixture):
+def case_fixture(
+    account_fixture: Account, case_node_fixture: CaseNode
+) -> Annotated[Case, "fixture"]:
     return Case(
         id=str(uuid4()),
         job_id="job123",
@@ -113,7 +116,7 @@ def case_fixture(account_fixture, case_node_fixture):
 
 
 @pytest.fixture
-def case_node_update_fixture():
+def case_node_update_fixture() -> Annotated[CaseNodeUpdate, "fixture"]:
     return CaseNodeUpdate(
         payload={"test": "value"},
         is_final=True,
@@ -122,7 +125,7 @@ def case_node_update_fixture():
 
 
 @pytest.fixture
-def parameter_fixture() -> Parameter:
+def parameter_fixture() -> Annotated[Parameter, "fixture"]:
     return Parameter(
         name="test_parameter",
         value="test_value",
@@ -132,7 +135,7 @@ def parameter_fixture() -> Parameter:
 
 
 @pytest.fixture
-def parameters_setup_fixture() -> ParametersSetup:
+def parameters_setup_fixture() -> Annotated[ParametersSetup, "fixture"]:
     return ParametersSetup.from_list(
         parameter_list=[
             Parameter(name="parameter1", value="value1", is_environment=True),
@@ -142,7 +145,9 @@ def parameters_setup_fixture() -> ParametersSetup:
 
 
 @pytest.fixture
-def agent_fixture(agent_method_fixture, parameters_setup_fixture) -> Agent:
+def agent_fixture(
+    agent_method_fixture: AgentMethod, parameters_setup_fixture: ParametersSetup
+) -> Annotated[Agent, "fixture"]:
     return Agent(
         id="LMKyPAS2Q8sKWBY34DS37a",
         name="agentName",
@@ -163,13 +168,14 @@ def agent_fixture(agent_method_fixture, parameters_setup_fixture) -> Agent:
 
 
 @pytest.fixture
-def server_fixture(account_fixture, agent_fixture):
+def server_fixture(
+    account_fixture: Account, agent_fixture: Agent
+) -> Annotated[Server, "fixture"]:
     """Create a server fixture."""
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
     )
-    public_key = private_key.public_key()
     return Server(
         scheme="http",
         host="localhost",
@@ -180,12 +186,13 @@ def server_fixture(account_fixture, agent_fixture):
         agent_timeout=10,
         jobs=[],
         private_key=private_key,
-        public_key=public_key,
         account=account_fixture,
         agents=[agent_fixture],
     )
 
 
 @pytest.fixture
-def parameters_fixture(parameters_setup_fixture):
+def parameters_fixture(
+    parameters_setup_fixture: ParametersSetup,
+) -> Annotated[Parameters, "fixture"]:
     return Parameters(values={"parameter1": "value1", "parameter2": "value2"})

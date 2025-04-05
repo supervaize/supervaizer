@@ -3,10 +3,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-from supervaize_control.case import Case, CaseNodeUpdate, CaseStatus
+from requests_mock import Mocker
+from supervaize_control.case import Case, CaseNodeUpdate, CaseStatus, CaseNode
+from supervaize_control import Account
 
 
-def test_case(case_fixture, case_node_fixture):
+def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:
     assert isinstance(case_fixture, Case)
     assert case_fixture.id is not None
     assert case_fixture.name == "Test Case"
@@ -14,7 +16,9 @@ def test_case(case_fixture, case_node_fixture):
     assert case_fixture.nodes == [case_node_fixture]
 
 
-def test_case_start(account_fixture, case_node_fixture, requests_mock):
+def test_case_start(
+    account_fixture: Account, case_node_fixture: CaseNode, requests_mock: Mocker
+) -> None:
     api_url = account_fixture.api_url
     # mock the start case event response (example for reference only)
     requests_mock.post(
@@ -64,9 +68,10 @@ def test_case_start(account_fixture, case_node_fixture, requests_mock):
     assert isinstance(new_case, Case)
 
 
-def test_case_close(account_fixture, requests_mock, case_fixture):
+def test_case_close(
+    account_fixture: Account, requests_mock: Mocker, case_fixture: Case
+) -> None:
     # Setup
-
     case = case_fixture
     case_result = {"status": "success"}
     final_cost = 10.0
@@ -90,7 +95,9 @@ def test_case_close(account_fixture, requests_mock, case_fixture):
     assert case.final_delivery == case_result
 
 
-def test_case_close_without_final_cost(account_fixture, requests_mock, case_fixture):
+def test_case_close_without_final_cost(
+    account_fixture: Account, requests_mock: Mocker, case_fixture: Case
+) -> None:
     # Setup
     case = case_fixture
 

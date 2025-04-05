@@ -1,7 +1,8 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License,
+# v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at https://mozilla.org/MPL/2.0/.
 
 from art import text2art
 from rich import box, print
@@ -11,6 +12,7 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
+import sys
 
 from supervaize_control.__version__ import VERSION
 
@@ -84,7 +86,8 @@ class Header:
         return Panel(grid, border_style="blue")
 
 
-def make_syntax() -> Syntax:
+def make_syntax() -> Panel:
+    """Create a syntax-highlighted code panel."""
     code = """\
 from supervaize_control import Server, Account, Agent
 sv_account = Account(
@@ -113,11 +116,18 @@ server.launch()
     return panel
 
 
-def make_footer(status_message: str):
+def make_footer(status_message: str) -> Panel:
+    """Create a footer panel with status message."""
     return Panel(status_message, border_style="green")
 
 
-def display_instructions(server_url: str, status_message: str):
+def display_instructions(server_url: str, status_message: str) -> None:
+    """Display the full instructions layout.
+
+    Args:
+        server_url: The URL where the server is running
+        status_message: Status message to display in footer
+    """
     layout = make_layout()
     layout["header"].update(Header())
     layout["body"].update(make_documentation_message(server_url))
@@ -125,9 +135,10 @@ def display_instructions(server_url: str, status_message: str):
     layout["footer"].update(make_footer(status_message))
 
     print(layout)
+    sys.exit(0)  # This function never returns normally
 
 
 if __name__ == "__main__":
-    layout = display_instructions(
+    display_instructions(
         "http://127.0.0.1:8000", "Starting server on http://127.0.0.1:8000"
     )

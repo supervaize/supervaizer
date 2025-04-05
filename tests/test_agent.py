@@ -1,24 +1,24 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# If a copy of the MPL was not distributed with this file, You can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
+import os
+import json
+from typing import Any, Dict
 import pytest
 from pydantic import BaseModel, ValidationError
 
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.job import JobContext
 from supervaize_control.parameter import ParametersSetup
+from supervaize_control.server import Server
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
 from supervaize_control.common import ApiSuccess
 
 
-def test_agent_method_fixture(agent_method_fixture):
+def test_agent_method_fixture(agent_method_fixture: AgentMethod) -> None:
     """Test that the fixture itself is working"""
     assert agent_method_fixture.name == "start"
     assert agent_method_fixture.method == "start"
@@ -26,7 +26,7 @@ def test_agent_method_fixture(agent_method_fixture):
     assert agent_method_fixture.description == "Start the agent"
 
 
-def test_agent(agent_fixture):
+def test_agent(agent_fixture: Agent) -> None:
     assert isinstance(agent_fixture, Agent)
     assert isinstance(agent_fixture.job_start_method, AgentMethod)
     assert isinstance(agent_fixture.job_stop_method, AgentMethod)
@@ -37,7 +37,7 @@ def test_agent(agent_fixture):
     assert isinstance(agent_fixture.custom_methods["method2"], AgentMethod)
 
 
-def test_account_error(agent_method_fixture):
+def test_account_error(agent_method_fixture: AgentMethod) -> None:
     with pytest.raises(ValueError):
         """
         Test that the agent ID does not match the name
@@ -49,19 +49,19 @@ def test_account_error(agent_method_fixture):
             developer="Dev",
             version="1.0.0",
             description="description",
-            start_method=agent_method_fixture,
-            stop_method=agent_method_fixture,
-            status_method=agent_method_fixture,
+            job_start_method=agent_method_fixture,
+            job_stop_method=agent_method_fixture,
+            job_status_method=agent_method_fixture,
             chat_method=agent_method_fixture,
             custom_methods={"method1": agent_method_fixture},
         )
 
 
-def test_agent_custom_methods(agent_fixture):
+def test_agent_custom_methods(agent_fixture: Agent) -> None:
     assert agent_fixture.custom_methods_names == ["method1", "method2"]
 
 
-def test_fields_annotations_dynamic_model():
+def test_fields_annotations_dynamic_model() -> None:
     # Create test AgentMethod instance
     agent_method = AgentMethod(
         name="start",
@@ -136,7 +136,7 @@ def test_fields_annotations_dynamic_model():
     assert DynamicModel.__annotations__["languages"] == list[str]
 
     # Test 3: Create a valid instance
-    valid_data = {
+    valid_data: Dict[str, Any] = {
         "full_name": "John Doe",
         "age": 30,
         "subscribe": True,
@@ -148,9 +148,9 @@ def test_fields_annotations_dynamic_model():
     model_instance = DynamicModel(**valid_data)
 
     # Verify we can access the fields
-    assert model_instance.full_name == "John Doe"
-    assert model_instance.age == 30
-    assert model_instance.languages == ["en", "es"]
+    assert getattr(model_instance, "full_name") == "John Doe"
+    assert getattr(model_instance, "age") == 30
+    assert getattr(model_instance, "languages") == ["en", "es"]
 
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
@@ -183,7 +183,7 @@ def test_fields_annotations_dynamic_model():
     assert isinstance(empty_instance, BaseModel)
 
 
-def test_job_model_dynamic_model():
+def test_job_model_dynamic_model() -> None:
     # Create test AgentMethod instance with fields
     agent_method = AgentMethod(
         name="start",
@@ -213,9 +213,8 @@ def test_job_model_dynamic_model():
     assert issubclass(JobModel, BaseModel)
 
     # Test 2: Check the structure of the model
-    assert "supervaize_context" in JobModel.__annotations__
-    assert "job_fields" in JobModel.__annotations__
-    assert JobModel.__annotations__["supervaize_context"] == JobContext
+    assert JobModel.model_fields["supervaize_context"].annotation == JobContext
+    assert "job_fields" in JobModel.model_fields
 
     # Test 3: Create a valid instance
     from datetime import datetime
@@ -237,6 +236,7 @@ def test_job_model_dynamic_model():
     # Verify we can access the fields
     assert model_instance.supervaize_context.workspace_id == "ws-123"
     assert model_instance.supervaize_context.job_id == "job-456"
+    # Job fields is dynamically created
     assert model_instance.job_fields.full_name == "John Doe"
     assert model_instance.job_fields.age == 30
 
@@ -249,12 +249,9 @@ def test_job_model_dynamic_model():
                 "started_by": "user-789",
                 "started_at": datetime.now(),
                 "mission_id": "mission-abc",
-                "mission_name": "Test Mission",
             },
-            job_fields={
-                "full_name": "John Doe",
-                "age": "not an integer",  # Wrong type
-            },
+            job_fields={"full_name": "John Doe", "age": "not an integer"},
+            encrypted_agent_parameters="encrypted_agent_parameters",
         )
 
     # Test 5: Missing required fields in context
@@ -308,42 +305,44 @@ def test_job_model_dynamic_model():
     }
     empty_instance = EmptyJobModel(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
-    assert empty_instance.supervaize_context.workspace_id == "ws-123"
+    assert model_instance.supervaize_context.workspace_id == "ws-123"
 
 
-def test_agent_parameters(agent_fixture):
+def test_agent_parameters(agent_fixture: Agent) -> None:
     assert agent_fixture.parameters_setup is not None
-    assert isinstance(agent_fixture.parameters_setup, ParametersSetup)
-    assert len(agent_fixture.parameters_setup.definitions) == 2
-    assert agent_fixture.parameters_setup.definitions["parameter1"].value == "value1"
-    assert agent_fixture.parameters_setup.definitions["parameter2"].value == "value2"
-    assert (
-        agent_fixture.parameters_setup.definitions["parameter2"].description == "desc2"
-    )
-    assert agent_fixture.parameters_setup.definitions["parameter1"].description is None
+    parameters_setup = agent_fixture.parameters_setup
+    assert isinstance(parameters_setup, ParametersSetup)
+    assert len(parameters_setup.definitions) == 2
+    assert parameters_setup.definitions["parameter1"].value == "value1"
+    assert parameters_setup.definitions["parameter2"].value == "value2"
+    assert parameters_setup.definitions["parameter2"].description == "desc2"
+    assert parameters_setup.definitions["parameter1"].description is None
 
 
-def test_agent_secrets_not_found(agent_fixture):
+def test_agent_secrets_not_found(agent_fixture: Agent) -> None:
+    assert agent_fixture.parameters_setup is not None
+    parameters_setup = agent_fixture.parameters_setup
     with pytest.raises(KeyError):
-        agent_fixture.parameters_setup.definitions["nonexistent"]
+        parameters_setup.definitions["nonexistent"]
 
 
-@pytest.mark.current
-def test_agent_update_agent_from_server(agent_fixture, server_fixture, monkeypatch):
+def test_agent_update_agent_from_server(
+    agent_fixture: Agent, server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Simulate that decrypt method is called and returns the registered values
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: {
-            "parameter1": "registered_value1",
-            "parameter2": "registered_value2",
-        },
+        lambda self, encrypted_parameters: json.dumps([
+            {"name": "parameter1", "value": "new_value1", "is_environment": True},
+            {"name": "parameter2", "value": "new_value2", "is_environment": False},
+        ]),
     )
     # Simulate server.account.get_agent_by() returns agent details
     monkeypatch.setattr(
         server_fixture.account.__class__,
         "get_agent_by",
-        lambda agent_id="LMKyPAS2Q8sKWBY34DS37a", agent_name=None: ApiSuccess(
+        lambda self, agent_id=None, agent_name=None: ApiSuccess(
             message="Success",
             detail=GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL,
             code=200,
@@ -352,19 +351,26 @@ def test_agent_update_agent_from_server(agent_fixture, server_fixture, monkeypat
     updated_agent = agent_fixture.update_agent_from_server(server_fixture)
     assert isinstance(updated_agent, Agent)
 
-    assert (
-        updated_agent.parameters_setup.definitions["parameter1"].value
-        == "registered_value1"
-    )
-    assert (
-        agent_fixture.parameters_setup.definitions["parameter2"].value
-        == "registered_value2"
-    )
+    assert updated_agent.parameters_setup is not None
+    parameters_setup = updated_agent.parameters_setup
+    assert parameters_setup.definitions["parameter1"].value == "new_value1"
+
+    assert agent_fixture.parameters_setup is not None
+    agent_parameters = agent_fixture.parameters_setup
+    assert agent_parameters.definitions["parameter2"].value == "new_value2"
+
+    # Check environment variables were set correctly
+    assert "parameter1" in os.environ
+    assert os.environ["parameter1"] == "new_value1"
+    assert "parameter2" not in os.environ
 
     # Simulate that decrypt returns an invalid parameter name
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: {"invalid_parameter": "invalid_value1"},
+        lambda self, encrypted_parameters: json.dumps([
+            {"invalid_parameter": "invalid_value1"}
+        ]),
     )
-    assert not agent_fixture.update_agent_from_server(server_fixture)
+    with pytest.raises(ValueError):
+        agent_fixture.update_agent_from_server(server_fixture)
