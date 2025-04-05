@@ -1,8 +1,10 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License,
-# v. 2.0. If a copy of the MPL was not distributed with this file,
-# You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
+import sys
 
 from art import text2art
 from rich import box, print
@@ -12,7 +14,6 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
-import sys
 
 from supervaize_control.__version__ import VERSION
 

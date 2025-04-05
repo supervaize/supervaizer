@@ -1,21 +1,23 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
+# If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-import os
+
 import json
+import os
 from typing import Any, Dict
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
 from supervaize_control import Agent, AgentMethod
+from supervaize_control.common import ApiSuccess
 from supervaize_control.job import JobContext
 from supervaize_control.parameter import ParametersSetup
 from supervaize_control.server import Server
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
-from supervaize_control.common import ApiSuccess
 
 
 def test_agent_method_fixture(agent_method_fixture: AgentMethod) -> None:

@@ -12,4 +12,4 @@ if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "supervaize_contro
     # Create the tag
     git tag -a "v${VERSION}" -m "Version ${VERSION}"
     echo "Created tag v${VERSION}"
-fi 
+fi

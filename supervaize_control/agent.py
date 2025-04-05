@@ -1,13 +1,15 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License,
-# v. 2.0. If a copy of the MPL was not distributed with this file,
-# You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
-from typing import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
+
+import json
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+
 import shortuuid
 from pydantic import BaseModel
-import json
 from slugify import slugify
 
 from .__version__ import VERSION
@@ -257,10 +259,10 @@ class Agent(AgentModel):
             from_server = server.account.get_agent_by(agent_name=self.name)
         if not isinstance(from_server, ApiSuccess):
             log.error(f"Failed to get agent details: {from_server}")
-            return
+            return None
 
         agent_from_server = from_server.detail
-        server_agent_id = agent_from_server.get("id")
+        server_agent_id = agent_from_server.get("id") if agent_from_server else None
 
         # This should never happen, but just in case
         if self.server_agent_id and self.server_agent_id != server_agent_id:
@@ -269,13 +271,21 @@ class Agent(AgentModel):
 
         # Update agent attributes
         self.server_agent_id = server_agent_id
-        self.server_agent_status = agent_from_server.get("status")
-        self.server_agent_onboarding_status = agent_from_server.get("onboarding_status")
+        self.server_agent_status = (
+            agent_from_server.get("status") if agent_from_server else None
+        )
+        self.server_agent_onboarding_status = (
+            agent_from_server.get("onboarding_status") if agent_from_server else None
+        )
 
         # If agent is configured, get encrypted parameters
         if self.server_agent_onboarding_status == "configured":
             log.debug(f"Agent {self.name} is configured, getting encrypted parameters")
-            server_encrypted_parameters = agent_from_server.get("parameters_encrypted")
+            server_encrypted_parameters = (
+                agent_from_server.get("parameters_encrypted")
+                if agent_from_server
+                else None
+            )
             if server_encrypted_parameters:
                 self.server_encrypted_parameters = server_encrypted_parameters
                 decrypted = server.decrypt(self.server_encrypted_parameters)

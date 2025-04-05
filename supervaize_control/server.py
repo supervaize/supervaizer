@@ -1,26 +1,28 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
+# If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 import os
 import sys
 import uuid
 from typing import (
+    Any,
     ClassVar,
+    Dict,
     List,
     Optional,
     TypeVar,
     Union,
-    Any,
-    Dict,
 )
+from enum import Enum
 from urllib.parse import urlunparse
+
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from cryptography.hazmat.primitives import serialization
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -34,22 +36,23 @@ from fastapi import (
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import field_validator
+from rich import inspect
+
 from .__version__ import VERSION
 from .account import Account
-from .agent import Agent, AgentMethodParams, AgentCustomMethodParams
+from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
 from .common import (
+    ApiResult,
     ApiSuccess,
-    log,
+    SvBaseModel,
     decrypt_value,
     encrypt_value,
-    SvBaseModel,
-    ApiResult,
+    log,
 )
 from .instructions import display_instructions
-from .job import Job, Jobs, JobStatus, JobContext
-from .server_utils import ErrorResponse, ErrorType, create_error_response
-from rich import inspect
+from .job import Job, JobContext, Jobs, JobStatus
 from .parameter import Parameters
+from .server_utils import ErrorResponse, ErrorType, create_error_response
 
 insp = inspect
 
@@ -336,7 +339,7 @@ class Server(ServerModel):
     def create_agent_routes(self) -> None:
         """Create agent-specific routes."""
         for agent in self.agents:
-            tags = [f"Agent {agent.name} v{agent.version}"]
+            tags: Optional[list[str | Enum]] = [f"Agent {agent.name} v{agent.version}"]
 
             router = APIRouter(prefix=f"/agents/{agent.slug}", tags=tags)
 
@@ -564,7 +567,14 @@ class Server(ServerModel):
                 log.info(
                     f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
                 )
-                return agent.custom_method(params)
+                if agent.custom_methods:
+                    return agent.custom_methods.get(params.method_name)
+                else:
+                    return create_error_response(
+                        ErrorType.INVALID_REQUEST,
+                        "Custom method not found",
+                        http_status.HTTP_405_METHOD_NOT_ALLOWED,
+                    )
 
             self.app.include_router(router)
 
@@ -606,7 +616,7 @@ class Server(ServerModel):
             log_level=log_level,
         )
 
-    def instructions(self):
+    def instructions(self) -> None:
         server_url = f"http://{self.host}:{self.port}"
         display_instructions(
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."

@@ -1,20 +1,22 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
+# If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
+
 
 import base64
 import json
+import os
 import traceback
-from typing import Any, Dict, Optional, TypeVar, Callable, Union
+from datetime import datetime
+from typing import Any, Callable, Dict, Optional, TypeVar
+
 import demjson3
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-import os
 from loguru import logger
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 log = logger.bind(module="supervaize")
@@ -39,7 +41,7 @@ class SvBaseModel(BaseModel):
 
 
 class ApiResult:
-    def __init__(self, message: str, detail: Union[Dict[str, Any], str], code: str):
+    def __init__(self, message: str, detail: Optional[Dict[str, Any]], code: str):
         self.message = message
         self.code = str(code)
         self.detail = detail
@@ -68,19 +70,25 @@ class ApiSuccess(ApiResult):
     """
 
     def __init__(
-        self, message: str, detail: Union[Dict[str, Any], str], code: int = 200
+        self, message: str, detail: Optional[Dict[str, Any] | str], code: int = 200
     ):
-        super().__init__(message, detail, str(code))
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
-            self.detail = result.object
-            self.id: Optional[str] = result.object.get("id") or None
-            self.log_message = (
-                f"✅ {message} : {self.id}" if self.id else f"✅ {message}"
-            )
+            detail = {"object": result.object}
+            id = result.object.get("id") or None
+            log_message = f"✅ {message} : {id}" if id else f"✅ {message}"
         else:
-            self.detail = detail
-            self.log_message = f"✅ {message}"
+            id = None
+            detail = detail
+            log_message = f"✅ {message}"
+
+        super().__init__(
+            message=message,
+            detail=detail,
+            code=str(code),
+        )
+        self.id: Optional[str] = id
+        self.log_message = log_message
 
 
 class ApiError(ApiResult):
@@ -96,7 +104,7 @@ class ApiError(ApiResult):
         self,
         message: str,
         code: str = "",
-        detail: Dict[str, Any] = {},
+        detail: Optional[Dict[str, Any]] = None,
         exception: Optional[Exception] = None,
         url: str = "",
         payload: Optional[Dict[str, Any]] = None,

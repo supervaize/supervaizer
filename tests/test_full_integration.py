@@ -1,7 +1,9 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 
 import shortuuid
 
@@ -27,18 +29,14 @@ def test_agent_setup(agent_fixture, job_fixture):
     )
 
     # Define the secrets expected by the agent
-    agent_parameters = ParametersSetup.from_list(
-        [
-            Parameter(
-                name="OPEN_API_KEY",
-                description="OpenAPI Key",
-                is_environment=True,
-            ),
-            Parameter(
-                name="SERPER_API", description="Server API key", is_environment=True
-            ),
-        ]
-    )
+    agent_parameters = ParametersSetup.from_list([
+        Parameter(
+            name="OPEN_API_KEY",
+            description="OpenAPI Key",
+            is_environment=True,
+        ),
+        Parameter(name="SERPER_API", description="Server API key", is_environment=True),
+    ])
 
     job_start_method = AgentMethod(
         name="start",

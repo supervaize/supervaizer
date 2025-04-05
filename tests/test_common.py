@@ -1,8 +1,9 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
+# If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
+
 
 import json
 from typing import Any, Dict, Optional
@@ -53,10 +54,14 @@ def test_api_success_basic() -> None:
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    json_str = (
-        '{"message": "success message", "code": "200", "detail": {"test": "data"}, '
-        '"log_message": "\\u2705 success message"}'
-    )
+    json_str = json.dumps({
+        "message": "success message",
+        "code": "200",
+        "detail": {"test": "data"},
+        "id": None,
+        "log_message": "\u2705 success message",
+    })
+    print(str(success))
     assert str(success) == json_str
 
 
@@ -96,14 +101,16 @@ def test_api_success_with_json_string_detail() -> None:
 
     # Verify the JSON was properly decoded
     assert success.detail == {
-        "message": 'Test "quoted" message',
-        "data": 'value with "quotes"',
+        "object": {
+            "message": 'Test "quoted" message',
+            "data": 'value with "quotes"',
+        }
     }
 
     # Verify the decoded data is properly re-serialized
     json_data = json.loads(success.json_return)
-    assert json_data["detail"]["message"] == 'Test "quoted" message'
-    assert json_data["detail"]["data"] == 'value with "quotes"'
+    assert json_data["detail"]["object"]["message"] == 'Test "quoted" message'
+    assert json_data["detail"]["object"]["data"] == 'value with "quotes"'
 
 
 def test_api_success() -> None:

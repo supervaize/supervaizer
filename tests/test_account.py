@@ -1,19 +1,20 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
 
 
 import pytest
 from pytest_mock import MockerFixture
 from requests.exceptions import (
-    HTTPError,
     ConnectionError,
+    HTTPError,
 )
 
 from supervaize_control import Account, ApiSuccess
-from supervaize_control.server import Server
 from supervaize_control.event import Event
+from supervaize_control.server import Server
 
 from . import (
     AUTH_ERROR_RESPONSE,
@@ -63,7 +64,7 @@ def test_account_send_event_success(
     result = account_fixture.send_event(sender=server_fixture, event=event_fixture)
     assert isinstance(result, ApiSuccess)
     assert result.message == "Event AGENT_WAKEUP sent"
-    assert result.detail == WAKEUP_EVENT_RESPONSE
+    assert result.detail == {"object": WAKEUP_EVENT_RESPONSE}
 
 
 def test_account_send_event_auth_error(
