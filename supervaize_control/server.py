@@ -17,6 +17,7 @@ from typing import (
     Union,
 )
 from urllib.parse import urlunparse
+from enum import Enum
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -72,8 +73,8 @@ class ServerModel(SvBaseModel):
     app: FastAPI
     reload: bool
     account: Account
-    private_key: Optional[RSAPrivateKey] = None
-    public_key: Optional[RSAPublicKey] = None
+    private_key: RSAPrivateKey
+    public_key: RSAPublicKey
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -163,7 +164,10 @@ async def get_all_agents(
     try:
         if not server:
             raise ValueError("Server instance not found")
-        return [a.registration_info for a in server.agents[skip : skip + limit]]
+        return [
+            AgentResponse(**a.registration_info)
+            for a in server.agents[skip : skip + limit]
+        ]
     except Exception as e:
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -207,17 +211,26 @@ class Server(ServerModel):
         port: int = int(os.getenv("SUPERVAIZE_CONTROL_PORT", 8001)),
         debug: bool = False,
         reload: bool = False,
-        mac_addr: str = "-".join(
-            ("%012X" % uuid.getnode())[i : i + 2] for i in range(0, 12, 2)
-        ),
-        private_key: Optional[RSAPrivateKey] = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend(),
-        ),
+        mac_addr: str = "",
+        private_key: Optional[RSAPrivateKey] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration."""
+        if not mac_addr:
+            node_id = uuid.getnode()
+            mac_addr = "-".join(
+                format(node_id, "012X")[i : i + 2] for i in range(0, 12, 2)
+            )
+
+        if private_key is None:
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+                backend=default_backend(),
+            )
+
+        public_key = private_key.public_key()
+
         # Create root app to handle version prefix
         docs_url = "/docs"  # Swagger UI
         redoc_url = "/redoc"  # ReDoc
@@ -262,7 +275,7 @@ class Server(ServerModel):
             reload=reload,
             account=account,
             private_key=private_key,
-            public_key=private_key.public_key(),
+            public_key=public_key,
             **kwargs,
         )
 
@@ -291,6 +304,7 @@ class Server(ServerModel):
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Get registration info for the server."""
+        assert self.public_key is not None, "Public key not initialized"
         return {
             "url": self.url,
             "uri": self.uri,
@@ -344,7 +358,7 @@ class Server(ServerModel):
     def create_agent_routes(self) -> None:
         """Create agent-specific routes."""
         for agent in self.agents:
-            tags: list[str] = [f"Agent {agent.name} v{agent.version}"]
+            tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
             router = APIRouter(
                 prefix=agent.path,
                 tags=tags,
@@ -363,7 +377,14 @@ class Server(ServerModel):
             )
             async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
                 log.info(f"Getting agent info for {agent.name}")
-                return agent.registration_info
+                return AgentResponse(
+                    name=agent.name,
+                    id=agent.id,
+                    version=agent.version,
+                    api_path=agent.path,
+                    description=agent.description,
+                    **agent.registration_info,
+                )
 
             @router.post(
                 "/jobs",
@@ -539,7 +560,15 @@ class Server(ServerModel):
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> AgentResponse:
                 log.info(f"Stopping agent {agent.name} with params {params}")
-                return agent.stop(params)
+                result = agent.job_stop(params.dict())
+                return AgentResponse(
+                    name=agent.name,
+                    id=agent.id,
+                    version=agent.version,
+                    api_path=agent.path,
+                    description=agent.description,
+                    **result if result else {},
+                )
 
             @router.post(
                 "/status",
@@ -554,7 +583,15 @@ class Server(ServerModel):
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> AgentResponse:
                 log.info(f"Getting status of agent {agent.name} with params {params}")
-                return agent.status(params)
+                result = agent.job_status(params.dict())
+                return AgentResponse(
+                    name=agent.name,
+                    id=agent.id,
+                    version=agent.version,
+                    api_path=agent.path,
+                    description=agent.description,
+                    **result if result else {},
+                )
 
             @router.post(
                 "/custom",
@@ -573,8 +610,20 @@ class Server(ServerModel):
                 log.info(
                     f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
                 )
-                if agent.custom_methods:
-                    return agent.custom_methods.get(params.method_name)
+                if agent.custom_methods and params.method_name in agent.custom_methods:
+                    method = agent.custom_methods[params.method_name]
+                    if callable(method):
+                        result = method(params.params)
+                    else:
+                        result = method
+                    return AgentResponse(
+                        name=agent.name,
+                        id=agent.id,
+                        version=agent.version,
+                        api_path=agent.path,
+                        description=agent.description,
+                        **result if result else {},
+                    )
                 else:
                     raise HTTPException(
                         status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -629,14 +678,14 @@ class Server(ServerModel):
 
     def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""
-        assert self.private_key is not None, "Private key not initialized"
         result = decrypt_value(encrypted_parameters, self.private_key)
-        assert result is not None, "Failed to decrypt parameters"
+        if result is None:
+            raise ValueError("Failed to decrypt parameters")
         return result
 
     def encrypt(self, parameters: str) -> str:
         """Encrypt parameters using the server's public key."""
-        assert self.public_key is not None, "Public key not initialized"
         result = encrypt_value(parameters, self.public_key)
-        assert result is not None, "Failed to encrypt parameters"
+        if result is None:
+            raise ValueError("Failed to encrypt parameters")
         return result
