@@ -295,9 +295,9 @@ class Agent(AgentModel):
                 if agent_from_server
                 else None
             )
-            if server_encrypted_parameters:
+            if server_encrypted_parameters and self.parameters_setup:
                 self.server_encrypted_parameters = server_encrypted_parameters
-                decrypted = server.decrypt(self.server_encrypted_parameters)
+                decrypted = server.decrypt(server_encrypted_parameters)
                 self.parameters_setup.update_values_from_server(json.loads(decrypted))
             else:
                 log.debug("No encrypted parameters found")
@@ -306,7 +306,7 @@ class Agent(AgentModel):
 
         return self
 
-    def _execute(self, action: str, params: Dict[str, Any] = {}):
+    def _execute(self, action: str, params: Dict[str, Any] = {}) -> Any:
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
@@ -315,7 +315,9 @@ class Agent(AgentModel):
             **params,
         )
 
-    def job_start(self, job: Job, job_fields: dict, context: JobContext):
+    def job_start(
+        self, job: Job, job_fields: Dict[str, Any], context: JobContext
+    ) -> Job:
         """Execute the agent's start method in the background
 
         Args:
@@ -338,14 +340,12 @@ class Agent(AgentModel):
 
         # Execute the method
         action = self.job_start_method.method
-        params = (
-            self.job_start_method.params | {"fields": job_fields} | {"context": context}
-        )
+        method_params = self.job_start_method.params or {}
+        params = method_params | {"fields": job_fields} | {"context": context}
         try:
             result = self._execute(action, params)
 
             # Store result and mark as completed
-
             job_response = JobResponse(
                 job_id=job.id,
                 status=JobStatus.COMPLETED,
@@ -368,28 +368,32 @@ class Agent(AgentModel):
 
         return job
 
-    def job_stop(self, params: Dict[str, Any] = {}):
+    def job_stop(self, params: Dict[str, Any] = {}) -> Any:
         method = self.job_stop_method.method
-        params = self.job_stop_method.params
-        return self._execute(method, params)
+        method_params = self.job_stop_method.params or {}
+        return self._execute(method, method_params)
 
-    def job_status(self, params: Dict[str, Any] = {}):
+    def job_status(self, params: Dict[str, Any] = {}) -> Any:
         method = self.job_status_method.method
-        params = self.job_status_method.params
-        return self._execute(method, params)
+        method_params = self.job_status_method.params or {}
+        return self._execute(method, method_params)
 
-    def chat(self, context: str, message: str):
+    def chat(self, context: str, message: str) -> Any:
+        if not self.chat_method:
+            raise ValueError("Chat method not configured")
         method = self.chat_method.method
         params = {"context": context, "message": message}
         return self._execute(method, params)
 
-    def custom(self, method: str, params: Dict[str, Any] = {}):
+    def custom(self, method: str, params: Dict[str, Any] = {}) -> Any:
         """Tested in tests/test_agent.py"""
+        if not self.custom_methods:
+            raise ValueError("No custom methods configured")
         if method not in self.custom_methods:
             raise ValueError(f"Method {method} not found")
-        method = self.custom_methods[method].method
-        params = self.custom_methods[method].params
-        return self._execute(method, params)
+        custom_method = self.custom_methods[method]
+        method_params = custom_method.params or {}
+        return self._execute(custom_method.method, method_params)
 
     @property
     def custom_methods_names(self) -> list[str] | None:

@@ -32,7 +32,6 @@ from fastapi import (
     Query,
     status as http_status,
 )
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import field_validator
 from rich import inspect
@@ -119,7 +118,7 @@ def get_all_jobs(
     status: Optional[JobStatus] = Query(
         default=None, description="Filter jobs by status"
     ),
-) -> Union[Dict[str, List[Job]], JSONResponse]:
+) -> Dict[str, List[Job]]:
     """Get all jobs across all agents with pagination and optional status filtering"""
     try:
         jobs_registry = Jobs()
@@ -140,15 +139,8 @@ def get_all_jobs(
 
         return all_jobs
     except Exception as e:
-        error_response = ErrorResponse(
-            error="Failed to retrieve jobs",
-            error_type=ErrorType.INTERNAL_ERROR,
-            detail=str(e),
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-        return JSONResponse(
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=jsonable_encoder(error_response),
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
@@ -166,18 +158,15 @@ async def get_all_agents(
         default=100, ge=1, le=1000, description="Number of jobs to return"
     ),
     server: Optional["Server"] = Depends(get_server),
-) -> Union[List[Dict[str, Any]], JSONResponse]:
+) -> List[AgentResponse]:
     """Get all registered agents with pagination"""
     try:
         if not server:
             raise ValueError("Server instance not found")
-        res = [a.registration_info for a in server.agents[skip : skip + limit]]
-        return res
+        return [a.registration_info for a in server.agents[skip : skip + limit]]
     except Exception as e:
-        return create_error_response(
-            ErrorType.INTERNAL_ERROR,
-            f"Failed to retrieve agents: {str(e)}",
-            http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
@@ -355,7 +344,7 @@ class Server(ServerModel):
     def create_agent_routes(self) -> None:
         """Create agent-specific routes."""
         for agent in self.agents:
-            tags = [f"Agent {agent.name} v{agent.version}"]
+            tags: list[str] = [f"Agent {agent.name} v{agent.version}"]
             router = APIRouter(
                 prefix=agent.path,
                 tags=tags,
@@ -372,7 +361,7 @@ class Server(ServerModel):
                 responses={http_status.HTTP_200_OK: {"model": AgentResponse}},
                 tags=tags,
             )
-            async def agent_info(agent: Agent = Depends(get_agent)) -> Agent:
+            async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
                 log.info(f"Getting agent info for {agent.name}")
                 return agent.registration_info
 
@@ -393,9 +382,11 @@ class Server(ServerModel):
             )
             async def start_job(
                 background_tasks: BackgroundTasks,
-                body_params: agent.job_start_method.job_model = Body(...),
+                body_params: Any = Body(
+                    ...
+                ),  # Type will be validated by FastAPI at runtime
                 agent: Agent = Depends(get_agent),
-            ) -> Job | JSONResponse:
+            ) -> Union[Job, JSONResponse]:
                 """Start a new job for this agent"""
                 try:
                     log.info(f"Starting agent {agent.name} with params {body_params}")
@@ -515,28 +506,24 @@ class Server(ServerModel):
             )
             async def get_job_status(
                 job_id: str, agent: Agent = Depends(get_agent)
-            ) -> Job | JSONResponse:
+            ) -> Job:
                 """Get the status of a job by its ID for this specific agent"""
                 try:
                     job = Jobs().get_job(job_id, agent_name=agent.name)
                     if not job:
-                        return create_error_response(
-                            ErrorType.JOB_NOT_FOUND,
-                            f"Job with ID {job_id} not found for agent {agent.name}",
-                            http_status.HTTP_404_NOT_FOUND,
+                        raise HTTPException(
+                            status_code=http_status.HTTP_404_NOT_FOUND,
+                            detail=f"Job with ID {job_id} not found for agent {agent.name}",
                         )
                     return job
                 except ValueError as e:
-                    return create_error_response(
-                        ErrorType.INVALID_REQUEST,
-                        str(e),
-                        http_status.HTTP_400_BAD_REQUEST,
+                    raise HTTPException(
+                        status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)
                     )
                 except Exception as e:
-                    return create_error_response(
-                        ErrorType.INTERNAL_ERROR,
-                        str(e),
-                        http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    raise HTTPException(
+                        status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=str(e),
                     )
 
             @router.post(
@@ -544,13 +531,13 @@ class Server(ServerModel):
                 summary=f"Stop the agent: {agent.name}",
                 description="Stop the agent",
                 responses={
-                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
                 },
                 tags=tags,
             )
             async def stop_agent(
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
-            ) -> Agent:
+            ) -> AgentResponse:
                 log.info(f"Stopping agent {agent.name} with params {params}")
                 return agent.stop(params)
 
@@ -559,13 +546,13 @@ class Server(ServerModel):
                 summary=f"Get the status of the agent: {agent.name}",
                 description="Get the status of the agent",
                 responses={
-                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
                 },
                 tags=tags,
             )
             async def status_agent(
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
-            ) -> Agent:
+            ) -> AgentResponse:
                 log.info(f"Getting status of agent {agent.name} with params {params}")
                 return agent.status(params)
 
@@ -573,25 +560,25 @@ class Server(ServerModel):
                 "/custom",
                 summary=f"Trigger a custom method for agent: {agent.name}",
                 description="Trigger a custom method",
+                response_model=AgentResponse,
                 responses={
-                    http_status.HTTP_202_ACCEPTED: {"model": Agent},
-                    http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": Agent},
+                    http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
+                    http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
                 },
                 tags=tags,
             )
             async def custom_method(
                 params: AgentCustomMethodParams, agent: Agent = Depends(get_agent)
-            ):
+            ) -> AgentResponse:
                 log.info(
                     f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
                 )
                 if agent.custom_methods:
                     return agent.custom_methods.get(params.method_name)
                 else:
-                    return create_error_response(
-                        ErrorType.INVALID_REQUEST,
-                        "Custom method not found",
-                        http_status.HTTP_405_METHOD_NOT_ALLOWED,
+                    raise HTTPException(
+                        status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
+                        detail="Custom method not found",
                     )
 
             self.app.include_router(router)
@@ -640,14 +627,16 @@ class Server(ServerModel):
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."
         )
 
-    def decrypt(self, encrypted_parameters: str) -> Optional[str]:
+    def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""
-        return (
-            decrypt_value(encrypted_parameters, self.private_key)
-            if self.private_key
-            else None
-        )
+        assert self.private_key is not None, "Private key not initialized"
+        result = decrypt_value(encrypted_parameters, self.private_key)
+        assert result is not None, "Failed to decrypt parameters"
+        return result
 
-    def encrypt(self, parameters: str) -> Optional[str]:
+    def encrypt(self, parameters: str) -> str:
         """Encrypt parameters using the server's public key."""
-        return encrypt_value(parameters, self.public_key) if self.public_key else None
+        assert self.public_key is not None, "Public key not initialized"
+        result = encrypt_value(parameters, self.public_key)
+        assert result is not None, "Failed to encrypt parameters"
+        return result
