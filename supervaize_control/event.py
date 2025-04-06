@@ -89,7 +89,7 @@ class AgentRegisterEvent(Event):
         super().__init__(
             type=EventType.AGENT_REGISTER,
             account=account,
-            source=agent.uri,
+            source=agent.path,
             details=agent.registration_info | {"polling": polling},
         )
 

@@ -42,7 +42,7 @@ def test_agent_register_event(agent_fixture: Agent, account_fixture: Account) ->
     )
     assert isinstance(agent_register_event, AgentRegisterEvent)
     assert agent_register_event.type == EventType.AGENT_REGISTER
-    assert agent_register_event.source.split(":")[0] == "agent"
+    assert agent_register_event.source == "/agents/agentname"
     assert agent_register_event.details["name"] == "agentName"
     assert agent_register_event.details["polling"] is False
 

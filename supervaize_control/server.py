@@ -16,7 +16,6 @@ from typing import (
     TypeVar,
     Union,
 )
-from enum import Enum
 from urllib.parse import urlunparse
 
 from cryptography.hazmat.backends import default_backend
@@ -38,9 +37,9 @@ from fastapi.responses import JSONResponse
 from pydantic import field_validator
 from rich import inspect
 
-from .__version__ import VERSION
+from .__version__ import VERSION, API_VERSION
 from .account import Account
-from .agent import Agent, AgentCustomMethodParams, AgentMethodParams
+from .agent import Agent, AgentCustomMethodParams, AgentMethodParams, AgentResponse
 from .common import (
     ApiResult,
     ApiSuccess,
@@ -160,7 +159,7 @@ async def get_server() -> Optional["Server"]:
     return None
 
 
-@default_router.get("/agents", tags=["Agents"], response_model=List[Agent])
+@default_router.get("/agents", tags=["Agents"], response_model=List[AgentResponse])
 async def get_all_agents(
     skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
     limit: int = Query(
@@ -182,7 +181,7 @@ async def get_all_agents(
         )
 
 
-@default_router.get("/agent/{agent_id}", tags=["Agents"], response_model=Agent)
+@default_router.get("/agent/{agent_id}", tags=["Agents"], response_model=AgentResponse)
 async def get_agent_details(
     agent_id: str,
     server: Optional["Server"] = Depends(get_server),
@@ -230,14 +229,23 @@ class Server(ServerModel):
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration."""
+        # Create root app to handle version prefix
+        docs_url = "/docs"  # Swagger UI
+        redoc_url = "/redoc"  # ReDoc
+        openapi_url = "/openapi.json"
+
         app = FastAPI(
             debug=debug,
             title="Supervaize Control API",
             description=(
-                "API for controlling and managing Supervaize agents. More information at "
-                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)"
+                f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
+                "API for controlling and managing Supervaize agents. \n\nMore information at "
+                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)\n\n\n\n"
+                f"[Swagger]({docs_url})\n"
+                f"[Redoc]({redoc_url})\n"
+                f"[OpenAPI]({openapi_url})\n"
             ),
-            version=VERSION,
+            version=API_VERSION,
             terms_of_service="https://supervaize.com/terms/",
             contact={
                 "name": "Support Team",
@@ -248,8 +256,10 @@ class Server(ServerModel):
                 "name": "Mozilla Public License 2.0",
                 "url": "https://mozilla.org/MPL/2.0/",
             },
+            docs_url=docs_url,
+            redoc_url=redoc_url,
+            openapi_url=openapi_url,
         )
-        # Generate RSA key pair for parameter encryption
 
         super().__init__(
             scheme=scheme,
@@ -295,11 +305,17 @@ class Server(ServerModel):
         return {
             "url": self.url,
             "uri": self.uri,
+            "api_version": API_VERSION,
             "environment": self.environment,
             "public_key": self.public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo,
             ).decode("utf-8"),
+            "docs": {
+                "swagger": f"{self.url}{self.app.docs_url}",
+                "redoc": f"{self.url}{self.app.redoc_url}",
+                "openapi": f"{self.url}{self.app.openapi_url}",
+            },
             "agents": [agent.registration_info for agent in self.agents],
         }
 
@@ -339,19 +355,21 @@ class Server(ServerModel):
     def create_agent_routes(self) -> None:
         """Create agent-specific routes."""
         for agent in self.agents:
-            tags: Optional[list[str | Enum]] = [f"Agent {agent.name} v{agent.version}"]
-
-            router = APIRouter(prefix=f"/agents/{agent.slug}", tags=tags)
+            tags = [f"Agent {agent.name} v{agent.version}"]
+            router = APIRouter(
+                prefix=agent.path,
+                tags=tags,
+            )
 
             async def get_agent() -> Agent:
                 return agent
 
             @router.get(
                 "/",
-                summary="Get agent information",
+                summary=f"Get information about the agent {agent.name}",
                 description="Detailed information about the agent, returned as a JSON object with Agent class fields",
-                response_model=Agent,
-                responses={http_status.HTTP_200_OK: {"model": Agent}},
+                response_model=AgentResponse,
+                responses={http_status.HTTP_200_OK: {"model": AgentResponse}},
                 tags=tags,
             )
             async def agent_info(agent: Agent = Depends(get_agent)) -> Agent:
@@ -360,7 +378,7 @@ class Server(ServerModel):
 
             @router.post(
                 "/jobs",
-                summary=f"Start a job with agent : {agent.name}",
+                summary=f"Start a job with agent: {agent.name}",
                 description=f"{agent.job_start_method.description}",
                 responses={
                     http_status.HTTP_202_ACCEPTED: {"model": agent.job_start_method},
@@ -523,7 +541,7 @@ class Server(ServerModel):
 
             @router.post(
                 "/stop",
-                summary="Stop the agent",
+                summary=f"Stop the agent: {agent.name}",
                 description="Stop the agent",
                 responses={
                     http_status.HTTP_202_ACCEPTED: {"model": Agent},
@@ -538,7 +556,7 @@ class Server(ServerModel):
 
             @router.post(
                 "/status",
-                summary="Status the agent",
+                summary=f"Get the status of the agent: {agent.name}",
                 description="Get the status of the agent",
                 responses={
                     http_status.HTTP_202_ACCEPTED: {"model": Agent},
@@ -553,7 +571,7 @@ class Server(ServerModel):
 
             @router.post(
                 "/custom",
-                summary="Trigger a custom method",
+                summary=f"Trigger a custom method for agent: {agent.name}",
                 description="Trigger a custom method",
                 responses={
                     http_status.HTTP_202_ACCEPTED: {"model": Agent},

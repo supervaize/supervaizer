@@ -181,8 +181,10 @@ class AgentModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
-    author: str
-    developer: str
+    author: Optional[str] = None
+    developer: Optional[str] = None
+    maintainer: Optional[str] = None
+    editor: Optional[str] = None
     version: str
     description: str
     tags: list[str] | None = None
@@ -214,8 +216,8 @@ class Agent(AgentModel):
         return slugify(self.name)
 
     @property
-    def uri(self) -> str:
-        return f"agent://{self.slug}"
+    def path(self) -> str:
+        return f"/agents/{self.slug}"
 
     @property
     def registration_info(self) -> Dict[str, Any]:
@@ -225,8 +227,11 @@ class Agent(AgentModel):
             "id": self.id,
             "author": self.author,
             "developer": self.developer,
+            "maintainer": self.maintainer,
+            "editor": self.editor,
             "version": self.version,
             "description": self.description,
+            "path": self.path,
             "tags": self.tags,
             "job_start_method": self.job_start_method.registration_info,
             "job_stop_method": self.job_stop_method.registration_info,
@@ -241,6 +246,10 @@ class Agent(AgentModel):
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,
+            "server_agent_id": self.server_agent_id,
+            "server_agent_status": self.server_agent_status,
+            "server_agent_onboarding_status": self.server_agent_onboarding_status,
+            "server_encrypted_parameters": self.server_encrypted_parameters,
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
@@ -387,3 +396,28 @@ class Agent(AgentModel):
         if self.custom_methods:
             return list(self.custom_methods.keys())
         return None
+
+
+class AgentResponse(BaseModel):
+    """Response model for agent endpoints - values provided by Agent.registration_info"""
+
+    name: str
+    id: str
+    author: Optional[str] = None
+    developer: Optional[str] = None
+    maintainer: Optional[str] = None
+    editor: Optional[str] = None
+    version: str
+    api_path: str
+    description: str
+    tags: Optional[list[str]] = None
+    job_start_method: Optional[Dict[str, Any]] = None
+    job_stop_method: Optional[Dict[str, Any]] = None
+    job_status_method: Optional[Dict[str, Any]] = None
+    chat_method: Optional[Dict[str, Any]] = None
+    custom_methods: Optional[Dict[str, Dict[str, Any]]] = None
+    parameters_setup: Optional[List[Dict[str, Any]]] = None
+    server_agent_id: Optional[str] = None
+    server_agent_status: Optional[str] = None
+    server_agent_onboarding_status: Optional[str] = None
+    server_encrypted_parameters: Optional[str] = None
