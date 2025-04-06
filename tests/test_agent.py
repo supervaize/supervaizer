@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.common import ApiSuccess
-from supervaize_control.job import JobContext
+from supervaize_control.job import JobContext, Job
 from supervaize_control.parameter import ParametersSetup
 from supervaize_control.server import Server
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -376,3 +376,28 @@ def test_agent_update_agent_from_server(
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)
+
+
+def test_agent_job_context(agent_fixture: Agent) -> None:
+    """Test agent job context"""
+    # Create a job context
+    context = JobContext(
+        job_id="test-job-id",
+        user_id="test-user-id",
+        organization_id="test-org-id",
+        metadata={"key": "value"},
+    )
+
+    # Test with valid fields
+    job_fields = {"full_name": "John Doe", "age": 30}
+
+    # Create job with context
+    job = Job.new(
+        supervaize_context=context, agent_name=agent_fixture.name, parameters=None
+    )
+
+    # Test job fields
+    assert job.supervaize_context.job_id == "test-job-id"
+    assert job.supervaize_context.user_id == "test-user-id"
+    assert job.supervaize_context.organization_id == "test-org-id"
+    assert job.supervaize_context.metadata == {"key": "value"}

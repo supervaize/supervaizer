@@ -112,3 +112,45 @@ def test_job_human_request(job_fixture: Job) -> None:
     assert job.status == JobStatus.WAITING
     assert job.finished_at is None
     assert job.payload == {"question": "What next?"}
+
+
+def test_job_status_transitions(job_fixture: Job) -> None:
+    """Test job status transitions"""
+    # Initial status
+    assert job_fixture.status == JobStatus.IN_PROGRESS
+
+    # Add a response that changes status to PAUSED
+    job_fixture.add_response(
+        JobResponse(
+            job_id=job_fixture.id,
+            status=JobStatus.PAUSED,
+            message="Job paused",
+            payload=None,
+        )
+    )
+    assert job_fixture.status is JobStatus.PAUSED
+    assert job_fixture.status != JobStatus.COMPLETED
+
+    # Add a response that changes status to COMPLETED
+    job_fixture.add_response(
+        JobResponse(
+            job_id=job_fixture.id,
+            status=JobStatus.COMPLETED,
+            message="Job completed",
+            payload={"result": "success"},
+        )
+    )
+    assert job_fixture.status is JobStatus.COMPLETED
+    assert job_fixture.status != JobStatus.IN_PROGRESS
+
+    # Add a response that changes status to FAILED
+    job_fixture.add_response(
+        JobResponse(
+            job_id=job_fixture.id,
+            status=JobStatus.FAILED,
+            message="Job failed",
+            payload=None,
+        )
+    )
+    assert job_fixture.status is JobStatus.FAILED
+    assert job_fixture.status != JobStatus.WAITING

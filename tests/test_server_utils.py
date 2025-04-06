@@ -8,11 +8,15 @@
 from datetime import datetime
 
 from fastapi.responses import JSONResponse
-
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, padding
+from cryptography.hazmat.primitives.asymmetric import rsa
 from supervaize_control.server_utils import (
     ErrorResponse,
     ErrorType,
     create_error_response,
+    encrypt_value,
+    decrypt_value,
 )
 
 
@@ -66,3 +70,44 @@ def test_create_error_response_without_detail() -> None:
 
     content = response.body.decode("utf-8")
     assert "Internal Error" in content
+
+
+def test_encrypt_decrypt() -> None:
+    """Test encryption and decryption"""
+    # Generate key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
+    public_key = private_key.public_key()
+
+    # Test string
+    test_str = "test string"
+    encrypted = encrypt_value(test_str, public_key)
+    decrypted = decrypt_value(encrypted, private_key)
+    assert isinstance(encrypted, str)
+    assert isinstance(decrypted, str)
+    assert decrypted == test_str
+
+    # Test with raw bytes
+    test_bytes = b"test bytes"
+    encrypted_bytes = public_key.encrypt(
+        test_bytes,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None,
+        ),
+    )
+    decrypted_bytes = private_key.decrypt(
+        encrypted_bytes,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None,
+        ),
+    )
+    if isinstance(decrypted_bytes, memoryview):
+        decrypted_bytes = bytes(decrypted_bytes)
+    assert decrypted_bytes.decode() == test_bytes.decode()

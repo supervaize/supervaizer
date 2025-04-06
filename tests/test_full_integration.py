@@ -14,10 +14,11 @@ from supervaize_control import (
     Parameter,
     ParametersSetup,
     Server,
+    Job,
 )
 
 
-def test_agent_setup(agent_fixture, job_fixture):
+def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     """
     Test the full setup. Serves as a template for the implementation of the agent.
     """

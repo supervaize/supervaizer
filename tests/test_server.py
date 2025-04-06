@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from supervaize_control import Server
 from supervaize_control.agent import Agent
 from supervaize_control.job import Job, JobContext, JobStatus
-from supervaize_control.server_utils import ErrorType
+from supervaize_control.server_utils import ErrorType, create_error_response
 
 
 @pytest.fixture
@@ -409,3 +409,14 @@ async def test_get_job_status_for_agent(
             # For success case, verify the mock job is properly set up
             assert mock_job is not None
             assert mock_job.id == "test-job-id"
+
+
+def test_error_response() -> None:
+    """Test error response creation"""
+    error = create_error_response(
+        ErrorType.INTERNAL_ERROR,
+        "Test error",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+    assert isinstance(error, JSONResponse)
+    assert error.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

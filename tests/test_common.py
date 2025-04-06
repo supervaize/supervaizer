@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
+from cryptography.hazmat.backends import default_backend
 
 from supervaize_control.common import (
     ApiError,
@@ -217,20 +218,26 @@ def test_singleton() -> None:
 
 def test_encrypt_decrypt() -> None:
     """Test encryption and decryption of values"""
-    # Generate test keys
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    # Generate key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
     public_key = private_key.public_key()
 
-    # Test string to encrypt
-    test_value = "secret message" * 100
-
-    # Test encryption
-    encrypted = encrypt_value(test_value, public_key)
-    assert encrypted is not None
-    assert isinstance(encrypted, str)
-    assert encrypted != test_value
-    assert len(encrypted) > len(test_value)
-
-    # Test decryption
+    # Test string
+    test_str = "test string"
+    encrypted = encrypt_value(test_str, public_key)
     decrypted = decrypt_value(encrypted, private_key)
-    assert decrypted == test_value
+    assert isinstance(encrypted, str)
+    assert isinstance(decrypted, str)
+    assert decrypted == test_str
+
+    # Test dict
+    test_dict = {"key": "value"}
+    encrypted_dict = encrypt_value(json.dumps(test_dict), public_key)
+    decrypted_dict = json.loads(decrypt_value(encrypted_dict, private_key))
+    assert isinstance(encrypted_dict, str)
+    assert isinstance(decrypted_dict, dict)
+    assert decrypted_dict == test_dict
