@@ -7,15 +7,7 @@
 import os
 import sys
 import uuid
-from typing import (
-    Any,
-    ClassVar,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-)
+from typing import Any, ClassVar, Dict, List, Optional, TypeVar, Union
 from urllib.parse import urlunparse
 from enum import Enum
 
@@ -39,7 +31,12 @@ from rich import inspect
 
 from .__version__ import VERSION, API_VERSION
 from .account import Account
-from .agent import Agent, AgentCustomMethodParams, AgentMethodParams, AgentResponse
+from .agent import (
+    Agent,
+    AgentCustomMethodParams,
+    AgentMethodParams,
+    AgentResponse,
+)
 from .common import (
     ApiResult,
     ApiSuccess,
@@ -386,6 +383,8 @@ class Server(ServerModel):
                     **agent.registration_info,
                 )
 
+            AgentJobModel = agent.job_start_method.job_model  # type: ignore
+
             @router.post(
                 "/jobs",
                 summary=f"Start a job with agent: {agent.name}",
@@ -403,16 +402,14 @@ class Server(ServerModel):
             )
             async def start_job(
                 background_tasks: BackgroundTasks,
-                body_params: Any = Body(
-                    ...
-                ),  # Type will be validated by FastAPI at runtime
+                body_params: agent.job_start_method.job_model = Body(...),  # type: ignore
                 agent: Agent = Depends(get_agent),
             ) -> Union[Job, JSONResponse]:
                 """Start a new job for this agent"""
                 try:
                     log.info(f"Starting agent {agent.name} with params {body_params}")
-                    sv_context: JobContext = body_params.supervaize_context
-                    job_fields = body_params.job_fields.to_dict()
+                    sv_context: JobContext = body_params.supervaize_context  # type: ignore[attr-defined]
+                    job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
 
                     # Get agent encrypted parameters if available
                     encrypted_agent_parameters = getattr(
@@ -560,7 +557,7 @@ class Server(ServerModel):
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> AgentResponse:
                 log.info(f"Stopping agent {agent.name} with params {params}")
-                result = agent.job_stop(params.dict())
+                result = agent.job_stop(params.params)
                 return AgentResponse(
                     name=agent.name,
                     id=agent.id,
@@ -583,7 +580,7 @@ class Server(ServerModel):
                 params: AgentMethodParams, agent: Agent = Depends(get_agent)
             ) -> AgentResponse:
                 log.info(f"Getting status of agent {agent.name} with params {params}")
-                result = agent.job_status(params.dict())
+                result = agent.job_status(params.params)
                 return AgentResponse(
                     name=agent.name,
                     id=agent.id,

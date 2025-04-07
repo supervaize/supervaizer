@@ -170,7 +170,7 @@ class AgentMethodParams(BaseModel):
 
     """
 
-    params: Dict[str, Any] | None = None
+    params: Dict[str, Any] = {"": ""}
 
 
 class AgentCustomMethodParams(AgentMethodParams):
