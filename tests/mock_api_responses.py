@@ -272,3 +272,32 @@ EVENT_REGISTER_SERVER_PAYLOAD = {
         ],
     },
 }
+
+
+JOB_START_PARAMS_EXAMPLE = {
+    "supervaize_context": {
+        "workspace_id": "string",
+        "job_id": "string",
+        "started_by": "string",
+        "started_at": "2025-04-07T16:35:10.652Z",
+        "mission_id": "string",
+        "mission_name": "string",
+        "mission_context": "string",
+        "job_conditions": {
+            "max_cases": 0,
+            "max_duration": 0,
+            "max_cost": 0,
+            "stop_on_warning": False,
+            "stop_on_error": True,
+        },
+    },
+    "job_fields": {
+        "full_name": "string",
+        "age": 0,
+        "subscribe": True,
+        "gender": "string",
+        "bio": "string",
+        "country": "string",
+        "languages": ["string"],
+    },
+}

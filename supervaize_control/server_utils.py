@@ -11,6 +11,7 @@ from enum import Enum
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from loguru import logger as log
 
 
 class ErrorType(str, Enum):
@@ -35,7 +36,7 @@ class ErrorResponse(BaseModel):
 
 
 def create_error_response(
-    error_type: ErrorType, detail: str, status_code: int
+    error_type: ErrorType, detail: str, status_code: int, traceback: str | None = None
 ) -> JSONResponse:
     """Helper function to create consistent error responses"""
     error_response = ErrorResponse(
@@ -44,6 +45,9 @@ def create_error_response(
         detail=detail,
         status_code=status_code,
     )
+    log.error(detail)
+    if traceback:
+        log.error(traceback)
     return JSONResponse(
         status_code=status_code,
         content=jsonable_encoder(error_response),

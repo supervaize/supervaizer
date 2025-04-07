@@ -7,6 +7,7 @@
 import os
 import sys
 import uuid
+import traceback
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar, Union
 from urllib.parse import urlunparse
 from enum import Enum
@@ -402,7 +403,8 @@ class Server(ServerModel):
             )
             async def start_job(
                 background_tasks: BackgroundTasks,
-                body_params: agent.job_start_method.job_model = Body(...),  # type: ignore
+                body_params: agent.job_start_method.job_model = Body(  # type: ignore
+                ),
                 agent: Agent = Depends(get_agent),
             ) -> Union[Job, JSONResponse]:
                 """Start a new job for this agent"""
@@ -418,9 +420,12 @@ class Server(ServerModel):
                     log.debug(
                         f"Encrypted agent parameters: {encrypted_agent_parameters}"
                     )
-
+                    agent_parameters = None
                     # If agent has parameters_setup defined, validate parameters
-                    if agent.parameters_setup and encrypted_agent_parameters:
+                    if (
+                        getattr(agent, "parameters_setup")
+                        and encrypted_agent_parameters
+                    ):
                         agent_parameters = Parameters.from_str(
                             self.decrypt(encrypted_agent_parameters)
                         )
@@ -449,15 +454,17 @@ class Server(ServerModel):
                             http_status.HTTP_409_CONFLICT,
                         )
                     return create_error_response(
-                        ErrorType.INVALID_REQUEST,
-                        str(e),
-                        http_status.HTTP_400_BAD_REQUEST,
+                        error_type=ErrorType.INVALID_REQUEST,
+                        detail=str(e),
+                        status_code=http_status.HTTP_400_BAD_REQUEST,
+                        traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
                     )
                 except Exception as e:
                     return create_error_response(
-                        ErrorType.INTERNAL_ERROR,
-                        str(e),
-                        http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        error_type=ErrorType.INTERNAL_ERROR,
+                        detail=str(e),
+                        status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
                     )
 
             @router.get(

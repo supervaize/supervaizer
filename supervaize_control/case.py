@@ -78,7 +78,10 @@ class Case(CaseModel):
         pass
 
     def close(
-        self, case_result: Dict[str, Any], final_cost: Optional[float], **kwargs: Any
+        self,
+        case_result: Dict[str, Any],
+        final_cost: Optional[float] = None,
+        **kwargs: Any,
     ) -> None:
         """
         Close the case and send the final update to the account.
