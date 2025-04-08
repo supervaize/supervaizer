@@ -69,6 +69,7 @@ class Event(EventModel):
             "name": f"{self.type.value} {self.source}",
             "source": f"{self.source}",
             "account": f"{self.account.id}",
+            "workspace": f"{self.account.workspace}",
             "event_type": f"{self.type.value}",
             "details": self.details,
         }
@@ -102,8 +103,8 @@ class ServerRegisterEvent(Event):
     ) -> None:
         super().__init__(
             type=EventType.SERVER_REGISTER,
-            account=account,
             source=server.uri,
+            account=account,
             details=server.registration_info,
         )
 

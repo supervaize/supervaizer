@@ -27,6 +27,7 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
         id="o34Z484gY9Nxz8axgTAdiH",
         api_key="APIKEY",
         api_url="http://localhost:8000",
+        workspace="test-workspace",
     )
 
     # Define the secrets expected by the agent

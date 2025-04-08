@@ -29,6 +29,7 @@ def test_event(event_fixture: Event) -> None:
         "name",
         "source",
         "account",
+        "workspace",
         "event_type",
         "details",
     ]

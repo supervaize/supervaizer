@@ -40,6 +40,7 @@ def account_fixture() -> Annotated[Account, "fixture"]:
     return Account(
         name="CUSTOMERFIRST",
         id="o34Z484gY9Nxz8axgTAdiH",
+        workspace="test-workspace",
         api_key="zYx680h5.73IZfE7c1tPNr6rvdeNwV3IahI6VzHYj",
         api_url="https://ample-strong-coyote.ngrok-free.app",
     )

@@ -28,6 +28,7 @@ class AccountModel(SvBaseModel):
     SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
+    workspace: str
     api_key: str
     api_url: str
 
