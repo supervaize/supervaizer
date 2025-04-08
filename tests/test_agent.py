@@ -7,6 +7,7 @@
 
 import json
 import os
+from datetime import datetime
 from typing import Any, Dict
 
 import pytest
@@ -14,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 
 from supervaize_control import Agent, AgentMethod
 from supervaize_control.common import ApiSuccess
-from supervaize_control.job import JobContext, Job
+from supervaize_control.job import Job, JobContext
 from supervaize_control.parameter import ParametersSetup
 from supervaize_control.server import Server
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -335,10 +336,12 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"name": "parameter1", "value": "new_value1", "is_environment": True},
-            {"name": "parameter2", "value": "new_value2", "is_environment": False},
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [
+                {"name": "parameter1", "value": "new_value1", "is_environment": True},
+                {"name": "parameter2", "value": "new_value2", "is_environment": False},
+            ]
+        ),
     )
     # Simulate server.account.get_agent_by() returns agent details
     monkeypatch.setattr(
@@ -370,9 +373,9 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"invalid_parameter": "invalid_value1"}
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [{"invalid_parameter": "invalid_value1"}]
+        ),
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)
@@ -382,10 +385,14 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
     """Test agent job context"""
     # Create a job context
     context = JobContext(
+        workspace_id="test-workspace-id",
         job_id="test-job-id",
-        user_id="test-user-id",
-        organization_id="test-org-id",
-        metadata={"key": "value"},
+        started_by="test-started-by",
+        started_at=datetime.now(),
+        mission_id="test-mission-id",
+        mission_name="test-mission-name",
+        mission_context=None,
+        job_conditions=None,
     )
 
     # Test with valid fields
@@ -398,6 +405,9 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
 
     # Test job fields
     assert job.supervaize_context.job_id == "test-job-id"
-    assert job.supervaize_context.user_id == "test-user-id"
-    assert job.supervaize_context.organization_id == "test-org-id"
-    assert job.supervaize_context.metadata == {"key": "value"}
+    assert job.supervaize_context.started_by == "test-started-by"
+    assert job.supervaize_context.workspace_id == "test-workspace-id"
+    assert job.supervaize_context.mission_id == "test-mission-id"
+    assert job.supervaize_context.mission_name == "test-mission-name"
+    assert job.supervaize_context.mission_context is None
+    assert job.supervaize_context.job_conditions is None

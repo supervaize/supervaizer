@@ -177,7 +177,7 @@ def singleton(cls: type[T]) -> Callable[..., T]:
     return get_instance
 
 
-def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> Optional[str]:
+def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> str:
     """Encrypt using hybrid RSA+AES encryption to handle messages of any size.
 
     Args:
@@ -185,10 +185,11 @@ def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> Option
         public_key (rsa.RSAPublicKey): RSA public key
 
     Returns:
-        Optional[str]: Base64 encoded encrypted value containing both the encrypted AES key and encrypted data
+        str: Base64 encoded encrypted value containing both the encrypted AES key and encrypted data
+
+    Raises:
+        ValueError: If encryption fails
     """
-    if not value_to_encrypt:
-        return None
 
     # Generate random AES key and IV
     aes_key = os.urandom(32)  # 256-bit key
@@ -223,9 +224,7 @@ def encrypt_value(value_to_encrypt: str, public_key: rsa.RSAPublicKey) -> Option
     return base64.b64encode(combined).decode("utf-8")
 
 
-def decrypt_value(
-    encrypted_value: str, private_key: rsa.RSAPrivateKey
-) -> Optional[str]:
+def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
     """Decrypt using hybrid RSA+AES decryption.
 
     Args:
@@ -234,9 +233,10 @@ def decrypt_value(
 
     Returns:
         str: Decrypted value as string
+
+    Raises:
+        ValueError: If decryption fails
     """
-    if not encrypted_value:
-        return None
 
     # Decode base64
     combined = base64.b64decode(encrypted_value)

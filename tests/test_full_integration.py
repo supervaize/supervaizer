@@ -5,19 +5,21 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+import pytest
 import shortuuid
 
 from supervaize_control import (
     Account,
     Agent,
     AgentMethod,
+    Job,
     Parameter,
     ParametersSetup,
     Server,
-    Job,
 )
 
 
+@pytest.mark.current
 def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     """
     Test the full setup. Serves as a template for the implementation of the agent.
@@ -31,14 +33,18 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     )
 
     # Define the secrets expected by the agent
-    agent_parameters = ParametersSetup.from_list([
-        Parameter(
-            name="OPEN_API_KEY",
-            description="OpenAPI Key",
-            is_environment=True,
-        ),
-        Parameter(name="SERPER_API", description="Server API key", is_environment=True),
-    ])
+    agent_parameters = ParametersSetup.from_list(
+        [
+            Parameter(
+                name="OPEN_API_KEY",
+                description="OpenAPI Key",
+                is_environment=True,
+            ),
+            Parameter(
+                name="SERPER_API", description="Server API key", is_environment=True
+            ),
+        ]
+    )
 
     job_start_method = AgentMethod(
         name="start",

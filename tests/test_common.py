@@ -8,9 +8,10 @@
 import json
 from typing import Any, Dict, Optional
 
+import pytest
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
-from cryptography.hazmat.backends import default_backend
 
 from supervaize_control.common import (
     ApiError,
@@ -55,13 +56,15 @@ def test_api_success_basic() -> None:
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    json_str = json.dumps({
-        "message": "success message",
-        "code": "200",
-        "detail": {"test": "data"},
-        "id": None,
-        "log_message": "\u2705 success message",
-    })
+    json_str = json.dumps(
+        {
+            "message": "success message",
+            "code": "200",
+            "detail": {"test": "data"},
+            "id": None,
+            "log_message": "\u2705 success message",
+        }
+    )
     print(str(success))
     assert str(success) == json_str
 
@@ -132,8 +135,8 @@ def test_api_success() -> None:
     assert success.log_message == "✅ success"
 
     """Test ApiSuccess with dict detail"""
-    detail = {"data": "test"}
-    success = ApiSuccess(message="success", detail=detail)
+    detail_dict = {"data": "test"}
+    success = ApiSuccess(message="success", detail=detail_dict)
     assert success.log_message == "✅ success"
 
 
@@ -241,3 +244,11 @@ def test_encrypt_decrypt() -> None:
     assert isinstance(encrypted_dict, str)
     assert isinstance(decrypted_dict, dict)
     assert decrypted_dict == test_dict
+
+    # Test encryption failure
+    with pytest.raises(AttributeError, match="object has no attribute"):
+        encrypt_value("test", None)  # type: ignore
+
+    # Test decryption failure
+    with pytest.raises(ValueError, match="Incorrect padding"):
+        decrypt_value("invalid", private_key)

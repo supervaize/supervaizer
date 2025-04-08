@@ -1,37 +1,46 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
+import traceback
 from enum import Enum
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Dict, Optional, Callable, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 from cryptography.hazmat.primitives import serialization
 from fastapi import (
     APIRouter,
-    Depends,
-    Body,
-    HTTPException,
-)
-
-from .agent import Agent
-from .common import log
-from .job import Job, Jobs
-from typing import List
-import traceback
-
-from fastapi import (
     BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
     Query,
     status as http_status,
 )
 from fastapi.responses import JSONResponse
 
 from .agent import (
+    Agent,
     AgentCustomMethodParams,
     AgentMethodParams,
     AgentResponse,
 )
-from .job import JobContext, JobStatus
+from .common import log
+from .job import Job, JobContext, Jobs, JobStatus
 from .parameter import Parameters
 from .server_utils import ErrorResponse, ErrorType, create_error_response
-
 
 if TYPE_CHECKING:
     from .server import Server
@@ -41,7 +50,9 @@ T = TypeVar("T")
 
 def handle_route_errors(
     job_conflict_check: bool = False,
-) -> Callable[[Callable[..., T]], Callable[..., Union[T, JSONResponse]]]:
+) -> Callable[
+    [Callable[..., Awaitable[T]]], Callable[..., Awaitable[Union[T, JSONResponse]]]
+]:
     """
     Decorator to handle common route error patterns.
 
@@ -50,11 +61,21 @@ def handle_route_errors(
                           and returns a conflict error response
     """
 
-    def decorator(func: Callable[..., T]) -> Callable[..., Union[T, JSONResponse]]:
+    def decorator(
+        func: Callable[..., Awaitable[T]],
+    ) -> Callable[..., Awaitable[Union[T, JSONResponse]]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
             try:
-                return await func(*args, **kwargs)
+                result: T = await func(*args, **kwargs)
+                return result
+
+            except HTTPException as e:
+                return create_error_response(
+                    error_type=ErrorType.INVALID_REQUEST,
+                    detail=e.detail if hasattr(e, "detail") else str(e),
+                    status_code=e.status_code,
+                )
             except ValueError as e:
                 if job_conflict_check and "already exists" in str(e):
                     return create_error_response(
@@ -241,7 +262,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         summary=f"Start a job with agent: {agent.name}",
         description=f"{agent.job_start_method.description}",
         responses={
-            http_status.HTTP_202_ACCEPTED: {"model": agent.job_start_method},
+            http_status.HTTP_202_ACCEPTED: {"model": Job},
             http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
@@ -252,7 +273,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors(job_conflict_check=True)
     async def start_job(
         background_tasks: BackgroundTasks,
-        body_params: agent.job_start_method.job_model = Body(),  # type: ignore
+        body_params: AgentJobModel = Body(...),  # type: ignore
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
@@ -279,7 +300,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             agent_name=agent.name,
             parameters=agent_parameters,
         )
-
         # Schedule the background execution
         background_tasks.add_task(agent.job_start, new_job, job_fields, sv_context)
 
@@ -414,13 +434,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         method = agent.custom_methods[params.method_name]
         result = method(params.params) if callable(method) else method
+        log.debug(f"Custom method result: {result}")
+
         return AgentResponse(
             name=agent.name,
             id=agent.id,
             version=agent.version,
             api_path=agent.path,
             description=agent.description,
-            **result if result else {},
         )
 
     return router

@@ -344,7 +344,6 @@ class Agent(AgentModel):
         params = method_params | {"fields": job_fields} | {"context": context}
         try:
             result = self._execute(action, params)
-
             # Store result and mark as completed
             job_response = JobResponse(
                 job_id=job.id,

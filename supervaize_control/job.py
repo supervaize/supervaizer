@@ -137,7 +137,7 @@ class JobResponse(SvBaseModel):
     job_id: str
     status: JobStatus
     message: str
-    payload: Any
+    payload: Optional[dict[str, Any]] = None
 
 
 class JobModel(SvBaseModel):
@@ -165,6 +165,7 @@ class Job(JobModel):
         self.payload = response.payload
         if response.status == JobStatus.COMPLETED:
             self.result = response.payload
+            self.status = JobStatus.COMPLETED
             self.finished_at = datetime.now()
         if response.status == JobStatus.FAILED:
             self.finished_at = datetime.now()
