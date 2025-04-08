@@ -125,7 +125,7 @@ This project uses [just](https://github.com/casey/just) as a command runner. Her
    - `uv venv`
    - Windows: `.venv\Scripts\activate`
    - Unix/MacOS: `source .venv/bin/activate`
-4. Install development dependencies: `uv pip install -e ".[dev]"`
+4. Install development dependencies: `uv pip install -e ".[dev]"` or `just dev-install`
 5. Install Git hooks: `just install-hooks`
 
 ### Running Tests
@@ -139,6 +139,38 @@ Or for specific test categories:
 ```bash
 pytest -m "not slow"  # Skip slow tests
 pytest -m "current"   # Run tests under development
+```
+
+Running tests without test coverage
+
+```bash
+just test-no-cov
+```
+
+Rerunning failed tests
+
+```bash
+just test-failed
+```
+
+### Type checking
+
+Running mypy directly
+
+```bash
+mypy supervaize_control
+```
+
+Running mypy for all (including tests)
+
+```bash
+mypy supervaize_control tests
+```
+
+Running mypy via precommit
+
+```bash
+just mypy
 ```
 
 ## Contributing

@@ -30,7 +30,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "pytest>=8.3.4",
     "pytest-cov>=4.1.0",

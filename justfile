@@ -10,6 +10,10 @@ YYYYMMDD:= `date +%Y%m%d`
 default:
     @just --list
 
+# Dev install 
+dev-install:
+    uv pip install -e .[dev]
+
 # Run pre-commit hooks manually
 pre-commit-manual:
     pre-commit run --all-files --verbose
