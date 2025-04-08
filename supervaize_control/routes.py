@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Dict, Optional, Callable, TypeVar, Union
 
 from cryptography.hazmat.primitives import serialization
 from fastapi import (
@@ -12,7 +13,7 @@ from fastapi import (
 from .agent import Agent
 from .common import log
 from .job import Job, Jobs
-from typing import List, Union
+from typing import List
 import traceback
 
 from fastapi import (
@@ -35,6 +36,50 @@ from .server_utils import ErrorResponse, ErrorType, create_error_response
 if TYPE_CHECKING:
     from .server import Server
 
+T = TypeVar("T")
+
+
+def handle_route_errors(
+    job_conflict_check: bool = False,
+) -> Callable[[Callable[..., T]], Callable[..., Union[T, JSONResponse]]]:
+    """
+    Decorator to handle common route error patterns.
+
+    Args:
+        job_conflict_check: If True, checks for "already exists" in ValueError messages
+                          and returns a conflict error response
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., Union[T, JSONResponse]]:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
+            try:
+                return await func(*args, **kwargs)
+            except ValueError as e:
+                if job_conflict_check and "already exists" in str(e):
+                    return create_error_response(
+                        ErrorType.JOB_ALREADY_EXISTS,
+                        str(e),
+                        http_status.HTTP_409_CONFLICT,
+                    )
+                return create_error_response(
+                    error_type=ErrorType.INVALID_REQUEST,
+                    detail=str(e),
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
+                )
+            except Exception as e:
+                return create_error_response(
+                    error_type=ErrorType.INTERNAL_ERROR,
+                    detail=str(e),
+                    status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
+                )
+
+        return wrapper
+
+    return decorator
+
 
 async def get_server() -> "Server":
     """Get the current server instance."""
@@ -46,7 +91,8 @@ def create_default_routes(server: "Server") -> APIRouter:
     router = APIRouter()
 
     @router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
-    def get_job_status(job_id: str) -> Job:
+    @handle_route_errors()
+    async def get_job_status(job_id: str) -> Job:
         """Get the status of a job by its ID"""
         job = Jobs().get_job(job_id)
         if not job:
@@ -57,7 +103,8 @@ def create_default_routes(server: "Server") -> APIRouter:
         return job
 
     @router.get("/jobs", tags=["Jobs"], response_model=Dict[str, List[Job]])
-    def get_all_jobs(
+    @handle_route_errors()
+    async def get_all_jobs(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
@@ -67,76 +114,56 @@ def create_default_routes(server: "Server") -> APIRouter:
         ),
     ) -> Dict[str, List[Job]]:
         """Get all jobs across all agents with pagination and optional status filtering"""
-        try:
-            jobs_registry = Jobs()
-            all_jobs: Dict[str, List[Job]] = {}
+        jobs_registry = Jobs()
+        all_jobs: Dict[str, List[Job]] = {}
 
-            for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
-                filtered_jobs = list(agent_jobs.values())
+        for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
+            filtered_jobs = list(agent_jobs.values())
 
-                # Apply status filter if specified
-                if status:
-                    filtered_jobs = [
-                        job for job in filtered_jobs if job.status == status
-                    ]
+            # Apply status filter if specified
+            if status:
+                filtered_jobs = [job for job in filtered_jobs if job.status == status]
 
-                # Apply pagination
-                filtered_jobs = filtered_jobs[skip : skip + limit]
+            # Apply pagination
+            filtered_jobs = filtered_jobs[skip : skip + limit]
 
-                if filtered_jobs:  # Only include agents that have jobs after filtering
-                    all_jobs[agent_name] = filtered_jobs
+            if filtered_jobs:  # Only include agents that have jobs after filtering
+                all_jobs[agent_name] = filtered_jobs
 
-            return all_jobs
-        except Exception as e:
-            raise HTTPException(
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-            )
+        return all_jobs
 
     @router.get("/agents", tags=["Agents"], response_model=List[AgentResponse])
-    def get_all_agents(
+    @handle_route_errors()
+    async def get_all_agents(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
         ),
-        server: Optional["Server"] = Depends(get_server),
     ) -> List[AgentResponse]:
         """Get all registered agents with pagination"""
-        try:
-            if not server:
-                raise ValueError("Server instance not found")
-            return [
-                AgentResponse(**a.registration_info)
-                for a in server.agents[skip : skip + limit]
-            ]
-        except Exception as e:
-            raise HTTPException(
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-            )
+        if not server:
+            raise ValueError("Server instance not found")
+        return [
+            AgentResponse(**a.registration_info)
+            for a in server.agents[skip : skip + limit]
+        ]
 
     @router.get("/agent/{agent_id}", tags=["Agents"], response_model=AgentResponse)
-    def get_agent_details(
+    @handle_route_errors()
+    async def get_agent_details(
         agent_id: str,
-        server: Optional["Server"] = Depends(get_server),
-    ) -> Union[Dict[str, Any], JSONResponse]:
+    ) -> AgentResponse:
         """Get details of a specific agent by ID"""
-        try:
-            if not server:
-                raise ValueError("Server instance not found")
-            for agent in server.agents:
-                if agent.id == agent_id:
-                    return agent.registration_info
+        if not server:
+            raise ValueError("Server instance not found")
+        for agent in server.agents:
+            if agent.id == agent_id:
+                return AgentResponse(**agent.registration_info)
 
-            return create_error_response(
-                ErrorType.AGENT_NOT_FOUND,
-                f"Agent with ID '{agent_id}' not found",
-                http_status.HTTP_404_NOT_FOUND,
-            )
-        except Exception as e:
-            return create_error_response(
-                ErrorType.INTERNAL_ERROR,
-                f"Failed to retrieve agent details: {str(e)}",
-                http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Agent with ID '{agent_id}' not found",
+        )
 
     return router
 
@@ -151,7 +178,8 @@ def create_utils_routes(server: "Server") -> APIRouter:
         description="Returns the server's public key in PEM format",
         response_model=str,
     )
-    def get_public_key() -> str:
+    @handle_route_errors()
+    async def get_public_key() -> str:
         pem = server.public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -165,7 +193,8 @@ def create_utils_routes(server: "Server") -> APIRouter:
         response_model=str,
         response_description="The encrypted string",
     )
-    def encrypt_string(text: str = Body(...)) -> str:
+    @handle_route_errors()
+    async def encrypt_string(text: str = Body(...)) -> str:
         return server.encrypt(text)
 
     return router
@@ -198,14 +227,10 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={http_status.HTTP_200_OK: {"model": AgentResponse}},
         tags=tags,
     )
+    @handle_route_errors()
     async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
         log.info(f"Getting agent info for {agent.name}")
         return AgentResponse(
-            name=agent.name,
-            id=agent.id,
-            version=agent.version,
-            api_path=agent.path,
-            description=agent.description,
             **agent.registration_info,
         )
 
@@ -224,64 +249,41 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         response_model=Job,
         status_code=http_status.HTTP_202_ACCEPTED,
     )
+    @handle_route_errors(job_conflict_check=True)
     async def start_job(
         background_tasks: BackgroundTasks,
-        body_params: agent.job_start_method.job_model = Body(  # type: ignore
-        ),
+        body_params: agent.job_start_method.job_model = Body(),  # type: ignore
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
-        try:
-            log.info(f"Starting agent {agent.name} with params {body_params}")
-            sv_context: JobContext = body_params.supervaize_context  # type: ignore[attr-defined]
-            job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
+        log.info(f"Starting agent {agent.name} with params {body_params}")
+        sv_context: JobContext = body_params.supervaize_context  # type: ignore[attr-defined]
+        job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
 
-            # Get agent encrypted parameters if available
-            encrypted_agent_parameters = getattr(
-                body_params, "encrypted_agent_parameters", None
+        # Get agent encrypted parameters if available
+        encrypted_agent_parameters = getattr(
+            body_params, "encrypted_agent_parameters", None
+        )
+        log.debug(f"Encrypted agent parameters: {encrypted_agent_parameters}")
+        agent_parameters = None
+        # If agent has parameters_setup defined, validate parameters
+        if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
+            agent_parameters = Parameters.from_str(
+                server.decrypt(encrypted_agent_parameters)
             )
-            log.debug(f"Encrypted agent parameters: {encrypted_agent_parameters}")
-            agent_parameters = None
-            # If agent has parameters_setup defined, validate parameters
-            if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
-                agent_parameters = Parameters.from_str(
-                    server.decrypt(encrypted_agent_parameters)
-                )
-                log.debug(
-                    f"Decrypted agent parameters: {agent_parameters}"
-                )  # TODO REMOVE ASAP
+            log.debug(f"Decrypted agent parameters: {agent_parameters}")
 
-            # Create and prepare the job
-            new_job = Job.new(
-                supervaize_context=sv_context,
-                agent_name=agent.name,
-                parameters=agent_parameters,
-            )
+        # Create and prepare the job
+        new_job = Job.new(
+            supervaize_context=sv_context,
+            agent_name=agent.name,
+            parameters=agent_parameters,
+        )
 
-            # Schedule the background execution
-            background_tasks.add_task(agent.job_start, new_job, job_fields, sv_context)
+        # Schedule the background execution
+        background_tasks.add_task(agent.job_start, new_job, job_fields, sv_context)
 
-            return new_job
-        except ValueError as e:
-            if "already exists" in str(e):
-                return create_error_response(
-                    ErrorType.JOB_ALREADY_EXISTS,
-                    str(e),
-                    http_status.HTTP_409_CONFLICT,
-                )
-            return create_error_response(
-                error_type=ErrorType.INVALID_REQUEST,
-                detail=str(e),
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
-            )
-        except Exception as e:
-            return create_error_response(
-                error_type=ErrorType.INTERNAL_ERROR,
-                detail=str(e),
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
-            )
+        return new_job
 
     @router.get(
         "/jobs",
@@ -294,6 +296,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         tags=tags,
     )
+    @handle_route_errors()
     async def get_agent_jobs(
         agent: Agent = Depends(get_agent),
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
@@ -305,27 +308,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         ),
     ) -> List[Job] | JSONResponse:
         """Get all jobs for this agent"""
-        try:
-            jobs = list(Jobs().get_agent_jobs(agent.name).values())
+        jobs = list(Jobs().get_agent_jobs(agent.name).values())
 
-            # Apply status filter if specified
-            if status:
-                jobs = [job for job in jobs if job.status == status]
+        # Apply status filter if specified
+        if status:
+            jobs = [job for job in jobs if job.status == status]
 
-            # Apply pagination
-            return jobs[skip : skip + limit]
-        except ValueError as e:
-            return create_error_response(
-                ErrorType.INVALID_REQUEST,
-                str(e),
-                http_status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as e:
-            return create_error_response(
-                ErrorType.INTERNAL_ERROR,
-                str(e),
-                http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # Apply pagination
+        return jobs[skip : skip + limit]
 
     @router.get(
         "/jobs/{job_id}",
@@ -339,25 +329,16 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         tags=tags,
     )
+    @handle_route_errors()
     async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
         """Get the status of a job by its ID for this specific agent"""
-        try:
-            job = Jobs().get_job(job_id, agent_name=agent.name)
-            if not job:
-                raise HTTPException(
-                    status_code=http_status.HTTP_404_NOT_FOUND,
-                    detail=f"Job with ID {job_id} not found for agent {agent.name}",
-                )
-            return job
-        except ValueError as e:
+        job = Jobs().get_job(job_id, agent_name=agent.name)
+        if not job:
             raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Job with ID {job_id} not found for agent {agent.name}",
             )
-        except Exception as e:
-            raise HTTPException(
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(e),
-            )
+        return job
 
     @router.post(
         "/stop",
@@ -368,6 +349,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         tags=tags,
     )
+    @handle_route_errors()
     async def stop_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
@@ -391,6 +373,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         tags=tags,
     )
+    @handle_route_errors()
     async def status_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
@@ -416,30 +399,28 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         tags=tags,
     )
+    @handle_route_errors()
     async def custom_method(
         params: AgentCustomMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
         log.info(
             f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
         )
-        if agent.custom_methods and params.method_name in agent.custom_methods:
-            method = agent.custom_methods[params.method_name]
-            if callable(method):
-                result = method(params.params)
-            else:
-                result = method
-            return AgentResponse(
-                name=agent.name,
-                id=agent.id,
-                version=agent.version,
-                api_path=agent.path,
-                description=agent.description,
-                **result if result else {},
-            )
-        else:
+        if not (agent.custom_methods and params.method_name in agent.custom_methods):
             raise HTTPException(
                 status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
                 detail="Custom method not found",
             )
+
+        method = agent.custom_methods[params.method_name]
+        result = method(params.params) if callable(method) else method
+        return AgentResponse(
+            name=agent.name,
+            id=agent.id,
+            version=agent.version,
+            api_path=agent.path,
+            description=agent.description,
+            **result if result else {},
+        )
 
     return router

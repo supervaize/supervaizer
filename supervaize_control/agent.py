@@ -231,7 +231,7 @@ class Agent(AgentModel):
             "editor": self.editor,
             "version": self.version,
             "description": self.description,
-            "path": self.path,
+            "api_path": self.path,
             "tags": self.tags,
             "job_start_method": self.job_start_method.registration_info,
             "job_stop_method": self.job_stop_method.registration_info,
