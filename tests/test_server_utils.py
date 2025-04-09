@@ -12,12 +12,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from fastapi.responses import JSONResponse
 
-from supervaize_control.common import decrypt_value, encrypt_value
-from supervaize_control.server_utils import (
-    ErrorResponse,
-    ErrorType,
-    create_error_response,
-)
+from supervaizer.common import decrypt_value, encrypt_value
+from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
 
 def test_error_type_enum() -> None:
@@ -110,4 +106,5 @@ def test_encrypt_decrypt() -> None:
     )
     if isinstance(decrypted_bytes, memoryview):
         decrypted_bytes = bytes(decrypted_bytes)
+    assert decrypted_bytes.decode() == test_bytes.decode()
     assert decrypted_bytes.decode() == test_bytes.decode()

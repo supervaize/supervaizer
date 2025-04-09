@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from supervaize_control.job import Job, JobContext, JobResponse, JobStatus
+from supervaizer.job import Job, JobContext, JobResponse, JobStatus
 
 
 @pytest.fixture

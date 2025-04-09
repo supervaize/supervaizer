@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 class AccountModel(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
     workspace: str

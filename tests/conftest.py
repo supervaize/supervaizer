@@ -12,7 +12,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from typing_extensions import Annotated
 
-from supervaize_control import (
+from supervaizer import (
     Account,
     Agent,
     AgentMethod,

@@ -178,7 +178,7 @@ class AgentCustomMethodParams(AgentMethodParams):
 
 
 class AgentModel(SvBaseModel):
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
     author: Optional[str] = None

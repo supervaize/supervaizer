@@ -7,20 +7,13 @@
 
 import pytest
 from pytest_mock import MockerFixture
-from requests.exceptions import (
-    ConnectionError,
-    HTTPError,
-)
+from requests.exceptions import ConnectionError, HTTPError
 
-from supervaize_control import Account, ApiSuccess
-from supervaize_control.event import Event
-from supervaize_control.server import Server
+from supervaizer import Account, ApiSuccess
+from supervaizer.event import Event
+from supervaizer.server import Server
 
-from . import (
-    AUTH_ERROR_RESPONSE,
-    SERVER_REGISTER_RESPONSE,
-    WAKEUP_EVENT_RESPONSE,
-)
+from . import AUTH_ERROR_RESPONSE, SERVER_REGISTER_RESPONSE, WAKEUP_EVENT_RESPONSE
 
 
 def test_account(account_fixture: Account) -> None:

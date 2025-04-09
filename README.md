@@ -1,13 +1,13 @@
-# SUPERVAIZE Controller
+# SUPERVAIZER
 
 A Python library for managing and controlling SUPERVAIZE agents and services.
 
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/supervaize/supervaize_control)
+[![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/supervaize/supervaizer)
 
 ## Description
 
-SUPERVAIZE Controller is a Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
+SUPERVAIZER is a Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
 
 ## Features
 
@@ -21,19 +21,19 @@ SUPERVAIZE Controller is a Python library designed to facilitate communication w
 ## Installation
 
 ```bash
-pip install supervaize-control
+pip install supervaizer
 ```
 
 Or with development dependencies:
 
 ```bash
-pip install "supervaize-control[dev]"
+pip install "supervaizer[dev]"
 ```
 
 ## Quick Start
 
 ```python
-from supervaize_control import Server, Agent, Account
+from supervaizer import Server, Agent, Account
 
 # Initialize a connection to the SUPERVAIZE server
 server = Server(api_url="https://api.example.com")
@@ -60,7 +60,7 @@ print(f"Agent status: {status}")
 The `Agent` class represents a SUPERVAIZE agent and provides methods for agent registration, status checks, and method execution.
 
 ```python
-from supervaize_control import Agent, AgentMethod
+from supervaizer import Agent, AgentMethod
 
 agent = Agent(server=server, account=account)
 agent.register(name="agent-name")
@@ -72,7 +72,7 @@ agent.set_method(AgentMethod.METHOD_NAME, handler_function)
 The `Server` class handles communication with the SUPERVAIZE backend services.
 
 ```python
-from supervaize_control import Server
+from supervaizer import Server
 
 server = Server(api_url="https://api.example.com")
 ```
@@ -82,7 +82,7 @@ server = Server(api_url="https://api.example.com")
 The `Account` class manages authentication and user information.
 
 ```python
-from supervaize_control import Account
+from supervaizer import Account
 
 account = Account(server=server)
 account.login(username="username", password="password")
@@ -93,7 +93,7 @@ account.login(username="username", password="password")
 The event system enables communication between components.
 
 ```python
-from supervaize_control import Event, EventType
+from supervaizer import Event, EventType
 
 event = Event.create(EventType.AGENT_REGISTERED, payload={"agent_id": "123"})
 ```
@@ -103,7 +103,7 @@ event = Event.create(EventType.AGENT_REGISTERED, payload={"agent_id": "123"})
 The job system handles the execution and tracking of agent tasks.
 
 ```python
-from supervaize_control import Job, JobStatus
+from supervaizer import Job, JobStatus
 
 # Check job status
 job = agent.get_job(job_id="job-123")
@@ -158,13 +158,13 @@ just test-failed
 Running mypy directly
 
 ```bash
-mypy supervaize_control
+mypy supervaizer
 ```
 
 Running mypy for all (including tests)
 
 ```bash
-mypy supervaize_control tests
+mypy supervaizer tests
 ```
 
 Running mypy via precommit

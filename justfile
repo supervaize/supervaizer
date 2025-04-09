@@ -12,6 +12,7 @@ default:
 
 # Dev install 
 dev-install:
+    uv venv
     uv pip install -e .[dev]
 
 # Run pre-commit hooks manually
@@ -80,4 +81,4 @@ unicorn:
 
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:
-    bash -c "VERSION=\$(grep '^VERSION = ' supervaize_control/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
+    bash -c "VERSION=\$(grep '^VERSION = ' supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""

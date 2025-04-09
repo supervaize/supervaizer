@@ -8,7 +8,7 @@
 import pytest
 import shortuuid
 
-from supervaize_control import (
+from supervaizer import (
     Account,
     Agent,
     AgentMethod,

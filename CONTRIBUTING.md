@@ -1,6 +1,6 @@
-# Contributing to SUPERVAIZE Control
+# Contributing to SUPERVAIZER
 
-Thank you for considering contributing to SUPERVAIZE Control! This document outlines the process for contributing to the project.
+Thank you for considering contributing to SUPERVAIZER! This document outlines the process for contributing to the project.
 
 ## Code of Conduct
 
@@ -37,7 +37,7 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 ```bash
 # Clone the repository
 git clone [repository-url]
-cd supervaize_control
+cd supervaizer
 
 # Install development dependencies
 uv venv
@@ -82,4 +82,4 @@ The commit message should be structured as follows:
 
 ## License
 
-By contributing to SUPERVAIZE Control, you agree that your contributions will be licensed under the project's [Mozilla Public License 2.0](LICENSE).
+By contributing to SUPERVAIZER, you agree that your contributions will be licensed under the project's [Mozilla Public License 2.0](LICENSE).

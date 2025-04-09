@@ -13,11 +13,9 @@ from typing import Any, Dict
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaize_control import Agent, AgentMethod
-from supervaize_control.common import ApiSuccess
-from supervaize_control.job import Job, JobContext
-from supervaize_control.parameter import ParametersSetup
-from supervaize_control.server import Server
+from supervaizer import Agent, AgentMethod, ApiSuccess, Server
+from supervaizer.job import Job, JobContext
+from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
 
 
@@ -336,12 +334,10 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps(
-            [
-                {"name": "parameter1", "value": "new_value1", "is_environment": True},
-                {"name": "parameter2", "value": "new_value2", "is_environment": False},
-            ]
-        ),
+        lambda self, encrypted_parameters: json.dumps([
+            {"name": "parameter1", "value": "new_value1", "is_environment": True},
+            {"name": "parameter2", "value": "new_value2", "is_environment": False},
+        ]),
     )
     # Simulate server.account.get_agent_by() returns agent details
     monkeypatch.setattr(
@@ -373,9 +369,9 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps(
-            [{"invalid_parameter": "invalid_value1"}]
-        ),
+        lambda self, encrypted_parameters: json.dumps([
+            {"invalid_parameter": "invalid_value1"}
+        ]),
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)

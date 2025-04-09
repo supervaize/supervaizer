@@ -141,7 +141,7 @@ class JobResponse(SvBaseModel):
 
 
 class JobModel(SvBaseModel):
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
     agent_name: str
     status: "JobStatus"

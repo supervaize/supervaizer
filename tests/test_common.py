@@ -13,7 +13,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
 
-from supervaize_control.common import (
+from supervaizer.common import (
     ApiError,
     ApiSuccess,
     SvBaseModel,

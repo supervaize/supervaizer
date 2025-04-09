@@ -34,7 +34,7 @@ class EventType(str, Enum):
 
 
 class EventModel(SvBaseModel):
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     source: str
     account: Account
     type: EventType

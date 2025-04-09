@@ -14,10 +14,10 @@ from fastapi import status
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-from supervaize_control import Server
-from supervaize_control.agent import Agent
-from supervaize_control.job import Job, JobContext, JobStatus
-from supervaize_control.server_utils import ErrorType, create_error_response
+from supervaizer import Server
+from supervaizer.agent import Agent
+from supervaizer.job import Job, JobContext, JobStatus
+from supervaizer.server_utils import ErrorType, create_error_response
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def test_get_job_status_endpoint(server_fixture: Server, job_fixture: Job) -> No
     client = TestClient(server_fixture.app)
 
     # Test success case
-    with patch("supervaize_control.routes.Jobs") as MockJobs:
+    with patch("supervaizer.routes.Jobs") as MockJobs:
         # Set up the Jobs mock to return our job fixture
         mock_jobs_instance = MagicMock()
         mock_jobs_instance.get_job.return_value = job_fixture
@@ -103,7 +103,7 @@ def test_get_job_status_endpoint(server_fixture: Server, job_fixture: Job) -> No
         assert response.json()["status"] == JobStatus.IN_PROGRESS.value
 
     # Test job not found case
-    with patch("supervaize_control.routes.Jobs") as MockJobs:
+    with patch("supervaizer.routes.Jobs") as MockJobs:
         mock_jobs_instance = MagicMock()
         mock_jobs_instance.get_job.return_value = None
         MockJobs.return_value = mock_jobs_instance
@@ -152,7 +152,7 @@ async def test_get_all_jobs_endpoint(
     mock_job2.status = JobStatus.IN_PROGRESS
 
     # Patch Jobs to prevent actual job registry access
-    with patch("supervaize_control.routes.Jobs") as mock_jobs:
+    with patch("supervaizer.routes.Jobs") as mock_jobs:
         # Configure mock response
         mock_jobs_instance = MagicMock()
 
@@ -250,7 +250,7 @@ async def test_start_job_endpoint(
 
     # Mock the Parameters.from_str method
     monkeypatch.setattr(
-        "supervaize_control.parameter.Parameters.from_str",
+        "supervaizer.parameter.Parameters.from_str",
         lambda x: {"param1": "value1"},
     )
 
@@ -266,7 +266,7 @@ async def test_start_job_endpoint(
             mock_job_start.return_value = mock_job
 
         # Test with mocked dependencies
-        with patch("supervaize_control.routes.create_error_response") as mock_error:
+        with patch("supervaizer.routes.create_error_response") as mock_error:
             # For this test, we'll just verify our mocking setup is correct
             # without trying to directly invoke endpoints
 
@@ -319,7 +319,7 @@ async def test_get_agent_jobs_endpoint(
     mock_job2.status = JobStatus.IN_PROGRESS
 
     # Mock Jobs().get_agent_jobs
-    with patch("supervaize_control.routes.Jobs") as mock_jobs:
+    with patch("supervaizer.routes.Jobs") as mock_jobs:
         mock_jobs_instance = MagicMock()
         if exception:
             mock_jobs_instance.get_agent_jobs.side_effect = exception
@@ -386,7 +386,7 @@ async def test_get_job_status_for_agent(
         mock_job.id = "test-job-id"
 
     # Mock Jobs().get_job
-    with patch("supervaize_control.routes.Jobs") as mock_jobs:
+    with patch("supervaizer.routes.Jobs") as mock_jobs:
         mock_jobs_instance = MagicMock()
         if exception:
             mock_jobs_instance.get_job.side_effect = exception

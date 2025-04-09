@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from pydantic import field_validator
 from rich import inspect
 
-from .__version__ import VERSION, API_VERSION
+from .__version__ import API_VERSION, VERSION
 from .account import Account
 from .agent import Agent
 from .common import (
@@ -31,9 +31,9 @@ from .common import (
 )
 from .instructions import display_instructions
 from .routes import (
+    create_agents_routes,
     create_default_routes,
     create_utils_routes,
-    create_agents_routes,
     get_server,
 )
 
@@ -46,7 +46,7 @@ class ServerModel(SvBaseModel):
     """API Server for the Supervaize Control."""
 
     model_config = {"arbitrary_types_allowed": True}  # for FastAPI
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     scheme: str
     host: str
     port: int
@@ -85,9 +85,9 @@ class Server(ServerModel):
         account: Account,
         agents: List[Agent],
         scheme: str = "http",
-        environment: str = os.getenv("SUPERVAIZE_CONTROL_ENVIRONMENT", "dev"),
-        host: str = os.getenv("SUPERVAIZE_CONTROL_HOST", "0.0.0.0"),
-        port: int = int(os.getenv("SUPERVAIZE_CONTROL_PORT", 8001)),
+        environment: str = os.getenv("supervaizer_ENVIRONMENT", "dev"),
+        host: str = os.getenv("supervaizer_HOST", "0.0.0.0"),
+        port: int = int(os.getenv("supervaizer_PORT", 8001)),
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",

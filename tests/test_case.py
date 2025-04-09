@@ -7,8 +7,8 @@
 
 from requests_mock import Mocker
 
-from supervaize_control import Account
-from supervaize_control.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
+from supervaizer import Account
+from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
 
 
 def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:

@@ -5,7 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from supervaize_control import (
+from supervaizer import (
     Account,
     Agent,
     AgentRegisterEvent,

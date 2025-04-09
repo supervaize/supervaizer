@@ -43,7 +43,7 @@ class TelemetrySeverity(str, Enum):
 
 
 class TelemetryModel(BaseModel):
-    SUPERVAIZE_CONTROL_VERSION: ClassVar[str] = VERSION
+    supervaizer_VERSION: ClassVar[str] = VERSION
     agentId: str
     type: TelemetryType
     category: TelemetryCategory

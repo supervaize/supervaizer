@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from supervaize_control.__version__ import VERSION
+from supervaizer.__version__ import VERSION
 
 console = Console()
 
@@ -90,7 +90,7 @@ class Header:
 def make_syntax() -> Panel:
     """Create a syntax-highlighted code panel."""
     code = """\
-from supervaize_control import Server, Account, Agent
+from supervaizer Server, Account, Agent
 sv_account = Account(
     name="CUSTOMERFIRST",
     id="xxxxxxxxxxxx",

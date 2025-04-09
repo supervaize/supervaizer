@@ -233,7 +233,7 @@ pyrightconfig.json
 .envrc
 .vscode
 
-/supervaize_control/.cursorrules
+/supervaizer/.cursorrules
 /CLAUDE.md
 /fix
 

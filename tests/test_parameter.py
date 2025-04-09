@@ -7,7 +7,7 @@
 
 import os
 
-from supervaize_control.parameter import Parameter, ParametersSetup
+from supervaizer.parameter import Parameter, ParametersSetup
 
 
 def test_parameter_creation() -> None:

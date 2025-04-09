@@ -5,12 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from supervaize_control import (
-    Telemetry,
-    TelemetryCategory,
-    TelemetrySeverity,
-    TelemetryType,
-)
+from supervaizer import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
 
 
 def test_telemetry(telemetry_fixture: Telemetry) -> None:
