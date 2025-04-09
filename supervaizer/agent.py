@@ -360,8 +360,8 @@ class Agent(AgentModel):
                 status=JobStatus.FAILED,
                 message=error_msg,
                 payload=None,
+                error=e,
             )
-            log.error(error_msg)
 
         job.add_response(job_response)
 

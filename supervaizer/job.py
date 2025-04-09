@@ -5,13 +5,14 @@
 # https://mozilla.org/MPL/2.0/.
 
 import time
+import traceback
 import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar, Optional
 
 from .__version__ import VERSION
-from .common import SvBaseModel, singleton
+from .common import SvBaseModel, log, singleton
 from .parameter import Parameters
 
 
@@ -40,9 +41,7 @@ class Jobs:
 
         # Check if job already exists for this agent
         if job.id in self.jobs_by_agent[agent_name]:
-            raise ValueError(
-                f"Job with ID {job.id} already exists for agent {agent_name}"
-            )
+            raise ValueError(f"Job ID '{job.id}' already exists for agent {agent_name}")
 
         self.jobs_by_agent[agent_name][job.id] = job
 
@@ -138,6 +137,39 @@ class JobResponse(SvBaseModel):
     status: JobStatus
     message: str
     payload: Optional[dict[str, Any]] = None
+    error_message: Optional[str] = None
+    error_traceback: Optional[str] = None
+
+    def __init__(
+        self,
+        job_id: str,
+        status: JobStatus,
+        message: str,
+        payload: Optional[dict[str, Any]] = None,
+        error: Optional[Exception] = None,
+        **kwargs: Any,
+    ) -> None:
+        if error is not None:
+            error_message = str(error)
+            error_traceback = traceback.format_exc()
+        else:
+            error_message = error_traceback = None
+
+        super().__init__(
+            job_id=job_id,
+            status=status,
+            message=message,
+            payload=payload,
+            error_message=error_message,
+            error_traceback=error_traceback,
+            **kwargs,
+        )
+
+        if self.error_message:
+            log.error(
+                f"Job execution failed - Job ID {self.job_id}: {self.error_message}"
+            )
+            log.error(self.error_traceback)
 
 
 class JobModel(SvBaseModel):

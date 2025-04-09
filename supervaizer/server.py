@@ -117,7 +117,7 @@ class Server(ServerModel):
 
         app = FastAPI(
             debug=debug,
-            title="Supervaize Control API",
+            title="Supervaizer API",
             description=(
                 f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
                 "API for controlling and managing Supervaize agents. \n\nMore information at "
