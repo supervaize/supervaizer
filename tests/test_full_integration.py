@@ -12,6 +12,7 @@ from supervaizer import (
     Account,
     Agent,
     AgentMethod,
+    AgentMethods,
     Job,
     Parameter,
     ParametersSetup,
@@ -33,18 +34,14 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     )
 
     # Define the secrets expected by the agent
-    agent_parameters = ParametersSetup.from_list(
-        [
-            Parameter(
-                name="OPEN_API_KEY",
-                description="OpenAPI Key",
-                is_environment=True,
-            ),
-            Parameter(
-                name="SERPER_API", description="Server API key", is_environment=True
-            ),
-        ]
-    )
+    agent_parameters = ParametersSetup.from_list([
+        Parameter(
+            name="OPEN_API_KEY",
+            description="OpenAPI Key",
+            is_environment=True,
+        ),
+        Parameter(name="SERPER_API", description="Server API key", is_environment=True),
+    ])
 
     job_start_method = AgentMethod(
         name="start",
@@ -91,10 +88,12 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
         urls={"dev": "http://host.docker.internal:8001", "prod": ""},
         active_environment="dev",
         tags=["testtag", "testtag2"],
-        job_start_method=job_start_method,
-        job_stop_method=job_stop_method,
-        job_status_method=job_status_method,
-        custom_methods={"custom1": custom_method},
+        methods=AgentMethods(
+            job_start=job_start_method,
+            job_stop=job_stop_method,
+            job_status=job_status_method,
+            custom={"custom1": custom_method},
+        ),
         parameters_setup=agent_parameters,
     )
 

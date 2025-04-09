@@ -11,6 +11,7 @@ from .agent import (
     AgentCustomMethodParams,
     AgentMethod,
     AgentMethodParams,
+    AgentMethods,
 )
 from .case import Case, CaseNode, CaseNodeUpdate, CaseStatus
 from .common import ApiError, ApiResult, ApiSuccess
@@ -22,7 +23,7 @@ from .event import (
     EventType,
     ServerRegisterEvent,
 )
-from .job import Job, JobConditions, JobContext, JobResponse, JobStatus
+from .job import Job, JobInstructions, JobContext, JobResponse, JobStatus
 from .parameter import Parameter, Parameters, ParametersSetup
 from .server import Server
 from .server_utils import ErrorResponse, ErrorType, create_error_response
@@ -30,7 +31,7 @@ from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, Telemetr
 
 __all__ = [
     "Agent",
-    "AgentMethod",
+    "AgentMethods",
     "Server",
     "Account",
     "Telemetry",
@@ -50,7 +51,7 @@ __all__ = [
     "Job",
     "JobStatus",
     "JobContext",
-    "JobConditions",
+    "JobInstructions",
     "Case",
     "CaseNodeUpdate",
     "CaseNode",

@@ -255,12 +255,12 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
-    AgentJobModel = agent.job_start_method.job_model  # type: ignore
+    AgentJobModel = agent.methods.job_start.job_model  # type: ignore
 
     @router.post(
         "/jobs",
         summary=f"Start a job with agent: {agent.name}",
-        description=f"{agent.job_start_method.description}",
+        description=f"{agent.methods.job_start.description}",
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": Job},
             http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
@@ -426,13 +426,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         log.info(
             f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
         )
-        if not (agent.custom_methods and params.method_name in agent.custom_methods):
+        if not (agent.methods.custom and params.method_name in agent.methods.custom):
             raise HTTPException(
                 status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
                 detail="Custom method not found",
             )
 
-        method = agent.custom_methods[params.method_name]
+        method = agent.methods.custom[params.method_name]
         result = method(params.params) if callable(method) else method
         log.debug(f"Custom method result: {result}")
 
@@ -442,6 +442,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             version=agent.version,
             api_path=agent.path,
             description=agent.description,
+            methods=agent.methods,
         )
 
     return router

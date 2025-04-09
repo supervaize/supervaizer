@@ -25,13 +25,15 @@ AGENT_INFO_EXAMPLE = {
     "tags": None,
     "uri": "agent:LMKyPAS2Q8sKWBY34DS37a",
     "slug": "agentname",
-    "job_start_method": AGENT_METHOD_EXAMPLE,
-    "job_stop_method": AGENT_METHOD_EXAMPLE,
-    "job_status_method": AGENT_METHOD_EXAMPLE,
-    "chat_method": AGENT_METHOD_EXAMPLE,
-    "custom_methods": {
-        "method1": AGENT_METHOD_EXAMPLE,
-        "method2": AGENT_METHOD_EXAMPLE,
+    "methods": {
+        "job_start": AGENT_METHOD_EXAMPLE,
+        "job_stop": AGENT_METHOD_EXAMPLE,
+        "job_status": AGENT_METHOD_EXAMPLE,
+        "chat": None,
+        "custom": {
+            "method1": AGENT_METHOD_EXAMPLE,
+            "method2": AGENT_METHOD_EXAMPLE,
+        },
     },
     "parameters_setup": {
         "parameters": [
@@ -174,78 +176,84 @@ EVENT_REGISTER_SERVER_PAYLOAD = {
                 "description": "This is a test agent",
                 "path": "/agents/competitor-summary",
                 "tags": ["testtag", "testtag2"],
-                "job_start_method": {
-                    "name": "start",
-                    "method": "control.example_synchronous_job_start",
-                    "params": {"action": "start"},
-                    "fields": [
-                        {
-                            "name": "full_name",
-                            "field_type": "CharField",
-                            "max_length": 100,
-                            "required": True,
-                        },
-                        {"name": "age", "field_type": "IntegerField", "required": True},
-                        {
-                            "name": "subscribe",
-                            "field_type": "BooleanField",
-                            "required": False,
-                        },
-                        {
-                            "name": "gender",
-                            "field_type": "ChoiceField",
-                            "choices": [["M", "Male"], ["F", "Female"]],
-                            "widget": "RadioSelect",
-                            "required": True,
-                        },
-                        {
-                            "name": "bio",
-                            "field_type": "CharField",
-                            "widget": "Textarea",
-                            "required": False,
-                        },
-                        {
-                            "name": "country",
-                            "field_type": "ChoiceField",
-                            "choices": [["US", "United States"], ["CA", "Canada"]],
-                            "required": True,
-                        },
-                        {
-                            "name": "languages",
-                            "field_type": "MultipleChoiceField",
-                            "choices": [
-                                ["en", "English"],
-                                ["fr", "French"],
-                                ["es", "Spanish"],
-                            ],
-                            "required": False,
-                        },
-                    ],
-                    "description": "Start the collection of new competitor summary",
-                },
-                "job_stop_method": {
-                    "name": "stop",
-                    "method": "control.stop",
-                    "params": {"action": "stop"},
-                    "fields": [],
-                    "description": "Stop the agent",
-                },
-                "job_status_method": {
-                    "name": "status",
-                    "method": "hello.mystatus",
-                    "params": {"status": "statusvalue"},
-                    "fields": [],
-                    "description": "Get the status of the agent",
-                },
-                "chat_method": None,
-                "custom_methods": {
-                    "custom1": {
-                        "name": "custom",
-                        "method": "control.custom",
-                        "params": {"action": "custom"},
+                "methods": {
+                    "job_start": {
+                        "name": "start",
+                        "method": "control.example_synchronous_job_start",
+                        "params": {"action": "start"},
+                        "fields": [
+                            {
+                                "name": "full_name",
+                                "field_type": "CharField",
+                                "max_length": 100,
+                                "required": True,
+                            },
+                            {
+                                "name": "age",
+                                "field_type": "IntegerField",
+                                "required": True,
+                            },
+                            {
+                                "name": "subscribe",
+                                "field_type": "BooleanField",
+                                "required": False,
+                            },
+                            {
+                                "name": "gender",
+                                "field_type": "ChoiceField",
+                                "choices": [["M", "Male"], ["F", "Female"]],
+                                "widget": "RadioSelect",
+                                "required": True,
+                            },
+                            {
+                                "name": "bio",
+                                "field_type": "CharField",
+                                "widget": "Textarea",
+                                "required": False,
+                            },
+                            {
+                                "name": "country",
+                                "field_type": "ChoiceField",
+                                "choices": [["US", "United States"], ["CA", "Canada"]],
+                                "required": True,
+                            },
+                            {
+                                "name": "languages",
+                                "field_type": "MultipleChoiceField",
+                                "choices": [
+                                    ["en", "English"],
+                                    ["fr", "French"],
+                                    ["es", "Spanish"],
+                                ],
+                                "required": False,
+                            },
+                        ],
+                        "description": "Start the collection of new competitor summary",
+                    },
+                    "job_stop": {
+                        "name": "stop",
+                        "method": "control.stop",
+                        "params": {"action": "stop"},
                         "fields": [],
-                        "description": "Custom method",
-                    }
+                        "description": "Stop the agent",
+                    },
+                    "job_status_method": {
+                        "name": "status",
+                        "method": "hello.mystatus",
+                        "params": {"status": "statusvalue"},
+                        "fields": [],
+                        "description": "Get the status of the agent",
+                    },
+                    "chat_method": None,
+                    "custom_methods": {
+                        "custom1": {
+                            "name": "custom",
+                            "method": "control.custom",
+                            "params": {"action": "custom"},
+                            "fields": [],
+                            "description": "Custom method",
+                        }
+                    },
                 },
                 "parameters_setup": [
                     {
@@ -283,7 +291,7 @@ JOB_START_PARAMS_EXAMPLE = {
         "mission_id": "string",
         "mission_name": "string",
         "mission_context": "string",
-        "job_conditions": {
+        "job_instructions": {
             "max_cases": 0,
             "max_duration": 0,
             "max_cost": 0,

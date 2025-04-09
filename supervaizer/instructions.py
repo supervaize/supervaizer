@@ -98,7 +98,7 @@ sv_account = Account(
     api_url=os.getenv("SUPERVAIZE_API_URL"),
     )
 
-job_start_method = AgentMethod(
+job_start = AgentMethod(
     name="job_start",
     method="control.job_start",
     params={"action": "run"},

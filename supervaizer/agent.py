@@ -177,6 +177,26 @@ class AgentCustomMethodParams(AgentMethodParams):
     method_name: str
 
 
+class AgentMethods(BaseModel):
+    job_start: AgentMethod
+    job_stop: AgentMethod
+    job_status: AgentMethod
+    chat: AgentMethod | None = None
+    custom: dict[str, AgentMethod] | None = None
+
+    def registration_info(self) -> Dict[str, Any]:
+        return {
+            "job_start": self.job_start.registration_info,
+            "job_stop": self.job_stop.registration_info,
+            "job_status": self.job_status.registration_info,
+            "chat": self.chat.registration_info if self.chat else None,
+            "custom": {
+                name: method.registration_info
+                for name, method in (self.custom or {}).items()
+            },
+        }
+
+
 class AgentModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     name: str
@@ -188,11 +208,7 @@ class AgentModel(SvBaseModel):
     version: str
     description: str
     tags: list[str] | None = None
-    job_start_method: AgentMethod
-    job_stop_method: AgentMethod
-    job_status_method: AgentMethod
-    chat_method: AgentMethod | None = None
-    custom_methods: dict[str, AgentMethod] | None = None
+    methods: AgentMethods
     parameters_setup: ParametersSetup | None = None
     server_agent_id: str | None = None
     server_agent_status: str | None = None
@@ -233,16 +249,7 @@ class Agent(AgentModel):
             "description": self.description,
             "api_path": self.path,
             "tags": self.tags,
-            "job_start_method": self.job_start_method.registration_info,
-            "job_stop_method": self.job_stop_method.registration_info,
-            "job_status_method": self.job_status_method.registration_info,
-            "chat_method": self.chat_method.registration_info
-            if self.chat_method
-            else None,
-            "custom_methods": {
-                name: method.registration_info
-                for name, method in (self.custom_methods or {}).items()
-            },
+            "methods": self.methods.registration_info(),
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,
@@ -339,8 +346,8 @@ class Agent(AgentModel):
         )
 
         # Execute the method
-        action = self.job_start_method.method
-        method_params = self.job_start_method.params or {}
+        action = self.methods.job_start.method
+        method_params = self.methods.job_start.params or {}
         params = method_params | {"fields": job_fields} | {"context": context}
         try:
             result = self._execute(action, params)
@@ -368,36 +375,36 @@ class Agent(AgentModel):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
-        method = self.job_stop_method.method
-        method_params = self.job_stop_method.params or {}
+        method = self.methods.job_stop.method
+        method_params = self.methods.job_stop.params or {}
         return self._execute(method, method_params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
-        method = self.job_status_method.method
-        method_params = self.job_status_method.params or {}
+        method = self.methods.job_status.method
+        method_params = self.methods.job_status.params or {}
         return self._execute(method, method_params)
 
     def chat(self, context: str, message: str) -> Any:
-        if not self.chat_method:
+        if not self.methods.chat:
             raise ValueError("Chat method not configured")
-        method = self.chat_method.method
+        method = self.methods.chat.method
         params = {"context": context, "message": message}
         return self._execute(method, params)
 
     def custom(self, method: str, params: Dict[str, Any] = {}) -> Any:
         """Tested in tests/test_agent.py"""
-        if not self.custom_methods:
+        if not self.methods.custom:
             raise ValueError("No custom methods configured")
-        if method not in self.custom_methods:
+        if method not in self.methods.custom:
             raise ValueError(f"Method {method} not found")
-        custom_method = self.custom_methods[method]
+        custom_method = self.methods.custom[method]
         method_params = custom_method.params or {}
         return self._execute(custom_method.method, method_params)
 
     @property
     def custom_methods_names(self) -> list[str] | None:
-        if self.custom_methods:
-            return list(self.custom_methods.keys())
+        if self.methods.custom:
+            return list(self.methods.custom.keys())
         return None
 
 
@@ -414,11 +421,7 @@ class AgentResponse(BaseModel):
     api_path: str
     description: str
     tags: Optional[list[str]] = None
-    job_start_method: Optional[Dict[str, Any]] = None
-    job_stop_method: Optional[Dict[str, Any]] = None
-    job_status_method: Optional[Dict[str, Any]] = None
-    chat_method: Optional[Dict[str, Any]] = None
-    custom_methods: Optional[Dict[str, Dict[str, Any]]] = None
+    methods: AgentMethods
     parameters_setup: Optional[List[Dict[str, Any]]] = None
     server_agent_id: Optional[str] = None
     server_agent_status: Optional[str] = None

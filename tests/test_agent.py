@@ -13,7 +13,7 @@ from typing import Any, Dict
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaizer import Agent, AgentMethod, ApiSuccess, Server
+from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
 from supervaizer.job import Job, JobContext
 from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -29,13 +29,13 @@ def test_agent_method_fixture(agent_method_fixture: AgentMethod) -> None:
 
 def test_agent(agent_fixture: Agent) -> None:
     assert isinstance(agent_fixture, Agent)
-    assert isinstance(agent_fixture.job_start_method, AgentMethod)
-    assert isinstance(agent_fixture.job_stop_method, AgentMethod)
-    assert isinstance(agent_fixture.job_status_method, AgentMethod)
-    assert isinstance(agent_fixture.chat_method, AgentMethod)
-    assert isinstance(agent_fixture.custom_methods, dict)
-    assert isinstance(agent_fixture.custom_methods["method1"], AgentMethod)
-    assert isinstance(agent_fixture.custom_methods["method2"], AgentMethod)
+    assert isinstance(agent_fixture.methods.job_start, AgentMethod)
+    assert isinstance(agent_fixture.methods.job_stop, AgentMethod)
+    assert isinstance(agent_fixture.methods.job_status, AgentMethod)
+    assert agent_fixture.methods.chat is None
+    assert isinstance(agent_fixture.methods.custom, dict)
+    assert isinstance(agent_fixture.methods.custom["method1"], AgentMethod)
+    assert isinstance(agent_fixture.methods.custom["method2"], AgentMethod)
 
 
 def test_account_error(agent_method_fixture: AgentMethod) -> None:
@@ -50,16 +50,18 @@ def test_account_error(agent_method_fixture: AgentMethod) -> None:
             developer="Dev",
             version="1.0.0",
             description="description",
-            job_start_method=agent_method_fixture,
-            job_stop_method=agent_method_fixture,
-            job_status_method=agent_method_fixture,
-            chat_method=agent_method_fixture,
-            custom_methods={"method1": agent_method_fixture},
+            methods=AgentMethods(
+                job_start=agent_method_fixture,
+                job_stop=agent_method_fixture,
+                job_status=agent_method_fixture,
+                chat=None,
+                custom={"method1": agent_method_fixture},
+            ),
         )
 
 
 def test_agent_custom_methods(agent_fixture: Agent) -> None:
-    assert agent_fixture.custom_methods_names == ["method1", "method2"]
+    assert list(agent_fixture.methods.custom.keys()) == ["method1", "method2"]
 
 
 def test_fields_annotations_dynamic_model() -> None:
@@ -388,7 +390,7 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
         mission_id="test-mission-id",
         mission_name="test-mission-name",
         mission_context=None,
-        job_conditions=None,
+        job_instructions=None,
     )
 
     # Test with valid fields
@@ -406,4 +408,4 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
     assert job.supervaize_context.mission_id == "test-mission-id"
     assert job.supervaize_context.mission_name == "test-mission-name"
     assert job.supervaize_context.mission_context is None
-    assert job.supervaize_context.job_conditions is None
+    assert job.supervaize_context.job_instructions is None

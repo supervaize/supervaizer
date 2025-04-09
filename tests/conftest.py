@@ -16,6 +16,7 @@ from supervaizer import (
     Account,
     Agent,
     AgentMethod,
+    AgentMethods,
     Case,
     CaseNode,
     CaseNodeUpdate,
@@ -157,14 +158,13 @@ def agent_fixture(
         developer="Dev",
         version="1.0.0",
         description="description",
-        job_start_method=agent_method_fixture,
-        job_stop_method=agent_method_fixture,
-        job_status_method=agent_method_fixture,
-        chat_method=agent_method_fixture,
-        custom_methods={
-            "method1": agent_method_fixture,
-            "method2": agent_method_fixture,
-        },
+        methods=AgentMethods(
+            job_start=agent_method_fixture,
+            job_stop=agent_method_fixture,
+            job_status=agent_method_fixture,
+            chat=None,
+            custom={"method1": agent_method_fixture, "method2": agent_method_fixture},
+        ),
         parameters_setup=parameters_setup_fixture,
     )
 

@@ -81,7 +81,7 @@ class Jobs:
         return any(job_id in jobs for jobs in self.jobs_by_agent.values())
 
 
-class JobConditions(SvBaseModel):
+class JobInstructions(SvBaseModel):
     max_cases: int | None = None
     max_duration: int | None = None  # in seconds
     max_cost: float | None = None
@@ -120,7 +120,7 @@ class JobContext(SvBaseModel):
     mission_id: str
     mission_name: str
     mission_context: Any = None
-    job_conditions: Optional[JobConditions] = None
+    job_instructions: Optional[JobInstructions] = None
 
 
 class JobStatus(str, Enum):
@@ -153,17 +153,14 @@ class JobResponse(SvBaseModel):
             error_message = str(error)
             error_traceback = traceback.format_exc()
         else:
-            error_message = error_traceback = None
-
-        super().__init__(
-            job_id=job_id,
-            status=status,
-            message=message,
-            payload=payload,
-            error_message=error_message,
-            error_traceback=error_traceback,
-            **kwargs,
-        )
+            error_message = error_traceback = ""
+        kwargs["job_id"] = job_id
+        kwargs["status"] = status
+        kwargs["message"] = message
+        kwargs["payload"] = payload
+        kwargs["error_message"] = error_message
+        kwargs["error_traceback"] = error_traceback
+        super().__init__(**kwargs)
 
         if self.error_message:
             log.error(
