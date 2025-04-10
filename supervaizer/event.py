@@ -68,8 +68,7 @@ class Event(EventModel):
         return {
             "name": f"{self.type.value} {self.source}",
             "source": f"{self.source}",
-            "account": f"{self.account.id}",
-            "workspace": f"{self.account.workspace}",
+            "workspace_id": f"{self.account.workspace_id}",
             "event_type": f"{self.type.value}",
             "details": self.details,
         }

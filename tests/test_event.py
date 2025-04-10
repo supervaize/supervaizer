@@ -28,8 +28,7 @@ def test_event(event_fixture: Event) -> None:
     assert list(event_fixture.payload.keys()) == [
         "name",
         "source",
-        "account",
-        "workspace",
+        "workspace_id",
         "event_type",
         "details",
     ]

@@ -18,18 +18,7 @@ from . import AUTH_ERROR_RESPONSE, SERVER_REGISTER_RESPONSE, WAKEUP_EVENT_RESPON
 
 def test_account(account_fixture: Account) -> None:
     assert isinstance(account_fixture, Account)
-    assert account_fixture.name == "CUSTOMERFIRST"
-    assert account_fixture.id == "o34Z484gY9Nxz8axgTAdiH"
-
-
-def test_account_error() -> None:
-    with pytest.raises(ValueError):
-        Account(
-            name="CUSTOMERFIRST",
-            id="NOTWORKING",
-            api_key="1234567890",
-            api_url="https://supervaize.com",
-        )
+    assert account_fixture.workspace_id == "o34Z484gY9Nxz8axgTAdiH"
 
 
 def test_account_api_headers(account_fixture: Account) -> None:

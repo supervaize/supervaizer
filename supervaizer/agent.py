@@ -30,7 +30,7 @@ class AgentJobContextBase(BaseModel):
     job_fields: Dict[str, Any]
 
 
-class AgentMethod(BaseModel):
+class AgentMethodModel(BaseModel):
     """
     Represents a method that can be called on an agent.
 
@@ -94,6 +94,8 @@ class AgentMethod(BaseModel):
     fields: List[Dict[str, Any]] | None = None
     description: str | None = None
 
+
+class AgentMethod(AgentMethodModel):
     @property
     def fields_definitions(self) -> list[Dict[str, Any]]:
         """
@@ -177,13 +179,15 @@ class AgentCustomMethodParams(AgentMethodParams):
     method_name: str
 
 
-class AgentMethods(BaseModel):
+class AgentMethodsModel(BaseModel):
     job_start: AgentMethod
     job_stop: AgentMethod
     job_status: AgentMethod
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
 
+
+class AgentMethods(AgentMethodsModel):
     def registration_info(self) -> Dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
