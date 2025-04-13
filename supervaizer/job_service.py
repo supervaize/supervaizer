@@ -1,6 +1,6 @@
 import json
 from typing import Optional, TYPE_CHECKING, Dict, Any
-from .event import JobStartConfirmationEvent
+from .event import JobStartConfirmationEvent, JobFinishedEvent
 from .common import log, decrypt_value
 from .job import Job
 
@@ -33,17 +33,16 @@ async def service_job_start(
     Returns:
         The created job
     """
-    log.debug(f"[Job start] : {agent.name}")
-    log.debug(f"[Saas Context] : {sv_context}")
-    log.debug(f"[Encrypted agent parameters] : {encrypted_agent_parameters}")
     agent_parameters: dict[str, Any] | None = None
     # If agent has parameters_setup defined, validate parameters
     if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-
-        agent_parameters = json.loads(agent_parameters_str)
+        print(f"[Agent parameters] : {agent_parameters_str}")
+        agent_parameters = (
+            json.loads(agent_parameters_str) if agent_parameters_str else None
+        )
         log.debug(
             f"[Decrypted parameters] : {agent_parameters} - TO REMOVE"
         )  # TODO remove log
@@ -59,9 +58,29 @@ async def service_job_start(
         job=new_saas_job,
         account=account,
     )
-    # Schedule the background execution
-    background_tasks.add_task(agent.job_start, new_saas_job, job_fields, sv_context)
+    # Start the background execution
+    background_tasks.add_task(
+        agent.job_start, new_saas_job, job_fields, sv_context, server
+    )
 
     account.send_event(sender=new_saas_job, event=event)
 
     return new_saas_job
+
+
+def service_job_finished(job: Job, server: "Server") -> None:
+    """
+    Service to handle the completion of a job.
+
+    Args:
+        job: The job that has finished
+        server: The server instance
+
+    Tested in tests/test_job_service.py
+    """
+    account = server.account
+    event = JobFinishedEvent(
+        job=job,
+        account=account,
+    )
+    account.send_event(sender=job, event=event)

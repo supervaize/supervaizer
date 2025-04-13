@@ -23,7 +23,7 @@ class EventType(str, Enum):
     AGENT_SEND_ANOMALY = "agent.anomaly"
     INTERMEDIARY = "agent.intermediary"
     JOB_START_CONFIRMATION = "agent.job.start.confirmation"
-    JOB_END = "agent.job.end"
+    JOB_FINISHED = "agent.job.finished"
     JOB_STATUS = "agent.job.status"
     JOB_RESULT = "agent.job.result"
     JOB_ERROR = "agent.job.error"
@@ -112,10 +112,20 @@ class JobStartConfirmationEvent(Event):
     def __init__(
         self,
         job: "Job",
-        account: Any,
+        account: Any,  # Use Any to avoid type resolution issues
     ) -> None:
         super().__init__(
             type=EventType.JOB_START_CONFIRMATION,
+            account=account,
+            source=job.id,
+            details=job.to_dict,
+        )
+
+
+class JobFinishedEvent(Event):
+    def __init__(self, job: "Job", account: Any) -> None:
+        super().__init__(
+            type=EventType.JOB_FINISHED,
             account=account,
             source=job.id,
             details=job.to_dict,
@@ -139,7 +149,7 @@ class CaseUpdateEvent(Event):
         self,
         case: "Case",
         account: Any,
-        update: "CaseNodeUpdate",  # Use Any to avoid type resolution issues
+        update: "CaseNodeUpdate",
     ) -> None:
         super().__init__(
             type=EventType.CASE_UPDATE,

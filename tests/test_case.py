@@ -7,6 +7,7 @@
 
 from supervaizer import Account
 from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
+import pytest
 
 
 def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:
@@ -108,6 +109,7 @@ def test_case_close(
     assert mock_send_event.call_count == 1
 
 
+@pytest.mark.asyncio
 async def test_case_close_without_final_cost(
     account_fixture: Account, respx_mock, case_fixture: Case, mocker
 ) -> None:
@@ -132,7 +134,9 @@ async def test_case_close_without_final_cost(
     )
 
     # Mock the account's send_event method to prevent actual API calls
-    mocker.patch.object(account_fixture, "send_event", return_value=None)
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
 
     # Execute
     case.close(case_result=case_result, final_cost=None)
@@ -141,3 +145,5 @@ async def test_case_close_without_final_cost(
     assert case.status == CaseStatus.COMPLETED
     assert case.total_cost == 8.0  # Sum of update costs
     assert case.final_delivery == case_result
+
+    assert mock_send_event.call_count == 1

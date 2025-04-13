@@ -42,10 +42,9 @@ def send_event(
         Tested in tests/test_account_service.py
     """
 
-    # log.debug(f"Sending event {event.type.name} to {account.url_event}")
     headers = account.api_headers
     payload = event.payload
-    log.debug(f"Sending event {event.type.name} to {account.url_event}")
+    log.debug(f"[Send event] <{event.type.name}> to <{account.url_event}>")
     try:
         response = httpx.post(account.url_event, headers=headers, json=payload)
         response.raise_for_status()
@@ -61,7 +60,7 @@ def send_event(
             payload=event.payload,
             exception=e,
         )
-        log.error(f"Error details: {error_result.dict}")
+        log.error(f"[Send event] Error details: {error_result.dict}")
         log.error(error_result.log_message)
         raise e
     return result

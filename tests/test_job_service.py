@@ -53,7 +53,7 @@ async def test_service_job_start_without_parameters(
 
     # Assert background_tasks.add_task was called
     background_tasks.add_task.assert_called_once_with(
-        agent_fixture.job_start, mock_job, job_fields, context_fixture
+        agent_fixture.job_start, mock_job, job_fields, context_fixture, server_fixture
     )
 
     # Assert an event was sent to the account
@@ -87,7 +87,8 @@ async def test_service_job_start_with_parameters(
 
     # Mock decrypt from common module
     mock_decrypt_value = mocker.patch(
-        "supervaizer.job_service.decrypt_value", return_value="decrypted_string"
+        "supervaizer.job_service.decrypt_value",
+        return_value='{"test":"decrypted_string"}',
     )
 
     # Mock account send_event to avoid actual API calls
@@ -114,12 +115,12 @@ async def test_service_job_start_with_parameters(
     mock_job_new.assert_called_once_with(
         supervaize_context=context_fixture,
         agent_name=agent_fixture.name,
-        parameters="decrypted_string",
+        parameters={"test": "decrypted_string"},
     )
 
     # Assert background_tasks.add_task was called
     background_tasks.add_task.assert_called_once_with(
-        agent_fixture.job_start, mock_job, job_fields, context_fixture
+        agent_fixture.job_start, mock_job, job_fields, context_fixture, server_fixture
     )
 
     # Assert an event was sent to the account
@@ -129,7 +130,6 @@ async def test_service_job_start_with_parameters(
     assert result == mock_job
 
 
-@pytest.mark.current
 @pytest.mark.asyncio
 async def test_service_job_start_event_sending(
     server_fixture, agent_fixture, context_fixture, mocker
@@ -168,6 +168,39 @@ async def test_service_job_start_event_sending(
 
     # Assert JobStartConfirmationEvent was created correctly
     mock_event_class.assert_called_once()
+
+    # Assert the event was sent to the account
+    mock_send_event.assert_called_once()
+
+
+@pytest.mark.current
+def test_service_job_finished(server_fixture, mocker):
+    """Test service_job_finished function correctly sends the JobFinishedEvent."""
+    # Create a mock job
+    mock_job = mocker.MagicMock(spec=Job)
+    mock_job.id = "test-job-id"
+
+    # Mock JobFinishedEvent
+    mock_event = mocker.MagicMock()
+    mock_event_class = mocker.patch("supervaizer.job_service.JobFinishedEvent")
+    mock_event_class.return_value = mock_event
+
+    # Mock account send_event to avoid actual API calls
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
+
+    # Import service_job_finished here to ensure mocks are in place
+    from supervaizer.job_service import service_job_finished
+
+    # Call the function
+    service_job_finished(job=mock_job, server=server_fixture)
+
+    # Assert JobFinishedEvent was created correctly
+    mock_event_class.assert_called_once_with(
+        job=mock_job,
+        account=server_fixture.account,
+    )
 
     # Assert the event was sent to the account
     mock_send_event.assert_called_once()

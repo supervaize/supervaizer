@@ -216,7 +216,9 @@ class Server(ServerModel):
                 log_level.lower()
             )  # needs to be lower case of uvicorn and uppercase of loguru
 
-        log.info(f"Starting Supervaize Control API v{VERSION} - Log : {log_level} ")
+        log.info(
+            f"[Server launch] Starting Supervaize Control API v{VERSION} - Log : {log_level} "
+        )
 
         # self.instructions()
 
@@ -230,7 +232,7 @@ class Server(ServerModel):
         for agent in self.agents:
             updated_agent = agent.update_agent_from_server(self)
             if updated_agent:
-                log.info(f"Updated agent {updated_agent.name}")
+                log.info(f"[Server launch] Updated agent {updated_agent.name}")
         import uvicorn
 
         uvicorn.run(

@@ -9,7 +9,6 @@ import base64
 import json
 import os
 import traceback
-from datetime import datetime
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 import demjson3
@@ -17,7 +16,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from loguru import logger
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 log = logger.bind(module="supervaize")
 
@@ -28,8 +27,6 @@ class SvBaseModel(BaseModel):
     """
     Base model for all Supervaize models.
     """
-
-    model_config = ConfigDict(json_encoders={datetime: lambda x: x.isoformat()})
 
     @property
     def to_dict(self) -> Dict[str, Any]:
@@ -72,7 +69,8 @@ class ApiSuccess(ApiResult):
     ApiSuccess is a class that extends ApiResult.
     It is used to return a success response from the API.
 
-    If the detail is a string, it is decoded as a JSON object: Expects a JSON object with a key "object" and a value of the JSON object to return.
+    If the detail is a string, it is decoded as a JSON object: Expects a JSON object with a
+    key "object" and a value of the JSON object to return.
     If the detail is a dictionary, it is used as is.
 
 

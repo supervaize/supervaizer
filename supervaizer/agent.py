@@ -12,6 +12,8 @@ import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
 
+from supervaizer.job_service import service_job_finished
+
 from .__version__ import VERSION
 from .common import ApiSuccess, SvBaseModel, log
 from .job import Job, JobContext, JobResponse, JobStatus
@@ -93,6 +95,7 @@ class AgentMethodModel(BaseModel):
     params: Dict[str, Any] | None = None
     fields: List[Dict[str, Any]] | None = None
     description: str | None = None
+    is_async: bool = False
 
 
 class AgentMethod(AgentMethodModel):
@@ -319,17 +322,27 @@ class Agent(AgentModel):
 
         return self
 
-    def _execute(self, action: str, params: Dict[str, Any] = {}) -> Any:
+    def _execute(self, action: str, params: Dict[str, Any] = {}) -> JobResponse:
+        """
+        Execute an agent method and return a JobResponse
+        """
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
         log.debug(f"[Agent method] {method.__name__} with params {params}")
-        return method(
-            **params,
-        )
+        result = method(**params)
+        if not isinstance(result, JobResponse):
+            raise TypeError(
+                f"Method {func_name} must return a JobResponse object, got {type(result).__name__}"
+            )
+        return result
 
     def job_start(
-        self, job: Job, job_fields: Dict[str, Any], context: JobContext
+        self,
+        job: Job,
+        job_fields: Dict[str, Any],
+        context: JobContext,
+        server: "Server",
     ) -> Job:
         """Execute the agent's start method in the background
 
@@ -340,7 +353,9 @@ class Agent(AgentModel):
         Returns:
             Job: The updated job instance
         """
-
+        log.debug(
+            f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
+        )
         # Mark job as in progress when execution starts
         job.add_response(
             JobResponse(
@@ -356,15 +371,22 @@ class Agent(AgentModel):
         method_params = self.methods.job_start.params or {}
         params = method_params | {"fields": job_fields} | {"context": context}
         try:
-            result = self._execute(action, params)
-            # Store result and mark as completed
-            job_response = JobResponse(
-                job_id=job.id,
-                status=JobStatus.COMPLETED,
-                message="Job completed successfully",
-                payload=result,
-            )
-
+            if self.methods.job_start.is_async:
+                # TODO: Implement async job execution & test
+                started = self._execute(action, params)
+                job_response = JobResponse(
+                    job_id=job.id,
+                    status=JobStatus.IN_PROGRESS,
+                    message="Job started ",
+                    payload={"intermediary_deliverable": started},
+                )
+            else:
+                job_response = self._execute(action, params)
+                if job_response.status == JobStatus.COMPLETED:
+                    job.add_response(job_response)
+                    service_job_finished(job, server=server)
+                else:
+                    job.add_response(job_response)
         except Exception as e:
             # Handle any execution errors
             error_msg = f"Job execution failed: {str(e)}"
@@ -375,8 +397,6 @@ class Agent(AgentModel):
                 payload=None,
                 error=e,
             )
-
-        job.add_response(job_response)
 
         return job
 

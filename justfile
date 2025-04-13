@@ -82,3 +82,4 @@ unicorn:
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
+

@@ -148,7 +148,8 @@ class JobResponse(SvBaseModel):
         error: Optional[Exception] = None,
         **kwargs: Any,
     ) -> None:
-        if error is not None:
+        if error:
+            log.error(f"[Job Response] Got and error : {error}")
             error_message = str(error)
             error_traceback = traceback.format_exc()
         else:
@@ -161,9 +162,9 @@ class JobResponse(SvBaseModel):
         kwargs["error_traceback"] = error_traceback
         super().__init__(**kwargs)
 
-        if self.error_message:
+        if error:
             log.error(
-                f"Job execution failed - Job ID {self.job_id}: {self.error_message}"
+                f"[Job Response] Execution failed - Job ID <{self.job_id}>: {self.error_message}"
             )
             log.error(self.error_traceback)
 

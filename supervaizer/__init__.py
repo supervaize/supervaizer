@@ -17,11 +17,13 @@ from .case import Case, CaseNode, CaseNodeUpdate, CaseStatus
 from .common import ApiError, ApiResult, ApiSuccess
 from .event import (
     AgentRegisterEvent,
-    CaseStartEvent,
     CaseUpdateEvent,
+    JobFinishedEvent,
+    JobStartConfirmationEvent,
     Event,
     EventType,
     ServerRegisterEvent,
+    CaseStartEvent,
 )
 from .job import Job, JobInstructions, JobContext, JobResponse, JobStatus
 from .parameter import Parameter, Parameters, ParametersSetup
@@ -66,6 +68,8 @@ __all__ = [
     "ErrorResponse",
     "ErrorType",
     "create_error_response",
+    "JobFinishedEvent",
+    "JobStartConfirmationEvent",
 ]
 
 # Rebuild models to resolve forward references after all imports are done

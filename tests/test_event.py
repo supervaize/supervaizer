@@ -15,9 +15,12 @@ from supervaizer import (
     CaseUpdateEvent,
     Event,
     EventType,
+    JobFinishedEvent,
+    JobStartConfirmationEvent,
     Server,
     ServerRegisterEvent,
 )
+from supervaizer.job import Job
 
 
 def test_event(event_fixture: Event) -> None:
@@ -88,3 +91,24 @@ def test_case_update_event(
     assert case_update_event.type == EventType.CASE_UPDATE
     assert case_update_event.source.split(":")[0] == "case"
     assert case_update_event.details == case_node_update_fixture.to_dict
+
+
+def test_job_start_confirmation_event(
+    job_fixture: Job, account_fixture: Account
+) -> None:
+    job_start_confirmation_event = JobStartConfirmationEvent(
+        job=job_fixture,
+        account=account_fixture,
+    )
+    assert isinstance(job_start_confirmation_event, JobStartConfirmationEvent)
+    assert job_start_confirmation_event.type == EventType.JOB_START_CONFIRMATION
+    assert job_start_confirmation_event.source.split(":")[0] == "test-job-id"
+    assert job_start_confirmation_event.details == job_fixture.to_dict
+
+
+def test_job_finished_event(job_fixture: Job, account_fixture: Account) -> None:
+    job_finished_event = JobFinishedEvent(
+        job=job_fixture,
+        account=account_fixture,
+    )
+    assert isinstance(job_finished_event, JobFinishedEvent)
