@@ -13,7 +13,6 @@ from typing import Any, ClassVar, Optional
 
 from .__version__ import VERSION
 from .common import SvBaseModel, log, singleton
-from .parameter import Parameters
 
 
 @singleton
@@ -206,14 +205,14 @@ class Job(JobModel):
         cls,
         supervaize_context: "JobContext",
         agent_name: str,
-        parameters: Optional[Parameters] = None,
+        parameters: Optional[dict[str, Any]] = None,
     ) -> "Job":
         """Create a new job
 
         Args:
             supervaize_context (JobContext): The context of the job
             agent_name (str): The name of the agent
-            parameters (Parameters | None): Optional parameters for the job
+            parameters (dict[str, Any] | None): Optional parameters for the job
 
         Returns:
             Job: The new job

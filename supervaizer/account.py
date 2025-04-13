@@ -7,7 +7,7 @@
 
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 
-import requests
+import httpx
 
 from .__version__ import TELEMETRY_VERSION, VERSION
 from .common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from .case import Case, CaseNodeUpdate
     from .event import Event
     from .server import Server
+    from .job import Job
 
 
 class AccountModel(SvBaseModel):
@@ -62,7 +63,9 @@ class Account(AccountModel):
         return f"{self.api_url}/api/v1/ctrl-events/"
 
     def send_event(
-        self, sender: Union["Agent", "Server", "Case", "CaseNodeUpdate"], event: "Event"
+        self,
+        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
+        event: "Event",
     ) -> ApiResult:
         """Send an event to the Supervaize SaaS API.
 
@@ -75,30 +78,10 @@ class Account(AccountModel):
         Raises:
             Request exception if the request fails.
         """
+        # Import here to avoid circular imports
+        from .account_service import send_event as service_send_event
 
-        log.debug(f"Sending event {event.type.name} to {self.url_event}")
-        headers = self.api_headers
-        payload = event.payload
-        try:
-            # log.debug(f"Event payload: {payload}")
-            response = requests.post(self.url_event, headers=headers, json=payload)
-            response.raise_for_status()
-            result = ApiSuccess(
-                message=f"Event {event.type.name} sent", detail=response.text
-            )
-
-            log.success(result.log_message)
-        except requests.exceptions.RequestException as e:
-            error_result = ApiError(
-                message=f"Error sending event {event.type.name}",
-                url=self.url_event,
-                payload=event.payload,
-                exception=e,
-            )
-            log.error(f"Error details: {error_result.dict}")
-            log.error(error_result.log_message)
-            raise e
-        return result
+        return service_send_event(self, sender, event)
 
     def register_server(self, server: "Server") -> ApiResult:
         """Register a server with the Supervaize Control API.
@@ -109,11 +92,15 @@ class Account(AccountModel):
         Returns:
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
+
+        Side effects:
+            - Sends a ServerRegisterEvent to the Supervaize Control API
         """
+        # Import here to avoid circular imports
         from .event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        log.debug(f"Event payload: {event.payload}")
+        log.debug(f"[Event payload] {event.payload}")
         return self.send_event(sender=server, event=event)
 
     def _create_api_result(
@@ -150,15 +137,15 @@ class Account(AccountModel):
         headers = self.api_headers
 
         try:
-            response = requests.get(url, headers=headers)
+            response = httpx.get(url, headers=headers, follow_redirects=True)
             response.raise_for_status()
             return ApiSuccess(
-                message=f"Agent {agent_name or agent_id} retrieved",
+                message=f"GET Agent <{agent_name or agent_id}>",
                 detail=response.json(),
             )
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             return ApiError(
-                message=f"Error getting agent {agent_name or agent_id}",
+                message=f"Error GET Agent <{agent_name or agent_id}>",
                 url=url,
                 payload=None,
                 exception=e,
@@ -175,18 +162,21 @@ class Account(AccountModel):
             ApiResult: ApiSuccess with response details if successful,
                       ApiError with error details if request fails
         """
+        # Import here to avoid circular imports
         from .event import AgentRegisterEvent
 
         event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
         return self.send_event(agent, event)
 
     def send_start_case(self, case: "Case") -> ApiResult:
+        # Import here to avoid circular imports
         from .event import CaseStartEvent
 
         event = CaseStartEvent(case=case, account=self)
         return self.send_event(case, event)
 
     def send_update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
+        # Import here to avoid circular imports
         from .event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)
@@ -207,12 +197,12 @@ class Account(AccountModel):
         payload = {"workspace_id": self.workspace_id} | telemetry.payload
         result: ApiSuccess | ApiError
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            response = httpx.post(url, headers=headers, json=payload)
             response.raise_for_status()
             result = ApiSuccess(
                 message=f"Telemetry sent {telemetry.type.name}", detail=response.text
             )
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             result = ApiError(
                 message=f"Error sending telemetry {telemetry.type.name}",
                 url=url,

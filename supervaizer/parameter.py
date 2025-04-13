@@ -38,7 +38,7 @@ class Parameter(ParameterModel):
         """
         self.value = value
         if self.is_environment:
-            log.debug(f"♻️  Setting environment variable for {self.name}")
+            log.debug(f"[Set Env] {self.name}")
             os.environ[self.name] = value
 
 

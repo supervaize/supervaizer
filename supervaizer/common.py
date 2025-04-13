@@ -33,7 +33,13 @@ class SvBaseModel(BaseModel):
 
     @property
     def to_dict(self) -> Dict[str, Any]:
-        return self.model_dump()
+        """
+        Convert the model to a dictionary.
+
+        Note: Using mode="json" to handle datetime serialization.
+        Tested in tests/test_common.test_sv_base_model_json_conversion
+        """
+        return self.model_dump(mode="json")
 
     @property
     def to_json(self) -> str:
@@ -66,21 +72,26 @@ class ApiSuccess(ApiResult):
     ApiSuccess is a class that extends ApiResult.
     It is used to return a success response from the API.
 
+    If the detail is a string, it is decoded as a JSON object: Expects a JSON object with a key "object" and a value of the JSON object to return.
+    If the detail is a dictionary, it is used as is.
+
+
     Tested in tests/test_common.py
     """
 
     def __init__(
         self, message: str, detail: Optional[Dict[str, Any] | str], code: int = 200
     ):
+        log_message = "✅ "
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
             detail = {"object": result.object}
             id = result.object.get("id") or None
-            log_message = f"✅ {message} : {id}" if id else f"✅ {message}"
+            log_message += f"{message} : {id}" if id else f"{message}"
         else:
             id = None
             detail = detail
-            log_message = f"✅ {message}"
+            log_message += f"{message}"
 
         super().__init__(
             message=message,
@@ -89,6 +100,7 @@ class ApiSuccess(ApiResult):
         )
         self.id: Optional[str] = id
         self.log_message = log_message
+        log.debug(f"[API Success] {self.log_message}")
 
 
 class ApiError(ApiResult):

@@ -5,8 +5,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from requests_mock import Mocker
-
 from supervaizer import Account
 from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
 
@@ -20,12 +18,11 @@ def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:
 
 
 def test_case_start(
-    account_fixture: Account, case_node_fixture: CaseNode, requests_mock: Mocker
+    account_fixture: Account, case_node_fixture: CaseNode, respx_mock, mocker
 ) -> None:
     api_url = account_fixture.api_url
     # mock the start case event response (example for reference only)
-    requests_mock.post(
-        f"{api_url}/api/v1/ctrl-events/",
+    respx_mock.post(f"{api_url}/api/v1/ctrl-events/").respond(
         status_code=200,
         json={
             "id": "01JPZGTY27KFR3Q5P9W2G6NY4E",
@@ -60,6 +57,12 @@ def test_case_start(
             "updated_by": 1,
         },
     )
+
+    # Mock the account service's send_event method and verify it was called
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
+
     new_case = Case.start(
         job_id="job123",
         account=account_fixture,
@@ -69,10 +72,11 @@ def test_case_start(
     )
 
     assert isinstance(new_case, Case)
+    assert mock_send_event.call_count == 1
 
 
 def test_case_close(
-    account_fixture: Account, requests_mock: Mocker, case_fixture: Case
+    account_fixture: Account, respx_mock, case_fixture: Case, mocker
 ) -> None:
     # Setup
     case = case_fixture
@@ -80,14 +84,18 @@ def test_case_close(
     final_cost = 10.0
 
     # simulate successful event update
-    requests_mock.post(
-        f"{account_fixture.api_url}/api/v1/ctrl-events/",
+    respx_mock.post(f"{account_fixture.api_url}/api/v1/ctrl-events/").respond(
         status_code=200,
         json={
             "details": {
                 "id": "6be515d3-8f5d-4194-9043-146f17463ee4",
             }
         },
+    )
+
+    # Mock the account's send_event method to prevent actual API calls
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
     )
     # Execute
     case.close(case_result=case_result, final_cost=final_cost)
@@ -97,9 +105,11 @@ def test_case_close(
     assert case.total_cost == final_cost
     assert case.final_delivery == case_result
 
+    assert mock_send_event.call_count == 1
 
-def test_case_close_without_final_cost(
-    account_fixture: Account, requests_mock: Mocker, case_fixture: Case
+
+async def test_case_close_without_final_cost(
+    account_fixture: Account, respx_mock, case_fixture: Case, mocker
 ) -> None:
     # Setup
     case = case_fixture
@@ -112,8 +122,7 @@ def test_case_close_without_final_cost(
     case_result = {"status": "success"}
 
     # simulate successful event update
-    requests_mock.post(
-        f"{account_fixture.api_url}/api/v1/ctrl-events/",
+    respx_mock.post(f"{account_fixture.api_url}/api/v1/ctrl-events/").respond(
         status_code=200,
         json={
             "details": {
@@ -121,6 +130,10 @@ def test_case_close_without_final_cost(
             }
         },
     )
+
+    # Mock the account's send_event method to prevent actual API calls
+    mocker.patch.object(account_fixture, "send_event", return_value=None)
+
     # Execute
     case.close(case_result=case_result, final_cost=None)
 

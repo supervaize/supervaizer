@@ -5,7 +5,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-import pytest
 import shortuuid
 
 from supervaizer import (
@@ -20,7 +19,6 @@ from supervaizer import (
 )
 
 
-@pytest.mark.current
 def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     """
     Test the full setup. Serves as a template for the implementation of the agent.

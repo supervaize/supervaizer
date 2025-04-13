@@ -65,12 +65,12 @@ class Case(CaseModel):
         return sum(update.cost or 0.0 for update in self.updates)
 
     def update(self, update: CaseNodeUpdate, **kwargs: Any) -> None:
-        log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
+        log.info(f"[Update case] {self.id} with update {update}")
         self.account.send_update_case(self, update)
         self.updates.append(update)
 
     def human_input(self, update: CaseNodeUpdate, message: str, **kwargs: Any) -> None:
-        log.info(f"CONTROLLER : Updating case {self.id} with update {update}")
+        log.info(f"[Update case] {self.id} with update {update}")
         self.account.send_update_case(self, update)
         self.updates.append(update)
 
@@ -91,7 +91,7 @@ class Case(CaseModel):
         else:
             self.total_cost = self.calculated_cost
         log.info(
-            f"CONTROLLER : Closing case {self.id} with result {case_result} - Case cost is {self.total_cost}"
+            f"[Close case] {self.id} with result {case_result} - Case cost is {self.total_cost}"
         )
         self.status = CaseStatus.COMPLETED
         update = CaseNodeUpdate(
@@ -135,7 +135,7 @@ class Case(CaseModel):
             status=CaseStatus.IN_PROGRESS,
             nodes=nodes,
         )
-        log.info(f"CONTROLLER : Case {case.id} created")
+        log.info(f"[Case created] {case.id}")
 
         # Send case startvent to Supervaize SaaS.
         account.send_start_case(case=case)

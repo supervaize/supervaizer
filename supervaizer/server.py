@@ -189,10 +189,12 @@ class Server(ServerModel):
             "uri": self.uri,
             "api_version": API_VERSION,
             "environment": self.environment,
-            "public_key": self.public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            ).decode("utf-8"),
+            "public_key": str(
+                self.public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                ).decode("utf-8")
+            ),
             "docs": {
                 "swagger": f"{self.url}{self.app.docs_url}",
                 "redoc": f"{self.url}{self.app.redoc_url}",

@@ -40,7 +40,7 @@ AGENT_INFO_EXAMPLE = {
             {
                 "name": "param1",
                 "description": "description",
-                "is_secret": False,
+                "is_environment": False,
             }
         ]
     },
@@ -151,16 +151,16 @@ GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL = {
 
 
 EVENT_REGISTER_SERVER_PAYLOAD = {
-    "name": "server.register server:E2-AC-ED-22-BF-B1",
-    "source": "server:E2-AC-ED-22-BF-B1",
-    "account": "o34Z484gY9Nxz8axgTAdiH",
+    "name": "server.register server:A7-50-A8-B5-00-B5",
+    "source": "server:A7-50-A8-B5-00-B5",
+    "workspace_id": "sv1",
     "event_type": "server.register",
     "details": {
         "url": "http://0.0.0.0:8001",
-        "uri": "server:E2-AC-ED-22-BF-B1",
+        "uri": "server:A7-50-A8-B5-00-B5",
         "api_version": "v1",
         "environment": "dev",
-        "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv6uXhCfhzXHYGmJOmhHE\nbWE+j79/l/IJ9tQ/ADJXUUbi7F81/94Jl8o0jH9Qn1+t2462Ajk7q6koIBUJH5kT\nPkCCdScpiL58c6l3NRMy2hYuILxWDIjsfkHF/eimCYubXjnm3u4VmDaRwB8kaNdM\nHqWSH7Vz4/mR3qI54cHJp3KWLDJ+pmcbTpIDguF2yfRfZk8vYaXM+M32Fk10IgFL\nuGU9UgjzA1AGSkc2mBqNa6sXbk93RHWDNLXr0ghRvb1gIo/IVmpOaPqkiihTzOQ2\nkNPzpkC6do8AQMBmlYLkJdyOYSoeu6C7z6Kwb1aMFDoXuOPW80ZkIv6cahSlTiIv\nQwIDAQAB\n-----END PUBLIC KEY-----\n",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyYsmA8G8aWzMPFpeqDTc\n9Wqz9yfZUVfsINi4EPYpaJBitC+2opU+uxWqgiasTpBXSpNeLAc0AHYw9vUBKHJt\nKHf2D4G3dIg75FS3q+aZsSOOBmodrsqQsBpgc2EnyIhJAtToJAHjhM4iruVY4NMH\niFc4kkWSsjkZisdYo6wGuI/hu2dvctqqsSqBABgUK86auDe30SaEy+W/IzY1loyi\nzW73W++KNl0DHHpsshbg+joSgfw3oK3GOa7jN6XxwKWhbuMAzR0z4kbhZdXep8wT\nWHxOpwOZKdrqJ1Ehk36OGT1tU4npV6i1Kwv2IEeRyXPpyD/LMAJwJ9dLG79hZXDU\nIQIDAQAB\n-----END PUBLIC KEY-----\n",
         "docs": {
             "swagger": "http://0.0.0.0:8001/docs",
             "redoc": "http://0.0.0.0:8001/redoc",
@@ -171,10 +171,12 @@ EVENT_REGISTER_SERVER_PAYLOAD = {
                 "name": "competitor_summary",
                 "id": "bwNtj65WC3SYoEGN6rpAWU",
                 "author": "John Doe",
-                "developer": "Develop",
+                "developer": "Developer",
+                "maintainer": "Ive Maintained",
+                "editor": "Yuri Editor",
                 "version": "1.2",
                 "description": "This is a test agent",
-                "path": "/agents/competitor-summary",
+                "api_path": "/agents/competitor-summary",
                 "tags": ["testtag", "testtag2"],
                 "methods": {
                     "job_start": {
@@ -237,15 +239,15 @@ EVENT_REGISTER_SERVER_PAYLOAD = {
                         "fields": [],
                         "description": "Stop the agent",
                     },
-                    "job_status_method": {
+                    "job_status": {
                         "name": "status",
                         "method": "hello.mystatus",
                         "params": {"status": "statusvalue"},
                         "fields": [],
                         "description": "Get the status of the agent",
                     },
-                    "chat_method": None,
-                    "custom_methods": {
+                    "chat": None,
+                    "custom": {
                         "custom1": {
                             "name": "custom",
                             "method": "control.custom",

@@ -48,7 +48,6 @@ agent.register(name="my-agent", description="My awesome agent")
 
 # Check agent status
 status = agent.get_status()
-print(f"Agent status: {status}")
 ```
 
 ## API Reference

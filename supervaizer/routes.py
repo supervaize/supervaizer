@@ -39,8 +39,8 @@ from .agent import (
 )
 from .common import log
 from .job import Job, JobContext, Jobs, JobStatus
-from .parameter import Parameters
 from .server_utils import ErrorResponse, ErrorType, create_error_response
+from .job_service import service_job_start
 
 if TYPE_CHECKING:
     from .server import Server
@@ -250,7 +250,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     )
     @handle_route_errors()
     async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
-        log.info(f"Getting agent info for {agent.name}")
+        log.info(f"GET /[Agent info] {agent.name}")
         return AgentResponse(
             **agent.registration_info,
         )
@@ -277,7 +277,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
-        log.info(f"Starting agent {agent.name} with params {body_params}")
+        log.info(f"POST /jobs [Start job] {agent.name} with params {body_params}")
         sv_context: JobContext = body_params.supervaize_context  # type: ignore[attr-defined]
         job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
 
@@ -285,23 +285,17 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         encrypted_agent_parameters = getattr(
             body_params, "encrypted_agent_parameters", None
         )
-        log.debug(f"Encrypted agent parameters: {encrypted_agent_parameters}")
-        agent_parameters = None
-        # If agent has parameters_setup defined, validate parameters
-        if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
-            agent_parameters = Parameters.from_str(
-                server.decrypt(encrypted_agent_parameters)
-            )
-            log.debug(f"Decrypted agent parameters: {agent_parameters}")
+        log.debug(f"[Encrypted parameters] : {encrypted_agent_parameters}")
 
-        # Create and prepare the job
-        new_job = Job.new(
-            supervaize_context=sv_context,
-            agent_name=agent.name,
-            parameters=agent_parameters,
+        # Delegate job creation and scheduling to the service
+        new_job = await service_job_start(
+            server,
+            background_tasks,
+            agent,
+            sv_context,
+            job_fields,
+            encrypted_agent_parameters,
         )
-        # Schedule the background execution
-        background_tasks.add_task(agent.job_start, new_job, job_fields, sv_context)
 
         return new_job
 
@@ -328,6 +322,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         ),
     ) -> List[Job] | JSONResponse:
         """Get all jobs for this agent"""
+        log.info(f"GET /jobs [Get agent jobs] {agent.name}")
         jobs = list(Jobs().get_agent_jobs(agent.name).values())
 
         # Apply status filter if specified
@@ -352,6 +347,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
         """Get the status of a job by its ID for this specific agent"""
+        log.info(f"GET /jobs/{job_id} [Get job status] {agent.name}")
         job = Jobs().get_job(job_id, agent_name=agent.name)
         if not job:
             raise HTTPException(
@@ -373,7 +369,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def stop_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
-        log.info(f"Stopping agent {agent.name} with params {params}")
+        log.info(f"POST /stop [Stop agent] {agent.name} with params {params}")
         result = agent.job_stop(params.params)
         return AgentResponse(
             name=agent.name,
@@ -397,7 +393,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def status_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
-        log.info(f"Getting status of agent {agent.name} with params {params}")
+        log.info(f"POST /status [Status agent] {agent.name} with params {params}")
         result = agent.job_status(params.params)
         return AgentResponse(
             name=agent.name,
@@ -424,7 +420,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         params: AgentCustomMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
         log.info(
-            f"Triggering custom method {params.method_name} for agent {agent.name} with params {params.params}"
+            f"POST /custom [Custom method] {params.method_name} for agent {agent.name} with params {params.params}"
         )
         if not (agent.methods.custom and params.method_name in agent.methods.custom):
             raise HTTPException(
@@ -434,7 +430,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         method = agent.methods.custom[params.method_name]
         result = method(params.params) if callable(method) else method
-        log.debug(f"Custom method result: {result}")
+        log.debug(f"[Custom method] {params.method_name} result: {result}")
 
         return AgentResponse(
             name=agent.name,

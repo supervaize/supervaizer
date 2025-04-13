@@ -5,15 +5,11 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-import pytest
 from pytest_mock import MockerFixture
-from requests.exceptions import ConnectionError, HTTPError
 
 from supervaizer import Account, ApiSuccess
 from supervaizer.event import Event
 from supervaizer.server import Server
-
-from . import AUTH_ERROR_RESPONSE, SERVER_REGISTER_RESPONSE, WAKEUP_EVENT_RESPONSE
 
 
 def test_account(account_fixture: Account) -> None:
@@ -34,59 +30,43 @@ def test_account_url_event(account_fixture: Account) -> None:
     assert account_fixture.url_event == f"{apiurl}/api/v1/ctrl-events/"
 
 
-def test_account_send_event_success(
+def test_account_send_event_delegation(
     account_fixture: Account,
     event_fixture: Event,
     server_fixture: Server,
     mocker: MockerFixture,
 ) -> None:
-    mock_post = mocker.patch("requests.post")
-    mock_post.return_value.status_code = 200
-    mock_post.return_value.text = str(WAKEUP_EVENT_RESPONSE)
-    result = account_fixture.send_event(sender=server_fixture, event=event_fixture)
-    assert isinstance(result, ApiSuccess)
-    assert result.message == "Event AGENT_WAKEUP sent"
-    assert result.detail == {"object": WAKEUP_EVENT_RESPONSE}
-
-
-def test_account_send_event_auth_error(
-    account_fixture: Account,
-    event_fixture: Event,
-    server_fixture: Server,
-    mocker: MockerFixture,
-) -> None:
-    mock_post = mocker.patch("requests.post")
-    mock_post.return_value.status_code = 403
-    mock_post.return_value.text = str(AUTH_ERROR_RESPONSE)
-    mock_post.side_effect = HTTPError(
-        "403 Client Error: Forbidden for url: https://api.example.com"
+    # Mock the account_service.send_event function
+    mock_service_send_event = mocker.patch("supervaizer.account_service.send_event")
+    mock_service_send_event.return_value = ApiSuccess(
+        message="Event sent",
+        detail={"id": "01JPZ7414FX3JHPNA8N1JXDADX", "response": "success"},
     )
 
-    with pytest.raises(HTTPError, match="403 Client Error: Forbidden for url"):
-        account_fixture.send_event(sender=server_fixture, event=event_fixture)
+    # Call the account.send_event method
+    result = account_fixture.send_event(sender=server_fixture, event=event_fixture)
 
-
-def test_account_send_event_url_error(
-    account_fixture: Account,
-    event_fixture: Event,
-    server_fixture: Server,
-    mocker: MockerFixture,
-) -> None:
-    mock_post = mocker.patch("requests.post")
-    mock_post.return_value.status_code = ""
-    mock_post.side_effect = ConnectionError("HTTPSConnectionPool(host='...")
-
-    with pytest.raises(ConnectionError, match="HTTPSConnectionPool"):
-        account_fixture.send_event(sender=server_fixture, event=event_fixture)
+    # Verify that the account_service.send_event was called with correct parameters
+    mock_service_send_event.assert_called_once_with(
+        account_fixture, server_fixture, event_fixture
+    )
+    assert result == mock_service_send_event.return_value
 
 
 def test_account_register_server_success(
     account_fixture: Account, server_fixture: Server, mocker: MockerFixture
 ) -> None:
-    mock_post = mocker.patch("requests.post")
-    mock_post.return_value.status_code = 200
-    mock_post.return_value.text = str(SERVER_REGISTER_RESPONSE)
+    # Mock the send_event method
+    mock_send_event = mocker.patch("supervaizer.account_service.send_event")
+    # Use a dictionary instead of SERVER_REGISTER_RESPONSE to avoid JSON decoding issues
+    detail = {"id": "01JPZ7414FX3JHPNA8N1JXDADX", "response": "success"}
+    mock_send_event.return_value = ApiSuccess(
+        message="Event SERVER_REGISTER sent",
+        detail=detail,
+    )
 
     result = account_fixture.register_server(server_fixture)
     assert isinstance(result, ApiSuccess)
     assert result.message == "Event SERVER_REGISTER sent"
+    # Verify that send_event was called
+    mock_send_event.assert_called_once()

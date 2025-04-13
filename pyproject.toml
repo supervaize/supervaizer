@@ -7,16 +7,17 @@ authors = [
     { name = "Alain Prasquier - Supervaize", email = "alain@supervaize.com" },
 ]
 dependencies = [
-    "art>=6.4",
+    "art>=6.5",
     "cryptography>=44.0.2",
     "demjson3>=3.0.6",
     "deprecated>=1.2.18",
-    "fastapi>=0.115.6",
+    "fastapi>=0.115.12",
+    "httpx>=0.28.1",
     "loguru>=0.7.3",
-    "pydantic>=2.10.4",
+    "orjson>=3.10.16",
+    "pydantic>=2.11.3",
     "python-slugify>=8.0.4",
-    "requests>=2.32.3",
-    "rich>=13.9.4",
+    "rich>=14.0.0",
     "shortuuid>=1.0.13",
     "uvicorn>=0.34.0",
 ]
@@ -32,17 +33,16 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3.4",
+    "pytest>=8.3.5",
     "pytest-cov>=4.1.0",
     "pre-commit>=3.7.0",
+    "respx>=0.22.0",
     "ruff>=0.3.4",
     "hatch>=1.9.3",
     "pytest-sugar>=1.0.0",
     "pytest-asyncio>=0.26.0",
     "pytest-mock>=3.14.0",
-    "requests-mock>=1.12.1",
     "mypy>=1.15.0",
-    "types-requests>=2.32.0.20250328",
     "types-deprecated>=1.2.15.20250304",
 ]
 

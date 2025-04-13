@@ -56,16 +56,13 @@ def test_api_success_basic() -> None:
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    json_str = json.dumps(
-        {
-            "message": "success message",
-            "code": "200",
-            "detail": {"test": "data"},
-            "id": None,
-            "log_message": "\u2705 success message",
-        }
-    )
-    print(str(success))
+    json_str = json.dumps({
+        "message": "success message",
+        "code": "200",
+        "detail": {"test": "data"},
+        "id": None,
+        "log_message": "\u2705 success message",
+    })
     assert str(success) == json_str
 
 
@@ -252,3 +249,28 @@ def test_encrypt_decrypt() -> None:
     # Test decryption failure
     with pytest.raises(ValueError, match="Incorrect padding"):
         decrypt_value("invalid", private_key)
+
+
+def test_sv_base_model_json_conversion() -> None:
+    """Test SvBaseModel with datetime serialization using mode='json'"""
+    from datetime import datetime
+
+    class ModelWithDateTime(SvBaseModel):
+        name: str = Field(default="test")
+        timestamp: datetime = Field(
+            default_factory=lambda: datetime(2024, 1, 1, 12, 0, 0)
+        )
+
+    model = ModelWithDateTime()
+
+    # Test to_dict converts datetime to ISO format string
+    dict_data = model.to_dict
+    assert dict_data["name"] == "test"
+    assert dict_data["timestamp"] == "2024-01-01T12:00:00"
+    assert isinstance(
+        dict_data["timestamp"], str
+    )  # Verify it's a string, not a datetime object
+
+    # Test to_json also handles the datetime correctly
+    json_data = json.loads(model.to_json)
+    assert json_data["timestamp"] == "2024-01-01T12:00:00"

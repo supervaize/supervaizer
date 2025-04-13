@@ -5,14 +5,15 @@
 # https://mozilla.org/MPL/2.0/.
 
 from enum import Enum
-from typing import Any, ClassVar, Dict
-
+from typing import Any, ClassVar, Dict, TYPE_CHECKING
 from .__version__ import VERSION
-from .account import Account
-from .agent import Agent
-from .case import Case, CaseNodeUpdate
 from .common import SvBaseModel
-from .server import Server
+
+if TYPE_CHECKING:
+    from .agent import Agent
+    from .case import Case, CaseNodeUpdate
+    from .server import Server
+    from .job import Job
 
 
 class EventType(str, Enum):
@@ -21,7 +22,7 @@ class EventType(str, Enum):
     AGENT_WAKEUP = "agent.wakeup"
     AGENT_SEND_ANOMALY = "agent.anomaly"
     INTERMEDIARY = "agent.intermediary"
-    JOB_START = "agent.job.start"
+    JOB_START_CONFIRMATION = "agent.job.start.confirmation"
     JOB_END = "agent.job.end"
     JOB_STATUS = "agent.job.status"
     JOB_RESULT = "agent.job.result"
@@ -36,7 +37,7 @@ class EventType(str, Enum):
 class EventModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     source: str
-    account: Account
+    account: Any  # Use Any to avoid Pydantic type resolution issues
     type: EventType
     details: Dict[str, Any]
 
@@ -66,9 +67,8 @@ class Event(EventModel):
         This must be a dictionary that can be serialized to JSON to be sent in the request body.
         """
         return {
-            "name": f"{self.type.value} {self.source}",
             "source": f"{self.source}",
-            "workspace_id": f"{self.account.workspace_id}",
+            "workspace": f"{self.account.workspace_id}",
             "event_type": f"{self.type.value}",
             "details": self.details,
         }
@@ -83,7 +83,7 @@ class AgentRegisterEvent(Event):
     def __init__(
         self,
         agent: "Agent",
-        account: "Account",
+        account: Any,  # Use Any to avoid type resolution issues
         polling: bool = True,
     ) -> None:
         super().__init__(
@@ -97,7 +97,7 @@ class AgentRegisterEvent(Event):
 class ServerRegisterEvent(Event):
     def __init__(
         self,
-        account: "Account",
+        account: Any,  # Use Any to avoid type resolution issues
         server: "Server",
     ) -> None:
         super().__init__(
@@ -108,8 +108,24 @@ class ServerRegisterEvent(Event):
         )
 
 
+class JobStartConfirmationEvent(Event):
+    def __init__(
+        self,
+        job: "Job",
+        account: Any,
+    ) -> None:
+        super().__init__(
+            type=EventType.JOB_START_CONFIRMATION,
+            account=account,
+            source=job.id,
+            details=job.to_dict,
+        )
+
+
 class CaseStartEvent(Event):
-    def __init__(self, case: "Case", account: "Account") -> None:
+    def __init__(
+        self, case: "Case", account: Any
+    ) -> None:  # Use Any to avoid type resolution issues
         super().__init__(
             type=EventType.CASE_START,
             account=account,
@@ -120,7 +136,10 @@ class CaseStartEvent(Event):
 
 class CaseUpdateEvent(Event):
     def __init__(
-        self, case: "Case", account: "Account", update: "CaseNodeUpdate"
+        self,
+        case: "Case",
+        account: Any,
+        update: "CaseNodeUpdate",  # Use Any to avoid type resolution issues
     ) -> None:
         super().__init__(
             type=EventType.CASE_UPDATE,

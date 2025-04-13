@@ -278,7 +278,7 @@ class Agent(AgentModel):
             # Get agent by name from SaaS Server
             from_server = server.account.get_agent_by(agent_name=self.name)
         if not isinstance(from_server, ApiSuccess):
-            log.error(f"Failed to get agent details: {from_server}")
+            log.error(f"[Agent update_agent_from_server] Failed : {from_server}")
             return None
 
         agent_from_server = from_server.detail
@@ -300,7 +300,9 @@ class Agent(AgentModel):
 
         # If agent is configured, get encrypted parameters
         if self.server_agent_onboarding_status == "configured":
-            log.debug(f"Agent {self.name} is configured, getting encrypted parameters")
+            log.debug(
+                f"[Agent configured] getting encrypted parameters for {self.name}"
+            )
             server_encrypted_parameters = (
                 agent_from_server.get("parameters_encrypted")
                 if agent_from_server
@@ -311,9 +313,9 @@ class Agent(AgentModel):
                 decrypted = server.decrypt(server_encrypted_parameters)
                 self.parameters_setup.update_values_from_server(json.loads(decrypted))
             else:
-                log.debug("No encrypted parameters found")
+                log.debug("[No encrypted parameters] for {self.name}")
         else:
-            log.debug("Agent is not onboarded, skipping encrypted parameters")
+            log.debug("[Agent not onboarded] skipping encrypted parameters")
 
         return self
 
@@ -321,7 +323,7 @@ class Agent(AgentModel):
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
-        log.info(f"Executing method {method.__name__} with params {params}")
+        log.debug(f"[Agent method] {method.__name__} with params {params}")
         return method(
             **params,
         )

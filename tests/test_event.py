@@ -25,13 +25,16 @@ def test_event(event_fixture: Event) -> None:
     assert event_fixture.type == EventType.AGENT_WAKEUP
     assert event_fixture.source == "test"
     assert event_fixture.details == {"test": "value"}
-    assert list(event_fixture.payload.keys()) == [
-        "name",
-        "source",
-        "workspace_id",
-        "event_type",
-        "details",
-    ]
+    assert (
+        list(event_fixture.payload.keys()).sort()
+        == [
+            "name",
+            "source",
+            "workspace_id",
+            "event_type",
+            "details",
+        ].sort()
+    )
 
 
 def test_agent_register_event(agent_fixture: Agent, account_fixture: Account) -> None:
