@@ -26,7 +26,11 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
         A dictionary representing the agent detail in ACP format
     """
     # Build the interfaces object
-    interfaces = {"input": "chat", "output": "chat", "awaits": []}
+    interfaces = {
+        "input": "chat",
+        "output": "chat",
+        "awaits": [{"name": "user_response", "request": {}, "response": {}}],
+    }
 
     # Build the metadata object
     metadata = {
@@ -36,7 +40,13 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
         "naturalLanguages": ["en"],
         "framework": "SUPERVAIZER",
         "useCases": [f"Agent services provided by {agent.name}"],
-        "tags": [agent.slug],
+        "examples": [
+            {
+                "prompt": f"Example interaction with {agent.name}",
+                "response": "Example response",
+            }
+        ],
+        "tags": [agent.slug] + (agent.tags or []),
         "createdAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updatedAt": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "author": {
@@ -44,10 +54,23 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
             "email": "info@supervaize.com",
             "url": "https://supervaize.com/",
         },
+        "contributors": [
+            {
+                "name": agent.maintainer
+                or agent.author
+                or agent.developer
+                or "SUPERVAIZER",
+                "email": "info@supervaize.com",
+                "url": "https://supervaize.com/",
+            }
+        ],
         "links": [
             {"type": "homepage", "url": f"{base_url}/agents/{agent.slug}"},
             {"type": "documentation", "url": f"{base_url}/docs"},
+            {"type": "source-code", "url": "https://github.com/supervaize/supervaizer"},
         ],
+        "dependencies": [{"type": "tool", "name": "supervaizer-core"}],
+        "recommendedModels": ["gpt-4", "claude-3-opus"],
     }
 
     # Get job statistics for status data
