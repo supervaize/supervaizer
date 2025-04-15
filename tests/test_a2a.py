@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 import jsonschema
 
 from supervaizer import Agent, Server
-from supervaizer.a2a import create_agent_card, create_agents_list
+from supervaizer.a2a import create_agent_card, create_agents_list, create_health_data
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:
@@ -26,6 +26,7 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert "developer" in card
     assert "version" in card
     assert card["version"] == agent_fixture.version
+    assert "version_info" in card
     assert "logo_url" in card
     assert "human_url" in card
     assert "contact_information" in card
@@ -38,6 +39,12 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert len(card["api_endpoints"]) > 0
     assert card["api_endpoints"][0]["type"] == "json"
     assert card["api_endpoints"][0]["url"] == f"{base_url}{agent_fixture.path}"
+
+    # Test OpenAPI integration
+    assert "openapi_url" in card["api_endpoints"][0]
+    assert card["api_endpoints"][0]["openapi_url"] == f"{base_url}/openapi.json"
+    assert "docs_url" in card["api_endpoints"][0]
+    assert card["api_endpoints"][0]["docs_url"] == f"{base_url}/docs"
 
     # Test that the tools are correctly structured
     assert isinstance(card["tools"], list)
@@ -62,6 +69,12 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
         for name in agent_fixture.methods.custom.keys():
             assert name in tool_names
 
+    # Test versioning information
+    assert "version_info" in card
+    assert "current" in card["version_info"]
+    assert "latest" in card["version_info"]
+    assert "changelog_url" in card["version_info"]
+
 
 def test_create_agents_list(agent_fixture: Agent) -> None:
     """Test the create_agents_list function."""
@@ -85,8 +98,39 @@ def test_create_agents_list(agent_fixture: Agent) -> None:
     assert "agent_card_url" in agent_entry
     assert (
         agent_entry["agent_card_url"]
-        == f"{base_url}/.well-known/agents/{agent_fixture.slug}_agent.json"
+        == f"{base_url}/.well-known/agents/v{agent_fixture.version}/{agent_fixture.slug}_agent.json"
     )
+
+
+def test_create_health_data(agent_fixture: Agent) -> None:
+    """Test the create_health_data function."""
+    health_data = create_health_data([agent_fixture])
+
+    # Test that the required fields are present
+    assert "schema_version" in health_data
+    assert health_data["schema_version"] == "a2a_2023_v1"
+    assert "status" in health_data
+    assert "timestamp" in health_data
+    assert "agents" in health_data
+
+    # Check that agent health information is included
+    assert agent_fixture.id in health_data["agents"]
+    agent_health = health_data["agents"][agent_fixture.id]
+
+    # Check agent health fields
+    assert "agent_id" in agent_health
+    assert "name" in agent_health
+    assert "status" in agent_health
+    assert "version" in agent_health
+    assert "statistics" in agent_health
+
+    # Check statistics fields
+    stats = agent_health["statistics"]
+    assert "total_jobs" in stats
+    assert "completed_jobs" in stats
+    assert "failed_jobs" in stats
+    assert "in_progress_jobs" in stats
+    assert "success_rate" in stats
 
 
 def test_a2a_route_endpoints(server_fixture: Server) -> None:
@@ -106,9 +150,11 @@ def test_a2a_route_endpoints(server_fixture: Server) -> None:
     assert isinstance(agents_list["agents"], list)
     assert len(agents_list["agents"]) == 1
 
-    # Test the agent card endpoint
+    # Test the v1 agent card endpoint
     agent = server_fixture.agents[0]
-    response = client.get(f"/.well-known/agents/{agent.slug}_agent.json")
+    response = client.get(
+        f"/.well-known/agents/v{agent.version}/{agent.slug}_agent.json"
+    )
     assert response.status_code == 200
     agent_card = response.json()
 

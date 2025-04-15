@@ -5,8 +5,10 @@
 # https://mozilla.org/MPL/2.0/.
 
 from typing import Dict, List, Any
+from datetime import datetime
 
 from .agent import Agent
+from .job import JobStatus, Jobs
 
 
 def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
@@ -26,13 +28,15 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
     # Construct the agent URL
     agent_url = f"{base_url}{agent.path}"
 
-    # Build API endpoints object
+    # Build API endpoints object with OpenAPI integration
     api_endpoints = [
         {
             "type": "json",
             "url": agent_url,
-            "name": "Supervaize API",
+            "name": "Supervaize API - A2A protocol support",
             "description": f"RESTful API for {agent.name} agent",
+            "openapi_url": f"{base_url}/openapi.json",
+            "docs_url": f"{base_url}/docs",
             "examples": [
                 {
                     "name": "Get agent info",
@@ -95,6 +99,13 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
         "description": "Authentication is handled at the Supervaize server level",
     }
 
+    # Version information
+    version_info = {
+        "current": agent.version,
+        "latest": agent.version,
+        "changelog_url": f"{base_url}/changelog/{agent.slug}",
+    }
+
     # Create the main agent card
     agent_card = {
         "schema_version": "a2a_2023_v1",
@@ -106,6 +117,7 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
             "email": "info@supervaize.com",
         },
         "version": agent.version,
+        "version_info": version_info,
         "logo_url": f"{base_url}/static/agents/{agent.slug}_logo.png",
         "human_url": f"{base_url}/agents/{agent.slug}",
         "contact_information": {"general": {"email": "support@supervaize.com"}},
@@ -136,8 +148,71 @@ def create_agents_list(agents: List[Agent], base_url: str) -> Dict[str, Any]:
                 "description": agent.description,
                 "developer": agent.developer or agent.author or "Supervaize",
                 "version": agent.version,
-                "agent_card_url": f"{base_url}/.well-known/agents/{agent.slug}_agent.json",
+                "agent_card_url": f"{base_url}/.well-known/agents/v{agent.version}/{agent.slug}_agent.json",
             }
             for agent in agents
         ],
+    }
+
+
+def create_health_data(agents: List[Agent]) -> Dict[str, Any]:
+    """
+    Create health data for all agents according to A2A protocol.
+
+    Args:
+        agents: List of Agent instances
+
+    Returns:
+        A dictionary with health information for all agents
+    """
+    jobs_registry = Jobs()
+
+    agents_health = {}
+    for agent in agents:
+        # Get agent jobs
+        agent_jobs = jobs_registry.get_agent_jobs(agent.name)
+
+        # Calculate job statistics
+        total_jobs = len(agent_jobs)
+        completed_jobs = sum(
+            1 for j in agent_jobs.values() if j.status == JobStatus.COMPLETED
+        )
+        failed_jobs = sum(
+            1 for j in agent_jobs.values() if j.status == JobStatus.FAILED
+        )
+        in_progress_jobs = sum(
+            1 for j in agent_jobs.values() if j.status == JobStatus.IN_PROGRESS
+        )
+
+        # Set agent status based on health indicators
+        if total_jobs == 0:
+            status = "available"
+        elif failed_jobs > total_jobs / 2:  # If more than half are failing
+            status = "degraded"
+        elif in_progress_jobs > 0:
+            status = "busy"
+        else:
+            status = "available"
+
+        agents_health[agent.id] = {
+            "agent_id": agent.id,
+            "name": agent.name,
+            "status": status,
+            "version": agent.version,
+            "statistics": {
+                "total_jobs": total_jobs,
+                "completed_jobs": completed_jobs,
+                "failed_jobs": failed_jobs,
+                "in_progress_jobs": in_progress_jobs,
+                "success_rate": (completed_jobs / total_jobs * 100)
+                if total_jobs > 0
+                else 100,
+            },
+        }
+
+    return {
+        "schema_version": "a2a_2023_v1",
+        "status": "operational",
+        "timestamp": str(datetime.now()),
+        "agents": agents_health,
     }
