@@ -470,30 +470,27 @@ def create_a2a_routes(server: "Server") -> APIRouter:
         log.info("[A2A] GET /.well-known/agents.json [Agent discovery]")
         return create_agents_list(server.agents, base_url)
 
-    @router.get(
-        "/agents/{agent_slug}_agent.json",
-        summary="A2A Agent Card",
-        description="Returns an agent card according to A2A protocol specification",
-        response_model=Dict[str, Any],
-    )
-    @handle_route_errors()
-    async def get_a2a_agent_card(agent_slug: str) -> Dict[str, Any]:
-        """Get an agent card in A2A format."""
-        log.info(f"[A2A] GET /.well-known/agents/{agent_slug}_agent.json [Agent card]")
+    # Create explicit routes for each agent
+    for agent in server.agents:
+        # Create a closure to properly capture the current agent
+        def create_agent_route(current_agent: Agent):
+            route_path = f"/agents/{current_agent.slug}_agent.json"
 
-        # Find the agent with the matching slug
-        agent = None
-        for a in server.agents:
-            if a.slug == agent_slug:
-                agent = a
-                break
-
-        if not agent:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Agent with slug '{agent_slug}' not found",
+            @router.get(
+                route_path,
+                summary=f"A2A Agent Card for {current_agent.name}",
+                description=f"Returns agent card for {current_agent.name} according to A2A protocol specification",
+                response_model=Dict[str, Any],
             )
+            @handle_route_errors()
+            async def get_agent_card() -> Dict[str, Any]:
+                """Get an agent card in A2A format."""
+                log.info(
+                    f"[A2A] GET /.well-known/agents/{current_agent.slug}_agent.json [Agent card]"
+                )
+                return create_agent_card(current_agent, base_url)
 
-        return create_agent_card(agent, base_url)
+        # Call the closure function with the current agent
+        create_agent_route(agent)
 
     return router
