@@ -126,21 +126,69 @@ pip install "supervaizer[dev]"
 ## Quick Start
 
 ```python
-from supervaizer import Server, Agent, Account
+from supervaizer import (
+    Server,
+    Agent,
+    AgentMethod,
+    Parameter,
+    ParametersSetup,
+    AgentMethods,
+)
+# Define at least one AgentMethod
+agent_method = AgentMethod(
+    name="start",
+    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start
+    is_async=False,
+    params={"action": "start"},
+    fields=[
+        {
+            "name": "Variable to start agent job",
+            "type": str,
+            "field_type": "CharField",
+            "max_length": 100,
+            "required": True,
+        }]}
+
+# Define agent parameters (optional)
+agent_parameters = ParametersSetup.from_list([
+    Parameter(
+        name="OPEN_API_KEY",
+        description="OpenAPI Key",
+        is_environment=True,
+    )]),
+
+# Define at least one agent
+agent = Agent(
+    name="agent_name",
+    id="agent_id",
+    author="John Doe",
+    developer="Developer",
+    maintainer="Ive Maintained",
+    editor="Yuri Editor",
+    version="1.3",
+    description="This is a test agent",
+    urls={"dev": "http://host.docker.internal:8001", "prod": ""},
+    active_environment="dev",
+    tags=["testtag", "testtag2"],
+    methods=AgentMethods(
+        job_start=agent_method,
+        job_stop=agent_method, #should be different methods
+        job_status=agent_method, # should be different methods
+        chat=None,
+        custom=None}
+    ),
+    parameters_setup=agent_parameters,
+)
 
 # Initialize a connection to the SUPERVAIZE server
-server = Server(api_url="https://api.example.com")
+server = Server(agents=[agent],
+    acp_endpoints=True,
+    a2a_endpoints=True,
+    supervisor_account=None,)
 
-# Create an account
-account = Account(server=server)
-account.login(username="your_username", password="your_password")
+# Start the server
+sv_server.launch(log_level="DEBUG")
 
-# Register an agent
-agent = Agent(server=server, account=account)
-agent.register(name="my-agent", description="My awesome agent")
-
-# Check agent status
-status = agent.get_status()
 ```
 
 For more comprehensive examples, check out the `examples/` directory:
