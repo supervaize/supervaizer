@@ -1,13 +1,23 @@
 # SUPERVAIZER
 
-A Python library for managing and controlling SUPERVAIZE agents and services.
+A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
 
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/supervaize/supervaizer)
+[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
 
 ## Description
 
-SUPERVAIZER is a Python library designed to facilitate communication with and management of SUPERVAIZE agents. It provides a robust API for agent registration, job control, event handling, telemetry, and more.
+SUPERVAIZER is a toolkit built for the age of AI interoperability. At its core, it implements Google's Agent-to-Agent (A2A) protocol, enabling seamless discovery and interaction between agents across different systems and platforms.
+
+With comprehensive support for the A2A specification, SUPERVAIZER allows you to:
+
+- Enhance the capabilities of your agents, making them automatically discoverable by other A2A systems
+- Expose standardized agent capabilities through agent cards
+- Monitor agent health and status through dedicated endpoints
+- Connect your agents to the growing ecosystem of A2A-compatible tools
+
+Beyond A2A interoperability, SUPERVAIZER provides a robust API for agent registration, job control, event handling, telemetry, and more, making it a crucial component for building and managing AI agent systems.
 
 ## Features
 
@@ -17,6 +27,52 @@ SUPERVAIZER is a Python library designed to facilitate communication with and ma
 - **Telemetry**: Monitor and analyze system performance
 - **Server Communication**: Interact with SUPERVAIZE servers
 - **Account Management**: Manage user accounts and authentication
+- **A2A Protocol Support**: Integration with Google's Agent-to-Agent protocol for interoperability
+
+## A2A Protocol Support
+
+SUPERVAIZER implements [Google's Agent-to-Agent (A2A) protocol](https://google.github.io/A2A/#/), providing standardized discovery and interaction with agents across different platforms and systems.
+
+### Implemented A2A Features
+
+- **Agent Discovery**: `/.well-known/agents.json` endpoint for listing all available agents
+- **Agent Cards**: Detailed agent information available at `/.well-known/agents/v{version}/{agent_slug}_agent.json`
+- **Health Monitoring**: Real-time system and agent health data at `/.well-known/health`
+- **Versioned Endpoints**: Support for agent versioning with backward compatibility
+- **OpenAPI Integration**: Direct links to OpenAPI specifications and documentation
+- **Version Information**: Comprehensive version tracking with changelog access
+
+### Benefits of A2A Integration
+
+- **Interoperability**: Your agents can be discovered and used by any A2A-compatible client
+- **Standardized Interface**: Consistent API structure across all agents and platforms
+- **Self-Documentation**: Automatic generation of comprehensive agent cards with capabilities
+- **Health Insights**: Real-time monitoring of agent status and performance metrics
+- **Future-Proofing**: Join the emerging standard for agent interoperability
+
+### Example: Discovering Agents
+
+To discover all agents on a SUPERVAIZER instance:
+
+```bash
+curl https://your-server/.well-known/agents.json
+```
+
+### Example: Agent Card
+
+To access a specific agent's capabilities:
+
+```bash
+curl https://your-server/.well-known/agents/v1.0.0/myagent_agent.json
+```
+
+### Future A2A Enhancements
+
+- **Webhooks**: Event subscription for real-time updates
+- **Rich Authentication**: OAuth2 and API key options with scope control
+- **Tool Streaming**: Support for streaming responses in long-running operations
+- **Extended Metadata**: Licensing, pricing, and usage limit information
+- **Localization**: Multi-language support for agent interfaces
 
 ## Installation
 
@@ -50,131 +106,20 @@ agent.register(name="my-agent", description="My awesome agent")
 status = agent.get_status()
 ```
 
-## API Reference
+For more comprehensive examples, check out the `examples/` directory:
 
-### Core Components
+- `examples/a2a-controller.py` - A complete A2A-compatible controller implementation
 
-#### Agent
-
-The `Agent` class represents a SUPERVAIZE agent and provides methods for agent registration, status checks, and method execution.
-
-```python
-from supervaizer import Agent, AgentMethod
-
-agent = Agent(server=server, account=account)
-agent.register(name="agent-name")
-agent.set_method(AgentMethod.METHOD_NAME, handler_function)
-```
-
-#### Server
-
-The `Server` class handles communication with the SUPERVAIZE backend services.
-
-```python
-from supervaizer import Server
-
-server = Server(api_url="https://api.example.com")
-```
-
-#### Account
-
-The `Account` class manages authentication and user information.
-
-```python
-from supervaizer import Account
-
-account = Account(server=server)
-account.login(username="username", password="password")
-```
-
-#### Events
-
-The event system enables communication between components.
-
-```python
-from supervaizer import Event, EventType
-
-event = Event.create(EventType.AGENT_REGISTERED, payload={"agent_id": "123"})
-```
-
-#### Jobs
-
-The job system handles the execution and tracking of agent tasks.
-
-```python
-from supervaizer import Job, JobStatus
-
-# Check job status
-job = agent.get_job(job_id="job-123")
-if job.status == JobStatus.COMPLETED:
-    print("Job completed successfully!")
-```
-
-## Development
-
-This project uses [just](https://github.com/casey/just) as a command runner. Here are the available commands:
-
-`just -l`
-
-### Setup Development Environment
-
-1. Clone the repository
-2. Install uv: `pip install uv`
-3. Create and activate a virtual environment:
-   - `uv venv`
-   - Windows: `.venv\Scripts\activate`
-   - Unix/MacOS: `source .venv/bin/activate`
-4. Install development dependencies: `uv pip install -e ".[dev]"` or `just dev-install`
-5. Install Git hooks: `just install-hooks`
-
-### Running Tests
+Run any example with:
 
 ```bash
-pytest
+python examples/a2a-controller.py
 ```
 
-Or for specific test categories:
+## Documentation
 
-```bash
-pytest -m "not slow"  # Skip slow tests
-pytest -m "current"   # Run tests under development
-```
-
-Running tests without test coverage
-
-```bash
-just test-no-cov
-```
-
-Rerunning failed tests
-
-```bash
-just test-failed
-```
-
-### Type checking
-
-Running mypy directly
-
-```bash
-mypy supervaizer
-```
-
-Running mypy for all (including tests)
-
-```bash
-mypy supervaizer tests
-```
-
-Running mypy via precommit
-
-```bash
-just mypy
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- [API Reference](API_REFERENCE.md) - Complete documentation of classes and methods
+- [Contributing Guide](CONTRIBUTING.md) - How to set up your development environment and contribute
 
 ## License
 

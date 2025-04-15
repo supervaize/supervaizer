@@ -1,85 +1,93 @@
 # Contributing to SUPERVAIZER
 
-Thank you for considering contributing to SUPERVAIZER! This document outlines the process for contributing to the project.
+Thank you for considering contributing to SUPERVAIZER! This document outlines the development process and guidelines.
 
-## Code of Conduct
+## Development Environment
 
-Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+This project uses [just](https://github.com/casey/just) as a command runner. Here are the available commands:
 
-## How to Contribute
+```bash
+just -l
+```
 
-### Reporting Bugs
+### Setup Development Environment
 
-- Check if the bug has already been reported
-- Use the bug report template when opening an issue
-- Include detailed steps to reproduce the bug
-- Specify your environment (Python version, OS, etc.)
+1. Clone the repository
+2. Install uv: `pip install uv`
+3. Create and activate a virtual environment:
+   - `uv venv`
+   - Windows: `.venv\Scripts\activate`
+   - Unix/MacOS: `source .venv/bin/activate`
+4. Install development dependencies: `uv pip install -e ".[dev]"` or `just dev-install`
+5. Install Git hooks: `just install-hooks`
 
-### Suggesting Features
+### Running Tests
 
-- Check if the feature has already been suggested
-- Use the feature request template when opening an issue
-- Clearly describe the feature and its benefits
-- Consider how it fits with the project's scope
+```bash
+pytest
+```
 
-### Pull Requests
+Or for specific test categories:
+
+```bash
+pytest -m "not slow"  # Skip slow tests
+pytest -m "current"   # Run tests under development
+```
+
+Running tests without test coverage:
+
+```bash
+just test-no-cov
+```
+
+Rerunning failed tests:
+
+```bash
+just test-failed
+```
+
+### Type checking
+
+Running mypy directly:
+
+```bash
+mypy supervaizer
+```
+
+Running mypy for all (including tests):
+
+```bash
+mypy supervaizer tests
+```
+
+Running mypy via pre-commit:
+
+```bash
+just mypy
+```
+
+## Pull Request Process
 
 1. Fork the repository
 2. Create a new branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`pytest`)
-5. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+4. Run the tests to ensure they pass
+5. Update documentation as needed
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
-## Development Setup
+## Code Style
 
-```bash
-# Clone the repository
-git clone [repository-url]
-cd supervaizer
+We follow PEP 8 with a line length of 120 characters. The project uses the following tools for code quality:
 
-# Install development dependencies
-uv venv
-uv pip install -e ".[dev]"
+- Black for code formatting
+- Flake8 for linting
+- Mypy for type checking
+- isort for import sorting
 
-# Run tests
-pytest
-```
-
-## Coding Standards
-
-- Follow PEP 8 conventions
-- Use type hints for function parameters and return values
-- Create proper docstrings with descriptions and parameter details
-- Classes use PascalCase, functions/variables use snake_case
-- Inherit from SvBaseModel (Pydantic) for data models
-- Use loguru for logging with appropriate context binding
-- Handle exceptions with ApiError class, capturing details
-
-## Commit Message Guidelines
-
-We follow the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) specification for commit messages.
-
-Talk imperative: Follow this rule: If applied, this commit will <commit message>
-
-The commit message should be structured as follows:
-
-- `feat`: A new feature
-- `fix`: A bug fix
-- `docs`: Documentation changes
-- `style`: Changes that do not affect code functionality
-- `refactor`: Code changes that neither fix bugs nor add features
-- `test`: Adding or modifying tests
-- `chore`: Changes to build process or auxiliary tools
-
-## Testing
-
-- Use pytest
-- Write unit tests for all new features and bug fixes
-- Maintain or improve code coverage
-- Run the test suite before submitting PRs
+All of these are run as pre-commit hooks, so make sure you install them as mentioned above.
 
 ## License
 
-By contributing to SUPERVAIZER, you agree that your contributions will be licensed under the project's [Mozilla Public License 2.0](LICENSE).
+By contributing, you agree that your contributions will be licensed under the project's [Mozilla Public License 2.0](LICENSE.md).
