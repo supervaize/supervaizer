@@ -120,10 +120,16 @@ class AgentMethod(AgentMethodModel):
             return type("EmptyFieldsModel", (BaseModel,), {"to_dict": lambda self: {}})
 
         field_annotations = {}
+        field_defaults = {}
         for field in self.fields:
             field_name = field["name"]
             field_type = field["type"]
-            field_annotations[field_name] = field_type
+            is_required = field.get("required", False)
+            field_annotations[field_name] = (
+                field_type if is_required else Optional[field_type]
+            )
+            if not is_required:
+                field_defaults[field_name] = None
 
         def to_dict(self: BaseModel) -> Dict[str, Any]:
             return {
@@ -134,7 +140,11 @@ class AgentMethod(AgentMethodModel):
         return type(
             "DynamicFieldsModel",
             (BaseModel,),
-            {"__annotations__": field_annotations, "to_dict": to_dict},
+            {
+                "__annotations__": field_annotations,
+                "to_dict": to_dict,
+                **field_defaults,
+            },
         )
 
     @property
@@ -255,6 +265,7 @@ class Agent(AgentModel):
             "version": self.version,
             "description": self.description,
             "api_path": self.path,
+            "slug": self.slug,
             "tags": self.tags,
             "methods": self.methods.registration_info(),
             "parameters_setup": self.parameters_setup.registration_info

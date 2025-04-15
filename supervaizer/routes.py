@@ -255,7 +255,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
-    AgentJobModel = agent.methods.job_start.job_model  # type: ignore
+    agent_job_model_name = f"{agent.slug}_Start_Job_Model"
+    # Create the dynamic model with the custom name for FastAPI documentation
+    AgentStartJobModel = type(
+        agent_job_model_name,
+        (agent.methods.job_start.job_model,),  # type: ignore
+        {},
+    )
 
     @router.post(
         "/jobs",
@@ -273,7 +279,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors(job_conflict_check=True)
     async def start_job(
         background_tasks: BackgroundTasks,
-        body_params: AgentJobModel = Body(...),  # type: ignore
+        body_params: AgentStartJobModel = Body(...),  # type: ignore
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""

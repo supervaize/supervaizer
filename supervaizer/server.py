@@ -14,7 +14,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import field_validator
 from rich import inspect
 
@@ -59,6 +61,7 @@ class ServerModel(SvBaseModel):
     account: Account
     private_key: RSAPrivateKey
     public_key: RSAPublicKey
+    registration_host: Optional[str] = None
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -85,16 +88,42 @@ class Server(ServerModel):
         account: Account,
         agents: List[Agent],
         scheme: str = "http",
-        environment: str = os.getenv("supervaizer_ENVIRONMENT", "dev"),
-        host: str = os.getenv("supervaizer_HOST", "0.0.0.0"),
-        port: int = int(os.getenv("supervaizer_PORT", 8001)),
+        environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
+        host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
+        port: int = int(os.getenv("SUPERVAIZER_PORT", 8000)),
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",
         private_key: Optional[RSAPrivateKey] = None,
+        registration_host: Optional[str] = os.getenv(
+            "SUPERVAIZER_REGISTRATION_HOST", None
+        ),
         **kwargs: Any,
     ) -> None:
-        """Initialize the server with the given configuration."""
+        """Initialize the server with the given configuration.
+
+        Args:
+            account: The account to use for server registration
+            agents: List of agents to register with the server
+            scheme: URL scheme (http or https)
+            environment: Environment name (e.g., dev, staging, prod)
+            host: Host to bind the server to (e.g., 0.0.0.0 for all interfaces)
+            port: Port to bind the server to
+            debug: Whether to enable debug mode
+            reload: Whether to enable auto-reload
+            mac_addr: MAC address to use for server identification
+            private_key: RSA private key for encryption
+            registration_host: Host to use for outbound connections and registration.
+                This is especially important in Docker environments where the binding
+                address (0.0.0.0) can't be used for outbound connections. Set to
+                'host.docker.internal' for Docker or the appropriate service name
+                in container environments.
+                Examples:
+                - In Docker, set to 'host.docker.internal' to reach the host machine
+                - In Kubernetes, might be set to the service name or external DNS
+                If not provided, falls back to using the listening host.
+
+        """
         if not mac_addr:
             node_id = uuid.getnode()
             mac_addr = "-".join(
@@ -142,6 +171,17 @@ class Server(ServerModel):
             openapi_url=openapi_url,
         )
 
+        # Add exception handler for 422 validation errors
+        @app.exception_handler(RequestValidationError)
+        async def validation_exception_handler(
+            request: Request, exc: RequestValidationError
+        ):
+            log.error(f"[422 Error] {exc.errors()}")
+            return JSONResponse(
+                status_code=422,
+                content={"detail": exc.errors(), "body": exc.body},
+            )
+
         super().__init__(
             scheme=scheme,
             host=host,
@@ -155,6 +195,7 @@ class Server(ServerModel):
             account=account,
             private_key=private_key,
             public_key=public_key,
+            registration_host=registration_host,
             **kwargs,
         )
 
@@ -173,7 +214,8 @@ class Server(ServerModel):
     @property
     def url(self) -> str:
         """Get the server's base URL."""
-        return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
+        host = self.registration_host if self.registration_host else self.host
+        return urlunparse((self.scheme, f"{host}:{self.port}", "", "", "", ""))
 
     @property
     def uri(self) -> str:
