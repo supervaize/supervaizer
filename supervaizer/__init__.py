@@ -30,6 +30,7 @@ from .parameter import Parameter, Parameters, ParametersSetup
 from .server import Server
 from .server_utils import ErrorResponse, ErrorType, create_error_response
 from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
+from . import protocol
 
 __all__ = [
     "Agent",
@@ -70,6 +71,7 @@ __all__ = [
     "create_error_response",
     "JobFinishedEvent",
     "JobStartConfirmationEvent",
+    "protocol",
 ]
 
 # Rebuild models to resolve forward references after all imports are done

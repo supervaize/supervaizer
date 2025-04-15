@@ -9,7 +9,11 @@ from fastapi.testclient import TestClient
 import jsonschema
 
 from supervaizer import Agent, Server
-from supervaizer.a2a import create_agent_card, create_agents_list, create_health_data
+from supervaizer.protocol.a2a import (
+    create_agent_card,
+    create_agents_list,
+    create_health_data,
+)
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:

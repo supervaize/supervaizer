@@ -36,6 +36,7 @@ SUPERVAIZER implements [Google's Agent-to-Agent (A2A) protocol](https://google.g
 ### Implemented A2A Features
 
 - **Agent Discovery**: `/.well-known/agents.json` endpoint for listing all available agents
+  Note: the current version of the A2A protocol does not support yet multiple agents.
 - **Agent Cards**: Detailed agent information available at `/.well-known/agents/v{version}/{agent_slug}_agent.json`
 - **Health Monitoring**: Real-time system and agent health data at `/.well-known/health`
 - **Versioned Endpoints**: Support for agent versioning with backward compatibility
@@ -73,6 +74,42 @@ curl https://your-server/.well-known/agents/v1.0.0/myagent_agent.json
 - **Tool Streaming**: Support for streaming responses in long-running operations
 - **Extended Metadata**: Licensing, pricing, and usage limit information
 - **Localization**: Multi-language support for agent interfaces
+
+## ACP Protocol Support
+
+SUPERVAIZER also implements the [Agent Communication Protocol (ACP)](https://docs.beeai.dev/acp/spec/concepts/discovery), providing standardized discovery and interaction with agents according to BeeAI's ACP specification.
+
+### Implemented ACP Features
+
+- **Agent Discovery**: `/agents` endpoint for listing all available agents
+- **Agent Details**: Detailed agent information available at `/agents/{agent_slug}`
+- **Health Monitoring**: Real-time system and agent health data at `/agents/health`
+- **Agent Metadata**: Comprehensive metadata including documentation, language support, authors, and more
+- **Status Metrics**: Performance metrics like success rate and average runtime
+
+### Benefits of ACP Integration
+
+- **Interoperability**: Your agents can be discovered and used by any ACP-compatible client
+- **Standardized Interface**: Consistent API structure across all agents and platforms
+- **Rich Metadata**: Automatically includes comprehensive metadata about agent capabilities
+- **Health Insights**: Real-time monitoring of agent status and performance metrics
+- **Multi-Protocol Support**: Works alongside A2A to provide maximum interoperability
+
+### Example: Discovering Agents
+
+To discover all agents on a SUPERVAIZER instance:
+
+```bash
+curl https://your-server/agents
+```
+
+### Example: Agent Detail
+
+To access a specific agent's capabilities:
+
+```bash
+curl https://your-server/agents/myagent
+```
 
 ## Installation
 
@@ -115,6 +152,15 @@ Run any example with:
 ```bash
 python examples/a2a-controller.py
 ```
+
+## Agent API Documentation
+
+The SUPERVAIZER API comes with comprehensive interactive documentation:
+
+- **Swagger UI**: Available at `/docs` - Interactive API documentation with request builder and testing tools
+- **ReDoc**: Available at `/redoc` - Responsive, searchable API reference documentation
+
+These documentation endpoints provide a complete reference of all available API endpoints, request/response formats, and testing capabilities.
 
 ## Documentation
 

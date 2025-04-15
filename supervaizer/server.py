@@ -36,9 +36,10 @@ from .routes import (
     create_agents_routes,
     create_default_routes,
     create_utils_routes,
-    create_a2a_routes,
     get_server,
 )
+from .protocol.a2a import create_routes as create_a2a_routes
+from .protocol.acp import create_routes as create_acp_routes
 
 insp = inspect
 
@@ -61,6 +62,7 @@ class ServerModel(SvBaseModel):
     reload: bool
     supervisor_account: Optional[Account] = None
     a2a_endpoints: bool = True
+    acp_endpoints: bool = True
     private_key: RSAPrivateKey
     public_key: RSAPublicKey
     registration_host: Optional[str] = None
@@ -90,6 +92,7 @@ class Server(ServerModel):
         agents: List[Agent],
         supervisor_account: Optional[Account] = None,
         a2a_endpoints: bool = True,
+        acp_endpoints: bool = True,
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
@@ -109,6 +112,7 @@ class Server(ServerModel):
             agents: List of agents to register with the server
             supervisor_account: Account of the supervisor
             a2a_endpoints: Whether to enable A2A endpoints
+            acp_endpoints: Whether to enable ACP endpoints
             scheme: URL scheme (http or https)
             environment: Environment name (e.g., dev, staging, prod)
             host: Host to bind the server to (e.g., 0.0.0.0 for all interfaces)
@@ -198,6 +202,7 @@ class Server(ServerModel):
             reload=reload,
             supervisor_account=supervisor_account,
             a2a_endpoints=a2a_endpoints,
+            acp_endpoints=acp_endpoints,
             private_key=private_key,
             public_key=public_key,
             registration_host=registration_host,
@@ -213,6 +218,9 @@ class Server(ServerModel):
         if self.a2a_endpoints:
             log.info("[Server launch] Deploy A2A routes")
             self.app.include_router(create_a2a_routes(self))
+        if self.acp_endpoints:
+            log.info("[Server launch] Deploy ACP routes")
+            self.app.include_router(create_acp_routes(self))
 
         # Override the get_server dependency to return this instance
         async def get_current_server() -> "Server":
