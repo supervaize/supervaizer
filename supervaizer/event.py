@@ -36,7 +36,7 @@ class EventType(str, Enum):
 
 class EventModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
-    source: str
+    source: Dict[str, Any]
     account: Any  # Use Any to avoid Pydantic type resolution issues
     type: EventType
     details: Dict[str, Any]
@@ -89,7 +89,7 @@ class AgentRegisterEvent(Event):
         super().__init__(
             type=EventType.AGENT_REGISTER,
             account=account,
-            source=agent.path,
+            source={"agent": agent.slug},
             details=agent.registration_info | {"polling": polling},
         )
 
@@ -102,7 +102,7 @@ class ServerRegisterEvent(Event):
     ) -> None:
         super().__init__(
             type=EventType.SERVER_REGISTER,
-            source=server.uri,
+            source={"server": server.uri},
             account=account,
             details=server.registration_info,
         )
@@ -117,7 +117,7 @@ class JobStartConfirmationEvent(Event):
         super().__init__(
             type=EventType.JOB_START_CONFIRMATION,
             account=account,
-            source=job.id,
+            source={"job": job.id},
             details=job.to_dict,
         )
 
@@ -127,7 +127,7 @@ class JobFinishedEvent(Event):
         super().__init__(
             type=EventType.JOB_FINISHED,
             account=account,
-            source=job.id,
+            source={"job": job.id},
             details=job.to_dict,
         )
 
@@ -139,7 +139,7 @@ class CaseStartEvent(Event):
         super().__init__(
             type=EventType.CASE_START,
             account=account,
-            source=case.uri,
+            source={"job": case.job_id, "case": case.id},
             details=case.to_dict,
         )
 
@@ -154,6 +154,6 @@ class CaseUpdateEvent(Event):
         super().__init__(
             type=EventType.CASE_UPDATE,
             account=account,
-            source=case.uri,
+            source={"job": case.job_id, "case": case.id},
             details=update.to_dict,
         )

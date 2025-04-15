@@ -8,7 +8,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -130,13 +130,13 @@ def test_fields_annotations_dynamic_model() -> None:
     assert issubclass(DynamicModel, BaseModel)
 
     # Test 2: Check field annotations match expected types
-    assert DynamicModel.__annotations__["full_name"] == str
-    assert DynamicModel.__annotations__["age"] == int
-    assert DynamicModel.__annotations__["subscribe"] == bool
-    assert DynamicModel.__annotations__["gender"] == str
-    assert DynamicModel.__annotations__["bio"] == str
-    assert DynamicModel.__annotations__["country"] == str
-    assert DynamicModel.__annotations__["languages"] == list[str]
+    assert DynamicModel.__annotations__["full_name"] is str
+    assert DynamicModel.__annotations__["age"] is int
+    assert DynamicModel.__annotations__["subscribe"] is Optional[bool]
+    assert DynamicModel.__annotations__["gender"] is str
+    assert DynamicModel.__annotations__["bio"] is Optional[str]
+    assert DynamicModel.__annotations__["country"] is str
+    assert DynamicModel.__annotations__["languages"] is Optional[list[str]]
 
     # Test 3: Create a valid instance
     valid_data: Dict[str, Any] = {

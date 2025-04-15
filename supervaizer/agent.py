@@ -120,7 +120,7 @@ class AgentMethod(AgentMethodModel):
             return type("EmptyFieldsModel", (BaseModel,), {"to_dict": lambda self: {}})
 
         field_annotations = {}
-        field_defaults = {}
+        field_defaults: Dict[str, None] = {}
         for field in self.fields:
             field_name = field["name"]
             field_type = field["type"]

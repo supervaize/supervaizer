@@ -31,6 +31,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
+from .a2a import create_agent_card, create_agents_list
 from .agent import (
     Agent,
     AgentCustomMethodParams,
@@ -87,14 +88,16 @@ def handle_route_errors(
                     error_type=ErrorType.INVALID_REQUEST,
                     detail=str(e),
                     status_code=http_status.HTTP_400_BAD_REQUEST,
-                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
+                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n"
+                    f"{traceback.format_exc()}",
                 )
             except Exception as e:
                 return create_error_response(
                     error_type=ErrorType.INTERNAL_ERROR,
                     detail=str(e),
                     status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n{traceback.format_exc()}",
+                    traceback=f"Error at line {traceback.extract_tb(e.__traceback__)[-1].lineno}:\n"
+                    f"{traceback.format_exc()}",
                 )
 
         return wrapper
@@ -446,5 +449,51 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             description=agent.description,
             methods=agent.methods,
         )
+
+    return router
+
+
+def create_a2a_routes(server: "Server") -> APIRouter:
+    """Create A2A protocol routes for the server."""
+    router = APIRouter(prefix="/.well-known", tags=["A2A Protocol"])
+    base_url = server.url
+
+    @router.get(
+        "/agents.json",
+        summary="A2A Agents Discovery",
+        description="Returns a list of all agents according to A2A protocol specification",
+        response_model=Dict[str, Any],
+    )
+    @handle_route_errors()
+    async def get_a2a_agents() -> Dict[str, Any]:
+        """Get a list of all available agents in A2A format."""
+        log.info("[A2A] GET /.well-known/agents.json [Agent discovery]")
+        return create_agents_list(server.agents, base_url)
+
+    @router.get(
+        "/agents/{agent_slug}_agent.json",
+        summary="A2A Agent Card",
+        description="Returns an agent card according to A2A protocol specification",
+        response_model=Dict[str, Any],
+    )
+    @handle_route_errors()
+    async def get_a2a_agent_card(agent_slug: str) -> Dict[str, Any]:
+        """Get an agent card in A2A format."""
+        log.info(f"[A2A] GET /.well-known/agents/{agent_slug}_agent.json [Agent card]")
+
+        # Find the agent with the matching slug
+        agent = None
+        for a in server.agents:
+            if a.slug == agent_slug:
+                agent = a
+                break
+
+        if not agent:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Agent with slug '{agent_slug}' not found",
+            )
+
+        return create_agent_card(agent, base_url)
 
     return router

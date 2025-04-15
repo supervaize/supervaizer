@@ -77,7 +77,7 @@ def job_fixture(context_fixture: JobContext) -> Annotated[Job, "fixture"]:
 def event_fixture(account_fixture: Account) -> Annotated[Event, "fixture"]:
     return Event(
         type=EventType.AGENT_WAKEUP,
-        source="test",
+        source={"test": "value"},
         details={"test": "value"},
         account=account_fixture,
     )

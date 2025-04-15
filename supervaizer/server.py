@@ -36,6 +36,7 @@ from .routes import (
     create_agents_routes,
     create_default_routes,
     create_utils_routes,
+    create_a2a_routes,
     get_server,
 )
 
@@ -175,7 +176,7 @@ class Server(ServerModel):
         @app.exception_handler(RequestValidationError)
         async def validation_exception_handler(
             request: Request, exc: RequestValidationError
-        ):
+        ) -> JSONResponse:
             log.error(f"[422 Error] {exc.errors()}")
             return JSONResponse(
                 status_code=422,
@@ -203,6 +204,7 @@ class Server(ServerModel):
         self.app.include_router(create_default_routes(self))
         self.app.include_router(create_utils_routes(self))
         self.app.include_router(create_agents_routes(self))
+        self.app.include_router(create_a2a_routes(self))
 
         # Override the get_server dependency to return this instance
         async def get_current_server() -> "Server":
