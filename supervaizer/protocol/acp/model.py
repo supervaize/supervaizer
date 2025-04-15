@@ -83,19 +83,15 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
     )
 
     # Calculate average runtime and success rate for status
-    avg_run_time = 0
+    avg_run_time = 0.0
     if total_jobs > 0:
         success_rate = (completed_jobs / total_jobs) * 100
 
         # Calculate average runtime in seconds
         runtimes = []
         for job in agent_jobs.values():
-            if (
-                job.created_at
-                and job.completed_at
-                and job.status == JobStatus.COMPLETED
-            ):
-                runtime = (job.completed_at - job.created_at).total_seconds()
+            if job.created_at and job.finished_at and job.status == JobStatus.COMPLETED:
+                runtime = (job.finished_at - job.created_at).total_seconds()
                 runtimes.append(runtime)
 
         if runtimes:

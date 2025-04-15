@@ -285,14 +285,20 @@ class Agent(AgentModel):
         Server is used to decrypt parameters if needed
         Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
-        if self.server_agent_id:
-            # Get agent by ID from SaaS Server
-            from_server = server.supervisor_account.get_agent_by(
-                agent_id=self.server_agent_id
-            )
+        if server.supervisor_account:
+            if self.server_agent_id:
+                # Get agent by ID from SaaS Server
+                from_server = server.supervisor_account.get_agent_by(
+                    agent_id=self.server_agent_id
+                )
+
+            else:
+                # Get agent by name from SaaS Server
+                from_server = server.supervisor_account.get_agent_by(
+                    agent_name=self.name
+                )
         else:
-            # Get agent by name from SaaS Server
-            from_server = server.supervisor_account.get_agent_by(agent_name=self.name)
+            return None
         if not isinstance(from_server, ApiSuccess):
             log.error(f"[Agent update_agent_from_server] Failed : {from_server}")
             return None

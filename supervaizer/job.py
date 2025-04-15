@@ -180,11 +180,13 @@ class JobModel(SvBaseModel):
     error: str | None = None
     responses: list["JobResponse"] = []
     finished_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class Job(JobModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.created_at = datetime.now()
         Jobs().add_job(
             job=self,
         )

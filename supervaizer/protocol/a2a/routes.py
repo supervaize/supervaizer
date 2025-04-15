@@ -14,6 +14,7 @@ from .model import create_agent_card, create_agents_list, create_health_data
 
 if TYPE_CHECKING:
     from ...server import Server
+    from ...agent import Agent
 
 
 def create_routes(server: "Server") -> APIRouter:
@@ -49,7 +50,7 @@ def create_routes(server: "Server") -> APIRouter:
     # Create explicit routes for each agent in the versioned format
     for agent in server.agents:
         # V1 endpoints (current version)
-        def create_agent_route_versioned(current_agent):
+        def create_agent_route_versioned(current_agent: "Agent") -> None:
             route_path = (
                 f"/agents/v{current_agent.version}/{current_agent.slug}_agent.json"
             )
@@ -70,7 +71,7 @@ def create_routes(server: "Server") -> APIRouter:
                 return create_agent_card(current_agent, base_url)
 
         # Create routes for backward compatibility to current versions
-        def create_agent_route_legacy(current_agent):
+        def create_agent_route_legacy(current_agent: "Agent") -> None:
             route_path = f"/agents/{current_agent.slug}_agent.json"
 
             @router.get(

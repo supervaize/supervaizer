@@ -122,7 +122,6 @@ def test_acp_route_endpoints(server_fixture: Server) -> None:
     response = client.get("/agents")
     assert response.status_code == 200
     agents_list = response.json()
-    print(agents_list)
     # Verify the structure
     assert isinstance(agents_list, list)
     assert len(agents_list) == 1

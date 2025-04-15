@@ -53,7 +53,9 @@ async def service_job_start(
         agent_name=agent.name,
         parameters=agent_parameters,
     )
+    assert server.supervisor_account is not None, "No account defined"
     account = server.supervisor_account
+
     event = JobStartConfirmationEvent(
         job=new_saas_job,
         account=account,
@@ -78,6 +80,7 @@ def service_job_finished(job: Job, server: "Server") -> None:
 
     Tested in tests/test_job_service.py
     """
+    assert server.supervisor_account is not None, "No account defined"
     account = server.supervisor_account
     event = JobFinishedEvent(
         job=job,

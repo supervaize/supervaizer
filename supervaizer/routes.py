@@ -43,6 +43,7 @@ from .job_service import service_job_start
 
 if TYPE_CHECKING:
     from .server import Server
+    from enum import Enum
 
 T = TypeVar("T")
 
@@ -110,9 +111,9 @@ async def get_server() -> "Server":
 
 def create_default_routes(server: "Server") -> APIRouter:
     """Create default routes for the server."""
-    router = APIRouter(tags=["Supervision"])
+    router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
 
-    @router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
+    @router.get("/jobs/{job_id}", response_model=Job)
     @handle_route_errors()
     async def get_job_status(job_id: str) -> Job:
         """Get the status of a job by its ID"""
@@ -124,7 +125,7 @@ def create_default_routes(server: "Server") -> APIRouter:
             )
         return job
 
-    @router.get("/jobs", tags=["Jobs"], response_model=Dict[str, List[Job]])
+    @router.get("/jobs", response_model=Dict[str, List[Job]])
     @handle_route_errors()
     async def get_all_jobs(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
@@ -154,7 +155,7 @@ def create_default_routes(server: "Server") -> APIRouter:
 
         return all_jobs
 
-    @router.get("/agents", tags=["Agents"], response_model=List[AgentResponse])
+    @router.get("/agents", response_model=List[AgentResponse])
     @handle_route_errors()
     async def get_all_agents(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
@@ -170,7 +171,7 @@ def create_default_routes(server: "Server") -> APIRouter:
             for a in server.agents[skip : skip + limit]
         ]
 
-    @router.get("/agent/{agent_id}", tags=["Agents"], response_model=AgentResponse)
+    @router.get("/agent/{agent_id}", response_model=AgentResponse)
     @handle_route_errors()
     async def get_agent_details(
         agent_id: str,
@@ -192,7 +193,7 @@ def create_default_routes(server: "Server") -> APIRouter:
 
 def create_utils_routes(server: "Server") -> APIRouter:
     """Create utility routes."""
-    router = APIRouter(prefix="/utils", tags=["Utils"])
+    router = APIRouter(prefix="/supervaizer/utils", tags=["Supervision"])
 
     @router.get(
         "/public_key",
@@ -224,7 +225,7 @@ def create_utils_routes(server: "Server") -> APIRouter:
 
 def create_agents_routes(server: "Server") -> APIRouter:
     """Create agent-specific routes."""
-    routers = APIRouter(tags=["Supervision"])
+    routers = APIRouter(prefix="/supervaizer", tags=["Supervision"])
     for agent in server.agents:
         routers.include_router(create_agent_route(server, agent))
     return routers
@@ -233,7 +234,7 @@ def create_agents_routes(server: "Server") -> APIRouter:
 def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     """Create agent-specific routes."""
     # tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
-    tags = ["Supervision"]
+    tags: list[str | Enum] = ["Supervision"]
     router = APIRouter(
         prefix=agent.path,
         tags=tags,

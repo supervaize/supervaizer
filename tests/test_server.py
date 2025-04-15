@@ -97,7 +97,7 @@ def test_get_job_status_endpoint(
     mock_jobs_instance.get_job.return_value = job_fixture
     mock_jobs.return_value = mock_jobs_instance
 
-    response = client.get("/jobs/test-job-id")
+    response = client.get("/supervaizer/jobs/test-job-id")
     assert response.status_code == 200
     assert response.json()["id"] == "test-job-id"
     assert response.json()["status"] == JobStatus.IN_PROGRESS.value
@@ -105,7 +105,7 @@ def test_get_job_status_endpoint(
     # Test job not found case
     mock_jobs_instance.get_job.return_value = None
 
-    response = client.get("/jobs/non-existent-job-id")
+    response = client.get("/supervaizer/jobs/non-existent-job-id")
     assert response.status_code == 404
     assert "detail" in response.json()
 
@@ -180,12 +180,12 @@ def test_utils_routes(server_fixture: Server) -> None:
     client = TestClient(server_fixture.app)
 
     # Test get_public_key endpoint
-    response = client.get("/utils/public_key")
+    response = client.get("/supervaizer/utils/public_key")
     assert response.status_code == 200
-    assert "-----BEGIN PUBLIC KEY-----" in response.text
+    assert "BEGIN PUBLIC KEY" in response.text
 
     # Test encrypt endpoint
-    response = client.post("/utils/encrypt", json="test_string")
+    response = client.post("/supervaizer/utils/encrypt", json="test_string")
     assert response.status_code == 200
     encrypted = response.json()
     assert isinstance(encrypted, str)

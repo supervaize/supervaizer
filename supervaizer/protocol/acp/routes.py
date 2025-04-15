@@ -13,6 +13,7 @@ from .model import create_agent_detail, list_agents, create_health_data
 
 if TYPE_CHECKING:
     from ...server import Server
+    from ...agent import Agent
 
 
 def create_routes(server: "Server") -> APIRouter:
@@ -35,7 +36,7 @@ def create_routes(server: "Server") -> APIRouter:
     # Create explicit routes for each agent
     for agent in server.agents:
 
-        def create_agent_route(current_agent):
+        def create_agent_route(current_agent: "Agent") -> None:
             route_path = f"/{current_agent.slug}"
 
             @router.get(
