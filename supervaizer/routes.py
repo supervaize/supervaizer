@@ -456,7 +456,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 def create_a2a_routes(server: "Server") -> APIRouter:
     """Create A2A protocol routes for the server."""
     router = APIRouter(prefix="/.well-known", tags=["A2A Protocol"])
-    base_url = server.url
+    base_url = server.public_url
 
     @router.get(
         "/agents.json",

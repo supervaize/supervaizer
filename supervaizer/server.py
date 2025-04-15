@@ -46,7 +46,7 @@ T = TypeVar("T")
 
 
 class ServerModel(SvBaseModel):
-    """API Server for the Supervaize Control."""
+    """API Server for the Supervaize Controller."""
 
     model_config = {"arbitrary_types_allowed": True}  # for FastAPI
     supervaizer_VERSION: ClassVar[str] = VERSION
@@ -59,7 +59,8 @@ class ServerModel(SvBaseModel):
     agents: List[Agent]
     app: FastAPI
     reload: bool
-    account: Account
+    supervisor_account: Optional[Account] = None
+    a2a_endpoints: bool = True
     private_key: RSAPrivateKey
     public_key: RSAPublicKey
     registration_host: Optional[str] = None
@@ -86,8 +87,9 @@ class ServerModel(SvBaseModel):
 class Server(ServerModel):
     def __init__(
         self,
-        account: Account,
         agents: List[Agent],
+        supervisor_account: Optional[Account] = None,
+        a2a_endpoints: bool = True,
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
@@ -104,8 +106,9 @@ class Server(ServerModel):
         """Initialize the server with the given configuration.
 
         Args:
-            account: The account to use for server registration
             agents: List of agents to register with the server
+            supervisor_account: Account of the supervisor
+            a2a_endpoints: Whether to enable A2A endpoints
             scheme: URL scheme (http or https)
             environment: Environment name (e.g., dev, staging, prod)
             host: Host to bind the server to (e.g., 0.0.0.0 for all interfaces)
@@ -193,7 +196,8 @@ class Server(ServerModel):
             agents=agents,
             app=app,
             reload=reload,
-            account=account,
+            supervisor_account=supervisor_account,
+            a2a_endpoints=a2a_endpoints,
             private_key=private_key,
             public_key=public_key,
             registration_host=registration_host,
@@ -201,10 +205,14 @@ class Server(ServerModel):
         )
 
         # Create routes
-        self.app.include_router(create_default_routes(self))
-        self.app.include_router(create_utils_routes(self))
-        self.app.include_router(create_agents_routes(self))
-        self.app.include_router(create_a2a_routes(self))
+        if self.supervisor_account:
+            log.info("[Server launch] Deploy all routes")
+            self.app.include_router(create_default_routes(self))
+            self.app.include_router(create_utils_routes(self))
+            self.app.include_router(create_agents_routes(self))
+        if self.a2a_endpoints:
+            log.info("[Server launch] Deploy A2A routes")
+            self.app.include_router(create_a2a_routes(self))
 
         # Override the get_server dependency to return this instance
         async def get_current_server() -> "Server":
@@ -218,6 +226,11 @@ class Server(ServerModel):
         """Get the server's base URL."""
         host = self.registration_host if self.registration_host else self.host
         return urlunparse((self.scheme, f"{host}:{self.port}", "", "", "", ""))
+
+    @property
+    def public_url(self) -> str:
+        """Get the server's base URL."""
+        return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
 
     @property
     def uri(self) -> str:
@@ -261,22 +274,23 @@ class Server(ServerModel):
             )  # needs to be lower case of uvicorn and uppercase of loguru
 
         log.info(
-            f"[Server launch] Starting Supervaize Control API v{VERSION} - Log : {log_level} "
+            f"[Server launch] Starting Supervaize Controller API v{VERSION} - Log : {log_level} "
         )
 
         # self.instructions()
+        if self.supervisor_account:
+            server_registration_result: ApiResult = (
+                self.supervisor_account.register_server(server=self)
+            )
+            assert isinstance(
+                server_registration_result, ApiSuccess
+            )  # If ApiError, exception should have been raised before
 
-        server_registration_result: ApiResult = self.account.register_server(
-            server=self
-        )
-        assert isinstance(
-            server_registration_result, ApiSuccess
-        )  # If ApiError, exception should have been raised before
+            for agent in self.agents:
+                updated_agent = agent.update_agent_from_server(self)
+                if updated_agent:
+                    log.info(f"[Server launch] Updated agent {updated_agent.name}")
 
-        for agent in self.agents:
-            updated_agent = agent.update_agent_from_server(self)
-            if updated_agent:
-                log.info(f"[Server launch] Updated agent {updated_agent.name}")
         import uvicorn
 
         uvicorn.run(

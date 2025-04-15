@@ -343,7 +343,7 @@ def test_agent_update_agent_from_server(
     )
     # Simulate server.account.get_agent_by() returns agent details
     monkeypatch.setattr(
-        server_fixture.account.__class__,
+        server_fixture.supervisor_account.__class__,
         "get_agent_by",
         lambda self, agent_id=None, agent_name=None: ApiSuccess(
             message="Success",
