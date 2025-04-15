@@ -341,7 +341,10 @@ def test_agent_update_agent_from_server(
             {"name": "parameter2", "value": "new_value2", "is_environment": False},
         ]),
     )
-    # Simulate server.account.get_agent_by() returns agent details
+    # Ensure supervisor_account is not None
+    assert server_fixture.supervisor_account is not None
+
+    # Simulate server.supervisor_account.get_agent_by() returns agent details
     monkeypatch.setattr(
         server_fixture.supervisor_account.__class__,
         "get_agent_by",

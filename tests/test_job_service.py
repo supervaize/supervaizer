@@ -173,7 +173,6 @@ async def test_service_job_start_event_sending(
     mock_send_event.assert_called_once()
 
 
-@pytest.mark.current
 def test_service_job_finished(server_fixture, mocker):
     """Test service_job_finished function correctly sends the JobFinishedEvent."""
     # Create a mock job
@@ -199,7 +198,7 @@ def test_service_job_finished(server_fixture, mocker):
     # Assert JobFinishedEvent was created correctly
     mock_event_class.assert_called_once_with(
         job=mock_job,
-        account=server_fixture.account,
+        account=server_fixture.supervisor_account,
     )
 
     # Assert the event was sent to the account

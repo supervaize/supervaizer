@@ -211,7 +211,7 @@ class Server(ServerModel):
 
         # Create routes
         if self.supervisor_account:
-            log.info("[Server launch] Deploy all routes")
+            log.info("[Server launch] Deploy the supervision routes")
             self.app.include_router(create_default_routes(self))
             self.app.include_router(create_utils_routes(self))
             self.app.include_router(create_agents_routes(self))
@@ -287,13 +287,14 @@ class Server(ServerModel):
 
         # self.instructions()
         if self.supervisor_account:
+            # Register the server with the supervisor account
             server_registration_result: ApiResult = (
                 self.supervisor_account.register_server(server=self)
             )
             assert isinstance(
                 server_registration_result, ApiSuccess
             )  # If ApiError, exception should have been raised before
-
+            # Get the agent details from the server
             for agent in self.agents:
                 updated_agent = agent.update_agent_from_server(self)
                 if updated_agent:

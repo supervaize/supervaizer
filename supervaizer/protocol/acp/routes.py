@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def create_routes(server: "Server") -> APIRouter:
     """Create ACP protocol routes for the server."""
-    router = APIRouter(prefix="/agents", tags=["ACP Protocol"])
+    router = APIRouter(prefix="/agents", tags=["Protocol ACP"])
     base_url = server.public_url
 
     @router.get(

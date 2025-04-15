@@ -5,7 +5,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 import traceback
-from enum import Enum
 from functools import wraps
 from typing import (
     TYPE_CHECKING,
@@ -111,7 +110,7 @@ async def get_server() -> "Server":
 
 def create_default_routes(server: "Server") -> APIRouter:
     """Create default routes for the server."""
-    router = APIRouter()
+    router = APIRouter(tags=["Supervision"])
 
     @router.get("/jobs/{job_id}", tags=["Jobs"], response_model=Job)
     @handle_route_errors()
@@ -225,7 +224,7 @@ def create_utils_routes(server: "Server") -> APIRouter:
 
 def create_agents_routes(server: "Server") -> APIRouter:
     """Create agent-specific routes."""
-    routers = APIRouter()
+    routers = APIRouter(tags=["Supervision"])
     for agent in server.agents:
         routers.include_router(create_agent_route(server, agent))
     return routers
@@ -233,7 +232,8 @@ def create_agents_routes(server: "Server") -> APIRouter:
 
 def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     """Create agent-specific routes."""
-    tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
+    # tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
+    tags = ["Supervision"]
     router = APIRouter(
         prefix=agent.path,
         tags=tags,
@@ -274,7 +274,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        tags=tags,
         response_model=Job,
         status_code=http_status.HTTP_202_ACCEPTED,
     )
@@ -316,7 +315,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_200_OK: {"model": List[Job]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        tags=tags,
     )
     @handle_route_errors()
     async def get_agent_jobs(
@@ -350,7 +348,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        tags=tags,
     )
     @handle_route_errors()
     async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
@@ -371,7 +368,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
-        tags=tags,
     )
     @handle_route_errors()
     async def stop_agent(
@@ -395,7 +391,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
-        tags=tags,
     )
     @handle_route_errors()
     async def status_agent(
@@ -421,7 +416,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
             http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
         },
-        tags=tags,
     )
     @handle_route_errors()
     async def custom_method(

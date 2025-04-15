@@ -186,7 +186,9 @@ def server_fixture(
         agent_timeout=10,
         jobs=[],
         private_key=private_key,
-        account=account_fixture,
+        acp_endpoints=True,
+        a2a_endpoints=True,
+        supervisor_account=account_fixture,
         agents=[agent_fixture],
     )
 
