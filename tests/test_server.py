@@ -233,7 +233,7 @@ async def test_start_job_endpoint(
 
     # Create a mock job model that matches the agent's job_start_method.job_model
     mock_job_model = mocker.MagicMock()
-    mock_job_model.supervaize_context = test_context
+    mock_job_model.job_context = test_context
     mock_job_model.job_fields = test_job_fields
     mock_job_model.encrypted_agent_parameters = "encrypted_params"
 
@@ -242,7 +242,7 @@ async def test_start_job_endpoint(
 
     # Mock the Job.new method
     monkeypatch.setattr(
-        Job, "new", lambda supervaize_context, agent_name, parameters: mock_job
+        Job, "new", lambda job_context, agent_name, parameters: mock_job
     )
 
     # Mock the Parameters.from_str method

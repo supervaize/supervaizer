@@ -285,7 +285,7 @@ EVENT_REGISTER_SERVER_PAYLOAD = {
 
 
 JOB_START_PARAMS_EXAMPLE = {
-    "supervaize_context": {
+    "job_context": {
         "workspace_id": "string",
         "job_id": "string",
         "started_by": "string",

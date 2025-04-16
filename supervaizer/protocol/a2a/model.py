@@ -64,7 +64,7 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
             "type": "object",
             "properties": {
                 "job_fields": {"type": "object"},
-                "supervaize_context": {"type": "object"},
+                "job_context": {"type": "object"},
             },
         },
     })

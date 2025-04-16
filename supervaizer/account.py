@@ -100,7 +100,7 @@ class Account(AccountModel):
         from .event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        log.debug(f"[Event payload] {event.payload}")
+        log.debug(f"[Account register server] {event.payload.keys()}")
         return self.send_event(sender=server, event=event)
 
     def _create_api_result(

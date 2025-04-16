@@ -1,6 +1,6 @@
 import json
 from typing import Optional, TYPE_CHECKING, Dict, Any
-from .event import JobStartConfirmationEvent, JobFinishedEvent
+from .event import JobFinishedEvent
 from .common import log, decrypt_value
 from .job import Job
 
@@ -46,24 +46,15 @@ async def service_job_start(
 
     # Create and prepare the job
     new_saas_job = Job.new(
-        supervaize_context=sv_context,
+        job_context=sv_context,
         agent_name=agent.name,
         parameters=agent_parameters,
     )
-    assert server.supervisor_account is not None, "No account defined"
-    account = server.supervisor_account
 
-    event = JobStartConfirmationEvent(
-        job=new_saas_job,
-        account=account,
-    )
     # Start the background execution
     background_tasks.add_task(
         agent.job_start, new_saas_job, job_fields, sv_context, server
     )
-
-    account.send_event(sender=new_saas_job, event=event)
-
     return new_saas_job
 
 

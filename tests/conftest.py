@@ -70,7 +70,7 @@ def context_fixture() -> Annotated[JobContext, "fixture"]:
 
 @pytest.fixture(scope="session")
 def job_fixture(context_fixture: JobContext) -> Annotated[Job, "fixture"]:
-    return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
+    return Job.new(job_context=context_fixture, agent_name="test-agent")
 
 
 @pytest.fixture

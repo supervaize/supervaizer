@@ -28,11 +28,11 @@ def context_fixture() -> JobContext:
 
 @pytest.fixture
 def job_fixture(context_fixture: JobContext) -> Job:
-    return Job.new(supervaize_context=context_fixture, agent_name="test-agent")
+    return Job.new(job_context=context_fixture, agent_name="test-agent")
 
 
 def test_job_creation(context_fixture: JobContext, job_fixture: Job) -> None:
-    supervaize_context = context_fixture
+    job_context = context_fixture
     job = job_fixture
     job_id = job.id
     response = JobResponse(
@@ -43,7 +43,7 @@ def test_job_creation(context_fixture: JobContext, job_fixture: Job) -> None:
     )
 
     job.add_response(response)
-    assert job.supervaize_context == supervaize_context
+    assert job.job_context == job_context
     assert job.status == JobStatus.IN_PROGRESS
     assert job.finished_at is None
     assert job.error is None

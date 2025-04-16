@@ -45,6 +45,7 @@ def send_event(
     headers = account.api_headers
     payload = event.payload
     log.debug(f"[Send event] <{event.type.name}> to <{account.url_event}>")
+    log.debug(f"[Send event] Payload: {payload}")
     try:
         response = httpx.post(account.url_event, headers=headers, json=payload)
         response.raise_for_status()
@@ -60,6 +61,7 @@ def send_event(
             payload=event.payload,
             exception=e,
         )
+        log.debug(f"[Send event] Payload: {payload}")
         log.error(f"[Send event] Error details: {error_result.dict}")
         log.error(error_result.log_message)
         raise e

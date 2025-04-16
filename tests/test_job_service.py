@@ -5,12 +5,11 @@
 # https://mozilla.org/MPL/2.0/.
 
 import pytest
-
+import uuid
 from supervaizer.job_service import service_job_start
 from supervaizer.job import Job
 
 
-@pytest.mark.current
 @pytest.mark.asyncio
 async def test_service_job_start_without_parameters(
     server_fixture, agent_fixture, context_fixture, mocker
@@ -25,7 +24,7 @@ async def test_service_job_start_without_parameters(
 
     # Create a mock job with required attributes
     mock_job = mocker.MagicMock(spec=Job)
-    mock_job.id = "test-job-id"  # Add id attribute to mock
+    mock_job.id = str(uuid.uuid4())  # Add id attribute to mock
     mock_job.registration_info = {"content": "of the job"}
     # Patch Job.new
     mock_job_new = mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
@@ -46,7 +45,7 @@ async def test_service_job_start_without_parameters(
 
     # Assert Job.new was called with correct parameters
     mock_job_new.assert_called_once_with(
-        supervaize_context=context_fixture,
+        job_context=context_fixture,
         agent_name=agent_fixture.name,
         parameters=None,
     )
@@ -57,8 +56,8 @@ async def test_service_job_start_without_parameters(
     )
 
     #
-    # Assert an event was sent to the account
-    assert mock_event_sent.call_count == 1
+    # Assert no event was sent to the account
+    assert mock_event_sent.call_count == 0
 
     # Assert the result is the created job
     assert result == mock_job
@@ -78,7 +77,7 @@ async def test_service_job_start_with_parameters(
 
     # Create a mock job with required attributes
     mock_job = mocker.MagicMock(spec=Job)
-    mock_job.id = "test-job-id"  # Add id attribute to mock
+    mock_job.id = str(uuid.uuid4())
     mock_job.registration_info = {"content": "of the job"}
     # Mock encrypted parameters
     encrypted_params = "encrypted_string"
@@ -114,7 +113,7 @@ async def test_service_job_start_with_parameters(
 
     # Assert Job.new was called with correct parameters
     mock_job_new.assert_called_once_with(
-        supervaize_context=context_fixture,
+        job_context=context_fixture,
         agent_name=agent_fixture.name,
         parameters={"test": "decrypted_string"},
     )
@@ -124,11 +123,10 @@ async def test_service_job_start_with_parameters(
         agent_fixture.job_start, mock_job, job_fields, context_fixture, server_fixture
     )
 
-    # Assert an event was sent to the account
-    assert mock_send_event.call_count == 1
-
     # Assert the result is the created job
     assert result == mock_job
+
+    mock_send_event.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -139,46 +137,30 @@ async def test_service_job_start_event_sending(
     # Create a mock for BackgroundTasks
     background_tasks = mocker.MagicMock()
     background_tasks.add_task = mocker.MagicMock(return_value=None)
-
+    job_id = str(uuid.uuid4())
     # Create mock job fields
     job_fields = mocker.MagicMock()
-
-    # Create a mock job with required attributes
-    mock_job = mocker.MagicMock(spec=Job)
-    mock_job.id = "test-job-id"  # Add id attribute to mock
-    mock_job.registration_info = {"content": "of the job"}
-    # Patch Job.new and JobStartConfirmationEvent
-    mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
-    mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
-    )
-
-    # Mock event instance
-    mock_event = mocker.MagicMock()
-    mock_event_class = mocker.patch("supervaizer.job_service.JobStartConfirmationEvent")
-    mock_event_class.return_value = mock_event
+    context_fixture.job_id = job_id
 
     # Call the function
-    await service_job_start(
+    job = await service_job_start(
         server=server_fixture,
         background_tasks=background_tasks,
         agent=agent_fixture,
         sv_context=context_fixture,
         job_fields=job_fields,
     )
+    assert isinstance(job, Job)
 
-    # Assert JobStartConfirmationEvent was created correctly
-    mock_event_class.assert_called_once()
-
-    # Assert the event was sent to the account
-    mock_send_event.assert_called_once()
+    # Assert background_tasks.add_task was called
+    background_tasks.add_task.assert_called_once()
 
 
 def test_service_job_finished(server_fixture, mocker):
     """Test service_job_finished function correctly sends the JobFinishedEvent."""
     # Create a mock job
     mock_job = mocker.MagicMock(spec=Job)
-    mock_job.id = "test-job-id"
+    mock_job.id = str(uuid.uuid4())
 
     # Mock JobFinishedEvent
     mock_event = mocker.MagicMock()

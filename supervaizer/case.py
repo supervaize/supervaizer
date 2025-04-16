@@ -47,6 +47,15 @@ class CaseNode(SvBaseModel):
     description: str
     type: str
 
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case node"""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "type": self.type,
+        }
+
 
 class CaseModel(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -119,9 +128,9 @@ class Case(CaseModel):
             "job_id": self.job_id,
             "name": self.name,
             "description": self.description,
-            "status": self.status,
-            "nodes": self.nodes,
-            "updates": self.updates,
+            "status": self.status.value,
+            "nodes": [node.registration_info for node in self.nodes],
+            "updates": [update.registration_info for update in self.updates],
             "total_cost": self.total_cost,
             "final_delivery": self.final_delivery,
         }

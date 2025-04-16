@@ -253,7 +253,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     )
     @handle_route_errors()
     async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
-        log.info(f"GET /[Agent info] {agent.name}")
+        log.info(f"📥  GET /[Agent info] {agent.name}")
         return AgentResponse(
             **agent.registration_info,
         )
@@ -285,8 +285,8 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
-        log.info(f"POST /jobs [Start job] {agent.name} with params {body_params}")
-        sv_context: JobContext = body_params.supervaize_context  # type: ignore[attr-defined]
+        log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
+        sv_context: JobContext = body_params.job_context  # type: ignore[attr-defined]
         job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
 
         # Get agent encrypted parameters if available
@@ -329,7 +329,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         ),
     ) -> List[Job] | JSONResponse:
         """Get all jobs for this agent"""
-        log.info(f"GET /jobs [Get agent jobs] {agent.name}")
+        log.info(f"📥  GET /jobs [Get agent jobs] {agent.name}")
         jobs = list(Jobs().get_agent_jobs(agent.name).values())
 
         # Apply status filter if specified
@@ -353,7 +353,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
         """Get the status of a job by its ID for this specific agent"""
-        log.info(f"GET /jobs/{job_id} [Get job status] {agent.name}")
+        log.info(f"📥  GET /jobs/{job_id} [Get job status] {agent.name}")
         job = Jobs().get_job(job_id, agent_name=agent.name)
         if not job:
             raise HTTPException(
@@ -374,7 +374,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def stop_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
-        log.info(f"POST /stop [Stop agent] {agent.name} with params {params}")
+        log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
         result = agent.job_stop(params.params)
         return AgentResponse(
             name=agent.name,
@@ -397,7 +397,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def status_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
     ) -> AgentResponse:
-        log.info(f"POST /status [Status agent] {agent.name} with params {params}")
+        log.info(f"📥  POST /status [Status agent] {agent.name} with params {params}")
         result = agent.job_status(params.params)
         return AgentResponse(
             name=agent.name,

@@ -110,6 +110,17 @@ class JobInstructions(SvBaseModel):
 
         return (True, "")
 
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the job instructions"""
+        return {
+            "max_cases": self.max_cases,
+            "max_duration": self.max_duration,
+            "max_cost": self.max_cost,
+            "stop_on_warning": self.stop_on_warning,
+            "stop_on_error": self.stop_on_error,
+        }
+
 
 class JobContext(SvBaseModel):
     workspace_id: str
@@ -120,6 +131,22 @@ class JobContext(SvBaseModel):
     mission_name: str
     mission_context: Any = None
     job_instructions: Optional[JobInstructions] = None
+
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the job context"""
+        return {
+            "workspace_id": self.workspace_id,
+            "job_id": self.job_id,
+            "started_by": self.started_by,
+            "started_at": self.started_at.isoformat() if self.started_at else "",
+            "mission_id": self.mission_id,
+            "mission_name": self.mission_name,
+            "mission_context": self.mission_context,
+            "job_instructions": self.job_instructions.registration_info
+            if self.job_instructions
+            else None,
+        }
 
 
 class JobStatus(str, Enum):
@@ -168,13 +195,25 @@ class JobResponse(SvBaseModel):
             )
             log.error(self.error_traceback)
 
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the job response"""
+        return {
+            "job_id": self.job_id,
+            "status": self.status.value,
+            "message": self.message,
+            "payload": self.payload,
+            "error_message": self.error_message,
+            "error_traceback": self.error_traceback,
+        }
+
 
 class JobModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
     agent_name: str
     status: "JobStatus"
-    supervaize_context: "JobContext"
+    job_context: "JobContext"
     payload: Any | None = None
     result: Any | None = None
     error: str | None = None
@@ -209,38 +248,38 @@ class Job(JobModel):
         return {
             "id": self.id,
             "agent_name": self.agent_name,
-            "status": self.status,
-            "supervaize_context": self.supervaize_context,
+            "status": self.status.value,
+            "job_context": self.job_context.registration_info,
             "payload": self.payload,
             "result": self.result,
             "error": self.error,
-            "responses": self.responses,
-            "finished_at": self.finished_at,
-            "created_at": self.created_at,
+            "responses": [response.registration_info for response in self.responses],
+            "finished_at": self.finished_at.isoformat() if self.finished_at else "",
+            "created_at": self.created_at.isoformat() if self.created_at else "",
         }
 
     @classmethod
     def new(
         cls,
-        supervaize_context: "JobContext",
+        job_context: "JobContext",
         agent_name: str,
         parameters: Optional[dict[str, Any]] = None,
     ) -> "Job":
         """Create a new job
 
         Args:
-            supervaize_context (JobContext): The context of the job
+            job_context (JobContext): The context of the job
             agent_name (str): The name of the agent
             parameters (dict[str, Any] | None): Optional parameters for the job
 
         Returns:
             Job: The new job
         """
-        job_id = supervaize_context.job_id or str(uuid.uuid4())
+        job_id = job_context.job_id or str(uuid.uuid4())
         job = cls(
             id=job_id,
             agent_name=agent_name,
-            supervaize_context=supervaize_context,
+            job_context=job_context,
             status=JobStatus.IN_PROGRESS,
         )
         return job

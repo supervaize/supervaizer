@@ -216,14 +216,14 @@ def test_job_model_dynamic_model() -> None:
     assert issubclass(JobModel, BaseModel)
 
     # Test 2: Check the structure of the model
-    assert JobModel.model_fields["supervaize_context"].annotation == JobContext
+    assert JobModel.model_fields["job_context"].annotation == JobContext
     assert "job_fields" in JobModel.model_fields
 
     # Test 3: Create a valid instance
     from datetime import datetime
 
     valid_data = {
-        "supervaize_context": {
+        "job_context": {
             "workspace_id": "ws-123",
             "job_id": "job-456",
             "started_by": "user-789",
@@ -237,8 +237,8 @@ def test_job_model_dynamic_model() -> None:
     model_instance = JobModel(**valid_data)
 
     # Verify we can access the fields
-    assert model_instance.supervaize_context.workspace_id == "ws-123"
-    assert model_instance.supervaize_context.job_id == "job-456"
+    assert model_instance.job_context.workspace_id == "ws-123"
+    assert model_instance.job_context.job_id == "job-456"
     # Job fields is dynamically created
     assert model_instance.job_fields.full_name == "John Doe"
     assert model_instance.job_fields.age == 30
@@ -246,7 +246,7 @@ def test_job_model_dynamic_model() -> None:
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
         JobModel(
-            supervaize_context={
+            job_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
                 "started_by": "user-789",
@@ -260,7 +260,7 @@ def test_job_model_dynamic_model() -> None:
     # Test 5: Missing required fields in context
     with pytest.raises(ValidationError):
         JobModel(
-            supervaize_context={
+            job_context={
                 # missing required fields
                 "workspace_id": "ws-123"
             },
@@ -270,7 +270,7 @@ def test_job_model_dynamic_model() -> None:
     # Test 6: Missing required fields in job_fields
     with pytest.raises(ValidationError):
         JobModel(
-            supervaize_context={
+            job_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
                 "started_by": "user-789",
@@ -295,7 +295,7 @@ def test_job_model_dynamic_model() -> None:
 
     # Create a valid instance with empty fields
     empty_valid_data = {
-        "supervaize_context": {
+        "job_context": {
             "workspace_id": "ws-123",
             "job_id": "job-456",
             "started_by": "user-789",
@@ -308,7 +308,7 @@ def test_job_model_dynamic_model() -> None:
     }
     empty_instance = EmptyJobModel(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
-    assert model_instance.supervaize_context.workspace_id == "ws-123"
+    assert model_instance.job_context.workspace_id == "ws-123"
 
 
 def test_agent_parameters(agent_fixture: Agent) -> None:
@@ -400,15 +400,13 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
     job_fields = {"full_name": "John Doe", "age": 30}
 
     # Create job with context
-    job = Job.new(
-        supervaize_context=context, agent_name=agent_fixture.name, parameters=None
-    )
+    job = Job.new(job_context=context, agent_name=agent_fixture.name, parameters=None)
 
     # Test job fields
-    assert job.supervaize_context.job_id == "test-job-id"
-    assert job.supervaize_context.started_by == "test-started-by"
-    assert job.supervaize_context.workspace_id == "test-workspace-id"
-    assert job.supervaize_context.mission_id == "test-mission-id"
-    assert job.supervaize_context.mission_name == "test-mission-name"
-    assert job.supervaize_context.mission_context is None
-    assert job.supervaize_context.job_instructions is None
+    assert job.job_context.job_id == "test-job-id"
+    assert job.job_context.started_by == "test-started-by"
+    assert job.job_context.workspace_id == "test-workspace-id"
+    assert job.job_context.mission_id == "test-mission-id"
+    assert job.job_context.mission_name == "test-mission-name"
+    assert job.job_context.mission_context is None
+    assert job.job_context.job_instructions is None

@@ -12,6 +12,7 @@ import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
 
+from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job_service import service_job_finished
 
 from .__version__ import VERSION
@@ -28,7 +29,7 @@ class AgentJobContextBase(BaseModel):
     Base model for agent job context parameters
     """
 
-    supervaize_context: JobContext
+    job_context: JobContext
     job_fields: Dict[str, Any]
 
 
@@ -159,7 +160,7 @@ class AgentMethod(AgentMethodModel):
             (AgentJobContextBase,),
             {
                 "__annotations__": {
-                    "supervaize_context": JobContext,
+                    "job_context": JobContext,
                     "job_fields": fields_model,
                 }
             },
@@ -376,6 +377,12 @@ class Agent(AgentModel):
         log.debug(
             f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
         )
+        event = JobStartConfirmationEvent(
+            job=job,
+            account=server.supervisor_account,
+        )
+        server.supervisor_account.send_event(sender=job, event=event)
+
         # Mark job as in progress when execution starts
         job.add_response(
             JobResponse(
