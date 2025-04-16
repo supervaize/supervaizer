@@ -25,16 +25,43 @@ class CaseStatus(str, Enum):
 
 
 class CaseNodeUpdate(SvBaseModel):
+    """
+    CaseNodeUpdate is a class that represents an update to a case node.
+
+
+    Returns:
+        CaseNodeUpdate: CaseNodeUpdate object
+    """
+
+    index: int | None = None  # added in Case.update
     cost: float | None = None
+    name: str | None = None
     # Todo: test with non-serializable objects. Make sure it works.
     payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
     question: Optional[Dict[str, Any]] = None
 
+    def __init__(
+        self,
+        cost: float | None = None,
+        name: str | None = None,
+        payload: Dict[str, Any] | None = None,
+        is_final: bool = False,
+        question: Dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            cost=cost,
+            name=name,
+            payload=payload,
+            is_final=is_final,
+            question=question,
+        )
+
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case node update"""
         return {
+            "index": self.index,
             "cost": self.cost,
             "payload": self.payload,
             "is_final": self.is_final,
@@ -85,13 +112,17 @@ class Case(CaseModel):
 
     def update(self, update: CaseNodeUpdate, **kwargs: Any) -> None:
         log.info(f"[Update case] {self.id} with update {update}")
+        update.index = len(self.updates) + 1
         self.account.send_update_case(self, update)
         self.updates.append(update)
 
-    def human_input(self, update: CaseNodeUpdate, message: str, **kwargs: Any) -> None:
-        log.info(f"[Update case] {self.id} with update {update}")
-        self.account.send_update_case(self, update)
-        self.updates.append(update)
+    def human_input(
+        self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
+    ) -> None:
+        log.info(f"[Update case] {self.id} with update {updateCaseNode}")
+        updateCaseNode.index = len(self.updates) + 1
+        self.account.send_update_case(self, updateCaseNode)
+        self.updates.append(updateCaseNode)
 
     def resume(self, **kwargs: Any) -> None:
         pass
@@ -124,7 +155,7 @@ class Case(CaseModel):
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case"""
         return {
-            "id": self.id,
+            "case_id": self.id,
             "job_id": self.job_id,
             "name": self.name,
             "description": self.description,

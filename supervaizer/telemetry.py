@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from .__version__ import VERSION
 
+# TODO: Uuse OpenTelemetry  / OpenInference standard  - Consider connecting to Arize Phoenix observability backend for storage and visualization.
+
 
 class TelemetryType(str, Enum):
     LOGS = "logs"

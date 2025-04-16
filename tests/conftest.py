@@ -119,6 +119,7 @@ def case_fixture(
 @pytest.fixture
 def case_node_update_fixture() -> Annotated[CaseNodeUpdate, "fixture"]:
     return CaseNodeUpdate(
+        index=1,
         payload={"test": "value"},
         is_final=True,
         cost=10.0,
