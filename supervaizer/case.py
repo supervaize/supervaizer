@@ -105,8 +105,8 @@ class Case(CaseModel):
     def start(
         cls,
         job_id: str,
-        account: "Account",
         name: str,
+        account: "Account",
         description: str,
         nodes: List[CaseNode],
         case_id: str = str(uuid4()),
@@ -117,8 +117,8 @@ class Case(CaseModel):
         Args:
             case_id (str): The id of the case
             job_id (str): The id of the job
-            account (Account): The account
             name (str): The name of the case
+            account (Account): The account
             description (str): The description of the case
             nodes (list[CaseNode]): The nodes of the case
 

@@ -67,7 +67,7 @@ class Event(EventModel):
         This must be a dictionary that can be serialized to JSON to be sent in the request body.
         """
         return {
-            "source": f"{self.source}",
+            "source": self.source,
             "workspace": f"{self.account.workspace_id}",
             "event_type": f"{self.type.value}",
             "details": self.details,

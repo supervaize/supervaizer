@@ -108,7 +108,6 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
 
     # Create the main agent card
     agent_card = {
-        "schema_version": "a2a_2023_v1",
         "name": agent.name,
         "description": agent.description,
         "developer": {
