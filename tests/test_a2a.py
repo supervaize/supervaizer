@@ -22,8 +22,6 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     card = create_agent_card(agent_fixture, base_url)
 
     # Test that the required A2A fields are present
-    assert "schema_version" in card
-    assert card["schema_version"] == "a2a_2023_v1"
     assert "name" in card
     assert card["name"] == agent_fixture.name
     assert "description" in card
@@ -148,8 +146,6 @@ def test_a2a_route_endpoints(server_fixture: Server) -> None:
     agents_list = response.json()
 
     # Verify the structure
-    assert "schema_version" in agents_list
-    assert agents_list["schema_version"] == "a2a_2023_v1"
     assert "agents" in agents_list
     assert isinstance(agents_list["agents"], list)
     assert len(agents_list["agents"]) == 1
@@ -163,8 +159,6 @@ def test_a2a_route_endpoints(server_fixture: Server) -> None:
     agent_card = response.json()
 
     # Verify the structure
-    assert "schema_version" in agent_card
-    assert agent_card["schema_version"] == "a2a_2023_v1"
     assert "name" in agent_card
     assert agent_card["name"] == agent.name
 
@@ -179,7 +173,6 @@ def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
     a2a_agent_schema = {
         "type": "object",
         "required": [
-            "schema_version",
             "name",
             "description",
             "developer",
@@ -191,7 +184,6 @@ def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
             "tools",
         ],
         "properties": {
-            "schema_version": {"type": "string", "const": "a2a_2023_v1"},
             "name": {"type": "string"},
             "description": {"type": "string"},
             "developer": {

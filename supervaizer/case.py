@@ -31,6 +31,16 @@ class CaseNodeUpdate(SvBaseModel):
     is_final: bool = False
     question: Optional[Dict[str, Any]] = None
 
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case node update"""
+        return {
+            "cost": self.cost,
+            "payload": self.payload,
+            "is_final": self.is_final,
+            "question": self.question,
+        }
+
 
 class CaseNode(SvBaseModel):
     name: str
@@ -100,6 +110,21 @@ class Case(CaseModel):
         )
         self.final_delivery = case_result
         self.account.send_update_case(self, update)
+
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case"""
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "name": self.name,
+            "description": self.description,
+            "status": self.status,
+            "nodes": self.nodes,
+            "updates": self.updates,
+            "total_cost": self.total_cost,
+            "final_delivery": self.final_delivery,
+        }
 
     @classmethod
     def start(

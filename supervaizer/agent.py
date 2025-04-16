@@ -201,6 +201,7 @@ class AgentMethodsModel(BaseModel):
 
 
 class AgentMethods(AgentMethodsModel):
+    @property
     def registration_info(self) -> Dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
@@ -267,7 +268,7 @@ class Agent(AgentModel):
             "api_path": self.path,
             "slug": self.slug,
             "tags": self.tags,
-            "methods": self.methods.registration_info(),
+            "methods": self.methods.registration_info,
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,

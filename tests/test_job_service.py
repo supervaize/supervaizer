@@ -10,6 +10,7 @@ from supervaizer.job_service import service_job_start
 from supervaizer.job import Job
 
 
+@pytest.mark.current
 @pytest.mark.asyncio
 async def test_service_job_start_without_parameters(
     server_fixture, agent_fixture, context_fixture, mocker
@@ -25,8 +26,7 @@ async def test_service_job_start_without_parameters(
     # Create a mock job with required attributes
     mock_job = mocker.MagicMock(spec=Job)
     mock_job.id = "test-job-id"  # Add id attribute to mock
-    mock_job.to_dict = {"content": "of the job"}
-
+    mock_job.registration_info = {"content": "of the job"}
     # Patch Job.new
     mock_job_new = mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
 
@@ -56,6 +56,7 @@ async def test_service_job_start_without_parameters(
         agent_fixture.job_start, mock_job, job_fields, context_fixture, server_fixture
     )
 
+    #
     # Assert an event was sent to the account
     assert mock_event_sent.call_count == 1
 
@@ -78,7 +79,7 @@ async def test_service_job_start_with_parameters(
     # Create a mock job with required attributes
     mock_job = mocker.MagicMock(spec=Job)
     mock_job.id = "test-job-id"  # Add id attribute to mock
-    mock_job.to_dict = {"content": "of the job"}
+    mock_job.registration_info = {"content": "of the job"}
     # Mock encrypted parameters
     encrypted_params = "encrypted_string"
 
@@ -145,7 +146,7 @@ async def test_service_job_start_event_sending(
     # Create a mock job with required attributes
     mock_job = mocker.MagicMock(spec=Job)
     mock_job.id = "test-job-id"  # Add id attribute to mock
-    mock_job.to_dict = {"content": "of the job"}
+    mock_job.registration_info = {"content": "of the job"}
     # Patch Job.new and JobStartConfirmationEvent
     mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
     mock_send_event = mocker.patch(

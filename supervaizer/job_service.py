@@ -39,13 +39,10 @@ async def service_job_start(
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-        print(f"[Agent parameters] : {agent_parameters_str}")
         agent_parameters = (
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
-        log.debug(
-            f"[Decrypted parameters] : {agent_parameters} - TO REMOVE"
-        )  # TODO remove log
+        log.debug("[Decrypted parameters] : parameters decrypted")
 
     # Create and prepare the job
     new_saas_job = Job.new(

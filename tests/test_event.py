@@ -77,7 +77,7 @@ def test_case_start_event(case_fixture: Case, account_fixture: Account) -> None:
         "job": case_fixture.job_id,
         "case": case_fixture.id,
     }
-    assert case_start_event.details == case_fixture.to_dict
+    assert case_start_event.details == case_fixture.registration_info
 
 
 def test_case_update_event(
@@ -96,7 +96,7 @@ def test_case_update_event(
         "job": case_fixture.job_id,
         "case": case_fixture.id,
     }
-    assert case_update_event.details == case_node_update_fixture.to_dict
+    assert case_update_event.details == case_node_update_fixture.registration_info
 
 
 def test_job_start_confirmation_event(
@@ -109,7 +109,7 @@ def test_job_start_confirmation_event(
     assert isinstance(job_start_confirmation_event, JobStartConfirmationEvent)
     assert job_start_confirmation_event.type == EventType.JOB_START_CONFIRMATION
     assert job_start_confirmation_event.source == {"job": "test-job-id"}
-    assert job_start_confirmation_event.details == job_fixture.to_dict
+    assert job_start_confirmation_event.details == job_fixture.registration_info
 
 
 def test_job_finished_event(job_fixture: Job, account_fixture: Account) -> None:

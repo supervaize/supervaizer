@@ -118,7 +118,7 @@ class JobStartConfirmationEvent(Event):
             type=EventType.JOB_START_CONFIRMATION,
             account=account,
             source={"job": job.id},
-            details=job.to_dict,
+            details=job.registration_info,
         )
 
 
@@ -128,7 +128,7 @@ class JobFinishedEvent(Event):
             type=EventType.JOB_FINISHED,
             account=account,
             source={"job": job.id},
-            details=job.to_dict,
+            details=job.registration_info,
         )
 
 
@@ -140,7 +140,7 @@ class CaseStartEvent(Event):
             type=EventType.CASE_START,
             account=account,
             source={"job": case.job_id, "case": case.id},
-            details=case.to_dict,
+            details=case.registration_info,
         )
 
 
@@ -155,5 +155,5 @@ class CaseUpdateEvent(Event):
             type=EventType.CASE_UPDATE,
             account=account,
             source={"job": case.job_id, "case": case.id},
-            details=update.to_dict,
+            details=update.registration_info,
         )

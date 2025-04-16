@@ -9,7 +9,7 @@ import traceback
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Dict, Optional
 
 from .__version__ import VERSION
 from .common import SvBaseModel, log, singleton
@@ -202,6 +202,22 @@ class Job(JobModel):
             self.finished_at = datetime.now()
             self.error = response.message
         self.responses.append(response)
+
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the job"""
+        return {
+            "id": self.id,
+            "agent_name": self.agent_name,
+            "status": self.status,
+            "supervaize_context": self.supervaize_context,
+            "payload": self.payload,
+            "result": self.result,
+            "error": self.error,
+            "responses": self.responses,
+            "finished_at": self.finished_at,
+            "created_at": self.created_at,
+        }
 
     @classmethod
     def new(
