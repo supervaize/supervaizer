@@ -1,13 +1,13 @@
 import json
 from typing import Optional, TYPE_CHECKING, Dict, Any
-from .event import JobFinishedEvent
-from .common import log, decrypt_value
-from .job import Job
+from supervaizer.event import JobFinishedEvent
+from supervaizer.common import log, decrypt_value
+from supervaizer.job import Job
 
 if TYPE_CHECKING:
-    from .job import Job, JobContext
-    from .server import Server
-    from .agent import Agent
+    from supervaizer.job import Job, JobContext
+    from supervaizer.server import Server
+    from supervaizer.agent import Agent
     from fastapi import BackgroundTasks
 
 

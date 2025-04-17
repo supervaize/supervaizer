@@ -9,16 +9,16 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 
 import httpx
 
-from .__version__ import TELEMETRY_VERSION, VERSION
-from .common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
-from .telemetry import Telemetry
+from supervaizer.__version__ import TELEMETRY_VERSION, VERSION
+from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
+from supervaizer.telemetry import Telemetry
 
 if TYPE_CHECKING:
-    from .agent import Agent
-    from .case import Case, CaseNodeUpdate
-    from .event import Event
-    from .server import Server
-    from .job import Job
+    from supervaizer.agent import Agent
+    from supervaizer.case import Case, CaseNodeUpdate
+    from supervaizer.event import Event
+    from supervaizer.server import Server
+    from supervaizer.job import Job
 
 
 class AccountModel(SvBaseModel):
@@ -79,7 +79,7 @@ class Account(AccountModel):
             Request exception if the request fails.
         """
         # Import here to avoid circular imports
-        from .account_service import send_event as service_send_event
+        from supervaizer.account_service import send_event as service_send_event
 
         return service_send_event(self, sender, event)
 
@@ -97,7 +97,7 @@ class Account(AccountModel):
             - Sends a ServerRegisterEvent to the Supervaize Control API
         """
         # Import here to avoid circular imports
-        from .event import ServerRegisterEvent
+        from supervaizer.event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
         log.debug(f"[Account register server] {event.payload.keys()}")
@@ -163,21 +163,21 @@ class Account(AccountModel):
                       ApiError with error details if request fails
         """
         # Import here to avoid circular imports
-        from .event import AgentRegisterEvent
+        from supervaizer.event import AgentRegisterEvent
 
         event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
         return self.send_event(agent, event)
 
     def send_start_case(self, case: "Case") -> ApiResult:
         # Import here to avoid circular imports
-        from .event import CaseStartEvent
+        from supervaizer.event import CaseStartEvent
 
         event = CaseStartEvent(case=case, account=self)
         return self.send_event(case, event)
 
     def send_update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
         # Import here to avoid circular imports
-        from .event import CaseUpdateEvent
+        from supervaizer.event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)
         return self.send_event(update, event)

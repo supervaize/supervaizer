@@ -20,10 +20,10 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import field_validator
 from rich import inspect
 
-from .__version__ import API_VERSION, VERSION
-from .account import Account
-from .agent import Agent
-from .common import (
+from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.account import Account
+from supervaizer.agent import Agent
+from supervaizer.common import (
     ApiResult,
     ApiSuccess,
     SvBaseModel,
@@ -31,15 +31,15 @@ from .common import (
     encrypt_value,
     log,
 )
-from .instructions import display_instructions
-from .routes import (
+from supervaizer.instructions import display_instructions
+from supervaizer.routes import (
     create_agents_routes,
     create_default_routes,
     create_utils_routes,
     get_server,
 )
-from .protocol.a2a import create_routes as create_a2a_routes
-from .protocol.acp import create_routes as create_acp_routes
+from supervaizer.protocol.a2a import create_routes as create_a2a_routes
+from supervaizer.protocol.acp import create_routes as create_acp_routes
 
 insp = inspect
 

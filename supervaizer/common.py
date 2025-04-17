@@ -85,7 +85,10 @@ class ApiSuccess(ApiResult):
             result = demjson3.decode(detail, return_errors=True)
             detail = {"object": result.object}
             id = result.object.get("id") or None
-            log_message += f"{message} - {id}"
+            if id is not None:
+                log_message += f"{message} : {id}"
+            else:
+                log_message += f"{message}"
         else:
             id = None
             detail = detail

@@ -6,14 +6,14 @@
 
 from enum import Enum
 from typing import Any, ClassVar, Dict, TYPE_CHECKING
-from .__version__ import VERSION
-from .common import SvBaseModel
+from supervaizer.__version__ import VERSION
+from supervaizer.common import SvBaseModel
 
 if TYPE_CHECKING:
-    from .agent import Agent
-    from .case import Case, CaseNodeUpdate
-    from .server import Server
-    from .job import Job
+    from supervaizer.agent import Agent
+    from supervaizer.case import Case, CaseNodeUpdate
+    from supervaizer.server import Server
+    from supervaizer.job import Job
 
 
 class EventType(str, Enum):

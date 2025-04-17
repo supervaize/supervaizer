@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING, Union
 
 import httpx
 
-from .common import ApiError, ApiResult, ApiSuccess, log
+from supervaizer.common import ApiError, ApiResult, ApiSuccess, log
 
 if TYPE_CHECKING:
-    from .agent import Agent
-    from .case import Case, CaseNodeUpdate
-    from .event import Event
-    from .server import Server
-    from .account import Account
-    from .job import Job
+    from supervaizer.agent import Agent
+    from supervaizer.case import Case, CaseNodeUpdate
+    from supervaizer.event import Event
+    from supervaizer.server import Server
+    from supervaizer.account import Account
+    from supervaizer.job import Job
 
 
 def send_event(

@@ -5,17 +5,17 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from .account import Account
-from .agent import (
+from supervaizer.account import Account
+from supervaizer.agent import (
     Agent,
     AgentCustomMethodParams,
     AgentMethod,
     AgentMethodParams,
     AgentMethods,
 )
-from .case import Case, CaseNode, CaseNodeUpdate, CaseStatus
-from .common import ApiError, ApiResult, ApiSuccess
-from .event import (
+from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
+from supervaizer.common import ApiError, ApiResult, ApiSuccess
+from supervaizer.event import (
     AgentRegisterEvent,
     CaseUpdateEvent,
     JobFinishedEvent,
@@ -25,12 +25,17 @@ from .event import (
     ServerRegisterEvent,
     CaseStartEvent,
 )
-from .job import Job, JobInstructions, JobContext, JobResponse, JobStatus
-from .parameter import Parameter, Parameters, ParametersSetup
-from .server import Server
-from .server_utils import ErrorResponse, ErrorType, create_error_response
-from .telemetry import Telemetry, TelemetryCategory, TelemetrySeverity, TelemetryType
-from . import protocol
+from supervaizer.job import Job, JobInstructions, JobContext, JobResponse, JobStatus
+from supervaizer.parameter import Parameter, Parameters, ParametersSetup
+from supervaizer.server import Server
+from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
+from supervaizer.telemetry import (
+    Telemetry,
+    TelemetryCategory,
+    TelemetrySeverity,
+    TelemetryType,
+)
+from supervaizer import protocol
 
 __all__ = [
     "Agent",

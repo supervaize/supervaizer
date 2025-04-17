@@ -14,14 +14,13 @@ from slugify import slugify
 
 from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job_service import service_job_finished
-
-from .__version__ import VERSION
-from .common import ApiSuccess, SvBaseModel, log
-from .job import Job, JobContext, JobResponse, JobStatus
-from .parameter import ParametersSetup
+from supervaizer.__version__ import VERSION
+from supervaizer.common import ApiSuccess, SvBaseModel, log
+from supervaizer.job import Job, JobContext, JobResponse, JobStatus
+from supervaizer.parameter import ParametersSetup
 
 if TYPE_CHECKING:
-    from .server import Server
+    from supervaizer.server import Server
 
 
 class AgentJobContextBase(BaseModel):

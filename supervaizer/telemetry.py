@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Dict
 
 from pydantic import BaseModel
 
-from .__version__ import VERSION
+from supervaizer.__version__ import VERSION
 
 # TODO: Uuse OpenTelemetry  / OpenInference standard  - Consider connecting to Arize Phoenix observability backend for storage and visualization.
 

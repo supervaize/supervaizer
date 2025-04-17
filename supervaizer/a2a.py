@@ -1,4 +1,4 @@
-from .protocol.a2a import (
+from supervaizer.protocol.a2a import (
     create_agent_card,
     create_agents_list,
     create_health_data,

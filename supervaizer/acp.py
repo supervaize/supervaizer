@@ -1,4 +1,4 @@
-from .protocol.acp import (
+from supervaizer.protocol.acp import (
     create_agent_detail,
     list_agents,
     create_health_data,

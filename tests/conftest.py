@@ -80,6 +80,7 @@ def event_fixture(account_fixture: Account) -> Annotated[Event, "fixture"]:
         source={"test": "value"},
         details={"test": "value"},
         account=account_fixture,
+        object_type="test_event",
     )
 
 

@@ -11,8 +11,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar, Dict, Optional
 
-from .__version__ import VERSION
-from .common import SvBaseModel, log, singleton
+from supervaizer.__version__ import VERSION
+from supervaizer.common import SvBaseModel, log, singleton
 
 
 @singleton

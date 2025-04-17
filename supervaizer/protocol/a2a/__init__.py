@@ -6,8 +6,12 @@
 
 """A2A protocol implementation for SUPERVAIZER."""
 
-from .model import create_agent_card, create_agents_list, create_health_data
-from .routes import create_routes
+from supervaizer.protocol.a2a.model import (
+    create_agent_card,
+    create_agents_list,
+    create_health_data,
+)
+from supervaizer.protocol.a2a.routes import create_routes
 
 __all__ = [
     "create_agent_card",

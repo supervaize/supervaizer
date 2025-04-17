@@ -7,13 +7,17 @@
 from typing import Dict, List, Any, TYPE_CHECKING
 from fastapi import APIRouter
 
-from ...common import log
-from ...routes import handle_route_errors
-from .model import create_agent_detail, list_agents, create_health_data
+from supervaizer.common import log
+from supervaizer.routes import handle_route_errors
+from supervaizer.protocol.acp.model import (
+    create_agent_detail,
+    list_agents,
+    create_health_data,
+)
 
 if TYPE_CHECKING:
-    from ...server import Server
-    from ...agent import Agent
+    from supervaizer.server import Server
+    from supervaizer.agent import Agent
 
 
 def create_routes(server: "Server") -> APIRouter:

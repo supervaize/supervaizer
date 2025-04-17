@@ -30,19 +30,19 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
-from .agent import (
+from supervaizer.agent import (
     Agent,
     AgentCustomMethodParams,
     AgentMethodParams,
     AgentResponse,
 )
-from .common import log
-from .job import Job, JobContext, Jobs, JobStatus
-from .server_utils import ErrorResponse, ErrorType, create_error_response
-from .job_service import service_job_start
+from supervaizer.common import log
+from supervaizer.job import Job, JobContext, Jobs, JobStatus
+from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
+from supervaizer.job_service import service_job_start
 
 if TYPE_CHECKING:
-    from .server import Server
+    from supervaizer.server import Server
     from enum import Enum
 
 T = TypeVar("T")

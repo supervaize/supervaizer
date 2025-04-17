@@ -11,10 +11,10 @@ from uuid import uuid4
 
 from pydantic import ConfigDict
 
-from .common import SvBaseModel, log
+from supervaizer.common import SvBaseModel, log
 
 if TYPE_CHECKING:
-    from .account import Account
+    from supervaizer.account import Account
 
 
 class CaseStatus(str, Enum):
@@ -48,13 +48,28 @@ class CaseNodeUpdate(SvBaseModel):
         payload: Dict[str, Any] | None = None,
         is_final: bool = False,
         question: Dict[str, Any] | None = None,
+        index: int | None = None,
     ) -> None:
+        """Initialize a CaseNodeUpdate.
+
+        Args:
+            cost (float): Cost of the update
+            name (str): Name of the update
+            payload (Dict[str, Any]): Additional data for the update
+            is_final (bool): Whether this is the final update. Default to False
+            question (Dict[str, Any]): Question for the update
+            index (int): Index of the node to update. This is set by Case.update()
+
+        Returns:
+            CaseNodeUpdate: CaseNodeUpdate object
+        """
         super().__init__(
             cost=cost,
             name=name,
             payload=payload,
             is_final=is_final,
             question=question,
+            index=index,
         )
 
     @property

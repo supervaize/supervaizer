@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 
 from deprecated import deprecated
 
-from .common import SvBaseModel, log
+from supervaizer.common import SvBaseModel, log
 
 
 class ParameterModel(SvBaseModel):

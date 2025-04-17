@@ -6,6 +6,6 @@
 
 """Protocol implementations for SUPERVAIZER."""
 
-from . import a2a, acp
+from supervaizer.protocol import a2a, acp
 
 __all__ = ["a2a", "acp"]
