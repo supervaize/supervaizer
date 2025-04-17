@@ -107,20 +107,25 @@ class Case(CaseModel):
         return f"case:{self.id}"
 
     @property
+    def case_ref(self) -> str:
+        return f"{self.job_id}-{self.id}"
+
+    @property
     def calculated_cost(self) -> float:
         return sum(update.cost or 0.0 for update in self.updates)
 
-    def update(self, update: CaseNodeUpdate, **kwargs: Any) -> None:
-        log.info(f"[Update case] {self.id} with update {update}")
-        update.index = len(self.updates) + 1
-        self.account.send_update_case(self, update)
-        self.updates.append(update)
+    def update(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
+        updateCaseNode.index = len(self.updates) + 1
+        self.account.send_update_case(self, updateCaseNode)
+        self.updates.append(updateCaseNode)
 
     def human_input(
         self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
     ) -> None:
-        log.info(f"[Update case] {self.id} with update {updateCaseNode}")
         updateCaseNode.index = len(self.updates) + 1
+        log.info(
+            f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
+        )
         self.account.send_update_case(self, updateCaseNode)
         self.updates.append(updateCaseNode)
 
@@ -141,13 +146,16 @@ class Case(CaseModel):
         else:
             self.total_cost = self.calculated_cost
         log.info(
-            f"[Close case] {self.id} with result {case_result} - Case cost is {self.total_cost}"
+            f"[Close case] CaseRef {self.case_ref} with result {case_result} - Case cost is {self.total_cost}"
         )
         self.status = CaseStatus.COMPLETED
+
         update = CaseNodeUpdate(
             payload=case_result,
             is_final=True,
         )
+        update.index = len(self.updates) + 1
+
         self.final_delivery = case_result
         self.account.send_update_case(self, update)
 
@@ -157,6 +165,7 @@ class Case(CaseModel):
         return {
             "case_id": self.id,
             "job_id": self.job_id,
+            "case_ref": self.case_ref,
             "name": self.name,
             "description": self.description,
             "status": self.status.value,

@@ -39,6 +39,7 @@ class EventModel(SvBaseModel):
     source: Dict[str, Any]
     account: Any  # Use Any to avoid Pydantic type resolution issues
     type: EventType
+    object_type: str
     details: Dict[str, Any]
 
 
@@ -70,6 +71,7 @@ class Event(EventModel):
             "source": self.source,
             "workspace": f"{self.account.workspace_id}",
             "event_type": f"{self.type.value}",
+            "object_type": self.object_type,
             "details": self.details,
         }
 
@@ -90,6 +92,7 @@ class AgentRegisterEvent(Event):
             type=EventType.AGENT_REGISTER,
             account=account,
             source={"agent": agent.slug},
+            object_type="agent",
             details=agent.registration_info | {"polling": polling},
         )
 
@@ -104,6 +107,7 @@ class ServerRegisterEvent(Event):
             type=EventType.SERVER_REGISTER,
             source={"server": server.uri},
             account=account,
+            object_type="server",
             details=server.registration_info,
         )
 
@@ -118,6 +122,7 @@ class JobStartConfirmationEvent(Event):
             type=EventType.JOB_START_CONFIRMATION,
             account=account,
             source={"job": job.id},
+            object_type="job",
             details=job.registration_info,
         )
 
@@ -128,6 +133,7 @@ class JobFinishedEvent(Event):
             type=EventType.JOB_FINISHED,
             account=account,
             source={"job": job.id},
+            object_type="job",
             details=job.registration_info,
         )
 
@@ -140,6 +146,7 @@ class CaseStartEvent(Event):
             type=EventType.CASE_START,
             account=account,
             source={"job": case.job_id, "case": case.id},
+            object_type="case",
             details=case.registration_info,
         )
 
@@ -155,5 +162,6 @@ class CaseUpdateEvent(Event):
             type=EventType.CASE_UPDATE,
             account=account,
             source={"job": case.job_id, "case": case.id},
+            object_type="case",
             details=update.registration_info,
         )
