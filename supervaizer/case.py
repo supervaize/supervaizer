@@ -5,23 +5,17 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from enum import Enum
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import ConfigDict
 
 from supervaizer.common import SvBaseModel, log
+from supervaizer.lifecycle import EntityStatus, EntityEvents, EntityLifecycle
 
 if TYPE_CHECKING:
     from supervaizer.account import Account
-
-
-class CaseStatus(str, Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 class CaseNodeUpdate(SvBaseModel):
@@ -115,11 +109,12 @@ class CaseModel(SvBaseModel):
     name: str
     account: "Account"  # type: ignore
     description: str
-    status: CaseStatus
+    status: EntityStatus
     nodes: List[CaseNode] = []
     updates: List[CaseNodeUpdate] = []
     total_cost: float = 0.0
     final_delivery: Optional[Dict[str, Any]] = None
+    finished_at: Optional[datetime] = None
 
 
 class Case(CaseModel):
@@ -154,7 +149,8 @@ class Case(CaseModel):
         self.updates.append(updateCaseNode)
 
     def resume(self, **kwargs: Any) -> None:
-        pass
+        # Transition from AWAITING to IN_PROGRESS
+        EntityLifecycle.handle_event(self, EntityEvents.INPUT_RECEIVED)
 
     def close(
         self,
@@ -172,7 +168,8 @@ class Case(CaseModel):
         log.info(
             f"[Close case] CaseRef {self.case_ref} with result {case_result} - Case cost is {self.total_cost}"
         )
-        self.status = CaseStatus.COMPLETED
+        # Transition from IN_PROGRESS to COMPLETED
+        EntityLifecycle.handle_event(self, EntityEvents.SUCCESSFULLY_DONE)
 
         update = CaseNodeUpdate(
             payload=case_result,
@@ -181,6 +178,7 @@ class Case(CaseModel):
         update.index = len(self.updates) + 1
 
         self.final_delivery = case_result
+        self.finished_at = datetime.now()
         self.account.send_update_case(self, update)
 
     @property
@@ -230,10 +228,13 @@ class Case(CaseModel):
             account=account,
             name=name,
             description=description,
-            status=CaseStatus.IN_PROGRESS,
+            status=EntityStatus.IN_PROGRESS,
             nodes=nodes,
         )
         log.info(f"[Case created] {case.id}")
+
+        # Transition from STOPPED to IN_PROGRESS
+        EntityLifecycle.handle_event(case, EntityEvents.START_WORK)
 
         # Send case startvent to Supervaize SaaS.
         account.send_start_case(case=case)

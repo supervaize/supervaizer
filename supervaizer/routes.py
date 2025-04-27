@@ -37,9 +37,10 @@ from supervaizer.agent import (
     AgentResponse,
 )
 from supervaizer.common import log
-from supervaizer.job import Job, JobContext, Jobs, JobStatus
+from supervaizer.job import Job, JobContext, Jobs
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 from supervaizer.job_service import service_job_start
+from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -132,7 +133,7 @@ def create_default_routes(server: "Server") -> APIRouter:
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
         ),
-        status: Optional[JobStatus] = Query(
+        status: Optional[EntityStatus] = Query(
             default=None, description="Filter jobs by status"
         ),
     ) -> Dict[str, List[Job]]:
@@ -324,7 +325,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
         ),
-        status: JobStatus | None = Query(
+        status: EntityStatus | None = Query(
             default=None, description="Filter jobs by status"
         ),
     ) -> List[Job] | JSONResponse:

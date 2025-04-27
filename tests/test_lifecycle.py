@@ -287,7 +287,6 @@ class TestEntityLifecycle:
         assert success is True
         assert error == ""
         assert entity.status == EntityStatus.IN_PROGRESS
-        assert entity.save.called
         assert entity.finished_at is None  # Should not be set for non-terminal states
 
     def test_transition_invalid(self, mocker):
@@ -300,7 +299,6 @@ class TestEntityLifecycle:
         assert success is False
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
-        assert not entity.save.called
 
     def test_transition_to_terminal_state(self, mocker):
         """Test transition to a terminal state sets finished_at."""
@@ -312,7 +310,6 @@ class TestEntityLifecycle:
         assert success is True
         assert error == ""
         assert entity.status == EntityStatus.COMPLETED
-        assert entity.save.call_count == 2  # Once for status, once for finished_at
         assert entity.finished_at is not None
 
     def test_handle_event_success(self, mocker):
@@ -325,7 +322,6 @@ class TestEntityLifecycle:
         assert success is True
         assert error == ""
         assert entity.status == EntityStatus.IN_PROGRESS
-        assert entity.save.called
 
     def test_handle_event_invalid(self, mocker):
         """Test invalid event handling."""
@@ -339,7 +335,6 @@ class TestEntityLifecycle:
         assert success is False
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
-        assert not entity.save.called
 
     def test_sequential_transitions(self, mocker):
         """Test a sequence of transitions."""

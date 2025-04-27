@@ -49,6 +49,7 @@ async def service_job_start(
         job_context=sv_context,
         agent_name=agent.name,
         parameters=agent_parameters,
+        name=sv_context.job_id,
     )
 
     # Start the background execution

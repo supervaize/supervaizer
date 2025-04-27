@@ -16,8 +16,9 @@ from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job_service import service_job_finished
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiSuccess, SvBaseModel, log
-from supervaizer.job import Job, JobContext, JobResponse, JobStatus
+from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.parameter import ParametersSetup
+from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -391,7 +392,7 @@ class Agent(AgentModel):
         job.add_response(
             JobResponse(
                 job_id=job.id,
-                status=JobStatus.IN_PROGRESS,
+                status=EntityStatus.IN_PROGRESS,
                 message="Starting job execution",
                 payload=None,
             )
@@ -407,13 +408,13 @@ class Agent(AgentModel):
                 started = self._execute(action, params)
                 job_response = JobResponse(
                     job_id=job.id,
-                    status=JobStatus.IN_PROGRESS,
+                    status=EntityStatus.IN_PROGRESS,
                     message="Job started ",
                     payload={"intermediary_deliverable": started},
                 )
             else:
                 job_response = self._execute(action, params)
-                if job_response.status == JobStatus.COMPLETED:
+                if job_response.status == EntityStatus.COMPLETED:
                     job.add_response(job_response)
                     service_job_finished(job, server=server)
                 else:
@@ -423,7 +424,7 @@ class Agent(AgentModel):
             error_msg = f"Job execution failed: {str(e)}"
             job_response = JobResponse(
                 job_id=job.id,
-                status=JobStatus.FAILED,
+                status=EntityStatus.FAILED,
                 message=error_msg,
                 payload=None,
                 error=e,

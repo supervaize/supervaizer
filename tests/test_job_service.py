@@ -47,6 +47,7 @@ async def test_service_job_start_without_parameters(
     mock_job_new.assert_called_once_with(
         job_context=context_fixture,
         agent_name=agent_fixture.name,
+        name="test-job-id",
         parameters=None,
     )
 
@@ -115,6 +116,7 @@ async def test_service_job_start_with_parameters(
     mock_job_new.assert_called_once_with(
         job_context=context_fixture,
         agent_name=agent_fixture.name,
+        name="test-job-id",
         parameters={"test": "decrypted_string"},
     )
 

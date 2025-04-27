@@ -8,11 +8,16 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Any, ClassVar, Dict, Optional, TYPE_CHECKING
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
+from supervaizer.lifecycle import (
+    EntityStatus,
+    EntityEvents,
+    EntityLifecycle,
+    Lifecycle,
+)
 
 if TYPE_CHECKING:
     pass
@@ -99,7 +104,8 @@ class JobInstructions(SvBaseModel):
             cost (float): Cost incurred so far
 
         Returns:
-            tuple[bool, str]: True if the job conditions are met, the job can continue, False otherwise, with explanation
+            tuple[bool, str]: True if job can continue, False if it should stop,
+                with explanation message
         """
         if self.max_cases and cases >= self.max_cases:
             return (False, f"Max cases {self.max_cases} reached")
@@ -152,18 +158,9 @@ class JobContext(SvBaseModel):
         }
 
 
-class JobStatus(str, Enum):
-    STOPPED = "stopped"
-    IN_PROGRESS = "in_progress"
-    PAUSED = "paused"
-    WAITING = "waiting"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
 class JobResponse(SvBaseModel):
     job_id: str
-    status: JobStatus
+    status: EntityStatus
     message: str
     payload: Optional[dict[str, Any]] = None
     error_message: Optional[str] = None
@@ -172,7 +169,7 @@ class JobResponse(SvBaseModel):
     def __init__(
         self,
         job_id: str,
-        status: JobStatus,
+        status: EntityStatus,
         message: str,
         payload: Optional[dict[str, Any]] = None,
         error: Optional[Exception] = None,
@@ -214,8 +211,9 @@ class JobResponse(SvBaseModel):
 class JobModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
+    name: str
     agent_name: str
-    status: JobStatus
+    status: EntityStatus
     job_context: JobContext
     payload: Any | None = None
     result: Any | None = None
@@ -232,7 +230,7 @@ class Job(JobModel):
     Args:
         id (str): Unique identifier for the job - provided by the platform
         agent_name (str): Name (slug) of the agent running the job
-        status (JobStatus): Current status of the job
+        status (EntityStatus): Current status of the job
         job_context (JobContext): Context information for the job
         payload (Any, optional): Job payload data. Defaults to None
         result (Any, optional): Job result data. Defaults to None
@@ -250,15 +248,24 @@ class Job(JobModel):
         )
 
     def add_response(self, response: JobResponse) -> None:
-        self.status = response.status
+        """Add a response to the job and update status based on the event lifecycle.
+
+        Args:
+            response: The response to add
+        """
+        if response.status in Lifecycle.get_terminal_states():
+            self.finished_at = datetime.now()
+
+        # Update payload
         self.payload = response.payload
-        if response.status == JobStatus.COMPLETED:
+        self.status = response.status
+        # Additional handling for completed or failed jobs
+        if response.status == EntityStatus.COMPLETED:
             self.result = response.payload
-            self.status = JobStatus.COMPLETED
-            self.finished_at = datetime.now()
-        if response.status == JobStatus.FAILED:
-            self.finished_at = datetime.now()
+
+        if response.status == EntityStatus.FAILED:
             self.error = response.message
+
         self.responses.append(response)
 
     @property
@@ -283,6 +290,7 @@ class Job(JobModel):
         job_context: "JobContext",
         agent_name: str,
         parameters: Optional[dict[str, Any]] = None,
+        name: Optional[str] = None,
     ) -> "Job":
         """Create a new job
 
@@ -290,15 +298,24 @@ class Job(JobModel):
             job_context (JobContext): The context of the job
             agent_name (str): The name of the agent
             parameters (dict[str, Any] | None): Optional parameters for the job
+            name (str | None): Optional name for the job, defaults to mission name if not provided
 
         Returns:
             Job: The new job
         """
         job_id = job_context.job_id or str(uuid.uuid4())
+        # Use provided name or fallback to mission name from context
+        job_name = name or job_context.mission_name
+
         job = cls(
             id=job_id,
+            name=job_name,
             agent_name=agent_name,
             job_context=job_context,
-            status=JobStatus.IN_PROGRESS,
+            status=EntityStatus.STOPPED,
         )
+
+        # Transition from STOPPED to IN_PROGRESS
+        EntityLifecycle.handle_event(job, EntityEvents.START_WORK)
+
         return job

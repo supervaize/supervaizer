@@ -51,9 +51,9 @@ class EntityStatus(str, Enum):
         return self.name.replace("_", " ").title()
 
 
-# Type aliases for JobStatus and CaseStatus to maintain backward compatibility
-JobStatus = EntityStatus
-CaseStatus = EntityStatus
+# Type aliases for EntityStatus and EntityStatus to maintain backward compatibility
+EntityStatus = EntityStatus
+EntityStatus = EntityStatus
 
 
 class EntityEvents(str, Enum):
@@ -314,8 +314,6 @@ class WorkflowEntity(Protocol):
     id: Any
     name: str
 
-    def save(self, *args, **kwargs) -> None: ...
-
 
 T = TypeVar("T", bound=WorkflowEntity)
 
@@ -365,7 +363,6 @@ class EntityLifecycle:
 
         # Update the entity status
         entity.status = to_status
-        entity.save(update_fields=["status"])
 
         # If transitioning to a terminal state, record the finished time
         if to_status in [
@@ -375,7 +372,6 @@ class EntityLifecycle:
         ]:
             if not entity.finished_at:
                 entity.finished_at = datetime.now()
-                entity.save(update_fields=["finished_at"])
 
         return True, ""
 

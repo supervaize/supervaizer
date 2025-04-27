@@ -6,7 +6,8 @@
 
 
 from supervaizer import Account
-from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
+from supervaizer.case import Case, CaseNode, CaseNodeUpdate
+from supervaizer.lifecycle import EntityStatus
 import pytest
 
 
@@ -102,7 +103,7 @@ def test_case_close(
     case.close(case_result=case_result, final_cost=final_cost)
 
     # Assert
-    assert case.status == CaseStatus.COMPLETED
+    assert case.status == EntityStatus.COMPLETED
     assert case.total_cost == final_cost
     assert case.final_delivery == case_result
 
@@ -142,7 +143,7 @@ async def test_case_close_without_final_cost(
     case.close(case_result=case_result, final_cost=None)
 
     # Assert
-    assert case.status == CaseStatus.COMPLETED
+    assert case.status == EntityStatus.COMPLETED
     assert case.total_cost == 8.0  # Sum of update costs
     assert case.final_delivery == case_result
 

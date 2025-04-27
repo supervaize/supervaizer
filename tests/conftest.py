@@ -20,7 +20,6 @@ from supervaizer import (
     Case,
     CaseNode,
     CaseNodeUpdate,
-    CaseStatus,
     Event,
     EventType,
     Job,
@@ -33,6 +32,7 @@ from supervaizer import (
     TelemetryCategory,
     TelemetrySeverity,
     TelemetryType,
+    EntityStatus,
 )
 
 
@@ -70,7 +70,11 @@ def context_fixture() -> Annotated[JobContext, "fixture"]:
 
 @pytest.fixture(scope="session")
 def job_fixture(context_fixture: JobContext) -> Annotated[Job, "fixture"]:
-    return Job.new(job_context=context_fixture, agent_name="test-agent")
+    return Job.new(
+        job_context=context_fixture,
+        agent_name="test-agent",
+        name="test-job-id",
+    )
 
 
 @pytest.fixture
@@ -110,7 +114,7 @@ def case_fixture(
         id=str(uuid4()),
         job_id="job123",
         account=account_fixture,
-        status=CaseStatus.IN_PROGRESS,
+        status=EntityStatus.IN_PROGRESS,
         name="Test Case",
         description="Test Case Description",
         nodes=[case_node_fixture],

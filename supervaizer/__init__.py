@@ -13,7 +13,7 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentMethods,
 )
-from supervaizer.case import Case, CaseNode, CaseNodeUpdate, CaseStatus
+from supervaizer.case import Case, CaseNode, CaseNodeUpdate
 from supervaizer.common import ApiError, ApiResult, ApiSuccess
 from supervaizer.event import (
     AgentRegisterEvent,
@@ -25,7 +25,8 @@ from supervaizer.event import (
     ServerRegisterEvent,
     CaseStartEvent,
 )
-from supervaizer.job import Job, JobInstructions, JobContext, JobResponse, JobStatus
+from supervaizer.job import Job, JobInstructions, JobContext, JobResponse
+from supervaizer.lifecycle import EntityStatus, EntityEvents, EntityLifecycle
 from supervaizer.parameter import Parameter, Parameters, ParametersSetup
 from supervaizer.server import Server
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
@@ -48,6 +49,9 @@ __all__ = [
     "TelemetrySeverity",
     "Event",
     "EventType",
+    "EntityStatus",
+    "EntityEvents",
+    "EntityLifecycle",
     "AgentRegisterEvent",
     "AgentMethod",
     "AgentCustomMethodParams",
@@ -57,7 +61,9 @@ __all__ = [
     "ApiError",
     "JobResponse",
     "Job",
-    "JobStatus",
+    "EntityStatus",
+    "EntityEvents",
+    "EntityLifecycle",
     "JobContext",
     "JobInstructions",
     "Case",
@@ -66,7 +72,6 @@ __all__ = [
     "CaseNodeUpdate",
     "CaseStartEvent",
     "CaseUpdateEvent",
-    "CaseStatus",
     "ServerRegisterEvent",
     "Parameter",
     "Parameters",

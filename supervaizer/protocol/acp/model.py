@@ -8,7 +8,7 @@ from typing import Dict, List, Any
 from datetime import datetime
 
 from supervaizer.agent import Agent
-from supervaizer.job import JobStatus, Jobs
+from supervaizer.job import EntityStatus, Jobs
 
 
 def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
@@ -79,7 +79,7 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
 
     total_jobs = len(agent_jobs)
     completed_jobs = sum(
-        1 for j in agent_jobs.values() if j.status == JobStatus.COMPLETED
+        1 for j in agent_jobs.values() if j.status == EntityStatus.COMPLETED
     )
 
     # Calculate average runtime and success rate for status
@@ -90,7 +90,11 @@ def create_agent_detail(agent: Agent, base_url: str) -> Dict[str, Any]:
         # Calculate average runtime in seconds
         runtimes = []
         for job in agent_jobs.values():
-            if job.created_at and job.finished_at and job.status == JobStatus.COMPLETED:
+            if (
+                job.created_at
+                and job.finished_at
+                and job.status == EntityStatus.COMPLETED
+            ):
                 runtime = (job.finished_at - job.created_at).total_seconds()
                 runtimes.append(runtime)
 
@@ -152,13 +156,13 @@ def create_health_data(agents: List[Agent]) -> Dict[str, Any]:
         # Calculate job statistics
         total_jobs = len(agent_jobs)
         completed_jobs = sum(
-            1 for j in agent_jobs.values() if j.status == JobStatus.COMPLETED
+            1 for j in agent_jobs.values() if j.status == EntityStatus.COMPLETED
         )
         failed_jobs = sum(
-            1 for j in agent_jobs.values() if j.status == JobStatus.FAILED
+            1 for j in agent_jobs.values() if j.status == EntityStatus.FAILED
         )
         in_progress_jobs = sum(
-            1 for j in agent_jobs.values() if j.status == JobStatus.IN_PROGRESS
+            1 for j in agent_jobs.values() if j.status == EntityStatus.IN_PROGRESS
         )
 
         # Set agent status based on health indicators

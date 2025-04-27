@@ -15,8 +15,9 @@ from fastapi.testclient import TestClient
 
 from supervaizer import Server
 from supervaizer.agent import Agent
-from supervaizer.job import Job, JobContext, JobStatus
+from supervaizer.job import Job, JobContext
 from supervaizer.server_utils import ErrorType, create_error_response
+from supervaizer.lifecycle import EntityStatus
 
 
 @pytest.fixture
@@ -100,7 +101,7 @@ def test_get_job_status_endpoint(
     response = client.get("/supervaizer/jobs/test-job-id")
     assert response.status_code == 200
     assert response.json()["id"] == "test-job-id"
-    assert response.json()["status"] == JobStatus.IN_PROGRESS.value
+    assert response.json()["status"] == EntityStatus.IN_PROGRESS.value
 
     # Test job not found case
     mock_jobs_instance.get_job.return_value = None
@@ -115,7 +116,7 @@ def test_get_job_status_endpoint(
     "exception,status_filter,expected_error_type,expected_status",
     [
         (None, None, None, None),  # Success case, no filter
-        (None, JobStatus.COMPLETED, None, None),  # Success case with filter
+        (None, EntityStatus.COMPLETED, None, None),  # Success case with filter
         (
             ValueError("Test error"),
             None,
@@ -135,7 +136,7 @@ async def test_get_all_jobs_endpoint(
     agent_fixture: Agent,
     mocker,
     exception: Optional[Exception],
-    status_filter: Optional[JobStatus],
+    status_filter: Optional[EntityStatus],
     expected_error_type: Optional[ErrorType],
     expected_status: Optional[int],
 ) -> None:
@@ -143,11 +144,11 @@ async def test_get_all_jobs_endpoint(
     # Create unique mock jobs
     mock_job1 = mocker.MagicMock()
     mock_job1.id = "test-job-1"  # Ensure unique IDs
-    mock_job1.status = JobStatus.COMPLETED
+    mock_job1.status = EntityStatus.COMPLETED
 
     mock_job2 = mocker.MagicMock()
     mock_job2.id = "test-job-2"  # Ensure unique IDs
-    mock_job2.status = JobStatus.IN_PROGRESS
+    mock_job2.status = EntityStatus.IN_PROGRESS
 
     # Patch Jobs to prevent actual job registry access
     mock_jobs = mocker.patch("supervaizer.routes.Jobs")
@@ -170,8 +171,8 @@ async def test_get_all_jobs_endpoint(
         assert expected_status is not None
     else:
         # For success case, verify we have mock jobs properly set up
-        assert mock_job1.status == JobStatus.COMPLETED
-        if status_filter == JobStatus.COMPLETED:
+        assert mock_job1.status == EntityStatus.COMPLETED
+        if status_filter == EntityStatus.COMPLETED:
             assert mock_job1.status == status_filter
 
 
@@ -282,7 +283,7 @@ async def test_start_job_endpoint(
     "exception,status_filter,expected_error_type,expected_status",
     [
         (None, None, None, None),  # Success case, no filter
-        (None, JobStatus.COMPLETED, None, None),  # Success case with filter
+        (None, EntityStatus.COMPLETED, None, None),  # Success case with filter
         (
             ValueError("Test error"),
             None,
@@ -302,16 +303,16 @@ async def test_get_agent_jobs_endpoint(
     agent_fixture: Agent,
     mocker,
     exception: Optional[Exception],
-    status_filter: Optional[JobStatus],
+    status_filter: Optional[EntityStatus],
     expected_error_type: Optional[ErrorType],
     expected_status: Optional[int],
 ) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     # Create mock jobs
     mock_job1 = mocker.MagicMock()
-    mock_job1.status = JobStatus.COMPLETED
+    mock_job1.status = EntityStatus.COMPLETED
     mock_job2 = mocker.MagicMock()
-    mock_job2.status = JobStatus.IN_PROGRESS
+    mock_job2.status = EntityStatus.IN_PROGRESS
 
     # Mock Jobs().get_agent_jobs
     mock_jobs = mocker.patch("supervaizer.routes.Jobs")
@@ -333,8 +334,8 @@ async def test_get_agent_jobs_endpoint(
         assert expected_status is not None
     else:
         # For success case, verify we have mock jobs properly set up
-        assert mock_job1.status == JobStatus.COMPLETED
-        if status_filter == JobStatus.COMPLETED:
+        assert mock_job1.status == EntityStatus.COMPLETED
+        if status_filter == EntityStatus.COMPLETED:
             assert mock_job1.status == status_filter
 
 

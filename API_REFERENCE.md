@@ -52,11 +52,12 @@ event = Event.create(EventType.AGENT_REGISTERED, payload={"agent_id": "123"})
 The job system handles the execution and tracking of agent tasks.
 
 ```python
-from supervaizer import Job, JobStatus
+from supervaizer import Job
+from supervaizer import EntityStatus
 
 # Check job status
 job = agent.get_job(job_id="job-123")
-if job.status == JobStatus.COMPLETED:
+if job.status == EntityStatus.COMPLETED:
     print("Job completed successfully!")
 ```
 
