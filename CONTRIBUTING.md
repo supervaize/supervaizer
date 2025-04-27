@@ -81,10 +81,8 @@ just mypy
 
 We follow PEP 8 with a line length of 120 characters. The project uses the following tools for code quality:
 
-- Black for code formatting
-- Flake8 for linting
+- Ruff for code formatting, linting and import sorting
 - Mypy for type checking
-- isort for import sorting
 
 All of these are run as pre-commit hooks, so make sure you install them as mentioned above.
 

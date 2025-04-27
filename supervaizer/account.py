@@ -53,6 +53,7 @@ class Account(AccountModel):
         return {
             "Authorization": f"Api-Key {self.api_key}",
             "accept": "application/json",
+            "workspace": self.workspace_id,
         }
 
     @property

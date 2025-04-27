@@ -63,14 +63,23 @@ class CaseNodeUpdate(SvBaseModel):
         Returns:
             CaseNodeUpdate: CaseNodeUpdate object
         """
-        super().__init__(
-            cost=cost,
-            name=name,
-            payload=payload,
-            is_final=is_final,
-            question=question,
-            index=index,
-        )
+        # Use model_construct rather than passing arguments to __init__
+        values = {
+            "cost": cost,
+            "name": name,
+            "payload": payload,
+            "is_final": is_final,
+            "question": question,
+            "index": index,
+        }
+        object.__setattr__(self, "__dict__", {})
+        object.__setattr__(self, "__pydantic_fields_set__", set())
+        object.__setattr__(self, "__pydantic_extra__", None)
+        object.__setattr__(self, "__pydantic_private__", None)
+
+        # Update the model fields without calling the SvBaseModel.__init__
+        for key, value in values.items():
+            setattr(self, key, value)
 
     @property
     def registration_info(self) -> Dict[str, Any]:
@@ -204,7 +213,7 @@ class Case(CaseModel):
         Start a new case
 
         Args:
-            case_id (str): The id of the case
+            case_id (str): The id of the case - should be unique for the job
             job_id (str): The id of the job
             name (str): The name of the case
             account (Account): The account

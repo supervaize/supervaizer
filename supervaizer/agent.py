@@ -380,7 +380,12 @@ class Agent(AgentModel):
             job=job,
             account=server.supervisor_account,
         )
-        server.supervisor_account.send_event(sender=job, event=event)
+        if server.supervisor_account is not None:
+            server.supervisor_account.send_event(sender=job, event=event)
+        else:
+            log.warning(
+                f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
+            )
 
         # Mark job as in progress when execution starts
         job.add_response(

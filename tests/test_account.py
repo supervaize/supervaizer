@@ -21,6 +21,7 @@ def test_account_api_headers(account_fixture: Account) -> None:
     apikey = account_fixture.api_key
     assert account_fixture.api_headers == {
         "Authorization": f"Api-Key {apikey}",
+        "workspace": "o34Z484gY9Nxz8axgTAdiH",
         "accept": "application/json",
     }
 

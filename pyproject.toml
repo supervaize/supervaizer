@@ -45,6 +45,7 @@ dev = [
     "mypy>=1.15.0",
     "types-deprecated>=1.2.15.20250304",
     "jsonschema>=4.23.0",
+    "pytest-mock>=3.14.0",
 ]
 
 [tool.pytest.ini_options]

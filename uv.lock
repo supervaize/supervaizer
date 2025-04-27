@@ -1011,6 +1011,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "hatch" },
+    { name = "jsonschema" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -1025,7 +1026,7 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "jsonschema" },
+    { name = "pytest-mock" },
 ]
 
 [package.metadata]
@@ -1037,6 +1038,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "hatch", marker = "extra == 'dev'", specifier = ">=1.9.3" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.23.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
     { name = "orjson", specifier = ">=3.10.16" },
@@ -1058,7 +1060,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "jsonschema", specifier = ">=4.23.0" }]
+dev = [{ name = "pytest-mock", specifier = ">=3.14.0" }]
 
 [[package]]
 name = "termcolor"

@@ -9,15 +9,18 @@ import traceback
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar, Dict, Optional
+from typing import Any, ClassVar, Dict, Optional, TYPE_CHECKING
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 
+if TYPE_CHECKING:
+    pass
+
 
 @singleton
 class Jobs:
-    """Global registry for all jobs, organized by agent"""
+    """Global registry for all jobs, organized by agent."""
 
     def __init__(self) -> None:
         # Structure: {agent_name: {job_id: Job}}
@@ -212,8 +215,8 @@ class JobModel(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
     agent_name: str
-    status: "JobStatus"
-    job_context: "JobContext"
+    status: JobStatus
+    job_context: JobContext
     payload: Any | None = None
     result: Any | None = None
     error: str | None = None
@@ -223,6 +226,22 @@ class JobModel(SvBaseModel):
 
 
 class Job(JobModel):
+    """
+    Jobs are typically created by the platform and are not created by the agent.
+
+    Args:
+        id (str): Unique identifier for the job - provided by the platform
+        agent_name (str): Name (slug) of the agent running the job
+        status (JobStatus): Current status of the job
+        job_context (JobContext): Context information for the job
+        payload (Any, optional): Job payload data. Defaults to None
+        result (Any, optional): Job result data. Defaults to None
+        error (str, optional): Error message if job failed. Defaults to None
+        responses (list[JobResponse], optional): List of job responses. Defaults to empty list
+        finished_at (datetime, optional): When job completed. Defaults to None
+        created_at (datetime, optional): When job was created. Defaults to None
+    """
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.created_at = datetime.now()
