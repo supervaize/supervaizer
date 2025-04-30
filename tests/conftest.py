@@ -190,12 +190,12 @@ def server_fixture(
         mac_addr="E2-AC-ED-22-BF-B2",
         debug=True,
         agent_timeout=10,
-        jobs=[],
         private_key=private_key,
         acp_endpoints=True,
         a2a_endpoints=True,
         supervisor_account=account_fixture,
         agents=[agent_fixture],
+        api_key="test-api-key",
     )
 
 
