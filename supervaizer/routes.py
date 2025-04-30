@@ -27,6 +27,7 @@ from fastapi import (
     HTTPException,
     Query,
     status as http_status,
+    Security,
 )
 from fastapi.responses import JSONResponse
 
@@ -114,7 +115,11 @@ def create_default_routes(server: "Server") -> APIRouter:
     """Create default routes for the server."""
     router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
 
-    @router.get("/jobs/{job_id}", response_model=Job)
+    @router.get(
+        "/jobs/{job_id}",
+        response_model=Job,
+        dependencies=[Security(server.verify_api_key)],
+    )
     @handle_route_errors()
     async def get_job_status(job_id: str) -> Job:
         """Get the status of a job by its ID"""
@@ -126,7 +131,11 @@ def create_default_routes(server: "Server") -> APIRouter:
             )
         return job
 
-    @router.get("/jobs", response_model=Dict[str, List[Job]])
+    @router.get(
+        "/jobs",
+        response_model=Dict[str, List[Job]],
+        dependencies=[Security(server.verify_api_key)],
+    )
     @handle_route_errors()
     async def get_all_jobs(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
@@ -251,6 +260,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         response_model=AgentResponse,
         responses={http_status.HTTP_200_OK: {"model": AgentResponse}},
         tags=tags,
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def agent_info(agent: Agent = Depends(get_agent)) -> AgentResponse:
@@ -278,6 +288,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         response_model=Job,
         status_code=http_status.HTTP_202_ACCEPTED,
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors(job_conflict_check=True)
     async def start_job(
@@ -317,6 +328,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_200_OK: {"model": List[Job]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def get_agent_jobs(
@@ -350,6 +362,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
@@ -370,6 +383,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def stop_agent(
@@ -393,6 +407,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def status_agent(
@@ -418,6 +433,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
             http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
         },
+        dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
     async def custom_method(

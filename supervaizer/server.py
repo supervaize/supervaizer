@@ -5,6 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import os
+import secrets
 import sys
 import uuid
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar
@@ -14,9 +15,11 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Security
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import APIKeyHeader
+from fastapi import status
 from pydantic import field_validator
 from rich import inspect
 
@@ -66,6 +69,8 @@ class ServerModel(SvBaseModel):
     private_key: RSAPrivateKey
     public_key: RSAPublicKey
     registration_host: Optional[str] = None
+    api_key: Optional[str] = None
+    api_key_header: Optional[APIKeyHeader] = None
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -104,6 +109,9 @@ class Server(ServerModel):
         registration_host: Optional[str] = os.getenv(
             "SUPERVAIZER_REGISTRATION_HOST", None
         ),
+        api_key: Optional[str] = os.getenv(
+            "SUPERVAIZER_API_KEY", secrets.token_urlsafe(32)
+        ),
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration.
@@ -130,6 +138,7 @@ class Server(ServerModel):
                 - In Docker, set to 'host.docker.internal' to reach the host machine
                 - In Kubernetes, might be set to the service name or external DNS
                 If not provided, falls back to using the listening host.
+            api_key: API key for securing endpoints
 
         """
         if not mac_addr:
@@ -158,7 +167,10 @@ class Server(ServerModel):
             description=(
                 f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
                 "API for controlling and managing Supervaize agents. \n\nMore information at "
-                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)\n\n\n\n"
+                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)\n\n"
+                "## Authentication\n\n"
+                "Some endpoints require API key authentication. Protected endpoints expect "
+                "the API key in the X-API-Key header.\n\n"
                 f"[Swagger]({docs_url})\n"
                 f"[Redoc]({redoc_url})\n"
                 f"[OpenAPI]({openapi_url})\n"
@@ -190,6 +202,10 @@ class Server(ServerModel):
                 content={"detail": exc.errors(), "body": exc.body},
             )
 
+        # Create API key header security
+        API_KEY_NAME = "X-API-Key"
+        api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
         super().__init__(
             scheme=scheme,
             host=host,
@@ -206,6 +222,8 @@ class Server(ServerModel):
             private_key=private_key,
             public_key=public_key,
             registration_host=registration_host,
+            api_key=api_key,
+            api_key_header=api_key_header,
             **kwargs,
         )
 
@@ -228,6 +246,41 @@ class Server(ServerModel):
 
         # Update the dependency
         self.app.dependency_overrides[get_server] = get_current_server
+
+        if api_key:
+            log.info("[Server launch] API Key authentication enabled")
+            # Print the API key if it was generated
+            if os.getenv("SUPERVAIZER_API_KEY") is None:
+                log.warning(f"[Server launch] Using auto-generated API key: {api_key}")
+        else:
+            log.info("[Server launch] API Key authentication disabled")
+
+    async def verify_api_key(
+        self, api_key: str = Security(APIKeyHeader(name="X-API-Key"))
+    ) -> bool:
+        """Verify that the API key is valid.
+
+        Args:
+            api_key: The API key from the request header
+
+        Returns:
+            True if the API key is valid
+
+        Raises:
+            HTTPException: If the API key is invalid or not provided when required
+        """
+        if self.api_key is None:
+            # API key authentication is disabled
+            return True
+
+        if api_key != self.api_key:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid API key",
+                headers={"WWW-Authenticate": "APIKey"},
+            )
+
+        return True
 
     @property
     def url(self) -> str:
@@ -260,6 +313,7 @@ class Server(ServerModel):
                     format=serialization.PublicFormat.SubjectPublicKeyInfo,
                 ).decode("utf-8")
             ),
+            "api_key": self.api_key,
             "docs": {
                 "swagger": f"{self.url}{self.app.docs_url}",
                 "redoc": f"{self.url}{self.app.redoc_url}",
