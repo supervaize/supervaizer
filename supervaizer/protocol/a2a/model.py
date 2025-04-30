@@ -195,6 +195,7 @@ def create_health_data(agents: List[Agent]) -> Dict[str, Any]:
 
         agents_health[agent.id] = {
             "agent_id": agent.id,
+            "agent_server_id": agent.server_agent_id,
             "name": agent.name,
             "status": status,
             "version": agent.version,
