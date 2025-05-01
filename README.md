@@ -3,8 +3,9 @@
 A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
 
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/version-0.1.5-green.svg)](https://github.com/supervaize/supervaizer)
+[![Package Version](https://img.shields.io/badge/Supervaizer-0.6.0-yellow.svg)](https://github.com/supervaize/supervaizer)
 [![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
+[![Test Coverage](https://img.shields.io/badge/Coverage-80%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
 ## Description
 
