@@ -242,3 +242,4 @@ pyrightconfig.json
 *.code-workspace
 sys.stderr
 uv.lock
+.cursorrules
