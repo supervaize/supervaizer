@@ -8,8 +8,8 @@
 
 from supervaizer.protocol.acp.model import (
     create_agent_detail,
-    list_agents,
     create_health_data,
+    list_agents,
 )
 from supervaizer.protocol.acp.routes import create_routes
 

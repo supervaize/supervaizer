@@ -5,6 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+from supervaizer import protocol
 from supervaizer.account import Account
 from supervaizer.agent import (
     Agent,
@@ -17,16 +18,16 @@ from supervaizer.case import Case, CaseNode, CaseNodeUpdate
 from supervaizer.common import ApiError, ApiResult, ApiSuccess
 from supervaizer.event import (
     AgentRegisterEvent,
+    CaseStartEvent,
     CaseUpdateEvent,
-    JobFinishedEvent,
-    JobStartConfirmationEvent,
     Event,
     EventType,
+    JobFinishedEvent,
+    JobStartConfirmationEvent,
     ServerRegisterEvent,
-    CaseStartEvent,
 )
-from supervaizer.job import Job, JobInstructions, JobContext, JobResponse
-from supervaizer.lifecycle import EntityStatus, EntityEvents, EntityLifecycle
+from supervaizer.job import Job, JobContext, JobInstructions, JobResponse
+from supervaizer.lifecycle import EntityEvents, EntityLifecycle, EntityStatus
 from supervaizer.parameter import Parameter, Parameters, ParametersSetup
 from supervaizer.server import Server
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
@@ -36,7 +37,6 @@ from supervaizer.telemetry import (
     TelemetrySeverity,
     TelemetryType,
 )
-from supervaizer import protocol
 
 __all__ = [
     "Agent",

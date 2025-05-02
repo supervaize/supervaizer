@@ -4,8 +4,8 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from typing import Dict, List, Any
 from datetime import datetime
+from typing import Any, Dict, List
 
 from supervaizer.agent import Agent
 from supervaizer.job import EntityStatus, Jobs

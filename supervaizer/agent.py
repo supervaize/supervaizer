@@ -12,13 +12,13 @@ import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
 
-from supervaizer.event import JobStartConfirmationEvent
-from supervaizer.job_service import service_job_finished
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiSuccess, SvBaseModel, log
+from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job import Job, JobContext, JobResponse
-from supervaizer.parameter import ParametersSetup
+from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.parameter import ParametersSetup
 
 if TYPE_CHECKING:
     from supervaizer.server import Server

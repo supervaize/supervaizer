@@ -10,8 +10,8 @@ from enum import Enum
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from loguru import logger as log
+from pydantic import BaseModel
 
 
 class ErrorType(str, Enum):

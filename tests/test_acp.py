@@ -4,14 +4,14 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from fastapi.testclient import TestClient
 import jsonschema
+from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Server
 from supervaizer.protocol.acp import (
     create_agent_detail,
-    list_agents,
     create_health_data,
+    list_agents,
 )
 
 

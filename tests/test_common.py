@@ -56,13 +56,15 @@ def test_api_success_basic() -> None:
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    json_str = json.dumps({
-        "message": "success message",
-        "code": "200",
-        "detail": {"test": "data"},
-        "id": None,
-        "log_message": "\u2705 success message",
-    })
+    json_str = json.dumps(
+        {
+            "message": "success message",
+            "code": "200",
+            "detail": {"test": "data"},
+            "id": None,
+            "log_message": "\u2705 success message",
+        }
+    )
     assert str(success) == json_str
 
 

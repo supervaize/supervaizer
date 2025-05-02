@@ -1,4 +1,11 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import pytest
+
 from supervaizer.lifecycle import (
     EntityEvents,
     EntityLifecycle,
@@ -245,9 +252,9 @@ class TestEntityTransitions:
         ]
 
         # Sort to ensure order-independent comparison
-        assert sorted([state.value for state in terminal_states]) == sorted([
-            state.value for state in expected_terminal
-        ])
+        assert sorted([state.value for state in terminal_states]) == sorted(
+            [state.value for state in expected_terminal]
+        )
 
         # Verify that these are indeed terminal states
         for state in terminal_states:

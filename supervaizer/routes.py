@@ -26,8 +26,8 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
-    status as http_status,
     Security,
+    status as http_status,
 )
 from fastapi.responses import JSONResponse
 
@@ -39,13 +39,14 @@ from supervaizer.agent import (
 )
 from supervaizer.common import log
 from supervaizer.job import Job, JobContext, Jobs
-from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 from supervaizer.job_service import service_job_start
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
 if TYPE_CHECKING:
-    from supervaizer.server import Server
     from enum import Enum
+
+    from supervaizer.server import Server
 
 T = TypeVar("T")
 

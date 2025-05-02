@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from supervaizer.agent import Agent
     from supervaizer.case import Case, CaseNodeUpdate
     from supervaizer.event import Event
-    from supervaizer.server import Server
     from supervaizer.job import Job
+    from supervaizer.server import Server
 
 
 class AccountModel(SvBaseModel):

@@ -8,14 +8,14 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import Any, ClassVar, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (
-    EntityStatus,
     EntityEvents,
     EntityLifecycle,
+    EntityStatus,
     Lifecycle,
 )
 

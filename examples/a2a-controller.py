@@ -1,34 +1,43 @@
-from supervaizer import (
-    Server,
-    Agent,
-    AgentMethod,
-    Parameter,
-    ParametersSetup,
-    AgentMethods,
-)
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import shortuuid
 from rich.console import Console
+
+from supervaizer import (
+    Agent,
+    AgentMethod,
+    AgentMethods,
+    Parameter,
+    ParametersSetup,
+    Server,
+)
 
 # Create a console with default style set to yellow
 console = Console(style="yellow")
 
 
 # Define the parameters and secrets expected by the agent
-agent_parameters = ParametersSetup.from_list([
-    Parameter(
-        name="OPEN_API_KEY",
-        description="OpenAPI Key",
-        is_environment=True,
-    ),
-    Parameter(
-        name="SERPER_API", description="Server API key updated", is_environment=True
-    ),
-    Parameter(
-        name="COMPETITOR_SUMMARY_URL",
-        description="Competitor Summary URL",
-        is_environment=True,
-    ),
-])
+agent_parameters = ParametersSetup.from_list(
+    [
+        Parameter(
+            name="OPEN_API_KEY",
+            description="OpenAPI Key",
+            is_environment=True,
+        ),
+        Parameter(
+            name="SERPER_API", description="Server API key updated", is_environment=True
+        ),
+        Parameter(
+            name="COMPETITOR_SUMMARY_URL",
+            description="Competitor Summary URL",
+            is_environment=True,
+        ),
+    ]
+)
 
 # Define the method used to start a job
 job_start_method = AgentMethod(

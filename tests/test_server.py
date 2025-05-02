@@ -11,13 +11,13 @@ import pytest
 from fastapi import status
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from rich import inspect
 
 from supervaizer import Server
 from supervaizer.agent import Agent
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorType, create_error_response
-from rich import inspect
 
 insp = inspect
 

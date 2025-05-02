@@ -5,10 +5,11 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+import pytest
+
 from supervaizer import Account
 from supervaizer.case import Case, CaseNode, CaseNodeUpdate
 from supervaizer.lifecycle import EntityStatus
-import pytest
 
 
 def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:

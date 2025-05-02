@@ -11,12 +11,12 @@ import httpx
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, log
 
 if TYPE_CHECKING:
+    from supervaizer.account import Account
     from supervaizer.agent import Agent
     from supervaizer.case import Case, CaseNodeUpdate
     from supervaizer.event import Event
-    from supervaizer.server import Server
-    from supervaizer.account import Account
     from supervaizer.job import Job
+    from supervaizer.server import Server
 
 
 def send_event(

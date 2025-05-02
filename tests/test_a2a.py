@@ -4,9 +4,9 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import jsonschema
 import pytest
 from fastapi.testclient import TestClient
-import jsonschema
 
 from supervaizer import Agent, Server
 from supervaizer.protocol.a2a import (

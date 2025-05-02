@@ -4,20 +4,21 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from typing import Dict, List, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List
+
 from fastapi import APIRouter
 
 from supervaizer.common import log
-from supervaizer.routes import handle_route_errors
 from supervaizer.protocol.acp.model import (
     create_agent_detail,
-    list_agents,
     create_health_data,
+    list_agents,
 )
+from supervaizer.routes import handle_route_errors
 
 if TYPE_CHECKING:
-    from supervaizer.server import Server
     from supervaizer.agent import Agent
+    from supervaizer.server import Server
 
 
 def create_routes(server: "Server") -> APIRouter:

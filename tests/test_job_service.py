@@ -4,10 +4,12 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-import pytest
 import uuid
-from supervaizer.job_service import service_job_start
+
+import pytest
+
 from supervaizer.job import Job
+from supervaizer.job_service import service_job_start
 
 
 @pytest.mark.asyncio

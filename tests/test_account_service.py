@@ -6,8 +6,8 @@
 
 
 import pytest
-from pytest_mock import MockerFixture
 from httpx import ConnectError, HTTPStatusError
+from pytest_mock import MockerFixture
 
 from supervaizer import Account, ApiSuccess
 from supervaizer.account_service import send_event

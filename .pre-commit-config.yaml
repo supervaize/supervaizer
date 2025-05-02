@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.2
+    rev: v0.11.8
     hooks:
       - id: ruff
         args: [--fix, --select=I]
@@ -16,8 +16,8 @@ repos:
       - id: debug-statements
 
   # Add mypy type checking
- # - repo: https://github.com/pre-commit/mirrors-mypy
- #   rev: v1.9.0
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
     hooks:
       - id: mypy
         language: python
@@ -36,12 +36,12 @@ repos:
           - "#"
 
   - repo: https://github.com/ljnsn/cz-conventional-gitmoji
-    rev: v0.6.1
+    rev: v0.7.0
     hooks:
       - id: conventional-gitmoji
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.4.1
+    rev: v4.6.0
     hooks:
       - id: commitizen
         additional_dependencies: [cz-conventional-gitmoji]

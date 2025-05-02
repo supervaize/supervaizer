@@ -5,15 +5,16 @@
 # https://mozilla.org/MPL/2.0/.
 
 from enum import Enum
-from typing import Any, ClassVar, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar, Dict
+
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
 
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
     from supervaizer.case import Case, CaseNodeUpdate
-    from supervaizer.server import Server
     from supervaizer.job import Job
+    from supervaizer.server import Server
 
 
 class EventType(str, Enum):

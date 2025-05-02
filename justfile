@@ -10,7 +10,7 @@ YYYYMMDD:= `date +%Y%m%d`
 default:
     @just --list
 
-# Dev install 
+# Dev install
 dev-install:
     uv venv
     uv pip install -e .[dev]
@@ -25,6 +25,7 @@ pre-commit-autoupdate:
 
 # Run tests without coverage
 test-no-cov:
+
     pytest --no-cov
 
 # Run only previously failed tests
@@ -35,9 +36,13 @@ test-failed:
 mypy:
     pre-commit run mypy --all-files
 
-# Sync dependencies
+# Sync dependencies (from pyproject.toml)
 env_sync:
     uv sync
+
+# Sync all dependencies - including dev dependencies
+env_sync_all:
+    uv sync --all-extras
 
 # build
 build:
@@ -82,4 +87,3 @@ unicorn:
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
-

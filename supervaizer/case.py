@@ -12,7 +12,7 @@ from uuid import uuid4
 from pydantic import ConfigDict
 
 from supervaizer.common import SvBaseModel, log
-from supervaizer.lifecycle import EntityStatus, EntityEvents, EntityLifecycle
+from supervaizer.lifecycle import EntityEvents, EntityLifecycle, EntityStatus
 
 if TYPE_CHECKING:
     from supervaizer.account import Account

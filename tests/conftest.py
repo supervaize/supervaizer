@@ -20,6 +20,7 @@ from supervaizer import (
     Case,
     CaseNode,
     CaseNodeUpdate,
+    EntityStatus,
     Event,
     EventType,
     Job,
@@ -32,7 +33,6 @@ from supervaizer import (
     TelemetryCategory,
     TelemetrySeverity,
     TelemetryType,
-    EntityStatus,
 )
 
 

@@ -1,14 +1,22 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import json
-from typing import Optional, TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
-from supervaizer.common import log, decrypt_value
 from supervaizer.job import Job
 
 if TYPE_CHECKING:
+    from fastapi import BackgroundTasks
+
+    from supervaizer.agent import Agent
     from supervaizer.job import Job, JobContext
     from supervaizer.server import Server
-    from supervaizer.agent import Agent
-    from fastapi import BackgroundTasks
 
 
 async def service_job_start(
