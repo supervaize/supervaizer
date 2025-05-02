@@ -17,7 +17,6 @@ from typing import (
     TypeVar,
     Union,
 )
-
 from cryptography.hazmat.primitives import serialization
 from fastapi import (
     APIRouter,
@@ -30,7 +29,7 @@ from fastapi import (
     status as http_status,
 )
 from fastapi.responses import JSONResponse
-
+from rich import inspect
 from supervaizer.agent import (
     Agent,
     AgentCustomMethodParams,
@@ -38,7 +37,7 @@ from supervaizer.agent import (
     AgentResponse,
 )
 from supervaizer.common import log
-from supervaizer.job import Job, JobContext, Jobs
+from supervaizer.job import Job, JobContext, Jobs, JobResponse
 from supervaizer.job_service import service_job_start
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
@@ -49,6 +48,8 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 T = TypeVar("T")
+
+insp = inspect
 
 
 def handle_route_errors(
@@ -134,7 +135,7 @@ def create_default_routes(server: "Server") -> APIRouter:
 
     @router.get(
         "/jobs",
-        response_model=Dict[str, List[Job]],
+        response_model=Dict[str, List[JobResponse]],
         dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
@@ -146,10 +147,10 @@ def create_default_routes(server: "Server") -> APIRouter:
         status: Optional[EntityStatus] = Query(
             default=None, description="Filter jobs by status"
         ),
-    ) -> Dict[str, List[Job]]:
+    ) -> Dict[str, List[JobResponse]]:
         """Get all jobs across all agents with pagination and optional status filtering"""
         jobs_registry = Jobs()
-        all_jobs: Dict[str, List[Job]] = {}
+        all_jobs: Dict[str, List[JobResponse]] = {}
 
         for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
             filtered_jobs = list(agent_jobs.values())
@@ -162,7 +163,18 @@ def create_default_routes(server: "Server") -> APIRouter:
             filtered_jobs = filtered_jobs[skip : skip + limit]
 
             if filtered_jobs:  # Only include agents that have jobs after filtering
-                all_jobs[agent_name] = filtered_jobs
+                # Convert each Job object to JobResponse
+                jobs_responses = [
+                    JobResponse(
+                        job_id=job.id,
+                        status=job.status,
+                        message=f"Job {job.id} status: {job.status.value}",
+                        payload=job.payload,
+                    )
+                    for job in filtered_jobs
+                ]
+
+                all_jobs[agent_name] = jobs_responses
 
         return all_jobs
 
@@ -324,9 +336,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/jobs",
         summary=f"Get all jobs for agent: {agent.name}",
         description="Get all jobs for this agent with pagination and optional status filtering",
-        response_model=List[Job],
+        response_model=List[JobResponse],
         responses={
-            http_status.HTTP_200_OK: {"model": List[Job]},
+            http_status.HTTP_200_OK: {"model": List[JobResponse]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
         dependencies=[Security(server.verify_api_key)],
@@ -341,7 +353,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         status: EntityStatus | None = Query(
             default=None, description="Filter jobs by status"
         ),
-    ) -> List[Job] | JSONResponse:
+    ) -> List[JobResponse] | JSONResponse:
         """Get all jobs for this agent"""
         log.info(f"📥  GET /jobs [Get agent jobs] {agent.name}")
         jobs = list(Jobs().get_agent_jobs(agent.name).values())
@@ -351,7 +363,18 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             jobs = [job for job in jobs if job.status == status]
 
         # Apply pagination
-        return jobs[skip : skip + limit]
+        jobs = jobs[skip : skip + limit]
+
+        # Convert Job objects to JobResponse objects
+        return [
+            JobResponse(
+                job_id=job.id,
+                status=job.status,
+                message=f"Job {job.id} status: {job.status.value}",
+                payload=job.payload,
+            )
+            for job in jobs
+        ]
 
     @router.get(
         "/jobs/{job_id}",
