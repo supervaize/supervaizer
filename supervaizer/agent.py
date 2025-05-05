@@ -8,6 +8,7 @@
 import json
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
+from rich import inspect, print
 import shortuuid
 from pydantic import BaseModel
 from slugify import slugify
@@ -22,6 +23,9 @@ from supervaizer.parameter import ParametersSetup
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
+
+insp = inspect
+prnt = print
 
 
 class AgentJobContextBase(BaseModel):
@@ -297,7 +301,7 @@ class Agent(AgentModel):
             else:
                 # Get agent by name from SaaS Server
                 from_server = server.supervisor_account.get_agent_by(
-                    agent_name=self.name
+                    agent_slug=self.slug
                 )
         else:
             return None

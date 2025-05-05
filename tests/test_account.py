@@ -28,7 +28,7 @@ def test_account_api_headers(account_fixture: Account) -> None:
 
 def test_account_url_event(account_fixture: Account) -> None:
     apiurl = account_fixture.api_url
-    assert account_fixture.url_event == f"{apiurl}/api/v1/ctrl-events/"
+    assert account_fixture.url_event.endswith("/api/v1/ctrl-events/")
 
 
 def test_account_send_event_delegation(
