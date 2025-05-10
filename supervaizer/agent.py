@@ -9,8 +9,8 @@ import json
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 from rich import inspect, print
-import shortuuid
 from pydantic import BaseModel
+import shortuuid
 from slugify import slugify
 
 from supervaizer.__version__ import VERSION
@@ -221,6 +221,11 @@ class AgentMethods(AgentMethodsModel):
 
 
 class AgentModel(SvBaseModel):
+    """
+    Agent model for the Supervaize Control API.
+
+    """
+
     supervaizer_VERSION: ClassVar[str] = VERSION
     name: str
     id: str
@@ -237,15 +242,82 @@ class AgentModel(SvBaseModel):
     server_agent_status: str | None = None
     server_agent_onboarding_status: str | None = None
     server_encrypted_parameters: str | None = None
+    max_execution_time: int
 
 
 class Agent(AgentModel):
-    def __init__(self, **kwargs: Any) -> None:
-        """Tested in tests/test_agent.py"""
-        if kwargs.get("id") != shortuuid.uuid(name=kwargs.get("name")):
+    def __init__(
+        self,
+        name: str,
+        id: str | None = None,
+        author: Optional[str] = None,
+        developer: Optional[str] = None,
+        maintainer: Optional[str] = None,
+        editor: Optional[str] = None,
+        version: str = "",
+        description: str = "",
+        tags: list[str] | None = None,
+        methods: AgentMethods | None = None,
+        parameters_setup: ParametersSetup | None = None,
+        server_agent_id: str | None = None,
+        server_agent_status: str | None = None,
+        server_agent_onboarding_status: str | None = None,
+        server_encrypted_parameters: str | None = None,
+        max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
+        **kwargs: Any,
+    ) -> None:
+        """
+        This represents an agent that can be registered with the Supervaize Control API.
+        It contains metadata about the agent like name, version, description etc. as well as
+        the methods it supports and any parameter configurations.
+
+        The agent ID is automatically generated from the name and must match.
+
+        Attributes:
+            name (str): Display name of the agent
+            id (str): Unique ID generated from name
+            author (str, optional): Original author
+            developer (str, optional): Current developer
+            maintainer (str, optional): Current maintainer
+            editor (str, optional): Current editor
+            version (str): Version string
+            description (str): Description of what the agent does
+            tags (list[str], optional): Tags for categorizing the agent
+            methods (AgentMethods): Methods supported by this agent
+            parameters_setup (ParametersSetup, optional): Parameter configuration
+            server_agent_id (str, optional): ID assigned by server
+            server_agent_status (str, optional): Current status on server
+            server_agent_onboarding_status (str, optional): Onboarding status
+            server_encrypted_parameters (str, optional): Encrypted parameters from server
+            max_execution_time (int):  Maximum execution time in seconds, defaults to 1 hour
+
+        Tested in tests/test_agent.py
+        """
+        # Validate or generate agent ID
+        agent_id = id or shortuuid.uuid(name=name)
+        if id is not None and id != shortuuid.uuid(name=name):
             raise ValueError("Agent ID does not match")
 
-        super().__init__(**kwargs)
+        # Initialize using Pydantic's mechanism
+        super().__init__(
+            name=name,
+            id=agent_id,
+            author=author,
+            developer=developer,
+            maintainer=maintainer,
+            editor=editor,
+            version=version,
+            description=description,
+            tags=tags,
+            methods=methods,
+            parameters_setup=parameters_setup,
+            server_agent_id=server_agent_id,
+            server_agent_status=server_agent_status,
+            server_agent_onboarding_status=server_agent_onboarding_status,
+            server_encrypted_parameters=server_encrypted_parameters,
+            max_execution_time=max_execution_time,
+            **kwargs,
+        )
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
@@ -281,6 +353,7 @@ class Agent(AgentModel):
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
             "server_encrypted_parameters": self.server_encrypted_parameters,
+            "max_execution_time": self.max_execution_time,
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
