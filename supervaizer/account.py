@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 
 import httpx
 
-from supervaizer.__version__ import TELEMETRY_VERSION, VERSION
+from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
 from supervaizer.telemetry import Telemetry
 
@@ -54,34 +54,12 @@ class Account(AccountModel):
         """
         super().__init__(**kwargs)
 
-    def get_url(self, url_name: str, **kwargs: Any) -> str:
-        """Build a URL based on a named pattern with optional parameters.
-
-        Args:
-            url_name: Name of the URL pattern from URL_PATTERNS
-            **kwargs: Additional parameters to format the URL pattern
-
-        Returns:
-            The formatted URL
-
-        Raises:
-            ValueError: If the URL pattern doesn't exist
+    @property
+    def api_url_w_v1(self) -> str:
+        """URL for the Supervaize Control API.
+        Tested in tests/test_account.py
         """
-        if url_name not in self._URL_PATTERNS:
-            raise ValueError(f"Unknown URL pattern: {url_name}")
-
-        # Default parameters that can be used in URL patterns
-        default_params = {
-            "api_url": self.api_url,
-            "workspace_id": self.workspace_id,
-            "telemetry_version": TELEMETRY_VERSION,
-        }
-
-        # Merge default parameters with provided parameters
-        params = {**default_params, **kwargs}
-
-        # Format the URL pattern with the parameters
-        return self._URL_PATTERNS[url_name].format(**params)
+        return f"{self.api_url}/w/{self.workspace_id}/api/v1"
 
     @property
     def api_headers(self) -> Dict[str, str]:
@@ -104,7 +82,7 @@ class Account(AccountModel):
         """URL for the Supervaize Control API.
         Tested in tests/test_account.py
         """
-        return self.get_url("event")
+        return f"{self.api_url_w_v1}/ctrl-events/"
 
     def send_event(
         self,
@@ -174,9 +152,9 @@ class Account(AccountModel):
         """
         url = ""
         if agent_id:
-            url = self.get_url("agent_by_id", agent_id=agent_id)
+            url = f"{self.api_url_w_v1}/agents/{agent_id}"
         elif agent_slug:
-            url = self.get_url("agent_by_slug", agent_slug=agent_slug)
+            url = f"{self.api_url_w_v1}/agents/by-slug/{agent_slug}"
         else:
             raise ValueError("No agent ID or slug provided")
 

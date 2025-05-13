@@ -19,6 +19,7 @@ class ParameterModel(SvBaseModel):
     description: str | None = None
     is_environment: bool = False
     value: str | None = None
+    is_secret: bool = True
 
 
 class Parameter(ParameterModel):
@@ -28,6 +29,7 @@ class Parameter(ParameterModel):
             "name": self.name,
             "description": self.description,
             "is_environment": self.is_environment,
+            "is_secret": self.is_secret,
         }
 
     def set_value(self, value: str) -> None:
