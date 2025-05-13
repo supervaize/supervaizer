@@ -485,4 +485,38 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             methods=agent.methods,
         )
 
+    @router.post(
+        "/parameters",
+        summary=f"Server updates agent: {agent.name}",
+        description="Server updates agent onboarding status and/or encrypted parameters",
+        response_model=AgentResponse,
+        responses={
+            http_status.HTTP_200_OK: {"model": AgentResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[Security(server.verify_api_key)],
+    )
+    @handle_route_errors()
+    async def server_update_agent(
+        onboarding_status: Optional[str] = Body(None),
+        parameters_encrypted: Optional[str] = Body(None),
+        agent: Agent = Depends(get_agent),
+    ) -> AgentResponse:
+        log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
+
+        if onboarding_status is not None:
+            agent.server_agent_onboarding_status = onboarding_status
+        if parameters_encrypted is not None:
+            agent.update_parameters_from_server(server, parameters_encrypted)
+
+        return AgentResponse(
+            name=agent.name,
+            id=agent.id,
+            version=agent.version,
+            api_path=agent.path,
+            description=agent.description,
+            server_agent_onboarding_status=agent.server_agent_onboarding_status,
+            server_encrypted_parameters=agent.server_encrypted_parameters,
+        )
+
     return router

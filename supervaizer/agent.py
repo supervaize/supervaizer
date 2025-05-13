@@ -409,16 +409,21 @@ class Agent(AgentModel):
                 if agent_from_server
                 else None
             )
-            if server_encrypted_parameters and self.parameters_setup:
-                self.server_encrypted_parameters = server_encrypted_parameters
-                decrypted = server.decrypt(server_encrypted_parameters)
-                self.parameters_setup.update_values_from_server(json.loads(decrypted))
-            else:
-                log.debug("[No encrypted parameters] for {self.name}")
+            self.update_parameters_from_server(server, server_encrypted_parameters)
         else:
             log.debug("[Agent not onboarded] skipping encrypted parameters")
 
         return self
+
+    def update_parameters_from_server(
+        self, server: "Server", server_encrypted_parameters: str
+    ) -> None:
+        if server_encrypted_parameters and self.parameters_setup:
+            self.server_encrypted_parameters = server_encrypted_parameters
+            decrypted = server.decrypt(server_encrypted_parameters)
+            self.parameters_setup.update_values_from_server(json.loads(decrypted))
+        else:
+            log.debug("[No encrypted parameters] for {self.name}")
 
     def _execute(self, action: str, params: Dict[str, Any] = {}) -> JobResponse:
         """
