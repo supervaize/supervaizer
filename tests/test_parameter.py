@@ -6,6 +6,7 @@
 
 
 import os
+
 from supervaizer.parameter import Parameter, ParametersSetup
 
 
@@ -79,3 +80,9 @@ def test_parameters_setup_update_values_from_server(
     assert isinstance(parameters_setup_fixture.definitions["parameter2"], Parameter)
     assert parameters_setup_fixture.definitions["parameter1"].value == "new_value1"
     assert parameters_setup_fixture.definitions["parameter2"].value == "new_value2"
+
+
+def test_parameters_setup_value(parameters_setup_fixture: ParametersSetup) -> None:
+    assert parameters_setup_fixture.value("parameter1") == "value1"
+    assert parameters_setup_fixture.value("parameter2") == "value2"
+    assert parameters_setup_fixture.value("parameterUNKNOWN") is None

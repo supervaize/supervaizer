@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from fastapi import BackgroundTasks
 
     from supervaizer.agent import Agent
-    from supervaizer.job import Job, JobContext
+    from supervaizer.job import JobContext
     from supervaizer.server import Server
 
 
@@ -56,7 +56,7 @@ async def service_job_start(
     new_saas_job = Job.new(
         job_context=sv_context,
         agent_name=agent.name,
-        parameters=agent_parameters,
+        agent_parameters=agent_parameters,
         name=sv_context.job_id,
     )
 

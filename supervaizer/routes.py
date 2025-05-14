@@ -314,11 +314,10 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         sv_context: JobContext = body_params.job_context  # type: ignore[attr-defined]
         job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
 
-        # Get agent encrypted parameters if available
+        # Get job encrypted parameters if available
         encrypted_agent_parameters = getattr(
             body_params, "encrypted_agent_parameters", None
         )
-        log.debug(f"[Encrypted parameters] : {encrypted_agent_parameters}")
 
         # Delegate job creation and scheduling to the service
         new_job = await service_job_start(

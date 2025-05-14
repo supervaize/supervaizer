@@ -400,7 +400,11 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
     job_fields = {"full_name": "John Doe", "age": 30}
 
     # Create job with context
-    job = Job.new(job_context=context, agent_name=agent_fixture.name, parameters=None)
+    job = Job.new(
+        job_context=context,
+        agent_name=agent_fixture.name,
+        agent_parameters=None,
+    )
 
     # Test job fields
     assert job.job_context.job_id == "test-job-id"

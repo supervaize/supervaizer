@@ -8,7 +8,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
@@ -220,6 +220,7 @@ class JobModel(SvBaseModel):
     responses: list["JobResponse"] = []
     finished_at: datetime | None = None
     created_at: datetime | None = None
+    agent_parameters: List[dict[str, Any]] | None = None
 
 
 class Job(JobModel):
@@ -288,7 +289,7 @@ class Job(JobModel):
         cls,
         job_context: "JobContext",
         agent_name: str,
-        parameters: Optional[dict[str, Any]] = None,
+        agent_parameters: Optional[List[dict[str, Any]]] = None,
         name: Optional[str] = None,
     ) -> "Job":
         """Create a new job
@@ -296,7 +297,7 @@ class Job(JobModel):
         Args:
             job_context (JobContext): The context of the job
             agent_name (str): The name of the agent
-            parameters (dict[str, Any] | None): Optional parameters for the job
+            agent_parameters (dict[str, Any] | None): Optional parameters for the job
             name (str | None): Optional name for the job, defaults to mission name if not provided
 
         Returns:
@@ -312,6 +313,7 @@ class Job(JobModel):
             agent_name=agent_name,
             job_context=job_context,
             status=EntityStatus.STOPPED,
+            agent_parameters=agent_parameters,
         )
 
         # Transition from STOPPED to IN_PROGRESS

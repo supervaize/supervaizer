@@ -40,7 +40,6 @@ class Parameter(ParameterModel):
         """
         self.value = value
         if self.is_environment:
-            log.debug(f"[Set Env] {self.name}")
             os.environ[self.name] = value
 
 
@@ -52,6 +51,13 @@ class ParametersSetup(SvBaseModel):
         return cls(
             definitions={parameter.name: parameter for parameter in parameter_list}
         )
+
+    def value(self, name: str) -> str | None:
+        """
+        Get the value of a parameter from the environment.
+        """
+        parameter = self.definitions.get(name, None)
+        return parameter.value if parameter else None
 
     @property
     def registration_info(self) -> List[Dict[str, Any]]:

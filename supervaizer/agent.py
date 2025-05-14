@@ -166,6 +166,7 @@ class AgentMethod(AgentMethodModel):
                 "__annotations__": {
                     "job_context": JobContext,
                     "job_fields": fields_model,
+                    "encrypted_agent_parameters": str | None,
                 }
             },
         )
@@ -460,6 +461,7 @@ class Agent(AgentModel):
         log.debug(
             f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
         )
+        log.debug(f"[Agent job_start] Decrypted parameters: {job.agent_parameters}")
         event = JobStartConfirmationEvent(
             job=job,
             account=server.supervisor_account,
@@ -484,7 +486,12 @@ class Agent(AgentModel):
         # Execute the method
         action = self.methods.job_start.method
         method_params = self.methods.job_start.params or {}
-        params = method_params | {"fields": job_fields} | {"context": context}
+        params = (
+            method_params
+            | {"fields": job_fields}
+            | {"context": context}
+            | {"agent_parameters": job.agent_parameters}
+        )
         try:
             if self.methods.job_start.is_async:
                 # TODO: Implement async job execution & test

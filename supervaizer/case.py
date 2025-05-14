@@ -228,7 +228,7 @@ class Case(CaseModel):
             account=account,
             name=name,
             description=description,
-            status=EntityStatus.IN_PROGRESS,
+            status=EntityStatus.STOPPED,
             nodes=nodes,
         )
         log.info(f"[Case created] {case.id}")

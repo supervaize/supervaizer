@@ -50,7 +50,7 @@ async def test_service_job_start_without_parameters(
         job_context=context_fixture,
         agent_name=agent_fixture.name,
         name="test-job-id",
-        parameters=None,
+        agent_parameters=None,
     )
 
     # Assert background_tasks.add_task was called
@@ -119,7 +119,7 @@ async def test_service_job_start_with_parameters(
         job_context=context_fixture,
         agent_name=agent_fixture.name,
         name="test-job-id",
-        parameters={"test": "decrypted_string"},
+        agent_parameters={"test": "decrypted_string"},
     )
 
     # Assert background_tasks.add_task was called
