@@ -508,15 +508,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             agent.server_agent_onboarding_status = onboarding_status
         if parameters_encrypted is not None:
             agent.update_parameters_from_server(server, parameters_encrypted)
+        # import importlib
 
-        return AgentResponse(
-            name=agent.name,
-            id=agent.id,
-            version=agent.version,
-            api_path=agent.path,
-            description=agent.description,
-            server_agent_onboarding_status=agent.server_agent_onboarding_status,
-            server_encrypted_parameters=agent.server_encrypted_parameters,
-        )
+        # importlib.reload(Agent)
+        return AgentResponse(**agent.registration_info)
 
     return router

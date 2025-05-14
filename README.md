@@ -138,7 +138,7 @@ from supervaizer import (
 # Define at least one AgentMethod
 agent_method = AgentMethod(
     name="start",
-    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start
+    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start - THIS MUST BE THE ABOLUTE PATH TO THE METHOD "module.submodule.method  - no parenthesis.
     is_async=False,
     params={"action": "start"},
     fields=[

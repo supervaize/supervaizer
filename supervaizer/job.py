@@ -176,7 +176,6 @@ class JobResponse(SvBaseModel):
         **kwargs: Any,
     ) -> None:
         if error:
-            log.error(f"[Job Response] Got and error : {error}")
             error_message = str(error)
             error_traceback = traceback.format_exc()
         else:
