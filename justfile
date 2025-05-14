@@ -25,7 +25,6 @@ pre-commit-autoupdate:
 
 # Run tests without coverage
 test-no-cov:
-
     pytest --no-cov
 
 # Run only previously failed tests

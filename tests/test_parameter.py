@@ -6,7 +6,6 @@
 
 
 import os
-
 from supervaizer.parameter import Parameter, ParametersSetup
 
 
@@ -57,8 +56,11 @@ def test_parameter_set_value(parameter_fixture: Parameter) -> None:
 
 
 def test_parameter_set_value_in_environment(parameter_fixture: Parameter) -> None:
+    os.environ["test_parameter"] = "old_value"
+    assert os.environ.get("test_parameter") == "old_value"
     parameter_fixture.is_environment = True
     parameter_fixture.set_value("newer_value")
+
     assert parameter_fixture.value == "newer_value"
     assert "test_parameter" in os.environ
     assert os.environ["test_parameter"] == "newer_value"

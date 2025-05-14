@@ -24,7 +24,7 @@ class EventType(str, Enum):
     AGENT_SEND_ANOMALY = "agent.anomaly"
     INTERMEDIARY = "agent.intermediary"
     JOB_START_CONFIRMATION = "agent.job.start.confirmation"
-    JOB_FINISHED = "agent.job.finished"
+    JOB_END = "agent.job.end"
     JOB_STATUS = "agent.job.status"
     JOB_RESULT = "agent.job.result"
     JOB_ERROR = "agent.job.error"
@@ -131,7 +131,7 @@ class JobStartConfirmationEvent(Event):
 class JobFinishedEvent(Event):
     def __init__(self, job: "Job", account: Any) -> None:
         super().__init__(
-            type=EventType.JOB_FINISHED,
+            type=EventType.JOB_END,
             account=account,
             source={"job": job.id},
             object_type="job",
