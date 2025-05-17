@@ -9,7 +9,6 @@ import traceback
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
-from time import perf_counter
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (
@@ -95,24 +94,25 @@ class JobInstructions(SvBaseModel):
     stop_on_warning: bool = False
     stop_on_error: bool = True
 
-    def check(
-        self, cases: int, cost: float, start_time: float = perf_counter()
-    ) -> tuple[bool, str]:
+    job_start_time: float | None = None
+
+    def check(self, cases: int, cost: float) -> tuple[bool, str]:
         """Check if the job conditions are met
 
         Args:
             cases (int): Number of cases processed so far
             start_time (float): Start time of the job - using time.perf_counter()
-            cost (float): Cost incurred so far
 
         Returns:
             tuple[bool, str]: True if job can continue, False if it should stop,
                 with explanation message
         """
+        if not self.job_start_time:
+            self.job_start_time = time.perf_counter()
         if self.max_cases and cases >= self.max_cases:
             return (False, f"Max cases {self.max_cases} reached")
 
-        duration = time.perf_counter() - start_time
+        duration = time.perf_counter() - self.job_start_time
         if self.max_duration and duration >= self.max_duration:
             return (False, f"Max duration {self.max_duration} seconds reached")
 

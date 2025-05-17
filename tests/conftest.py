@@ -20,6 +20,7 @@ from supervaizer import (
     Case,
     CaseNode,
     CaseNodeUpdate,
+    CaseNoteType,
     EntityStatus,
     Event,
     EventType,
@@ -102,7 +103,7 @@ def telemetry_fixture() -> Annotated[Telemetry, "fixture"]:
 @pytest.fixture
 def case_node_fixture() -> Annotated[CaseNode, "fixture"]:
     return CaseNode(
-        name="Test Node", description="Test Node Description", type="node_type"
+        name="Test Node", description="Test Node Description", type=CaseNoteType.TRIGGER
     )
 
 

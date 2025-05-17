@@ -7,8 +7,8 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from uuid import uuid4
-
+import shortuuid
+from enum import Enum
 from pydantic import ConfigDict
 
 from supervaizer.common import SvBaseModel, log
@@ -87,10 +87,28 @@ class CaseNodeUpdate(SvBaseModel):
         }
 
 
+class CaseNoteType(Enum):
+    """
+    CaseNoteType is an enum that represents the type of a case note.
+    """
+
+    CHAT = "chat"
+    TRIGGER = "trigger"
+    NOTIFICATION = "notification"
+    VALIDATION = "validation"
+    DELIVERY = "delivery"
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
 class CaseNode(SvBaseModel):
     name: str
     description: str
-    type: str
+    type: CaseNoteType
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @property
     def registration_info(self) -> Dict[str, Any]:
@@ -205,13 +223,13 @@ class Case(CaseModel):
         account: "Account",
         description: str,
         nodes: List[CaseNode],
-        case_id: str = str(uuid4()),
+        case_id: Optional[str] = None,
     ) -> "Case":
         """
         Start a new case
 
         Args:
-            case_id (str): The id of the case - should be unique for the job
+            case_id (str): The id of the case - should be unique for the job. If not provided, a shortuuid will be generated.
             job_id (str): The id of the job
             name (str): The name of the case
             account (Account): The account
@@ -223,7 +241,7 @@ class Case(CaseModel):
         """
 
         case = cls(
-            id=case_id,
+            id=case_id or shortuuid.uuid(),
             job_id=job_id,
             account=account,
             name=name,
