@@ -9,7 +9,7 @@ import traceback
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
-
+from time import perf_counter
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (
@@ -95,7 +95,9 @@ class JobInstructions(SvBaseModel):
     stop_on_warning: bool = False
     stop_on_error: bool = True
 
-    def check(self, cases: int, start_time: float, cost: float) -> tuple[bool, str]:
+    def check(
+        self, cases: int, cost: float, start_time: float = perf_counter()
+    ) -> tuple[bool, str]:
         """Check if the job conditions are met
 
         Args:

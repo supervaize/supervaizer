@@ -47,7 +47,11 @@ class ParametersSetup(SvBaseModel):
     definitions: Dict[str, Parameter]
 
     @classmethod
-    def from_list(cls, parameter_list: List[Parameter]) -> "ParametersSetup":
+    def from_list(
+        cls, parameter_list: List[Parameter | Dict[str, Any]]
+    ) -> "ParametersSetup":
+        if isinstance(parameter_list[0], dict):  # TODO: add test for this
+            parameter_list = [Parameter(**parameter) for parameter in parameter_list]
         return cls(
             definitions={parameter.name: parameter for parameter in parameter_list}
         )

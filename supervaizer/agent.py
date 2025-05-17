@@ -430,7 +430,6 @@ class Agent(AgentModel):
         """
         Execute an agent method and return a JobResponse
         """
-        log.debug(f"[Agent _execute] {action} with params {params}")
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
@@ -461,7 +460,6 @@ class Agent(AgentModel):
         log.debug(
             f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
         )
-        log.debug(f"[Agent job_start] Decrypted parameters: {job.agent_parameters}")
         event = JobStartConfirmationEvent(
             job=job,
             account=server.supervisor_account,
@@ -503,7 +501,6 @@ class Agent(AgentModel):
                     payload={"intermediary_deliverable": started},
                 )
             else:
-                log.debug(f"[Agent job_start] Executing {action} with params {params}")
                 job_response = self._execute(action, params)
                 if job_response.status == EntityStatus.COMPLETED:
                     job.add_response(job_response)
