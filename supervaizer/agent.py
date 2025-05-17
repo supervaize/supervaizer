@@ -8,9 +8,9 @@
 import json
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
 
-from rich import inspect, print
-from pydantic import BaseModel
 import shortuuid
+from pydantic import BaseModel
+from rich import inspect, print
 from slugify import slugify
 
 from supervaizer.__version__ import VERSION
@@ -68,8 +68,9 @@ class AgentMethodModel(BaseModel):
        Each field is a dictionary with properties like:
        - name: Field identifier
        - type: Python type of the field for pydantic validation
-       - field_type: Field type (e.g. ChoiceField, TextField)
+       - field_type: Field type (one of: CharField, IntegerField, BooleanField, ChoiceField, MultipleChoiceField)
        - choices: For choice fields, list of [value, label] pairs
+       - default: (optional) Default value for the field
        - widget: UI widget to use (e.g. RadioSelect, TextInput)
        - required: Whether field is required
 

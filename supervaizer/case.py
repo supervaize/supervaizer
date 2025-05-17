@@ -6,9 +6,10 @@
 
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-import shortuuid
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+import shortuuid
 from pydantic import ConfigDict
 
 from supervaizer.common import SvBaseModel, log
@@ -116,7 +117,7 @@ class CaseNode(SvBaseModel):
         return {
             "name": self.name,
             "description": self.description,
-            "type": self.type,
+            "type": self.type.value,
         }
 
 

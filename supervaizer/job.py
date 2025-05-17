@@ -9,6 +9,7 @@ import traceback
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (

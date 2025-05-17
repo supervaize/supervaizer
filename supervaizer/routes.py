@@ -17,6 +17,7 @@ from typing import (
     TypeVar,
     Union,
 )
+
 from cryptography.hazmat.primitives import serialization
 from fastapi import (
     APIRouter,
@@ -30,6 +31,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 from rich import inspect
+
 from supervaizer.agent import (
     Agent,
     AgentCustomMethodParams,
@@ -37,7 +39,7 @@ from supervaizer.agent import (
     AgentResponse,
 )
 from supervaizer.common import log
-from supervaizer.job import Job, JobContext, Jobs, JobResponse
+from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.job_service import service_job_start
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
