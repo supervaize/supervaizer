@@ -60,6 +60,8 @@ markers = [
 ]
 addopts = "--cov=supervaizer --cov-report=term-missing --cov-report=html"
 asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [build-system]
 requires = ["hatchling"]
@@ -68,7 +70,7 @@ build-backend = "hatchling.build"
 [tool]
 [tool.hatch]
 [tool.hatch.version]
-path = "supervaizer/__version__.py"
+path = "src/supervaizer/__version__.py"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
@@ -88,3 +90,4 @@ ignore_missing_imports = true
 disallow_untyped_defs = true
 warn_unused_ignores = false
 no_implicit_optional = true
+mypy_path = "src"

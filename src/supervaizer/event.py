@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
+from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
@@ -130,8 +131,15 @@ class JobStartConfirmationEvent(Event):
 
 class JobFinishedEvent(Event):
     def __init__(self, job: "Job", account: Any) -> None:
+        details = job.responses[-1].status
+        event_type = (
+            EventType.JOB_END
+            if details == EntityStatus.COMPLETED
+            else EventType.JOB_ERROR
+        )
+
         super().__init__(
-            type=EventType.JOB_END,
+            type=event_type,
             account=account,
             source={"job": job.id},
             object_type="job",

@@ -26,7 +26,7 @@ from supervaizer.event import (
     JobStartConfirmationEvent,
     ServerRegisterEvent,
 )
-from supervaizer.job import Job, JobContext, JobInstructions, JobResponse
+from supervaizer.job import Job, JobContext, JobInstructions, JobResponse, Jobs
 from supervaizer.lifecycle import EntityEvents, EntityLifecycle, EntityStatus
 from supervaizer.parameter import Parameter, Parameters, ParametersSetup
 from supervaizer.server import Server
@@ -61,6 +61,7 @@ __all__ = [
     "ApiError",
     "JobResponse",
     "Job",
+    "Jobs",
     "EntityStatus",
     "EntityEvents",
     "EntityLifecycle",

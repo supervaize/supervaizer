@@ -503,14 +503,21 @@ class Agent(AgentModel):
                 )
             else:
                 job_response = self._execute(action, params)
-                if job_response.status == EntityStatus.COMPLETED:
+                if (
+                    job_response.status == EntityStatus.COMPLETED
+                    or job_response.status == EntityStatus.FAILED
+                ):
                     job.add_response(job_response)
-                    service_job_finished(job, server=server)
+
                 else:
-                    job.add_response(job_response)
+                    log.error(
+                        f"[Agent job_start] Job {job.id} status {job_response} is not a terminal status, skipping job finish"
+                    )
+
         except Exception as e:
             # Handle any execution errors
             error_msg = f"Job execution failed: {str(e)}"
+            log.error(f"[Agent job_start] Job {job.id} failed: {error_msg}")
             job_response = JobResponse(
                 job_id=job.id,
                 status=EntityStatus.FAILED,
@@ -518,7 +525,9 @@ class Agent(AgentModel):
                 payload=None,
                 error=e,
             )
+            job.add_response(job_response)
 
+        service_job_finished(job, server=server)
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
