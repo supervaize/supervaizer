@@ -276,6 +276,23 @@ The SUPERVAIZER API comes with comprehensive interactive documentation:
 
 These documentation endpoints provide a complete reference of all available API endpoints, request/response formats, and testing capabilities.
 
+# Calculating costs
+
+Developers are free to define the cost of the transaction the way they want when updating the cases.
+Here is a way to easily get an estimate of the cost of an LLM transaction (note that litellm also supports custom pricing. )
+
+```python
+from litellm import completion_cost
+prompt = "Explain how transformers work."
+output = "Transformers use attention mechanisms..."
+model = "gpt-4"
+cost = completion_cost(model=model, prompt=prompt, completion=output)
+print(cost)
+```
+
+A list of costs is maintained here:
+`https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json`
+
 ## Documentation
 
 - [API Reference](API_REFERENCE.md) - Complete documentation of classes and methods

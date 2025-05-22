@@ -35,6 +35,7 @@ class CaseNodeUpdate(SvBaseModel):
     payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
     question: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
     def __init__(
         self,
@@ -44,6 +45,7 @@ class CaseNodeUpdate(SvBaseModel):
         is_final: bool = False,
         question: Dict[str, Any] | None = None,
         index: int | None = None,
+        error: Optional[str] = None,
     ) -> None:
         """Initialize a CaseNodeUpdate.
 
@@ -66,6 +68,7 @@ class CaseNodeUpdate(SvBaseModel):
             "is_final": is_final,
             "question": question,
             "index": index,
+            "error": error,
         }
         object.__setattr__(self, "__dict__", {})
         object.__setattr__(self, "__pydantic_fields_set__", set())
@@ -81,6 +84,8 @@ class CaseNodeUpdate(SvBaseModel):
         """Returns registration info for the case node update"""
         return {
             "index": self.index,
+            "name": self.name,
+            "error": self.error,
             "cost": self.cost,
             "payload": self.payload,
             "is_final": self.is_final,
@@ -154,6 +159,9 @@ class Case(CaseModel):
 
     def update(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
         updateCaseNode.index = len(self.updates) + 1
+        if updateCaseNode.error:
+            EntityLifecycle.handle_event(self, EntityEvents.ERROR_ENCOUNTERED)
+            assert self.status == EntityStatus.FAILED  # Just to be sure
         self.account.send_update_case(self, updateCaseNode)
         self.updates.append(updateCaseNode)
 

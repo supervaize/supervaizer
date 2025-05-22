@@ -8,7 +8,7 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "cryptography>=45.0.1",
+    "cryptography>=45.0.2",
     "demjson3>=3.0.6",
     "deprecated>=1.2.18",
     "fastapi>=0.115.12",

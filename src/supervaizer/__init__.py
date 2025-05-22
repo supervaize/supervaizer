@@ -70,7 +70,6 @@ __all__ = [
     "Case",
     "CaseNodeUpdate",
     "CaseNode",
-    "CaseNodeUpdate",
     "CaseStartEvent",
     "CaseNoteType",
     "CaseUpdateEvent",
