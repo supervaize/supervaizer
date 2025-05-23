@@ -210,7 +210,7 @@ class JobResponse(SvBaseModel):
         }
 
 
-class JobModel(SvBaseModel):
+class AbstractJob(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
     name: str
@@ -226,7 +226,7 @@ class JobModel(SvBaseModel):
     agent_parameters: List[dict[str, Any]] | None = None
 
 
-class Job(JobModel):
+class Job(AbstractJob):
     """
     Jobs are typically created by the platform and are not created by the agent.
 

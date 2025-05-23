@@ -36,7 +36,7 @@ class EventType(str, Enum):
     CASE_UPDATE = "agent.case.update"
 
 
-class EventModel(SvBaseModel):
+class AbstractEvent(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     source: Dict[str, Any]
     account: Any  # Use Any to avoid Pydantic type resolution issues
@@ -45,13 +45,13 @@ class EventModel(SvBaseModel):
     details: Dict[str, Any]
 
 
-class Event(EventModel):
+class Event(AbstractEvent):
     """Base class for all events in the Supervaize Control system.
 
     Events represent messages sent from agents to the control system to communicate
     status, anomalies, deliverables and other information.
 
-    Inherits from EventModel which defines the core event attributes:
+    Inherits from AbstractEvent which defines the core event attributes:
         - source: The source/origin of the event (e.g. agent/server URI)
         - type: The EventType enum indicating the event category
         - account: The account that the event belongs to

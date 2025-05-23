@@ -126,7 +126,7 @@ class CaseNode(SvBaseModel):
         }
 
 
-class CaseModel(SvBaseModel):
+class AbstractModel(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     id: str
     job_id: str
@@ -141,7 +141,7 @@ class CaseModel(SvBaseModel):
     finished_at: Optional[datetime] = None
 
 
-class Case(CaseModel):
+class Case(AbstractModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 

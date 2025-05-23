@@ -210,14 +210,14 @@ def test_job_model_dynamic_model() -> None:
     )
 
     # Get the dynamic job model class
-    JobModel = agent_method.job_model
+    AbstractJob = agent_method.job_model
 
     # Test 1: Verify it's a Pydantic model
-    assert issubclass(JobModel, BaseModel)
+    assert issubclass(AbstractJob, BaseModel)
 
     # Test 2: Check the structure of the model
-    assert JobModel.model_fields["job_context"].annotation == JobContext
-    assert "job_fields" in JobModel.model_fields
+    assert AbstractJob.model_fields["job_context"].annotation == JobContext
+    assert "job_fields" in AbstractJob.model_fields
 
     # Test 3: Create a valid instance
     from datetime import datetime
@@ -234,7 +234,7 @@ def test_job_model_dynamic_model() -> None:
         "job_fields": {"full_name": "John Doe", "age": 30},
         "encrypted_agent_parameters": "encrypted_agent_parameters",
     }
-    model_instance = JobModel(**valid_data)
+    model_instance = AbstractJob(**valid_data)
 
     # Verify we can access the fields
     assert model_instance.job_context.workspace_id == "ws-123"
@@ -245,7 +245,7 @@ def test_job_model_dynamic_model() -> None:
 
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
-        JobModel(
+        AbstractJob(
             job_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
@@ -259,7 +259,7 @@ def test_job_model_dynamic_model() -> None:
 
     # Test 5: Missing required fields in context
     with pytest.raises(ValidationError):
-        JobModel(
+        AbstractJob(
             job_context={
                 # missing required fields
                 "workspace_id": "ws-123"
@@ -269,7 +269,7 @@ def test_job_model_dynamic_model() -> None:
 
     # Test 6: Missing required fields in job_fields
     with pytest.raises(ValidationError):
-        JobModel(
+        AbstractJob(
             job_context={
                 "workspace_id": "ws-123",
                 "job_id": "job-456",
@@ -290,8 +290,8 @@ def test_job_model_dynamic_model() -> None:
         method="control.empty",
         params={},
     )
-    EmptyJobModel = empty_method.job_model
-    assert issubclass(EmptyJobModel, BaseModel)
+    EmptyAbstractJob = empty_method.job_model
+    assert issubclass(EmptyAbstractJob, BaseModel)
 
     # Create a valid instance with empty fields
     empty_valid_data = {
@@ -306,7 +306,7 @@ def test_job_model_dynamic_model() -> None:
         "job_fields": {},
         "encrypted_agent_parameters": "encrypted_agent_parameters",
     }
-    empty_instance = EmptyJobModel(**empty_valid_data)
+    empty_instance = EmptyAbstractJob(**empty_valid_data)
     assert isinstance(empty_instance, BaseModel)
     assert model_instance.job_context.workspace_id == "ws-123"
 

@@ -161,7 +161,7 @@ class AgentMethod(AgentMethodModel):
         fields_model = self.fields_annotations
 
         return type(
-            "AgentJobModel",
+            "AgentAbstractJob",
             (AgentJobContextBase,),
             {
                 "__annotations__": {
@@ -222,7 +222,7 @@ class AgentMethods(AgentMethodsModel):
         }
 
 
-class AgentModel(SvBaseModel):
+class AbstractAgent(SvBaseModel):
     """
     Agent model for the Supervaize Control API.
 
@@ -247,7 +247,7 @@ class AgentModel(SvBaseModel):
     max_execution_time: int
 
 
-class Agent(AgentModel):
+class Agent(AbstractAgent):
     def __init__(
         self,
         name: str,

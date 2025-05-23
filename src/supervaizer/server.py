@@ -48,7 +48,7 @@ insp = inspect
 T = TypeVar("T")
 
 
-class ServerModel(SvBaseModel):
+class AbstractServer(SvBaseModel):
     """API Server for the Supervaize Controller."""
 
     model_config = {"arbitrary_types_allowed": True}  # for FastAPI
@@ -90,7 +90,7 @@ class ServerModel(SvBaseModel):
         return None
 
 
-class Server(ServerModel):
+class Server(AbstractServer):
     def __init__(
         self,
         agents: List[Agent],
