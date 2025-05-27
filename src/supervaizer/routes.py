@@ -38,7 +38,8 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentResponse,
 )
-from supervaizer.common import log
+from supervaizer.case import Cases, CaseNodeUpdate
+from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.job_service import service_job_start
 from supervaizer.lifecycle import EntityStatus
@@ -52,6 +53,13 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 insp = inspect
+
+
+class CaseUpdateRequest(SvBaseModel):
+    """Request model for updating a case with answer to a question."""
+
+    answer: Dict[str, Any]
+    message: Optional[str] = None
 
 
 def handle_route_errors(
@@ -179,6 +187,82 @@ def create_default_routes(server: "Server") -> APIRouter:
                 all_jobs[agent_name] = jobs_responses
 
         return all_jobs
+
+    @router.post(
+        "/jobs/{job_id}/cases/{case_id}/update",
+        summary="Update case with answer to question",
+        description="Provide an answer to a question that was requested by a case step",
+        response_model=Dict[str, str],
+        responses={
+            http_status.HTTP_200_OK: {"model": Dict[str, str]},
+            http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+            http_status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[Security(server.verify_api_key)],
+    )
+    @handle_route_errors()
+    async def update_case_with_answer(
+        job_id: str,
+        case_id: str,
+        request: CaseUpdateRequest = Body(...),
+    ) -> Dict[str, str]:
+        """Update a case with an answer to a question requested by a case step"""
+        log.info(
+            f"📥 POST /jobs/{job_id}/cases/{case_id}/update [Update case with answer]"
+        )
+
+        # Get the job first
+        job = Jobs().get_job(job_id)
+        if not job:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Job with ID {job_id} not found",
+            )
+
+        # Get the case from the Cases registry
+        case = Cases().get_case(case_id, job_id)
+        if not case:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Case with ID {case_id} not found for job {job_id}",
+            )
+
+        # Check if the case is in AWAITING status (waiting for human input)
+        if case.status != EntityStatus.AWAITING:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value}",
+            )
+
+        # Create a case node update with the answer
+        update = CaseNodeUpdate(
+            name="Human Input Response",
+            payload={
+                "answer": request.answer,
+                "message": request.message,
+                "response_type": "human_input",
+            },
+            is_final=False,
+        )
+
+        # Update the case with the answer
+        case.update(update)
+
+        # Transition the case from AWAITING to IN_PROGRESS
+        case.receive_human_input()
+
+        log.info(
+            f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Answer received and processed for case {case_id} in job {job_id}",
+            "job_id": job_id,
+            "case_id": case_id,
+            "case_status": case.status.value,
+        }
 
     @router.get("/agents", response_model=List[AgentResponse])
     @handle_route_errors()

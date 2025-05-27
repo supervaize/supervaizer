@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import shortuuid
 from pydantic import ConfigDict
 
-from supervaizer.common import SvBaseModel, log
+from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityLifecycle, EntityStatus
 
 if TYPE_CHECKING:
@@ -160,6 +160,8 @@ class AbstractModel(SvBaseModel):
 class Case(AbstractModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        # Register the case in the global registry
+        Cases().add_case(self)
 
     @property
     def uri(self) -> str:
@@ -284,3 +286,68 @@ class Case(AbstractModel):
         account.send_start_case(case=case)
 
         return case
+
+
+@singleton
+class Cases:
+    """Global registry for all cases, organized by job."""
+
+    def __init__(self) -> None:
+        # Structure: {job_id: {case_id: Case}}
+        self.cases_by_job: dict[str, dict[str, "Case"]] = {}
+
+    def add_case(self, case: "Case") -> None:
+        """Add a case to the registry under its job
+
+        Args:
+            case (Case): The case to add
+
+        Raises:
+            ValueError: If case with same ID already exists for this job
+        """
+        job_id = case.job_id
+
+        # Initialize job's case dict if not exists
+        if job_id not in self.cases_by_job:
+            self.cases_by_job[job_id] = {}
+
+        # Check if case already exists for this job
+        if case.id in self.cases_by_job[job_id]:
+            raise ValueError(f"Case ID '{case.id}' already exists for job {job_id}")
+
+        self.cases_by_job[job_id][case.id] = case
+
+    def get_case(self, case_id: str, job_id: str | None = None) -> "Case | None":
+        """Get a case by its ID and optionally job ID
+
+        Args:
+            case_id (str): The ID of the case to get
+            job_id (str | None): The ID of the job. If None, searches all jobs.
+
+        Returns:
+            Case | None: The case if found, None otherwise
+        """
+        if job_id:
+            # Search in specific job's cases
+            return self.cases_by_job.get(job_id, {}).get(case_id)
+
+        # Search across all jobs
+        for job_cases in self.cases_by_job.values():
+            if case_id in job_cases:
+                return job_cases[case_id]
+        return None
+
+    def get_job_cases(self, job_id: str) -> dict[str, "Case"]:
+        """Get all cases for a specific job
+
+        Args:
+            job_id (str): The ID of the job
+
+        Returns:
+            dict[str, Case]: Dictionary of cases for this job, empty if job not found
+        """
+        return self.cases_by_job.get(job_id, {})
+
+    def __contains__(self, case_id: str) -> bool:
+        """Check if case exists in any job's registry"""
+        return any(case_id in cases for cases in self.cases_by_job.values())
