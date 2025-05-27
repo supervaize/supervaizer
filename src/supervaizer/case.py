@@ -34,7 +34,6 @@ class CaseNodeUpdate(SvBaseModel):
     # Todo: test with non-serializable objects. Make sure it works.
     payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
-    question: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
     def __init__(
@@ -43,7 +42,6 @@ class CaseNodeUpdate(SvBaseModel):
         name: str | None = None,
         payload: Dict[str, Any] | None = None,
         is_final: bool = False,
-        question: Dict[str, Any] | None = None,
         index: int | None = None,
         error: Optional[str] = None,
     ) -> None:
@@ -52,10 +50,30 @@ class CaseNodeUpdate(SvBaseModel):
         Args:
             cost (float): Cost of the update
             name (str): Name of the update
-            payload (Dict[str, Any]): Additional data for the update
+            payload (Dict[str, Any]): Additional data for the update - when a question is requested to the user, the payload is the question
             is_final (bool): Whether this is the final update. Default to False
-            question (Dict[str, Any]): Question for the update
             index (int): Index of the node to update. This is set by Case.update()
+
+            error (Optional[str]): Error message if any. Default to None
+
+        When payload contains a question (supervaizer_form):
+            payload = {
+                "supervaizer_form": {
+                    "question": str,  # The question to ask
+                    "answer": {
+                        "fields": [
+                            {
+                                "name": str,        # Field name
+                                "description": str, # Field description
+                                "type": type,      # Field type (e.g. bool)
+                                "field_type": str, # Field type name (e.g. "BooleanField")
+                                "required": bool   # Whether field is required
+                            },
+                            # ... additional fields
+                        ]
+                    }
+                }
+            }
 
         Returns:
             CaseNodeUpdate: CaseNodeUpdate object
@@ -66,7 +84,6 @@ class CaseNodeUpdate(SvBaseModel):
             "name": name,
             "payload": payload,
             "is_final": is_final,
-            "question": question,
             "index": index,
             "error": error,
         }
@@ -89,7 +106,6 @@ class CaseNodeUpdate(SvBaseModel):
             "cost": self.cost,
             "payload": self.payload,
             "is_final": self.is_final,
-            "question": self.question,
         }
 
 
@@ -165,7 +181,7 @@ class Case(AbstractModel):
         self.account.send_update_case(self, updateCaseNode)
         self.updates.append(updateCaseNode)
 
-    def human_input(
+    def request_human_input(
         self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
     ) -> None:
         updateCaseNode.index = len(self.updates) + 1
@@ -173,9 +189,10 @@ class Case(AbstractModel):
             f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
         )
         self.account.send_update_case(self, updateCaseNode)
+        EntityLifecycle.handle_event(self, EntityEvents.AWAITING_ON_INPUT)
         self.updates.append(updateCaseNode)
 
-    def resume(self, **kwargs: Any) -> None:
+    def receive_human_input(self, **kwargs: Any) -> None:
         # Transition from AWAITING to IN_PROGRESS
         EntityLifecycle.handle_event(self, EntityEvents.INPUT_RECEIVED)
 
