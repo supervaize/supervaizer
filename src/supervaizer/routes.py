@@ -584,9 +584,9 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             f"/custom/{method_name}",
             summary=f"Trigger custom method '{method_name}' for agent: {agent.name}",
             description=f"{method_config.description if hasattr(method_config, 'description') else f'Trigger custom method {method_name}'}",
-            response_model=AgentResponse,
+            response_model=JobResponse,
             responses={
-                http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
+                http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
                 http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
             },
             dependencies=[Security(server.verify_api_key)],
@@ -596,29 +596,31 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
         async def custom_method_endpoint(
             params: AgentMethodParams,
             agent: Agent = Depends(get_agent),
-            _method_name: str = method_name,  # Capture method_name in closure
-        ) -> AgentResponse:
+        ) -> JobResponse:
             log.info(
-                f"POST /custom/{_method_name} [Custom method] {_method_name} for agent {agent.name} with params {params}"
+                f"POST /custom/{method_name} [Custom method] {method_name} for agent {agent.name} with params {params}"
             )
 
-            if not (agent.methods.custom and _method_name in agent.methods.custom):
+            if not (agent.methods.custom and method_name in agent.methods.custom):
                 raise HTTPException(
                     status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
-                    detail=f"Custom method '{_method_name}' not found",
+                    detail=f"Custom method '{method_name}' not found",
                 )
 
-            method = agent.methods.custom[_method_name]
+            method = agent.methods.custom[method_name]
             result = method(params.params) if callable(method) else method
-            log.debug(f"[Custom method] {_method_name} result: {result}")
+            log.debug(f"[Custom method] {method_name} result: {result}")
 
-            return AgentResponse(
-                name=agent.name,
-                id=agent.id,
-                version=agent.version,
-                api_path=agent.path,
-                description=agent.description,
-                methods=agent.methods,
+            # Return a JobResponse instead of AgentResponse
+            return JobResponse(
+                job_id=result.get("job_id", "unknown")
+                if isinstance(result, dict)
+                else "unknown",
+                status=result.get("status", EntityStatus.COMPLETED)
+                if isinstance(result, dict)
+                else EntityStatus.COMPLETED,
+                message=f"Custom method '{method_name}' executed successfully",
+                payload=result if result else {},
             )
 
     return router
