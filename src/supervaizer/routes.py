@@ -40,7 +40,7 @@ from supervaizer.agent import (
 from supervaizer.case import Cases, CaseNodeUpdate
 from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
-from supervaizer.job_service import service_job_start
+from supervaizer.job_service import service_job_start, service_job_custom
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
@@ -579,6 +579,13 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
 
     # Create a route for each custom method
     for method_name, method_config in agent.methods.custom.items():
+        # Create the dynamic model with the custom name for FastAPI documentation
+        custom_job_model_name = f"{agent.slug}_Custom_{method_name}_Job_Model"
+        AgentCustomAbstractJob = type(
+            custom_job_model_name,
+            (method_config.job_model,),  # type: ignore
+            {},
+        )
 
         @router.post(
             f"/custom/{method_name}",
@@ -594,33 +601,38 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
         )
         @handle_route_errors()
         async def custom_method_endpoint(
-            params: AgentMethodParams,
+            background_tasks: BackgroundTasks,
+            body_params: AgentCustomAbstractJob = Body(...),  # type: ignore
             agent: Agent = Depends(get_agent),
-        ) -> JobResponse:
+        ) -> Union[JobResponse, JSONResponse]:
             log.info(
-                f"POST /custom/{method_name} [Custom method] {method_name} for agent {agent.name} with params {params}"
+                f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
+            )
+            sv_context: JobContext = body_params.job_context  # type: ignore[attr-defined]
+            job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
+
+            # Get job encrypted parameters if available
+            encrypted_agent_parameters = getattr(
+                body_params, "encrypted_agent_parameters", None
             )
 
-            if not (agent.methods.custom and method_name in agent.methods.custom):
-                raise HTTPException(
-                    status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
-                    detail=f"Custom method '{method_name}' not found",
-                )
+            # Delegate job creation and scheduling to the service
+            new_job = await service_job_custom(
+                method_name,
+                server,
+                background_tasks,
+                agent,
+                sv_context,
+                job_fields,
+                encrypted_agent_parameters,
+            )
 
-            method = agent.methods.custom[method_name]
-            result = method(params.params) if callable(method) else method
-            log.debug(f"[Custom method] {method_name} result: {result}")
-
-            # Return a JobResponse instead of AgentResponse
+            # Convert Job to JobResponse to match the endpoint's response model
             return JobResponse(
-                job_id=result.get("job_id", "unknown")
-                if isinstance(result, dict)
-                else "unknown",
-                status=result.get("status", EntityStatus.COMPLETED)
-                if isinstance(result, dict)
-                else EntityStatus.COMPLETED,
-                message=f"Custom method '{method_name}' executed successfully",
-                payload=result if result else {},
+                job_id=new_job.id,
+                status=new_job.status,
+                message=f"Custom method '{method_name}' job started for agent {agent.name}",
+                payload=new_job.payload,
             )
 
     return router

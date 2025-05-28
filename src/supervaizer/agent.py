@@ -482,6 +482,7 @@ class Agent(AbstractAgent):
         job_fields: Dict[str, Any],
         context: JobContext,
         server: "Server",
+        method_name: str = "job_start",
     ) -> Job:
         """Execute the agent's start method in the background
 
@@ -517,18 +518,29 @@ class Agent(AbstractAgent):
         )
 
         # Execute the method
-        action = self.methods.job_start.method
-        method_params = self.methods.job_start.params or {}
+        if method_name == "job_start":
+            action = self.method.job_start
+        else:
+            action = self.methods.custom[method_name]
+
+        action_method = action.method
+        method_params = action.params or {}
         params = (
             method_params
             | {"fields": job_fields}
             | {"context": context}
             | {"agent_parameters": job.agent_parameters}
         )
+        log.debug(
+            f"[Agent job_start] action_method : {action_method} - params : {params}"
+        )
         try:
             if self.methods.job_start.is_async:
                 # TODO: Implement async job execution & test
-                started = self._execute(action, params)
+                raise NotImplementedError(
+                    "[Agent job_start] Async job execution is not implemented"
+                )
+                started = self._execute(action_method, params)
                 job_response = JobResponse(
                     job_id=job.id,
                     status=EntityStatus.IN_PROGRESS,
@@ -536,7 +548,7 @@ class Agent(AbstractAgent):
                     payload={"intermediary_deliverable": started},
                 )
             else:
-                job_response = self._execute(action, params)
+                job_response = self._execute(action_method, params)
                 if (
                     job_response.status == EntityStatus.COMPLETED
                     or job_response.status == EntityStatus.FAILED
@@ -545,13 +557,13 @@ class Agent(AbstractAgent):
 
                 else:
                     log.error(
-                        f"[Agent job_start] Job {job.id} status {job_response} is not a terminal status, skipping job finish"
+                        f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {job_response} "
                     )
 
         except Exception as e:
             # Handle any execution errors
             error_msg = f"Job execution failed: {str(e)}"
-            log.error(f"[Agent job_start] Job {job.id} failed: {error_msg}")
+            log.error(f"[Agent job_start] Job failed : {job.id} - {error_msg}")
             job_response = JobResponse(
                 job_id=job.id,
                 status=EntityStatus.FAILED,
@@ -560,6 +572,7 @@ class Agent(AbstractAgent):
                 error=e,
             )
             job.add_response(job_response)
+            raise
 
         service_job_finished(job, server=server)
         return job
@@ -580,16 +593,6 @@ class Agent(AbstractAgent):
         method = self.methods.chat.method
         params = {"context": context, "message": message}
         return self._execute(method, params)
-
-    def custom(self, method: str, params: Dict[str, Any] = {}) -> Any:
-        """Tested in tests/test_agent.py"""
-        if not self.methods.custom:
-            raise ValueError("No custom methods configured")
-        if method not in self.methods.custom:
-            raise ValueError(f"Method {method} not found")
-        custom_method = self.methods.custom[method]
-        method_params = custom_method.params or {}
-        return self._execute(custom_method.method, method_params)
 
     @property
     def custom_methods_names(self) -> list[str] | None:

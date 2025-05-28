@@ -48,8 +48,10 @@ class ParametersSetup(SvBaseModel):
 
     @classmethod
     def from_list(
-        cls, parameter_list: List[Parameter | Dict[str, Any]]
+        cls, parameter_list: List[Parameter | Dict[str, Any]] | None
     ) -> "ParametersSetup":
+        if not parameter_list:
+            return
         if isinstance(parameter_list[0], dict):  # TODO: add test for this
             parameter_list = [Parameter(**parameter) for parameter in parameter_list]
         return cls(
