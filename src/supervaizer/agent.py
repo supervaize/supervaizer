@@ -6,10 +6,19 @@
 
 
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+import re
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+)
 
 import shortuuid
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from rich import inspect, print
 from slugify import slugify
 
@@ -26,6 +35,8 @@ if TYPE_CHECKING:
 
 insp = inspect
 prnt = print
+
+T = TypeVar("T")
 
 
 class AgentJobContextBase(BaseModel):
@@ -205,6 +216,29 @@ class AgentMethodsModel(BaseModel):
     job_status: AgentMethod
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
+
+    @field_validator("custom")
+    @classmethod
+    def validate_custom_method_keys(cls, value):
+        """Validate that custom method keys are valid slug-like values suitable for endpoints."""
+        if value:
+            for key in value.keys():
+                # Check if key is a valid slug format
+                if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", key):
+                    raise ValueError(
+                        f"Custom method key '{key}' is not a valid slug. "
+                        f"Keys must contain only lowercase letters, numbers, and hyphens, "
+                        f"and cannot start or end with a hyphen. "
+                        f"Examples: 'backup', 'health-check', 'sync-data'"
+                    )
+
+                # Additional checks for endpoint safety
+                if len(key) > 50:
+                    raise ValueError(
+                        f"Custom method key '{key}' is too long (max 50 characters)"
+                    )
+
+        return value
 
 
 class AgentMethods(AgentMethodsModel):

@@ -14,6 +14,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
+from supervaizer.agent import AgentMethodsModel
 from supervaizer.job import Job, JobContext
 from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -414,3 +415,125 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
     assert job.job_context.mission_name == "test-mission-name"
     assert job.job_context.mission_context is None
     assert job.job_context.job_instructions is None
+
+
+def test_custom_method_key_validation() -> None:
+    """Test validation of custom method keys in AgentMethodsModel."""
+
+    # Create a basic agent method for testing
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method"
+    )
+
+    # Test valid custom method keys
+    valid_keys = [
+        "backup",
+        "health-check",
+        "sync-data",
+        "test123",
+        "method-1",
+        "a",
+        "very-long-method-name-that-is-still-valid",
+    ]
+
+    for key in valid_keys:
+        # Should not raise any validation error
+        methods = AgentMethodsModel(
+            job_start=basic_method,
+            job_stop=basic_method,
+            job_status=basic_method,
+            custom={key: basic_method},
+        )
+        assert methods.custom is not None
+        assert key in methods.custom
+
+    # Test invalid custom method keys
+    invalid_cases = [
+        # Invalid characters
+        ("method_with_underscore", "not a valid slug"),
+        ("method with spaces", "not a valid slug"),
+        ("method@special", "not a valid slug"),
+        ("Method-With-Caps", "not a valid slug"),
+        ("method.with.dots", "not a valid slug"),
+        # Invalid format - these will be caught by the regex check
+        ("-starts-with-hyphen", "not a valid slug"),
+        ("ends-with-hyphen-", "not a valid slug"),
+        ("double--hyphen", "not a valid slug"),
+        # Too long
+        ("a" * 51, "too long"),
+    ]
+
+    for invalid_key, expected_error_part in invalid_cases:
+        with pytest.raises(ValidationError) as exc_info:
+            AgentMethodsModel(
+                job_start=basic_method,
+                job_stop=basic_method,
+                job_status=basic_method,
+                custom={invalid_key: basic_method},
+            )
+
+        # Check that the error message contains the expected part
+        error_message = str(exc_info.value)
+        assert expected_error_part in error_message.lower(), (
+            f"Expected '{expected_error_part}' in error for key '{invalid_key}', got: {error_message}"
+        )
+
+
+def test_custom_method_key_validation_with_multiple_keys() -> None:
+    """Test validation when multiple custom method keys are provided."""
+
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method"
+    )
+
+    # Test with mix of valid and invalid keys
+    with pytest.raises(ValidationError) as exc_info:
+        AgentMethodsModel(
+            job_start=basic_method,
+            job_stop=basic_method,
+            job_status=basic_method,
+            custom={
+                "valid-method": basic_method,
+                "another-valid": basic_method,
+                "Invalid-Key": basic_method,  # This should cause validation error
+                "also-valid": basic_method,
+            },
+        )
+
+    error_message = str(exc_info.value)
+    assert "Invalid-Key" in error_message
+    assert "not a valid slug" in error_message
+
+
+def test_custom_method_key_validation_none_value() -> None:
+    """Test that validation passes when custom is None."""
+
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method"
+    )
+
+    # Should not raise any validation error when custom is None
+    methods = AgentMethodsModel(
+        job_start=basic_method,
+        job_stop=basic_method,
+        job_status=basic_method,
+        custom=None,
+    )
+    assert methods.custom is None
+
+
+def test_custom_method_key_validation_empty_dict() -> None:
+    """Test that validation passes when custom is an empty dict."""
+
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method"
+    )
+
+    # Should not raise any validation error when custom is empty
+    methods = AgentMethodsModel(
+        job_start=basic_method,
+        job_stop=basic_method,
+        job_status=basic_method,
+        custom={},
+    )
+    assert methods.custom == {}

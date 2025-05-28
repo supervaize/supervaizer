@@ -147,10 +147,10 @@ class AbstractModel(SvBaseModel):
     id: str
     job_id: str
     name: str
-    account: "Account"  # type: ignore
+    account: "Account"  # type: ignor
     description: str
     status: EntityStatus
-    nodes: List[CaseNode] = []
+    nodes: List[CaseNode] = []  # TODO: do we really need the case nodes ?
     updates: List[CaseNodeUpdate] = []
     total_cost: float = 0.0
     final_delivery: Optional[Dict[str, Any]] = None

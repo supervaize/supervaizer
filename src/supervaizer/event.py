@@ -131,7 +131,12 @@ class JobStartConfirmationEvent(Event):
 
 class JobFinishedEvent(Event):
     def __init__(self, job: "Job", account: Any) -> None:
-        details = job.responses[-1].status
+        # Check if job has responses, otherwise use the job's current status
+        if job.responses:
+            details = job.responses[-1].status
+        else:
+            details = job.status
+
         event_type = (
             EventType.JOB_END
             if details == EntityStatus.COMPLETED

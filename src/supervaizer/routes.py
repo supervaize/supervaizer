@@ -34,7 +34,6 @@ from rich import inspect
 
 from supervaizer.agent import (
     Agent,
-    AgentCustomMethodParams,
     AgentMethodParams,
     AgentResponse,
 )
@@ -337,6 +336,9 @@ def create_agents_routes(server: "Server") -> APIRouter:
     routers = APIRouter(prefix="/supervaizer", tags=["Supervision"])
     for agent in server.agents:
         routers.include_router(create_agent_route(server, agent))
+        # Add custom method routes for each agent
+        if agent.methods.custom:
+            routers.include_router(create_agent_custom_routes(server, agent))
     return routers
 
 
@@ -534,43 +536,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
 
     @router.post(
-        "/custom",
-        summary=f"Trigger a custom method for agent: {agent.name}",
-        description="Trigger a custom method",
-        response_model=AgentResponse,
-        responses={
-            http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
-            http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
-        },
-        dependencies=[Security(server.verify_api_key)],
-    )
-    @handle_route_errors()
-    async def custom_method(
-        params: AgentCustomMethodParams, agent: Agent = Depends(get_agent)
-    ) -> AgentResponse:
-        log.info(
-            f"POST /custom [Custom method] {params.method_name} for agent {agent.name} with params {params.params}"
-        )
-        if not (agent.methods.custom and params.method_name in agent.methods.custom):
-            raise HTTPException(
-                status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
-                detail="Custom method not found",
-            )
-
-        method = agent.methods.custom[params.method_name]
-        result = method(params.params) if callable(method) else method
-        log.debug(f"[Custom method] {params.method_name} result: {result}")
-
-        return AgentResponse(
-            name=agent.name,
-            id=agent.id,
-            version=agent.version,
-            api_path=agent.path,
-            description=agent.description,
-            methods=agent.methods,
-        )
-
-    @router.post(
         "/parameters",
         summary=f"Server updates agent: {agent.name}",
         description="Server updates agent onboarding status and/or encrypted parameters",
@@ -597,5 +562,63 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         # importlib.reload(Agent)
         return AgentResponse(**agent.registration_info)
+
+    return router
+
+
+def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
+    """Create individual routes for each custom method of an agent."""
+    tags: list[str | Enum] = ["Supervision"]
+    router = APIRouter(
+        prefix=agent.path,
+        tags=tags,
+    )
+
+    async def get_agent() -> Agent:
+        return agent
+
+    # Create a route for each custom method
+    for method_name, method_config in agent.methods.custom.items():
+
+        @router.post(
+            f"/custom/{method_name}",
+            summary=f"Trigger custom method '{method_name}' for agent: {agent.name}",
+            description=f"{method_config.description if hasattr(method_config, 'description') else f'Trigger custom method {method_name}'}",
+            response_model=AgentResponse,
+            responses={
+                http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
+                http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
+            },
+            dependencies=[Security(server.verify_api_key)],
+            name=f"{agent.slug}_custom_{method_name}",  # Unique operation ID
+        )
+        @handle_route_errors()
+        async def custom_method_endpoint(
+            params: AgentMethodParams,
+            agent: Agent = Depends(get_agent),
+            _method_name: str = method_name,  # Capture method_name in closure
+        ) -> AgentResponse:
+            log.info(
+                f"POST /custom/{_method_name} [Custom method] {_method_name} for agent {agent.name} with params {params}"
+            )
+
+            if not (agent.methods.custom and _method_name in agent.methods.custom):
+                raise HTTPException(
+                    status_code=http_status.HTTP_405_METHOD_NOT_ALLOWED,
+                    detail=f"Custom method '{_method_name}' not found",
+                )
+
+            method = agent.methods.custom[_method_name]
+            result = method(params.params) if callable(method) else method
+            log.debug(f"[Custom method] {_method_name} result: {result}")
+
+            return AgentResponse(
+                name=agent.name,
+                id=agent.id,
+                version=agent.version,
+                api_path=agent.path,
+                description=agent.description,
+                methods=agent.methods,
+            )
 
     return router
