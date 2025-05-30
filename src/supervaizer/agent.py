@@ -519,7 +519,7 @@ class Agent(AbstractAgent):
 
         # Execute the method
         if method_name == "job_start":
-            action = self.method.job_start
+            action = self.methods.job_start
         else:
             action = self.methods.custom[method_name]
 
@@ -579,13 +579,11 @@ class Agent(AbstractAgent):
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
         method = self.methods.job_stop.method
-        method_params = self.methods.job_stop.params or {}
-        return self._execute(method, method_params)
+        return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
         method = self.methods.job_status.method
-        method_params = self.methods.job_status.params or {}
-        return self._execute(method, method_params)
+        return self._execute(method, params)
 
     def chat(self, context: str, message: str) -> Any:
         if not self.methods.chat:
@@ -614,7 +612,7 @@ class AgentResponse(BaseModel):
     api_path: str
     description: str
     tags: Optional[list[str]] = None
-    methods: AgentMethods
+    methods: Optional[AgentMethods] = None
     parameters_setup: Optional[List[Dict[str, Any]]] = None
     server_agent_id: Optional[str] = None
     server_agent_status: Optional[str] = None

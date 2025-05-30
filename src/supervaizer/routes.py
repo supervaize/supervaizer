@@ -79,6 +79,7 @@ def handle_route_errors(
     ) -> Callable[..., Awaitable[Union[T, JSONResponse]]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
+            log.debug(f"------[DEBUG]----------\n {args} \n {kwargs}")
             try:
                 result: T = await func(*args, **kwargs)
                 return result
@@ -498,17 +499,20 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     )
     @handle_route_errors()
     async def stop_agent(
-        params: AgentMethodParams, agent: Agent = Depends(get_agent)
+        background_tasks: BackgroundTasks,
+        params=Body(...),
+        agent: Agent = Depends(get_agent),
     ) -> AgentResponse:
         log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
-        result = agent.job_stop(params.params)
+        result = agent.job_stop(params.get("job_context"))
+        res_info = result.registration_info if result else {}
         return AgentResponse(
             name=agent.name,
             id=agent.id,
             version=agent.version,
             api_path=agent.path,
             description=agent.description,
-            **result if result else {},
+            **res_info,
         )
 
     @router.post(

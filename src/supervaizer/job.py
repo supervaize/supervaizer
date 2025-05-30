@@ -189,6 +189,7 @@ class JobResponse(SvBaseModel):
         kwargs["payload"] = payload
         kwargs["error_message"] = error_message
         kwargs["error_traceback"] = error_traceback
+        log.debug(f"------[Job Response] {kwargs}")
         super().__init__(**kwargs)
 
         if error:
