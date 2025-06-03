@@ -142,7 +142,7 @@ class CaseNode(SvBaseModel):
         }
 
 
-class AbstractModel(SvBaseModel):
+class CaseAbstractModel(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     id: str
     job_id: str
@@ -157,7 +157,7 @@ class AbstractModel(SvBaseModel):
     finished_at: Optional[datetime] = None
 
 
-class Case(AbstractModel):
+class Case(CaseAbstractModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Register the case in the global registry

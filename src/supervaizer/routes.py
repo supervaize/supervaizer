@@ -40,6 +40,7 @@ from supervaizer.agent import (
 from supervaizer.case import Cases, CaseNodeUpdate
 from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
+from supervaizer.case import Case
 from supervaizer.job_service import service_job_start, service_job_custom
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
@@ -79,7 +80,7 @@ def handle_route_errors(
     ) -> Callable[..., Awaitable[Union[T, JSONResponse]]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
-            log.debug(f"------[DEBUG]----------\n {args} \n {kwargs}")
+            log.debug(f"------[DEBUG]----------\n args :{args} \n kwargs :{kwargs}")
             try:
                 result: T = await func(*args, **kwargs)
                 return result
@@ -223,11 +224,16 @@ def create_default_routes(server: "Server") -> APIRouter:
         # Get the case from the Cases registry
         case = Cases().get_case(case_id, job_id)
         if not case:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Case with ID {case_id} not found for job {job_id}",
+            log.warning(f"Case with ID {case_id} not found for job {job_id}")
+            # Create a new case if case does not exist (may happen if the agent server was restarted and objects were flushed)
+            case = Case(
+                id=case_id,
+                job_id=job_id,
+                name=f"Case created by API for job {job_id}",
+                account=server.account,
+                description="Case created by API ",
+                status=EntityStatus.AWAITING,
             )
-
         # Check if the case is in AWAITING status (waiting for human input)
         if case.status != EntityStatus.AWAITING:
             raise HTTPException(
