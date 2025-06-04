@@ -552,12 +552,19 @@ class Agent(AbstractAgent):
                 if (
                     job_response.status == EntityStatus.COMPLETED
                     or job_response.status == EntityStatus.FAILED
+                    or job_response.status == EntityStatus.CANCELLED
+                    or job_response.status == EntityStatus.CANCELLING
                 ):
                     job.add_response(job_response)
-
+                    service_job_finished(job, server=server)
+                elif job_response.status == EntityStatus.AWAITING:
+                    log.debug(
+                        f"[Agent job_start] Job is awaiting input, adding response : Job {job.id} status {job_response} §SAS02"
+                    )
+                    job.add_response(job_response)
                 else:
-                    log.error(
-                        f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {job_response} "
+                    log.warning(
+                        f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {job_response} §SAS01"
                     )
 
         except Exception as e:
@@ -573,8 +580,6 @@ class Agent(AbstractAgent):
             )
             job.add_response(job_response)
             raise
-
-        service_job_finished(job, server=server)
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:

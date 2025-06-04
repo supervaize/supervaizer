@@ -140,7 +140,7 @@ def create_default_routes(server: "Server") -> APIRouter:
         if not job:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Job with ID {job_id} not found",
+                detail=f"Job with ID {job_id} not found §SRCG01",
             )
         return job
 
@@ -218,19 +218,19 @@ def create_default_routes(server: "Server") -> APIRouter:
         if not job:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Job with ID {job_id} not found",
+                detail=f"Job with ID {job_id} not found §SRCU01",
             )
 
         # Get the case from the Cases registry
         case = Cases().get_case(case_id, job_id)
         if not case:
-            log.warning(f"Case with ID {case_id} not found for job {job_id}")
+            log.warning(f"Case with ID {case_id} not found for job {job_id} §SRCU02")
             # Create a new case if case does not exist (may happen if the agent server was restarted and objects were flushed)
             case = Case(
                 id=case_id,
                 job_id=job_id,
                 name=f"Case created by API for job {job_id}",
-                account=server.account,
+                account=server.supervisor_account,
                 description="Case created by API ",
                 status=EntityStatus.AWAITING,
             )
@@ -238,7 +238,7 @@ def create_default_routes(server: "Server") -> APIRouter:
         if case.status != EntityStatus.AWAITING:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value}",
+                detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
             )
 
         # Create a case node update with the answer

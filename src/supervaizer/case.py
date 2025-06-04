@@ -147,7 +147,7 @@ class CaseAbstractModel(SvBaseModel):
     id: str
     job_id: str
     name: str
-    account: "Account"  # type: ignor
+    account: "Account"
     description: str
     status: EntityStatus
     nodes: List[CaseNode] = []  # TODO: do we really need the case nodes ?
