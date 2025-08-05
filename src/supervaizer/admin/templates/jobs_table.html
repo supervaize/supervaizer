@@ -1,0 +1,122 @@
+<div class="bg-white shadow overflow-hidden rounded-md">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Job
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Agent
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cases
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                </th>
+                <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for job in jobs %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">{{ job.name }}</div>
+                        <div class="text-sm text-gray-500">{{ job.id }}</div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">{{ job.agent_name }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        {% if job.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif job.status == 'in_progress' %}bg-blue-100 text-blue-800
+                        {% elif job.status == 'failed' %}bg-red-100 text-red-800
+                        {% elif job.status == 'cancelled' %}bg-gray-100 text-gray-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ job.status.replace('_', ' ').title() }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ job.case_count }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if job.created_at %}
+                        {{ job.created_at[:10] }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                        onclick="showJobDetails('{{ job.id }}')"
+                        class="text-blue-600 hover:text-blue-900 mr-4"
+                    >
+                        View
+                    </button>
+                    <button
+                        hx-delete="/admin/api/jobs/{{ job.id }}"
+                        hx-confirm="Are you sure you want to delete this job and all its cases?"
+                        hx-trigger="click"
+                        hx-on::after-request="if(event.detail.successful) { window.showToast('Job deleted successfully', 'success'); htmx.trigger('#jobs-table-container', 'refresh'); }"
+                        class="text-red-600 hover:text-red-900"
+                    >
+                        Delete
+                    </button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-12 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No jobs found</h3>
+                    <p class="mt-1 text-sm text-gray-500">Try adjusting your filters or search criteria.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if total > 0 %}
+    <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <p class="text-sm text-gray-700">
+                    Showing {{ skip + 1 }} to {{ skip + jobs|length }} of {{ total }} results
+                </p>
+            </div>
+            <div class="flex space-x-2">
+                {% if has_prev %}
+                <button
+                    hx-get="/admin/api/jobs?skip={{ skip - limit }}&limit={{ limit }}"
+                    hx-target="#jobs-table-container"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                    Previous
+                </button>
+                {% endif %}
+
+                {% if has_next %}
+                <button
+                    hx-get="/admin/api/jobs?skip={{ skip + limit }}&limit={{ limit }}"
+                    hx-target="#jobs-table-container"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                    Next
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

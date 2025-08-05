@@ -14,10 +14,10 @@ from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (
     EntityEvents,
-    EntityLifecycle,
     EntityStatus,
     Lifecycle,
 )
+from supervaizer.storage import storage_manager
 
 if TYPE_CHECKING:
     pass
@@ -30,6 +30,9 @@ class Jobs:
     def __init__(self) -> None:
         # Structure: {agent_name: {job_id: Job}}
         self.jobs_by_agent: dict[str, dict[str, "Job"]] = {}
+
+    def reset(self) -> None:
+        self.jobs_by_agent.clear()
 
     def add_job(self, job: "Job") -> None:
         """Add a job to the registry under its agent
@@ -48,29 +51,42 @@ class Jobs:
 
         # Check if job already exists for this agent
         if job.id in self.jobs_by_agent[agent_name]:
-            raise ValueError(f"Job ID '{job.id}' already exists for agent {agent_name}")
+            log.warning(f"Job ID '{job.id}' already exists for agent {agent_name}.")
 
         self.jobs_by_agent[agent_name][job.id] = job
 
-    def get_job(self, job_id: str, agent_name: str | None = None) -> "Job | None":
+    def get_job(
+        self,
+        job_id: str,
+        agent_name: str | None = None,
+        include_persisted: bool = False,
+    ) -> "Job | None":
         """Get a job by its ID and optionally agent name
 
         Args:
             job_id (str): The ID of the job to get
             agent_name (str | None): The name of the agent. If None, searches all agents.
+            include_persisted (bool): Whether to include persisted jobs. Defaults to False.
 
         Returns:
             Job | None: The job if found, None otherwise
         """
+        found_job = None
+
         if agent_name:
             # Search in specific agent's jobs
-            return self.jobs_by_agent.get(agent_name, {}).get(job_id)
+            found_job = self.jobs_by_agent.get(agent_name, {}).get(job_id)
 
         # Search across all agents
         for agent_jobs in self.jobs_by_agent.values():
             if job_id in agent_jobs:
-                return agent_jobs[job_id]
-        return None
+                found_job = agent_jobs[job_id]
+
+        if include_persisted:
+            job_from_storage = storage_manager.get_object_by_id("Job", job_id)
+            if job_from_storage:
+                found_job = Job(**job_from_storage)
+        return found_job
 
     def get_agent_jobs(self, agent_name: str) -> dict[str, "Job"]:
         """Get all jobs for a specific agent
@@ -178,6 +194,9 @@ class JobResponse(SvBaseModel):
         error: Optional[Exception] = None,
         **kwargs: Any,
     ) -> None:
+        log.debug(
+            f"[JobResponse __init__] job_id={job_id}, status={status}, message={message}, payload={payload}, error={error}, kwargs={kwargs}"
+        )
         if error:
             error_message = str(error)
             error_traceback = traceback.format_exc()
@@ -189,7 +208,6 @@ class JobResponse(SvBaseModel):
         kwargs["payload"] = payload
         kwargs["error_message"] = error_message
         kwargs["error_traceback"] = error_traceback
-        log.debug(f"------[Job Response] {kwargs}")
         super().__init__(**kwargs)
 
         if error:
@@ -225,6 +243,7 @@ class AbstractJob(SvBaseModel):
     finished_at: datetime | None = None
     created_at: datetime | None = None
     agent_parameters: List[dict[str, Any]] | None = None
+    case_ids: List[str] = []  # Foreign key relationship to cases
 
 
 class Job(AbstractJob):
@@ -250,6 +269,9 @@ class Job(AbstractJob):
         Jobs().add_job(
             job=self,
         )
+        # Persist job to storage
+
+        storage_manager.save_object("Job", self.to_dict)
 
     def add_response(self, response: JobResponse) -> None:
         """Add a response to the job and update status based on the event lifecycle.
@@ -272,6 +294,34 @@ class Job(AbstractJob):
 
         self.responses.append(response)
 
+        # Persist updated job to storage
+
+        storage_manager.save_object("Job", self.to_dict)
+
+    def add_case_id(self, case_id: str) -> None:
+        """Add a case ID to this job's case list.
+
+        Args:
+            case_id: The case ID to add
+        """
+        if case_id not in self.case_ids:
+            self.case_ids.append(case_id)
+            log.debug(f"[Job add_response] Added case {case_id} to job {self.id}")
+            # Persist updated job to storage
+            storage_manager.save_object("Job", self.to_dict)
+
+    def remove_case_id(self, case_id: str) -> None:
+        """Remove a case ID from this job's case list.
+
+        Args:
+            case_id: The case ID to remove
+        """
+        if case_id in self.case_ids:
+            self.case_ids.remove(case_id)
+            log.debug(f"Removed case {case_id} from job {self.id}")
+            # Persist updated job to storage
+            storage_manager.save_object("Job", self.to_dict)
+
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the job"""
@@ -286,6 +336,7 @@ class Job(AbstractJob):
             "responses": [response.registration_info for response in self.responses],
             "finished_at": self.finished_at.isoformat() if self.finished_at else "",
             "created_at": self.created_at.isoformat() if self.created_at else "",
+            "case_ids": self.case_ids,
         }
 
     @classmethod
@@ -321,6 +372,8 @@ class Job(AbstractJob):
         )
 
         # Transition from STOPPED to IN_PROGRESS
-        EntityLifecycle.handle_event(job, EntityEvents.START_WORK)
+        from supervaizer.storage import PersistentEntityLifecycle
+
+        PersistentEntityLifecycle.handle_event(job, EntityEvents.START_WORK)
 
         return job

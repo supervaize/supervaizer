@@ -1,0 +1,192 @@
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+    <div class="sm:flex sm:items-start">
+        <div class="w-full">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Job Details</h3>
+                <button
+                    @click="open = false"
+                    class="bg-white rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                    <span class="sr-only">Close</span>
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Job Information -->
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Basic Information</h4>
+                    <dl class="space-y-2">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</dt>
+                            <dd class="text-sm text-gray-900">{{ job.name or "Unnamed Job" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">ID</dt>
+                            <dd class="text-sm text-gray-900 font-mono">{{ job.id }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</dt>
+                            <dd class="text-sm text-gray-900">{{ job.agent_name or "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</dt>
+                            <dd>
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if job.status == 'completed' %}bg-green-100 text-green-800
+                                    {% elif job.status == 'in_progress' %}bg-blue-100 text-blue-800
+                                    {% elif job.status == 'failed' %}bg-red-100 text-red-800
+                                    {% elif job.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ job.status.replace('_', ' ').title() }}
+                                </span>
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Timestamps</h4>
+                    <dl class="space-y-2">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Created</dt>
+                            <dd class="text-sm text-gray-900">{{ job.created_at or "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Finished</dt>
+                            <dd class="text-sm text-gray-900">{{ job.finished_at or "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Cases</dt>
+                            <dd class="text-sm text-gray-900">{{ (job.case_ids | length) if job.case_ids else 0 }} related case(s)</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Job Context -->
+            {% if job.job_context %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Job Context</h4>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {% if job.job_context.workspace_id %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Workspace ID</dt>
+                            <dd class="text-sm text-gray-900 font-mono">{{ job.job_context.workspace_id }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if job.job_context.mission_name %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Mission</dt>
+                            <dd class="text-sm text-gray-900">{{ job.job_context.mission_name }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if job.job_context.started_by %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500">Started By</dt>
+                            <dd class="text-sm text-gray-900">{{ job.job_context.started_by }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Related Cases -->
+            {% if cases %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Related Cases ({{ cases | length }})</h4>
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <ul role="list" class="divide-y divide-gray-200">
+                        {% for case in cases %}
+                        <li class="px-4 py-3 hover:bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">{{ case.name or case.id[:8] + "..." }}</p>
+                                        <p class="text-sm text-gray-500">{{ case.description or "No description" }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                        {% if case.status == 'completed' %}bg-green-100 text-green-800
+                                        {% elif case.status == 'in_progress' %}bg-blue-100 text-blue-800
+                                        {% elif case.status == 'failed' %}bg-red-100 text-red-800
+                                        {% elif case.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                        {{ case.status.replace('_', ' ').title() }}
+                                    </span>
+                                    <button
+                                        onclick="showCaseDetails('{{ case.id }}')"
+                                        class="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                    >
+                                        View
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Footer -->
+<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+    <button
+        @click="open = false"
+        type="button"
+        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+    >
+        Close
+    </button>
+
+    <!-- Status Update Button -->
+    {% if job.status not in ['completed', 'failed', 'cancelled'] %}
+    <div class="relative inline-block text-left" x-data="{ statusOpen: false }">
+        <button
+            @click="statusOpen = !statusOpen"
+            type="button"
+            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+        >
+            Update Status
+        </button>
+
+        <div x-show="statusOpen" @click.away="statusOpen = false" x-cloak class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+            <div class="py-1" role="menu">
+                <button
+                    hx-post="/admin/api/jobs/{{ job.id }}/status"
+                    hx-vals='{"status": "completed"}'
+                    hx-on::after-request="if(event.detail.successful) { window.showToast('Job status updated', 'success'); open = false; htmx.trigger('#jobs-table-container', 'refresh'); }"
+                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                    Mark as Completed
+                </button>
+                <button
+                    hx-post="/admin/api/jobs/{{ job.id }}/status"
+                    hx-vals='{"status": "failed"}'
+                    hx-on::after-request="if(event.detail.successful) { window.showToast('Job status updated', 'success'); open = false; htmx.trigger('#jobs-table-container', 'refresh'); }"
+                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                    Mark as Failed
+                </button>
+                <button
+                    hx-post="/admin/api/jobs/{{ job.id }}/status"
+                    hx-vals='{"status": "cancelled"}'
+                    hx-on::after-request="if(event.detail.successful) { window.showToast('Job status updated', 'success'); open = false; htmx.trigger('#jobs-table-container', 'refresh'); }"
+                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                    Cancel Job
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

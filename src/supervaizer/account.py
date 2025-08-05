@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 import httpx
 
 from supervaizer.__version__ import VERSION
-from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel, log
+from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
 from supervaizer.telemetry import Telemetry
 
 if TYPE_CHECKING:
@@ -84,6 +84,36 @@ class Account(AccountModel):
         """
         return f"{self.api_url_w_v1}/ctrl-events/"
 
+    def get_url(self, pattern_name: str, **kwargs: Any) -> str:
+        """Generate a URL using the predefined patterns.
+
+        Args:
+            pattern_name (str): The name of the URL pattern to use
+            **kwargs: Additional parameters for URL formatting
+
+        Returns:
+            str: The formatted URL
+
+        Raises:
+            KeyError: If the pattern_name is not found in _URL_PATTERNS
+        """
+        if pattern_name not in self._URL_PATTERNS:
+            raise KeyError(f"URL pattern '{pattern_name}' not found")
+
+        pattern = self._URL_PATTERNS[pattern_name]
+
+        # Default values from the account
+        url_params = {
+            "api_url": self.api_url,
+            "workspace_id": self.workspace_id,
+            "telemetry_version": "v1",  # Default telemetry version
+        }
+
+        # Override with any provided kwargs
+        url_params.update(kwargs)
+
+        return pattern.format(**url_params)
+
     def send_event(
         self,
         sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
@@ -122,7 +152,6 @@ class Account(AccountModel):
         from supervaizer.event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        log.debug(f"[Account register server]: payload keys {event.payload.keys()}")
         return self.send_event(sender=server, event=event)
 
     def _create_api_result(

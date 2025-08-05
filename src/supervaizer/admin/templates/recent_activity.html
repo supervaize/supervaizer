@@ -1,0 +1,81 @@
+<div class="bg-white shadow overflow-hidden rounded-md">
+    {% if activities %}
+    <ul role="list" class="divide-y divide-gray-200">
+        {% for activity in activities %}
+        <li class="px-6 py-4 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        {% if activity.type == 'job' %}
+                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        {% else %}
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="ml-4">
+                        <div class="flex items-center">
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ activity.name or activity.id[:8] + "..." }}
+                            </p>
+                            <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {% if activity.status == 'completed' %}bg-green-100 text-green-800
+                                {% elif activity.status == 'in_progress' %}bg-blue-100 text-blue-800
+                                {% elif activity.status == 'failed' %}bg-red-100 text-red-800
+                                {% elif activity.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ activity.status.replace('_', ' ').title() }}
+                            </span>
+                        </div>
+                        <div class="mt-1 flex items-center text-sm text-gray-500">
+                            <span class="capitalize">{{ activity.type }}</span>
+                            {% if activity.type == 'job' and activity.agent_name %}
+                                <span class="mx-1">•</span>
+                                <span>{{ activity.agent_name }}</span>
+                            {% elif activity.type == 'case' and activity.job_id %}
+                                <span class="mx-1">•</span>
+                                <span>Job: {{ activity.job_id[:8] }}...</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-500">
+                        {% if activity.created_at %}
+                            {{ activity.created_at[:10] }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                    <button
+                        {% if activity.type == 'job' %}
+                            onclick="showJobDetails('{{ activity.id }}')"
+                        {% else %}
+                            onclick="showCaseDetails('{{ activity.id }}')"
+                        {% endif %}
+                        class="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                    >
+                        View
+                    </button>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No recent activity</h3>
+        <p class="mt-1 text-sm text-gray-500">Activity will appear here as jobs and cases are created and updated.</p>
+    </div>
+    {% endif %}
+</div>

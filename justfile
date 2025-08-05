@@ -16,11 +16,11 @@ dev-install:
     uv pip install -e .[dev]
 
 # Run pre-commit hooks manually
-pre-commit-manual:
+precommit:
     pre-commit run --all-files --verbose
 
 # Run pre-commit autoupdate (when pre-commit-config.yaml is updated)
-pre-commit-autoupdate:
+precommit-autoupdate:
     pre-commit autoupdate
 
 # Run tests without coverage

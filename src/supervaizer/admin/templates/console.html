@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Console - Supervaizer Admin{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="md:flex md:items-center md:justify-between">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Console
+            </h2>
+            <p class="mt-1 text-sm text-gray-500">Interactive command interface and system logs</p>
+        </div>
+        <div class="mt-4 flex md:mt-0 space-x-3">
+            <button
+                onclick="clearConsole()"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+                Clear
+            </button>
+            <button
+                onclick="toggleAutoScroll()"
+                id="autoscroll-btn"
+                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+                Auto-scroll: ON
+            </button>
+        </div>
+    </div>
+
+    <!-- Console Interface -->
+    <div class="mt-6 space-y-6">
+        <!-- Command Input -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Command Interface</h3>
+            </div>
+            <div class="px-6 py-4">
+                <div class="flex space-x-4">
+                    <input
+                        type="text"
+                        id="command-input"
+                        placeholder="Enter command..."
+                        class="flex-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm font-mono"
+                        onkeypress="handleCommandKeypress(event)"
+                    >
+                    <button
+                        onclick="executeCommand()"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                        Execute
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Log Stream -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Live Server Logs</h3>
+                <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                    <span id="connection-status" class="flex items-center">
+                        <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                        Connecting...
+                    </span>
+                    <span>Auto-scroll: <span id="autoscroll-status">ON</span></span>
+                </div>
+            </div>
+            <div class="px-6 py-4">
+                <div
+                    id="console-output"
+                    class="bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-300 h-96 overflow-y-auto"
+                >
+                    <div id="console-lines" class="space-y-1">
+                        <div class="flex space-x-2">
+                            <span class="text-gray-500">[--:--:--]</span>
+                            <span class="text-blue-400 font-semibold">SYSTEM</span>
+                            <span>Connecting to live log stream...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let autoScroll = true;
+    let eventSource = null;
+    let reconnectTimeout = null;
+    let lineCount = 0;
+    let maxLines = 1000; // Limit console lines for performance
+
+    // Initialize console on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        connectToLogStream();
+    });
+
+    function connectToLogStream() {
+        if (eventSource) {
+            eventSource.close();
+        }
+
+        updateConnectionStatus('connecting');
+
+        // Connect to the log stream endpoint with console token
+        const consoleToken = '{{ console_token }}';
+        const cacheBuster = Date.now();
+        
+        // Better validation and error handling
+        if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
+            addLogMessage('ERROR', 'No console token available. Please refresh the page.', 'red');
+            updateConnectionStatus('error');
+            return;
+        }
+
+        const streamUrl = `/admin/log-stream?token=${encodeURIComponent(consoleToken)}&_t=${cacheBuster}`;
+        
+        try {
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onopen = function(event) {
+                updateConnectionStatus('connected');
+                addLogMessage('SYSTEM', 'Connected to live log stream', 'blue');
+            };
+
+            eventSource.onmessage = function(event) {
+                try {
+                    // Handle different event data formats
+                    let logData;
+                    if (event.data.startsWith('data: ')) {
+                        // Remove "data: " prefix if present
+                        logData = JSON.parse(event.data.substring(6));
+                    } else {
+                        logData = JSON.parse(event.data);
+                    }
+                    
+                    if (logData && logData.level && logData.message) {
+                        addLogMessage(logData.level, logData.message, getLevelColor(logData.level), logData.timestamp);
+                    } else {
+                        addLogMessage('WARNING', 'Received invalid log data format', 'yellow');
+                    }
+                } catch (e) {
+                    addLogMessage('ERROR', `Parse error: ${e.message}`, 'red');
+                }
+            };
+
+            eventSource.onerror = function(event) {
+                updateConnectionStatus('error');
+                
+                // More specific error handling
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    addLogMessage('ERROR', 'Connection to log stream closed by server', 'red');
+                } else if (eventSource.readyState === EventSource.CONNECTING) {
+                    addLogMessage('WARNING', 'Attempting to reconnect to log stream...', 'yellow');
+                } else {
+                    addLogMessage('ERROR', 'Unknown log stream error occurred', 'red');
+                }
+
+                // Reconnect after 5 seconds
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = setTimeout(() => {
+                    addLogMessage('INFO', 'Attempting to reconnect...', 'blue');
+                    connectToLogStream();
+                }, 5000);
+            };
+        } catch (e) {
+            addLogMessage('ERROR', `Failed to create connection: ${e.message}`, 'red');
+            updateConnectionStatus('error');
+        }
+    }
+
+    function updateConnectionStatus(status) {
+        const statusElement = document.getElementById('connection-status');
+        if (!statusElement) return;
+        
+        const statusIndicator = statusElement.querySelector('.w-2.h-2');
+        const statusText = statusElement.querySelector('span:last-child');
+        
+        if (!statusIndicator || !statusText) return;
+
+        switch (status) {
+            case 'connecting':
+                statusIndicator.className = 'w-2 h-2 bg-yellow-400 rounded-full mr-2 animate-pulse';
+                statusText.textContent = 'Connecting...';
+                break;
+            case 'connected':
+                statusIndicator.className = 'w-2 h-2 bg-green-400 rounded-full mr-2';
+                statusText.textContent = 'Connected';
+                break;
+            case 'error':
+                statusIndicator.className = 'w-2 h-2 bg-red-400 rounded-full mr-2 animate-pulse';
+                statusText.textContent = 'Disconnected';
+                break;
+        }
+    }
+
+    function getLevelColor(level) {
+        const levelColors = {
+            'TRACE': 'purple',
+            'DEBUG': 'gray',
+            'INFO': 'blue',
+            'SUCCESS': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red'
+        };
+        return levelColors[level] || 'green';
+    }
+
+    function addLogMessage(level, message, color = 'green', timestamp = null) {
+        const lines = document.getElementById('console-lines');
+        if (!lines) return;
+
+        // Parse timestamp or use current time
+        let timeStr;
+        if (timestamp) {
+            try {
+                const date = new Date(timestamp);
+                timeStr = date.toLocaleTimeString();
+            } catch (e) {
+                timeStr = new Date().toLocaleTimeString();
+            }
+        } else {
+            timeStr = new Date().toLocaleTimeString();
+        }
+
+        const colorMap = {
+            'red': 'text-red-400',
+            'green': 'text-green-300',
+            'blue': 'text-blue-400',
+            'yellow': 'text-yellow-400',
+            'cyan': 'text-cyan-400',
+            'purple': 'text-purple-400',
+            'gray': 'text-gray-400'
+        };
+
+        const div = document.createElement('div');
+        div.className = 'flex space-x-2 text-xs leading-relaxed';
+        div.innerHTML = `
+            <span class="text-gray-500 flex-shrink-0">[${timeStr}]</span>
+            <span class="font-semibold min-w-[60px] flex-shrink-0 ${colorMap[color] || 'text-green-300'}">${level}</span>
+            <span class="${colorMap[color] || 'text-green-300'} break-words">${escapeHtml(message)}</span>
+        `;
+
+        lines.appendChild(div);
+        lineCount++;
+
+        // Limit lines for performance
+        if (lineCount > maxLines) {
+            const firstChild = lines.firstElementChild;
+            if (firstChild) {
+                lines.removeChild(firstChild);
+                lineCount--;
+            }
+        }
+
+        if (autoScroll) {
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function handleCommandKeypress(event) {
+        if (event.key === 'Enter') {
+            executeCommand();
+        }
+    }
+
+    function executeCommand() {
+        const input = document.getElementById('command-input');
+        if (!input) return;
+        
+        const command = input.value.trim();
+
+        if (!command) return;
+
+        // Show command in console
+        addLogMessage('USER', `$ ${command}`, 'cyan');
+
+        // Process command
+        processCommand(command);
+
+        // Clear input
+        input.value = '';
+    }
+
+    function processCommand(command) {
+        const cmd = command.toLowerCase();
+
+        // Handle local-only commands
+        if (cmd === 'clear') {
+            clearConsole();
+            return;
+        }
+        
+        if (cmd === 'reconnect') {
+            addLogMessage('INFO', 'Reconnecting to log stream...', 'blue');
+            connectToLogStream();
+            return;
+        }
+
+        // Send command to server for processing and live console display
+        sendCommandToServer(command);
+    }
+
+    async function sendCommandToServer(command) {
+        const consoleToken = '{{ console_token }}';
+        
+        if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
+            addLogMessage('ERROR', 'No console token available. Cannot execute command.', 'red');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/admin/api/console/execute?token=${encodeURIComponent(consoleToken)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    command: command
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.status === 'error') {
+                addLogMessage('ERROR', `Command failed: ${result.message}`, 'red');
+            }
+            // Success messages are handled by the log stream
+            
+        } catch (error) {
+            addLogMessage('ERROR', `Failed to execute command: ${error.message}`, 'red');
+        }
+    }
+
+    function clearConsole() {
+        const lines = document.getElementById('console-lines');
+        if (lines) {
+            lines.innerHTML = '';
+            lineCount = 0;
+            addLogMessage('SYSTEM', 'Console cleared.', 'blue');
+        }
+    }
+
+    function toggleAutoScroll() {
+        autoScroll = !autoScroll;
+        const btn = document.getElementById('autoscroll-btn');
+        const status = document.getElementById('autoscroll-status');
+        
+        if (btn && status) {
+            const newText = autoScroll ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
+            btn.textContent = newText;
+            status.textContent = autoScroll ? 'ON' : 'OFF';
+        }
+
+        if (autoScroll) {
+            const output = document.getElementById('console-output');
+            if (output) {
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+    }
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+        }
+    });
+</script>
+{% endblock %}

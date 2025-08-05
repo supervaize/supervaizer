@@ -108,7 +108,7 @@ def test_job_start_confirmation_event(
     )
     assert isinstance(job_start_confirmation_event, JobStartConfirmationEvent)
     assert job_start_confirmation_event.type == EventType.JOB_START_CONFIRMATION
-    assert job_start_confirmation_event.source == {"job": "test-job-id"}
+    assert job_start_confirmation_event.source == {"job": job_fixture.id}
     assert job_start_confirmation_event.details == job_fixture.registration_info
 
 

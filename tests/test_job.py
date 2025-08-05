@@ -7,10 +7,12 @@
 
 from datetime import datetime
 from uuid import uuid4
+from unittest.mock import patch
+from typing import Dict, Any
 
 import pytest
 
-from supervaizer.job import Job, JobContext, JobResponse
+from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 
 
@@ -168,3 +170,40 @@ def test_job_status_transitions(job_fixture: Job) -> None:
     )
     assert job_fixture.status is EntityStatus.FAILED
     assert job_fixture.status != EntityStatus.AWAITING
+
+
+def make_job_dict(job: Job) -> Dict[str, Any]:
+    # Helper to convert a Job to a dict for persistence simulation
+    d = job.__dict__.copy()
+    d["job_context"] = job.job_context.__dict__
+    d["status"] = job.status  # Enum, will be handled in Job init
+    d["responses"] = []  # Simplify for test
+    d["created_at"] = job.created_at
+    d["finished_at"] = job.finished_at
+    d["case_ids"] = job.case_ids
+    return d
+
+
+def test_get_job_include_persisted_found(job_fixture: Job) -> None:
+    # Reset registry to avoid collision
+    Jobs().reset()
+    # Patch storage_manager.get_object_by_id to simulate a persisted job found in storage
+    job = job_fixture
+    job_id = job.id
+    job_dict = make_job_dict(job)
+    with patch("supervaizer.job.storage_manager.get_object_by_id") as mock_get:
+        mock_get.return_value = job_dict  # Simulate job found in persistence
+        result = Jobs().get_job(job_id, include_persisted=True)
+        assert result is not None
+        assert result.id == job_id
+        assert isinstance(result, Job)
+
+
+def test_get_job_include_persisted_not_found() -> None:
+    # Reset registry to ensure no job is in memory
+    Jobs().reset()
+    job_id = str(uuid4())  # Use a unique job_id not in memory
+    with patch("supervaizer.job.storage_manager.get_object_by_id") as mock_get:
+        mock_get.return_value = None  # Simulate job not found in persistence
+        result = Jobs().get_job(job_id, include_persisted=True)
+        assert result is None

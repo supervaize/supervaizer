@@ -1,5 +1,37 @@
 # SUPERVAIZER
 
+- [SUPERVAIZER](#supervaizer)
+  - [Description](#description)
+  - [Features](#features)
+  - [Protocol Support](#protocol-support)
+    - [Google's Agent-to-Agent (A2A) protocol](#googles-agent-to-agent-a2a-protocol)
+      - [A2A Examples](#a2a-examples)
+      - [Future A2A Enhancements](#future-a2a-enhancements)
+    - [Agent Communication Protocol (ACP)](#agent-communication-protocol-acp)
+    - [Implemented ACP Features](#implemented-acp-features)
+    - [Example: Discovering Agents](#example-discovering-agents)
+    - [Enabling protocol Support](#enabling-protocol-support)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+  - [Using the CLI](#using-the-cli)
+    - [CLI Commands](#cli-commands)
+    - [Environment Variables](#environment-variables)
+  - [API Documentation \& User Interfaces](#api-documentation--user-interfaces)
+    - [Interactive API Documentation](#interactive-api-documentation)
+      - [Swagger UI (`/docs`)](#swagger-ui-docs)
+      - [ReDoc (`/redoc`)](#redoc-redoc)
+      - [OpenAPI Schema (`/openapi.json`)](#openapi-schema-openapijson)
+    - [Admin Interface (`/admin`)](#admin-interface-admin)
+      - [Features](#features-1)
+      - [Access Requirements](#access-requirements)
+      - [Quick Start](#quick-start-1)
+    - [Documentation URLs](#documentation-urls)
+    - [Authentication](#authentication)
+    - [Example: Testing with Swagger UI](#example-testing-with-swagger-ui)
+- [Calculating costs](#calculating-costs)
+  - [Documentation](#documentation)
+  - [License](#license)
+
 A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
 
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
@@ -9,11 +41,11 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
 
 ## Description
 
-SUPERVAIZER is a toolkit built for the age of AI interoperability. At its core, it implements Google's Agent-to-Agent (A2A) protocol, enabling seamless discovery and interaction between agents across different systems and platforms.
+SUPERVAIZER is a toolkit built for the age of AI interoperability. At its core, it implements Google's Agent-to-Agent (A2A) protocol and IBM's Agent Communication Protocol (ACP), enabling seamless discovery and interaction between agents across different systems and platforms.
 
-With comprehensive support for the A2A specification, SUPERVAIZER allows you to:
+With comprehensive support for the A2A/ACP protocols, specification, SUPERVAIZER allows you to:
 
-- Enhance the capabilities of your agents, making them automatically discoverable by other A2A systems
+- Enhance the capabilities of your agents, making them automatically discoverable by other A2A/ACP compatible systems
 - Expose standardized agent capabilities through agent cards
 - Monitor agent health and status through dedicated endpoints
 - Connect your agents to the growing ecosystem of A2A-compatible tools
@@ -25,16 +57,15 @@ Beyond A2A interoperability, SUPERVAIZER provides a robust API for agent registr
 - **Agent Management**: Register, update, and control agents
 - **Job Control**: Create, track, and manage jobs
 - **Event Handling**: Process and respond to system events
-- **Telemetry**: Monitor and analyze system performance
-- **Server Communication**: Interact with SUPERVAIZE servers
-- **Account Management**: Manage user accounts and authentication
-- **A2A Protocol Support**: Integration with Google's Agent-to-Agent protocol for interoperability
+- Protocol support
+  - **A2A Protocol **: Integration with Google's Agent-to-Agent protocol for interoperability
+  - **ACP Protocol **: Integration with IBM/BeeAI's Agent Communication Protocol for standardized agent discovery and interaction
+- **Server Communication**: Interact with SUPERVAIZE servers (see [supervaize.com](https://www.supervaize.com) for more info)
+- **Web Admin Interface**: Easy to use web-based admin dashboard for managing jobs, cases, and system monitoring
 
-## A2A Protocol Support
+## Protocol Support
 
-SUPERVAIZER implements [Google's Agent-to-Agent (A2A) protocol](https://google.github.io/A2A/#/), providing standardized discovery and interaction with agents across different platforms and systems.
-
-### Implemented A2A Features
+### [Google's Agent-to-Agent (A2A) protocol](https://google.github.io/A2A/#/)
 
 - **Agent Discovery**: `/.well-known/agents.json` endpoint for listing all available agents
   Note: the current version of the A2A protocol does not support yet multiple agents.
@@ -44,31 +75,19 @@ SUPERVAIZER implements [Google's Agent-to-Agent (A2A) protocol](https://google.g
 - **OpenAPI Integration**: Direct links to OpenAPI specifications and documentation
 - **Version Information**: Comprehensive version tracking with changelog access
 
-### Benefits of A2A Integration
-
-- **Interoperability**: Your agents can be discovered and used by any A2A-compatible client
-- **Standardized Interface**: Consistent API structure across all agents and platforms
-- **Self-Documentation**: Automatic generation of comprehensive agent cards with capabilities
-- **Health Insights**: Real-time monitoring of agent status and performance metrics
-- **Future-Proofing**: Join the emerging standard for agent interoperability
-
-### Example: Discovering Agents
-
-To discover all agents on a SUPERVAIZER instance:
+#### A2A Examples
 
 ```bash
+# Discovering Agents
 curl https://your-server/.well-known/agents.json
-```
 
-### Example: Agent Card
-
-To access a specific agent's capabilities:
-
-```bash
+# Agent card
 curl https://your-server/.well-known/agents/v1.0.0/myagent_agent.json
 ```
 
-### Future A2A Enhancements
+Full documentation of A2A endpoints can be found at [local A2A](http://127.0.0.1:8001/docs#/Protocol%20A2A)
+
+#### Future A2A Enhancements
 
 - **Webhooks**: Event subscription for real-time updates
 - **Rich Authentication**: OAuth2 and API key options with scope control
@@ -76,9 +95,7 @@ curl https://your-server/.well-known/agents/v1.0.0/myagent_agent.json
 - **Extended Metadata**: Licensing, pricing, and usage limit information
 - **Localization**: Multi-language support for agent interfaces
 
-## ACP Protocol Support
-
-SUPERVAIZER also implements the [Agent Communication Protocol (ACP)](https://docs.beeai.dev/acp/spec/concepts/discovery), providing standardized discovery and interaction with agents according to BeeAI's ACP specification.
+### [Agent Communication Protocol (ACP)](https://docs.beeai.dev/acp/spec/concepts/discovery)
 
 ### Implemented ACP Features
 
@@ -87,41 +104,44 @@ SUPERVAIZER also implements the [Agent Communication Protocol (ACP)](https://doc
 - **Health Monitoring**: Real-time system and agent health data at `/agents/health`
 - **Agent Metadata**: Comprehensive metadata including documentation, language support, authors, and more
 - **Status Metrics**: Performance metrics like success rate and average runtime
-
-### Benefits of ACP Integration
-
-- **Interoperability**: Your agents can be discovered and used by any ACP-compatible client
-- **Standardized Interface**: Consistent API structure across all agents and platforms
-- **Rich Metadata**: Automatically includes comprehensive metadata about agent capabilities
-- **Health Insights**: Real-time monitoring of agent status and performance metrics
-- **Multi-Protocol Support**: Works alongside A2A to provide maximum interoperability
+- **Rich Interfaces**: Standardized input/output interfaces with chat capabilities
+- **Comprehensive Metadata**: Includes licensing, programming language, framework, use cases, and examples
+- **Performance Tracking**: Real-time statistics on job completion rates and average runtime
+- **Health Status**: Agent status monitoring (available, busy, degraded)
 
 ### Example: Discovering Agents
 
 To discover all agents on a SUPERVAIZER instance:
 
 ```bash
+# Agent discovery
 curl https://your-server/agents
+
+# Agent details
+curl https://your-server/agents/myagent
+
+# Health monitoring
+curl https://your-server/agents/health
 ```
 
-### Example: Agent Detail
+Full documentation of ACP endpoints can be found at [local ACP](http://127.0.0.1:8001/docs#/Protocol%20ACP)
 
-To access a specific agent's capabilities:
+### Enabling protocol Support
 
-```bash
-curl https://your-server/agents/myagent
+ACP endpoints are enabled by default. You can control ACP support when creating your server:
+
+```python
+server = Server(
+    agents=[agent],
+    acp_endpoints=True,  # Enable ACP protocol support (default: True)
+    a2a_endpoints=True,  # Enable A2A protocol support
+)
 ```
 
 ## Installation
 
 ```bash
 pip install supervaizer
-```
-
-Or with development dependencies:
-
-```bash
-pip install "supervaizer[dev]"
 ```
 
 ## Quick Start
@@ -182,10 +202,14 @@ agent = Agent(
 )
 
 # Initialize a connection to the SUPERVAIZE server
-server = Server(agents=[agent],
-    acp_endpoints=True,
-    a2a_endpoints=True,
-    supervisor_account=None,)
+server = Server(
+    agents=[agent],
+    acp_endpoints=True,  # Enable ACP protocol support
+    a2a_endpoints=True,  # Enable A2A protocol support
+    admin_interface=True,  # Enable web admin interface (requires api_key)
+    api_key="your-secure-api-key",  # Required for admin interface
+    supervisor_account=None,
+)
 
 # Start the server
 sv_server.launch(log_level="DEBUG")
@@ -267,14 +291,95 @@ All CLI options can also be configured through environment variables:
 | SUPERVAIZER_OUTPUT_PATH   | Path for install command output | supervaizer_control.py |
 | SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file   | false                  |
 
-## Agent API Documentation
+## API Documentation & User Interfaces
 
-The SUPERVAIZER API comes with comprehensive interactive documentation:
+SUPERVAIZER provides multiple ways to interact with and explore the API:
 
-- **Swagger UI**: Available at `/docs` - Interactive API documentation with request builder and testing tools
-- **ReDoc**: Available at `/redoc` - Responsive, searchable API reference documentation
+### Interactive API Documentation
 
-These documentation endpoints provide a complete reference of all available API endpoints, request/response formats, and testing capabilities.
+#### Swagger UI (`/docs`)
+
+- **Interactive Testing**: Test API endpoints directly from the browser
+- **Request Builder**: Build and execute API requests with real-time validation
+- **Authentication**: Test authenticated endpoints using the API key
+- **Schema Exploration**: Browse request/response schemas and data models
+- **Try It Out**: Execute requests and see live responses
+
+#### ReDoc (`/redoc`)
+
+- **Responsive Design**: Mobile-friendly documentation interface
+- **Searchable**: Full-text search across all endpoints and schemas
+- **Clean Layout**: Organized, easy-to-read API reference
+- **Schema Examples**: Detailed examples for all request/response formats
+
+#### OpenAPI Schema (`/openapi.json`)
+
+- **Machine Readable**: Complete OpenAPI 3.0 specification
+- **Integration Ready**: Use with API clients and code generators
+- **Schema Validation**: Validate requests against the specification
+
+### Admin Interface (`/admin`)
+
+A comprehensive web-based admin interface for managing your SUPERVAIZER instance:
+
+#### Features
+
+- **Dashboard**: Real-time system statistics and health monitoring
+- **Job Management**: Create, view, update, and delete jobs
+- **Case Management**: Manage workflow cases and their status
+- **Agent Monitoring**: View agent status and performance metrics
+- **Live Console**: Real-time logging and system monitoring
+- **Advanced Filtering**: Search and filter entities by various criteria
+- **Responsive Design**: Works on desktop and mobile devices
+
+#### Access Requirements
+
+- **API Key Required**: Admin interface requires a valid API key
+- **Authentication**: Add `X-API-Key` header to requests
+- **Secure Access**: All admin endpoints are protected
+
+#### Quick Start
+
+```python
+from supervaizer import Server, Agent
+
+# Create server with admin interface
+server = Server(
+    agents=[your_agents],
+    api_key="your-secure-api-key",  # Required for admin interface
+    admin_interface=True,  # Enable admin interface (default: True)
+)
+
+server.launch()
+print(f"Admin Interface: http://localhost:8000/admin/")
+```
+
+### Documentation URLs
+
+When your server is running, you can access:
+
+| Interface       | URL                                  | Description                 |
+| --------------- | ------------------------------------ | --------------------------- |
+| Swagger UI      | `http://localhost:8000/docs`         | Interactive API testing     |
+| ReDoc           | `http://localhost:8000/redoc`        | API reference documentation |
+| OpenAPI Schema  | `http://localhost:8000/openapi.json` | Machine-readable API spec   |
+| Admin Dashboard | `http://localhost:8000/admin/`       | Web-based admin interface   |
+
+### Authentication
+
+Most endpoints support API key authentication:
+
+- **Header**: `X-API-Key: your-api-key`
+- **Auto-generated**: API key is automatically generated if not provided
+- **Admin Interface**: Requires valid API key for access
+
+### Example: Testing with Swagger UI
+
+1. Start your SUPERVAIZER server
+2. Navigate to `http://localhost:8000/docs`
+3. Click "Authorize" and enter your API key
+4. Browse available endpoints and test them directly
+5. View request/response schemas and examples
 
 # Calculating costs
 

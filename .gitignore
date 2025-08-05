@@ -245,3 +245,5 @@ uv.lock
 .cursorrules
 .devaigents/documenter.md
 /.devaigents
+
+/data/*

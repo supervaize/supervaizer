@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Server - Supervaizer Admin{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="md:flex md:items-center md:justify-between">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Server Status
+            </h2>
+            <p class="mt-1 text-sm text-gray-500">Monitor server health and configuration</p>
+        </div>
+        <div class="mt-4 flex md:mt-0">
+            <button
+                hx-get="/admin/api/server/status"
+                hx-target="#server-status-container"
+                hx-indicator="#refresh-indicator"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+                <svg id="refresh-indicator" class="htmx-indicator -ml-1 mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Server Status Cards -->
+    <div id="server-status-container" class="mt-6">
+        {% include "server_status_cards.html" %}
+    </div>
+
+    <!-- Server Configuration -->
+    <div class="mt-8">
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Server Configuration</h3>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">Current server settings and environment</p>
+            </div>
+            <div class="border-t border-gray-200">
+                <dl>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Host</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ server_config.host }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Port</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ server_config.port }}</dd>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">API Version</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ server_config.api_version }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Environment</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0 capitalize">{{ server_config.environment }}</dd>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Database</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ server_config.database_type }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Storage Path</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ server_config.storage_path }}</dd>
+                    </div>
+                    {% if server_config.agents %}
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Agents</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                            <div class="space-y-2">
+                                {% for agent in server_config.agents %}
+                                <div class="bg-white p-2 rounded border">
+                                    <div class="font-medium">{{ agent.name }}</div>
+                                    <div class="text-xs text-gray-500">{{ agent.description }}</div>
+                                    <div class="text-xs text-gray-400">v{{ agent.version }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+
+<script>
+    // Auto-refresh server status every 30 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up auto-refresh interval
+        setInterval(function() {
+            const refreshButton = document.querySelector('[hx-get="/admin/api/server/status"]');
+            if (refreshButton) {
+                htmx.trigger(refreshButton, 'click');
+            }
+        }, 30000); // Refresh every 30 seconds
+    });
+</script>
+{% endblock %}

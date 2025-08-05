@@ -26,9 +26,9 @@ class EntityStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-    @property
-    def is_stopped(self) -> bool:
-        return self in [
+    @staticmethod
+    def status_stopped() -> list["EntityStatus"]:
+        return [
             EntityStatus.STOPPED,
             EntityStatus.CANCELLED,
             EntityStatus.FAILED,
@@ -36,30 +36,37 @@ class EntityStatus(str, Enum):
         ]
 
     @property
-    def is_running(self) -> bool:
-        return self in [
+    def is_stopped(self) -> bool:
+        return self in EntityStatus.status_stopped()
+
+    @staticmethod
+    def status_running() -> list["EntityStatus"]:
+        return [
             EntityStatus.IN_PROGRESS,
             EntityStatus.CANCELLING,
             EntityStatus.AWAITING,
         ]
 
     @property
-    def is_anomaly(self) -> bool:
-        return self in [
+    def is_running(self) -> bool:
+        return self in EntityStatus.status_running()
+
+    @staticmethod
+    def status_anomaly() -> list["EntityStatus"]:
+        return [
             EntityStatus.CANCELLING,
             EntityStatus.CANCELLED,
             EntityStatus.FAILED,
         ]
 
     @property
+    def is_anomaly(self) -> bool:
+        return self in EntityStatus.status_anomaly()
+
+    @property
     def label(self) -> str:
         """Get the display label for the enum value."""
         return self.name.replace("_", " ").title()
-
-
-# Type aliases for EntityStatus and EntityStatus to maintain backward compatibility
-EntityStatus = EntityStatus
-EntityStatus = EntityStatus
 
 
 class EntityEvents(str, Enum):
@@ -209,17 +216,17 @@ class Lifecycle:
     @classmethod
     def get_transition_reason(
         cls, from_status: EntityStatus, to_status: EntityStatus
-    ) -> EntityEvents:
+    ) -> str:
         """Get the reason/description for a transition."""
         for event, (event_from, event_to) in cls.EVENT_TRANSITIONS.items():
             if event_from == from_status and event_to == to_status:
-                return event
+                return event.value
         return "Invalid transition"
 
     @classmethod
     def get_status_from_event(
         cls, current_status: EntityStatus, event: EntityEvents
-    ) -> EntityStatus:
+    ) -> EntityStatus | None:
         """Get the target status for a given event from the current status."""
         if event not in cls.EVENT_TRANSITIONS:
             return None
@@ -244,7 +251,9 @@ class Lifecycle:
         }
         """
         # Initialize the result dictionary with all statuses
-        result = {status: {} for status in EntityStatus}
+        result: Dict[EntityStatus, Dict[EntityStatus, EntityEvents]] = {
+            status: {} for status in EntityStatus
+        }
 
         # Populate with transitions from EVENT_TRANSITIONS
         for event, (from_status, to_status) in cls.EVENT_TRANSITIONS.items():
@@ -315,7 +324,7 @@ JobTransitions = Lifecycle
 class WorkflowEntity(Protocol):
     """Protocol that defines the interface required for an entity to work with lifecycle transitions."""
 
-    status: str
+    status: EntityStatus
     finished_at: Any
     id: Any
     name: str

@@ -1,0 +1,80 @@
+<div class="bg-white shadow overflow-hidden rounded-md">
+    <div class="px-4 py-5 sm:p-6">
+        {% if agents %}
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {% for agent in agents %}
+            <div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            {% if agent.type == "analytical" %}
+                            <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            {% elif agent.type == "workflow" %}
+                            <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            {% elif agent.type == "specialist" %}
+                            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                </svg>
+                            </div>
+                            {% else %}
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            {% endif %}
+                            <div class="ml-3">
+                                <h3 class="text-lg font-medium text-gray-900">{{ agent.name }}</h3>
+                                <p class="text-sm text-gray-500 capitalize">{{ agent.type or "conversational" }}</p>
+                            </div>
+                        </div>
+                        <!-- For now, assume all agents are active since we don't have real status -->
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Active
+                        </span>
+                    </div>
+                    <p class="mt-4 text-sm text-gray-600">
+                        {{ agent.description or "AI agent ready to assist with various tasks." }}
+                    </p>
+                    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-500">Version:</span>
+                            <span class="font-medium text-gray-900">{{ agent.version or "1.0.0" }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Status:</span>
+                            <span class="font-medium text-green-600">Ready</span>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex space-x-3">
+                        <button onclick="showAgentDetails('{{ agent.slug }}')" class="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            View
+                        </button>
+                        <button onclick="editAgent('{{ agent.slug }}')" class="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            Configure
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No agents available</h3>
+            <p class="mt-1 text-sm text-gray-500">No agents are currently configured in the server.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

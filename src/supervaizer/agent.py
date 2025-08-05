@@ -21,6 +21,8 @@ import shortuuid
 from pydantic import BaseModel, field_validator
 from rich import inspect, print
 from slugify import slugify
+from dataclasses import dataclass
+from enum import Enum
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiSuccess, SvBaseModel, log
@@ -37,6 +39,30 @@ insp = inspect
 prnt = print
 
 T = TypeVar("T")
+
+
+class FieldTypeEnum(str, Enum):
+    CHAR = "CharField"
+    INT = "IntegerField"
+    BOOL = "BooleanField"
+    CHOICE = "ChoiceField"
+    MULTICHOICE = "MultipleChoiceField"
+    DATE = "DateField"
+    DATETIME = "DateTimeField"
+    FLOAT = "FloatField"
+    EMAIL = "EmailField"
+
+
+@dataclass
+class AgentMethodField:
+    name: str
+    type: Any  # Python type for pydantic validation
+    field_type: FieldTypeEnum = FieldTypeEnum.CHAR
+    description: str | None = None
+    choices: list[str] | None = None  # For choice fields
+    default: Any = None
+    widget: str | None = None
+    required: bool = False
 
 
 class AgentJobContextBase(BaseModel):
@@ -78,7 +104,7 @@ class AgentMethodModel(BaseModel):
        see : https://docs.djangoproject.com/en/5.1/ref/forms/fields/
        Each field is a dictionary with properties like:
        - name: Field identifier
-       - type: Python type of the field for pydantic validation
+       - type: Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]
        - field_type: Field type (one of: CharField, IntegerField, BooleanField, ChoiceField, MultipleChoiceField)
        - choices: For choice fields, list of [value, label] pairs
        - default: (optional) Default value for the field
@@ -110,7 +136,7 @@ class AgentMethodModel(BaseModel):
     name: str
     method: str
     params: Dict[str, Any] | None = None
-    fields: List[Dict[str, Any]] | None = None
+    fields: List[AgentMethodField] | None = None
     description: str | None = None
     is_async: bool = False
 
@@ -119,13 +145,23 @@ class AgentMethod(AgentMethodModel):
     @property
     def fields_definitions(self) -> list[Dict[str, Any]]:
         """
-        Returns a list of the fields without the type key.
+        Returns a list of the fields with the type key as a string
         Used for the API response.
         """
         if self.fields:
-            return [
-                {k: v for k, v in field.items() if k != "type"} for field in self.fields
-            ]
+            result = []
+            for field in self.fields:
+                d = {k: v for k, v in field.__dict__.items() if k != "type"}
+                # type as string
+                type_val = field.type
+                if hasattr(type_val, "__name__"):
+                    d["type"] = type_val.__name__
+                elif hasattr(type_val, "_name") and type_val._name:
+                    d["type"] = type_val._name
+                else:
+                    d["type"] = str(type_val)
+                result.append(d)
+            return result
         return []
 
     @property
@@ -139,9 +175,9 @@ class AgentMethod(AgentMethodModel):
         field_annotations = {}
         field_defaults: Dict[str, None] = {}
         for field in self.fields:
-            field_name = field["name"]
-            field_type = field["type"]
-            is_required = field.get("required", False)
+            field_name = field.name
+            field_type = field.type
+            is_required = field.required
             field_annotations[field_name] = (
                 field_type if is_required else Optional[field_type]
             )
@@ -219,7 +255,9 @@ class AgentMethodsModel(BaseModel):
 
     @field_validator("custom")
     @classmethod
-    def validate_custom_method_keys(cls, value):
+    def validate_custom_method_keys(
+        cls, value: dict[str, AgentMethod]
+    ) -> dict[str, AgentMethod]:
         """Validate that custom method keys are valid slug-like values suitable for endpoints."""
         if value:
             for key in value.keys():
@@ -272,7 +310,7 @@ class AbstractAgent(SvBaseModel):
     version: str
     description: str
     tags: list[str] | None = None
-    methods: AgentMethods
+    methods: AgentMethods | None = None
     parameters_setup: ParametersSetup | None = None
     server_agent_id: str | None = None
     server_agent_status: str | None = None
@@ -381,7 +419,7 @@ class Agent(AbstractAgent):
             "api_path": self.path,
             "slug": self.slug,
             "tags": self.tags,
-            "methods": self.methods.registration_info,
+            "methods": self.methods.registration_info if self.methods else {},
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,
@@ -465,6 +503,7 @@ class Agent(AbstractAgent):
         """
         Execute an agent method and return a JobResponse
         """
+
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)

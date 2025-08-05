@@ -5,7 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import pytest
-
+from typing import Any
 from supervaizer.lifecycle import (
     EntityEvents,
     EntityLifecycle,
@@ -29,7 +29,9 @@ class TestEntityStatus:
             (EntityStatus.CANCELLED, True, False, True),
         ],
     )
-    def test_status_properties(self, status, is_stopped, is_running, is_anomaly):
+    def test_status_properties(
+        self, status: EntityStatus, is_stopped: bool, is_running: bool, is_anomaly: bool
+    ) -> None:
         """Test the status enum properties."""
         assert status.is_stopped == is_stopped
         assert status.is_running == is_running
@@ -80,11 +82,13 @@ class TestEntityTransitions:
             ),  # Invalid transition
         ],
     )
-    def test_can_transition(self, from_status, to_status, expected):
+    def test_can_transition(
+        self, from_status: EntityStatus, to_status: EntityStatus, expected: bool
+    ) -> None:
         """Test checking if a transition is valid."""
         assert Lifecycle.can_transition(from_status, to_status) == expected
 
-    def test_get_transition_reason(self):
+    def test_get_transition_reason(self) -> None:
         """Test getting the reason/event for a transition."""
         # Valid transition
         reason = Lifecycle.get_transition_reason(
@@ -252,9 +256,9 @@ class TestEntityTransitions:
         ]
 
         # Sort to ensure order-independent comparison
-        assert sorted([state.value for state in terminal_states]) == sorted(
-            [state.value for state in expected_terminal]
-        )
+        assert sorted([state.value for state in terminal_states]) == sorted([
+            state.value for state in expected_terminal
+        ])
 
         # Verify that these are indeed terminal states
         for state in terminal_states:
@@ -284,7 +288,7 @@ class TestEntityLifecycle:
         entity.name = "Test Entity"
         return entity
 
-    def test_transition_success(self, mocker):
+    def test_transition_success(self, mocker: Any):
         """Test successful transition."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -296,7 +300,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.IN_PROGRESS
         assert entity.finished_at is None  # Should not be set for non-terminal states
 
-    def test_transition_invalid(self, mocker):
+    def test_transition_invalid(self, mocker: Any):
         """Test invalid transition."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -307,7 +311,7 @@ class TestEntityLifecycle:
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
 
-    def test_transition_to_terminal_state(self, mocker):
+    def test_transition_to_terminal_state(self, mocker: Any):
         """Test transition to a terminal state sets finished_at."""
         entity = self.create_mock_entity(mocker, EntityStatus.IN_PROGRESS)
 
@@ -319,7 +323,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.COMPLETED
         assert entity.finished_at is not None
 
-    def test_handle_event_success(self, mocker):
+    def test_handle_event_success(self, mocker: Any):
         """Test successful event handling."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -330,7 +334,7 @@ class TestEntityLifecycle:
         assert error == ""
         assert entity.status == EntityStatus.IN_PROGRESS
 
-    def test_handle_event_invalid(self, mocker):
+    def test_handle_event_invalid(self, mocker: Any):
         """Test invalid event handling."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -343,7 +347,7 @@ class TestEntityLifecycle:
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
 
-    def test_sequential_transitions(self, mocker):
+    def test_sequential_transitions(self, mocker: Any):
         """Test a sequence of transitions."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -365,7 +369,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.COMPLETED
         assert entity.finished_at is not None
 
-    def test_sequential_events(self, mocker):
+    def test_sequential_events(self, mocker: Any):
         """Test a sequence of events."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 

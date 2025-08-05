@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Supervaizer Admin{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Suppress Tailwind CDN warning in development
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && args[0].includes && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // Suppress this specific warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .htmx-request { opacity: 0.5; }
+        .htmx-request.htmx-swapping { opacity: 1; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    {% include "navigation.html" %}
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Live Console -->
+    <div id="live-console" class="fixed bottom-0 left-0 right-0 bg-black text-green-300 font-mono text-xs z-40 border-t border-gray-700" x-data="{ expanded: false, logs: [] }" x-cloak>
+        <!-- Console Header -->
+        <div class="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-700">
+            <span class="text-green-400 font-semibold">Live Console</span>
+            <div class="flex items-center space-x-2">
+                <button @click="logs = []" class="text-gray-400 hover:text-white text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700">Clear</button>
+                <button @click="expanded = !expanded" class="text-gray-400 hover:text-white">
+                    <svg class="w-4 h-4 transform transition-transform" :class="expanded ? 'rotate-180' : ''" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Console Body -->
+        <div id="console-body" x-show="expanded" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95" class="h-64 overflow-y-auto p-4 space-y-1">
+            <template x-for="log in logs" :key="log.id">
+                <div class="flex space-x-2" :class="{
+                    'text-red-400': log.level === 'ERROR' || log.level === 'CRITICAL',
+                    'text-yellow-400': log.level === 'WARNING',
+                    'text-blue-400': log.level === 'INFO',
+                    'text-green-300': log.level === 'SUCCESS',
+                    'text-gray-400': log.level === 'DEBUG',
+                    'text-cyan-400': log.level === 'USER',
+                    'text-purple-400': log.level === 'SYSTEM'
+                }">
+                    <span class="text-gray-500 whitespace-nowrap" x-text="log.time"></span>
+                    <span class="font-semibold min-w-[60px]" x-text="log.level"></span>
+                    <span x-text="log.message"></span>
+                </div>
+            </template>
+            <div x-show="logs.length === 0" class="text-gray-500 text-center py-8">
+                No logs yet. Start using the application to see live logs here.
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // HTMX Event Handlers
+        document.body.addEventListener('htmx:responseError', function(e) {
+            showToast('Error: ' + e.detail.xhr.statusText, 'error');
+        });
+
+        document.body.addEventListener('htmx:sendError', function(e) {
+            showToast('Network error occurred', 'error');
+        });
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+
+            toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('toast-container').appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 100);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Make showToast globally available
+        window.showToast = showToast;
+
+        // Live Console - Server-Sent Events
+        function initializeLogStream() {
+            console.log('initializeLogStream called, pathname:', window.location.pathname);
+            
+            // Skip if we're on the dedicated console page to avoid conflicts
+            if (window.location.pathname.includes('/console')) {
+                console.log('Skipping live console on console page');
+                return;
+            }
+            
+            const consoleComponent = document.querySelector('#live-console');
+            if (!consoleComponent) {
+                console.error('Live console component not found');
+                return;
+            }
+            
+            console.log('Initializing live console log stream');
+
+            let eventSource = null;
+            let logCounter = 0;
+
+            function connectLogStream() {
+                if (eventSource) {
+                    eventSource.close();
+                }
+
+                // For live console, always connect without authentication (admin interface)
+                const streamUrl = '/admin/log-stream';
+                eventSource = new EventSource(streamUrl);
+
+                eventSource.onmessage = function(event) {
+                    try {
+                        console.log('Received log message:', event.data);
+                        // Handle different event data formats
+                        let logData;
+                        if (event.data.startsWith('data: ')) {
+                            // Remove "data: " prefix if present
+                            logData = JSON.parse(event.data.substring(6));
+                        } else {
+                            logData = JSON.parse(event.data);
+                        }
+                        const logEntry = {
+                            id: ++logCounter,
+                            time: new Date(logData.timestamp).toLocaleTimeString(),
+                            level: logData.level,
+                            message: logData.message
+                        };
+
+                        // Get Alpine.js component data
+                        const alpineData = Alpine.$data(consoleComponent);
+
+                        // Add log and limit to last 1000 entries
+                        alpineData.logs.push(logEntry);
+                        if (alpineData.logs.length > 1000) {
+                            alpineData.logs.shift();
+                        }
+                        console.log('Added log entry, total logs:', alpineData.logs.length);
+
+                        // Auto-scroll to bottom if expanded
+                        if (alpineData.expanded) {
+                            const consoleBody = document.getElementById('console-body');
+                            if (consoleBody) {
+                                setTimeout(() => {
+                                    consoleBody.scrollTop = consoleBody.scrollHeight;
+                                }, 10);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error processing log message:', error, event.data);
+                    }
+                };
+
+                eventSource.onerror = function(event) {
+                    console.error('Log stream error:', event);
+                    showToast('Log stream disconnected. Attempting to reconnect...', 'error');
+
+                    // Attempt reconnection after 5 seconds
+                    setTimeout(() => {
+                        connectLogStream();
+                    }, 5000);
+                };
+
+                eventSource.onopen = function(event) {
+                    console.log('Log stream connected successfully');
+                };
+            }
+
+            // Initialize connection
+            connectLogStream();
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', function() {
+                if (eventSource) {
+                    eventSource.close();
+                }
+            });
+        }
+
+        // Initialize when Alpine.js is ready
+        document.addEventListener('alpine:init', function() {
+            initializeLogStream();
+        });
+    </script>
+</body>
+</html>

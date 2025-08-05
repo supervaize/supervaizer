@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Supervaizer Admin{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="md:flex md:items-center md:justify-between">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Dashboard
+            </h2>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <!-- Jobs Stats -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Jobs</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.jobs.total }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <a href="/admin/jobs" class="font-medium text-blue-700 hover:text-blue-900">
+                        View all jobs
+                    </a>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                    Running: {{ stats.jobs.running }} | Completed: {{ stats.jobs.completed }} | Failed: {{ stats.jobs.failed }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Cases Stats -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Cases</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.cases.total }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <a href="/admin/cases" class="font-medium text-green-700 hover:text-green-900">
+                        View all cases
+                    </a>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                    Running: {{ stats.cases.running }} | Completed: {{ stats.cases.completed }} | Failed: {{ stats.cases.failed }}
+                </div>
+            </div>
+        </div>
+
+        <!-- System Stats -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2z" clip-rule="evenodd"></path>
+                                <path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V9a1 1 0 00-1-1h-1v-1z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">System Status</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ system_status }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="font-medium text-purple-700">Persistent Storage: {{ data_storage_path }}</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                    Database: {{ db_name }} | Collections: {{ stats.collections }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="mt-8">
+        <div class="md:flex md:items-center md:justify-between">
+            <div class="min-w-0 flex-1">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Recent Activity</h3>
+            </div>
+            <div class="mt-4 flex md:mt-0">
+                <button
+                    hx-get="/admin/api/recent-activity"
+                    hx-target="#recent-activity-content"
+                    hx-indicator="#refresh-indicator"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                    <svg id="refresh-indicator" class="htmx-indicator -ml-1 mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <div id="recent-activity-content" class="mt-6 bg-white shadow overflow-hidden rounded-md">
+            <div class="px-4 py-5 sm:p-6">
+                <div class="text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">Loading recent activity...</h3>
+                    <p class="mt-1 text-sm text-gray-500">This will show the latest entity updates.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-load recent activity on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        htmx.trigger('#recent-activity-content', 'refresh');
+    });
+</script>
+{% endblock %}

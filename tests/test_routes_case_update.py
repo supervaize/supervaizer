@@ -4,10 +4,12 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from fastapi.testclient import TestClient
 from uuid import uuid4
 
-from supervaizer import Account, Case, CaseNode, CaseNoteType, Job, Server
+from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture
+
+from supervaizer import Account, Case, Job, Server
 from supervaizer.lifecycle import EntityStatus
 
 
@@ -15,13 +17,9 @@ def test_update_case_with_answer_success(
     server_fixture: Server,
     job_fixture: Job,
     account_fixture: Account,
-    mocker,
+    mocker: MockerFixture,
 ) -> None:
     """Test successful case update with answer."""
-    # Create a case in AWAITING status for this test
-    case_node = CaseNode(
-        name="Test Node", description="Test Node Description", type=CaseNoteType.CHAT
-    )
 
     test_case = Case(
         id=f"test-case-{uuid4()}",
@@ -30,7 +28,6 @@ def test_update_case_with_answer_success(
         status=EntityStatus.AWAITING,  # Set to awaiting for testing
         name="Test Case",
         description="Test Case Description",
-        nodes=[case_node],
     )
 
     client = TestClient(server_fixture.app)
@@ -49,7 +46,7 @@ def test_update_case_with_answer_success(
 
     response = client.post(
         f"/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
-        headers=headers,
+        headers=headers,  # type: ignore
         json=request_data,
     )
 
@@ -63,8 +60,8 @@ def test_update_case_with_answer_success(
     # Verify the case was updated
     assert test_case.status == EntityStatus.IN_PROGRESS
     assert len(test_case.updates) == 1
-    assert test_case.updates[0].payload["answer"] == request_data["answer"]
-    assert test_case.updates[0].payload["message"] == request_data["message"]
+    assert test_case.updates[0].payload["answer"] == request_data["answer"]  # type: ignore
+    assert test_case.updates[0].payload["message"] == request_data["message"]  # type: ignore
 
     # Verify send_event was called (send_update_case calls send_event internally)
     assert mock_send_event.call_count == 1
@@ -81,7 +78,7 @@ def test_update_case_job_not_found(server_fixture: Server) -> None:
 
     response = client.post(
         "/supervaizer/jobs/nonexistent-job/cases/test-case/update",
-        headers=headers,
+        headers=headers,  # type: ignore
         json=request_data,
     )
 
@@ -103,7 +100,7 @@ def test_update_case_case_not_found(
 
     response = client.post(
         f"/supervaizer/jobs/{job_fixture.id}/cases/nonexistent-case/update",
-        headers=headers,
+        headers=headers,  # type: ignore
         json=request_data,
     )
 
@@ -120,10 +117,6 @@ def test_update_case_not_awaiting_input(
     account_fixture: Account,
 ) -> None:
     """Test case update when case is not in AWAITING status."""
-    # Create a case that's not awaiting input
-    case_node = CaseNode(
-        name="Test Node", description="Test Node Description", type=CaseNoteType.CHAT
-    )
 
     test_case = Case(
         id=f"test-case-not-awaiting-{uuid4()}",
@@ -132,7 +125,6 @@ def test_update_case_not_awaiting_input(
         status=EntityStatus.IN_PROGRESS,  # Not awaiting
         name="Test Case",
         description="Test Case Description",
-        nodes=[case_node],
     )
 
     client = TestClient(server_fixture.app)
@@ -144,7 +136,7 @@ def test_update_case_not_awaiting_input(
 
     response = client.post(
         f"/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
-        headers=headers,
+        headers=headers,  # type: ignore
         json=request_data,
     )
 
@@ -156,10 +148,6 @@ def test_update_case_unauthorized(
     server_fixture: Server, job_fixture: Job, account_fixture: Account
 ) -> None:
     """Test case update without API key."""
-    # Create a test case for this test
-    case_node = CaseNode(
-        name="Test Node", description="Test Node Description", type=CaseNoteType.CHAT
-    )
 
     test_case = Case(
         id=f"test-case-unauth-{uuid4()}",
@@ -168,7 +156,6 @@ def test_update_case_unauthorized(
         status=EntityStatus.AWAITING,
         name="Test Case",
         description="Test Case Description",
-        nodes=[case_node],
     )
 
     client = TestClient(server_fixture.app)

@@ -7,7 +7,9 @@
 import os
 import secrets
 import sys
+import time
 import uuid
+from datetime import datetime
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar
 from urllib.parse import urlunparse
 
@@ -19,11 +21,12 @@ from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
-from pydantic import field_validator
+from pydantic import BaseModel, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.account import Account
+from supervaizer.admin.routes import create_admin_routes
 from supervaizer.agent import Agent
 from supervaizer.common import (
     ApiResult,
@@ -42,10 +45,75 @@ from supervaizer.routes import (
     create_utils_routes,
     get_server,
 )
+from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 insp = inspect
 
 T = TypeVar("T")
+
+# Additional imports for server persistence
+
+
+class ServerInfo(BaseModel):
+    """Complete server information for storage."""
+
+    id: str = "server_instance"  # Fixed ID for singleton
+    host: str
+    port: int
+    api_version: str
+    environment: str
+    agents: List[Dict[str, str]]
+    start_time: float
+    created_at: str
+    updated_at: str
+
+
+def save_server_info_to_storage(server_instance: "Server") -> None:
+    """Save server information to storage."""
+    try:
+        storage = StorageManager()
+
+        # Get agent information
+        agents = []
+        if hasattr(server_instance, "agents") and server_instance.agents:
+            for agent in server_instance.agents:
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                })
+
+        # Create server info
+        server_info = ServerInfo(
+            host=getattr(server_instance, "host", "0.0.0.0"),
+            port=getattr(server_instance, "port", 8000),
+            api_version=API_VERSION,
+            environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
+            agents=agents,
+            start_time=time.time(),
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+        )
+
+        # Save to storage
+        storage.save_object("ServerInfo", server_info.model_dump())
+
+        log.info(
+            f"[Server] Server info saved to storage: {server_info.host}:{server_info.port}"
+        )
+
+    except Exception as e:
+        log.error(f"[Server] Failed to save server info to storage: {e}")
+
+
+def get_server_info_from_storage() -> Optional[ServerInfo]:
+    """Get server information from storage."""
+    storage = StorageManager()
+    server_data = storage.get_object_by_id("ServerInfo", "server_instance")
+
+    if server_data:
+        return ServerInfo.model_validate(server_data)
+    return None
 
 
 class AbstractServer(SvBaseModel):
@@ -97,6 +165,7 @@ class Server(AbstractServer):
         supervisor_account: Optional[Account] = None,
         a2a_endpoints: bool = True,
         acp_endpoints: bool = True,
+        admin_interface: bool = True,
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
@@ -120,6 +189,7 @@ class Server(AbstractServer):
             supervisor_account: Account of the supervisor
             a2a_endpoints: Whether to enable A2A endpoints
             acp_endpoints: Whether to enable ACP endpoints
+            admin_interface: Whether to enable admin interface
             scheme: URL scheme (http or https)
             environment: Environment name (e.g., dev, staging, prod)
             host: Host to bind the server to (e.g., 0.0.0.0 for all interfaces)
@@ -228,16 +298,33 @@ class Server(AbstractServer):
 
         # Create routes
         if self.supervisor_account:
-            log.info("[Server launch] Deploy the supervision routes")
+            log.info("[Server launch] 🚀 Deploy Supervaizer routes")
             self.app.include_router(create_default_routes(self))
             self.app.include_router(create_utils_routes(self))
             self.app.include_router(create_agents_routes(self))
         if self.a2a_endpoints:
-            log.info("[Server launch] Deploy A2A routes")
+            log.info("[Server launch] 📢 Deploy A2A routes")
             self.app.include_router(create_a2a_routes(self))
         if self.acp_endpoints:
-            log.info("[Server launch] Deploy ACP routes")
+            log.info("[Server launch] 📢 Deploy ACP routes")
             self.app.include_router(create_acp_routes(self))
+
+        # Deploy admin routes if API key is available
+        if self.api_key and admin_interface:
+            log.info(
+                f"[Server launch] 💼 Deploy Admin interface @ {self.public_url}/admin"
+            )
+            self.app.include_router(create_admin_routes(), prefix="/admin")
+
+            # Save server info to storage for admin interface
+            save_server_info_to_storage(self)
+
+        # Load running entities from storage into memory
+        try:
+            load_running_entities_on_startup()
+        except Exception as e:
+            log.error(f"[Server launch] Failed to load running entities: {e}")
+            raise
 
         # Override the get_server dependency to return this instance
         async def get_current_server() -> "Server":
@@ -322,14 +409,39 @@ class Server(AbstractServer):
         }
 
     def launch(self, log_level: Optional[str] = "INFO") -> None:
-        log.remove()
         if log_level:
+            log.remove()
             log.add(
                 sys.stderr,
                 colorize=True,
-                format="<green>{time}</green>|<level> {level}</level> | <level>{message}</level>",
+                format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green>|<level> {level}</level> | <level>{message}</level>",
                 level=log_level,
             )
+
+            # Add log handler for admin streaming if API key is enabled
+            if self.api_key:
+
+                def log_queue_handler(message: Any) -> None:
+                    record = message.record
+                    try:
+                        # Import here to avoid circular imports and ensure module is loaded
+                        import supervaizer.admin.routes as admin_routes
+
+                        admin_routes.add_log_to_queue(
+                            timestamp=record["time"].isoformat(),
+                            level=record["level"].name,
+                            message=record["message"],
+                        )
+                    except ImportError:
+                        # Silently ignore import errors to avoid breaking logging
+                        pass
+                    except Exception:
+                        # Silently ignore other errors to avoid breaking logging
+                        pass
+
+                # Add the handler with a specific format to avoid recursion
+                log.add(log_queue_handler, level=log_level, format="{message}")
+
             log_level = (
                 log_level.lower()
             )  # needs to be lower case of uvicorn and uppercase of loguru

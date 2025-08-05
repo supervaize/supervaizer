@@ -5,11 +5,9 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-import json
 import os
 from typing import Any, Dict, List
 
-from deprecated import deprecated
 
 from supervaizer.common import SvBaseModel, log
 
@@ -20,9 +18,20 @@ class ParameterModel(SvBaseModel):
     is_environment: bool = False
     value: str | None = None
     is_secret: bool = True
+    is_required: bool = False
 
 
 class Parameter(ParameterModel):
+    @property
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Override the to_dict method to handle the value field.
+        """
+        data = self.model_dump(mode="json")
+        if self.is_secret:
+            data["value"] = "********"
+        return data
+
     @property
     def registration_info(self) -> Dict[str, Any]:
         return {
@@ -30,6 +39,7 @@ class Parameter(ParameterModel):
             "description": self.description,
             "is_environment": self.is_environment,
             "is_secret": self.is_secret,
+            "is_required": self.is_required,
         }
 
     def set_value(self, value: str) -> None:
@@ -49,13 +59,18 @@ class ParametersSetup(SvBaseModel):
     @classmethod
     def from_list(
         cls, parameter_list: List[Parameter | Dict[str, Any]] | None
-    ) -> "ParametersSetup":
+    ) -> "ParametersSetup | None":
         if not parameter_list:
-            return
+            return None
+
         if isinstance(parameter_list[0], dict):  # TODO: add test for this
-            parameter_list = [Parameter(**parameter) for parameter in parameter_list]
+            parameter_list_casted = [
+                Parameter(**parameter)  # type: ignore # just checked that instance is dict
+                for parameter in parameter_list
+            ]
+            parameter_list = parameter_list_casted  # type: ignore
         return cls(
-            definitions={parameter.name: parameter for parameter in parameter_list}
+            definitions={parameter.name: parameter for parameter in parameter_list}  # type: ignore
         )
 
     def value(self, name: str) -> str | None:
@@ -95,27 +110,3 @@ class ParametersSetup(SvBaseModel):
                 raise ValueError(message)
 
         return self
-
-
-@deprecated(
-    version="0.1.6",
-    reason=(
-        "Encrypted parameters are passed in to the agent in the Server "
-        "registration flow"
-    ),
-)
-class Parameters(SvBaseModel):
-    """
-    Incoming parameters are received from the SaaS platform.
-    They are encrypted with the agent's public key.
-    """
-
-    values: Dict[str, str]
-
-    @classmethod
-    def from_str(cls, unencrypted: str) -> "Parameters":
-        """
-        Create a Parameters object from json string of parameters.
-        Not to be used in production - for testing purposes only.
-        """
-        return cls(values=json.loads(unencrypted))

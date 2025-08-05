@@ -1,0 +1,230 @@
+<div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[80vh] overflow-y-auto">
+    <div class="sm:flex sm:items-start">
+        <div class="w-full">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Case Details</h3>
+                <button
+                    @click="open = false"
+                    class="bg-white rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                    <span class="sr-only">Close</span>
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Case Information -->
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Basic Information</h4>
+                    <dl class="space-y-2">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</dt>
+                            <dd class="text-sm text-gray-900">{{ case.name or "Unnamed Case" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">ID</dt>
+                            <dd class="text-sm text-gray-900 font-mono">{{ case.id }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</dt>
+                            <dd>
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if case.status == 'completed' %}bg-green-100 text-green-800
+                                    {% elif case.status == 'in_progress' %}bg-blue-100 text-blue-800
+                                    {% elif case.status == 'failed' %}bg-red-100 text-red-800
+                                    {% elif case.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ case.status.replace('_', ' ').title() }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</dt>
+                            <dd class="text-sm text-gray-900">${{ "%.2f"|format(case.total_cost or 0) }}</dd>
+                        </div>
+                        {% if case.agent_name %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</dt>
+                            <dd>
+                                <a href="/admin/agents" class="text-sm text-blue-600 hover:text-blue-900">{{ case.agent_name }}</a>
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Timestamps</h4>
+                    <dl class="space-y-2">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Created</dt>
+                            <dd class="text-sm text-gray-900">{{ case.created_at or "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Finished</dt>
+                            <dd class="text-sm text-gray-900">{{ case.finished_at or "-" }}</dd>
+                        </div>
+                        {% if case.job_id %}
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Job</dt>
+                            <dd>
+                                <a href="/admin/jobs" class="text-sm text-blue-600 hover:text-blue-900 font-mono">{{ case.job_id }}</a>
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Description -->
+            {% if case.description %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Description</h4>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-700">{{ case.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Parent Job Information -->
+            {% if job %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Parent Job Information</h4>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-blue-900">{{ job.name or "Unnamed Job" }}</p>
+                            {% if job.agent_name %}
+                            <p class="text-sm text-blue-700">
+                                Agent: <a href="/admin/agents" class="text-blue-600 hover:text-blue-800 underline">{{ job.agent_name }}</a>
+                            </p>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {% if job.status == 'completed' %}bg-green-100 text-green-800
+                                {% elif job.status == 'in_progress' %}bg-blue-100 text-blue-800
+                                {% elif job.status == 'failed' %}bg-red-100 text-red-800
+                                {% elif job.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ job.status.replace('_', ' ').title() }}
+                            </span>
+                            <a href="/admin/jobs" class="text-blue-600 hover:text-blue-900 text-sm font-medium underline">View Job</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+         
+
+            <!-- Case Updates -->
+            {% if case.updates %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Case Updates ({{ case.updates | length }} total, showing recent 10)</h4>
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                        {% for update in case.updates[-10:] %}
+                        <div class="px-4 py-4">
+                            <div class="flex items-start space-x-3">
+                                <!-- Update Type Icon -->
+                                <div class="flex-shrink-0">
+                                    {% if update.type == 'status_change' %}
+                                    <div class="w-2 h-2 bg-blue-400 rounded-full mt-2"></div>
+                                    {% elif update.type == 'error' %}
+                                    <div class="w-2 h-2 bg-red-400 rounded-full mt-2"></div>
+                                    {% elif update.type == 'progress' %}
+                                    <div class="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                                    {% else %}
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="flex-1 min-w-0">
+                                    <!-- Update Header -->
+                                    <div class="flex items-center justify-between">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                            {% if update.type == 'status_change' %}bg-blue-100 text-blue-800
+                                            {% elif update.type == 'error' %}bg-red-100 text-red-800
+                                            {% elif update.type == 'progress' %}bg-green-100 text-green-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ update.type or "Update" }}
+                                        </span>
+                                        <time class="text-xs text-gray-500">
+                                            {{ update.timestamp or "Unknown time" }}
+                                        </time>
+                                    </div>
+                                    
+                                    <!-- Update Message -->
+                                    <div class="mt-2">
+                                        <p class="text-sm text-gray-900">{{ update.message or "No message" }}</p>
+                                        
+                                        <!-- Additional Details -->
+                                        {% if update.details %}
+                                        <div class="mt-2 bg-gray-50 rounded-md p-3">
+                                            {% if update.details is string %}
+                                            <p class="text-xs text-gray-600">{{ update.details }}</p>
+                                            {% else %}
+                                            <pre class="text-xs text-gray-600 whitespace-pre-wrap">{{ update.details | tojson(indent=2) }}</pre>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <!-- Cost Information -->
+                                        {% if update.cost %}
+                                        <div class="mt-2 flex items-center text-xs text-gray-500">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"></path>
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            Cost: ${{ "%.4f"|format(update.cost) }}
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <!-- Agent Information -->
+                                        {% if update.agent %}
+                                        <div class="mt-2 flex items-center text-xs text-gray-500">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            Agent: {{ update.agent }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Final Delivery -->
+            {% if case.final_delivery %}
+            <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">Final Delivery</h4>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <pre class="text-sm text-green-800 whitespace-pre-wrap">{{ case.final_delivery | tojson(indent=2) }}</pre>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Footer -->
+<div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+    <button
+        @click="open = false"
+        type="button"
+        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+    >
+        Close
+    </button>
+
+
+</div>

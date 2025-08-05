@@ -37,11 +37,10 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentResponse,
 )
-from supervaizer.case import Cases, CaseNodeUpdate
+from supervaizer.case import CaseNodeUpdate, Cases
 from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
-from supervaizer.case import Case
-from supervaizer.job_service import service_job_start, service_job_custom
+from supervaizer.job_service import service_job_custom, service_job_start
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
@@ -80,7 +79,7 @@ def handle_route_errors(
     ) -> Callable[..., Awaitable[Union[T, JSONResponse]]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
-            log.debug(f"------[DEBUG]----------\n args :{args} \n kwargs :{kwargs}")
+            # log.debug(f"------[DEBUG]----------\n args :{args} \n kwargs :{kwargs}")
             try:
                 result: T = await func(*args, **kwargs)
                 return result
@@ -130,19 +129,24 @@ def create_default_routes(server: "Server") -> APIRouter:
 
     @router.get(
         "/jobs/{job_id}",
-        response_model=Job,
+        response_model=JobResponse,
         dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
-    async def get_job_status(job_id: str) -> Job:
+    async def get_job_status(job_id: str) -> JobResponse:
         """Get the status of a job by its ID"""
-        job = Jobs().get_job(job_id)
+        job = Jobs().get_job(job_id, include_persisted=True)
         if not job:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Job with ID {job_id} not found §SRCG01",
             )
-        return job
+        return JobResponse(
+            job_id=job.id,
+            status=job.status,
+            message=f"Job {job.id} status: {job.status.value}",
+            payload=job.payload,
+        )
 
     @router.get(
         "/jobs",
@@ -175,15 +179,22 @@ def create_default_routes(server: "Server") -> APIRouter:
 
             if filtered_jobs:  # Only include agents that have jobs after filtering
                 # Convert each Job object to JobResponse
-                jobs_responses = [
-                    JobResponse(
-                        job_id=job.id,
-                        status=job.status,
-                        message=f"Job {job.id} status: {job.status.value}",
-                        payload=job.payload,
+                jobs_responses = []
+                for job in filtered_jobs:
+                    job_status = job.status
+                    if isinstance(job_status, str):
+                        try:
+                            job_status = EntityStatus(job_status)
+                        except ValueError:
+                            job_status = EntityStatus.IN_PROGRESS  # fallback or default
+                    jobs_responses.append(
+                        JobResponse(
+                            job_id=job.id,
+                            status=job_status,
+                            message=f"Job {job.id} status: {job_status.value}",
+                            payload=job.payload,
+                        )
                     )
-                    for job in filtered_jobs
-                ]
 
                 all_jobs[agent_name] = jobs_responses
 
@@ -225,14 +236,9 @@ def create_default_routes(server: "Server") -> APIRouter:
         case = Cases().get_case(case_id, job_id)
         if not case:
             log.warning(f"Case with ID {case_id} not found for job {job_id} §SRCU02")
-            # Create a new case if case does not exist (may happen if the agent server was restarted and objects were flushed)
-            case = Case(
-                id=case_id,
-                job_id=job_id,
-                name=f"Case created by API for job {job_id}",
-                account=server.supervisor_account,
-                description="Case created by API ",
-                status=EntityStatus.AWAITING,
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Case with ID {case_id} not found for job {job_id} §SRCU02",
             )
         # Check if the case is in AWAITING status (waiting for human input)
         if case.status != EntityStatus.AWAITING:
@@ -474,7 +480,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/jobs/{job_id}",
         summary=f"Get job status for agent: {agent.name}",
         description="Get the status and details of a specific job",
-        response_model=Job,
+        response_model=JobResponse,
         responses={
             http_status.HTTP_200_OK: {"model": Job},
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
@@ -483,16 +489,23 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
-    async def get_job_status(job_id: str, agent: Agent = Depends(get_agent)) -> Job:
+    async def get_job_status(
+        job_id: str, agent: Agent = Depends(get_agent)
+    ) -> JobResponse:
         """Get the status of a job by its ID for this specific agent"""
         log.info(f"📥  GET /jobs/{job_id} [Get job status] {agent.name}")
-        job = Jobs().get_job(job_id, agent_name=agent.name)
+        job = Jobs().get_job(job_id, agent_name=agent.name, include_persisted=True)
         if not job:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Job with ID {job_id} not found for agent {agent.name}",
             )
-        return job
+        return JobResponse(
+            job_id=job.id,
+            status=job.status,
+            message=f"Job {job.id} status: {job.status.value}",
+            payload=job.payload,
+        )
 
     @router.post(
         "/stop",
@@ -506,11 +519,11 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def stop_agent(
         background_tasks: BackgroundTasks,
-        params=Body(...),
+        params: dict[str, Any] = Body(...),
         agent: Agent = Depends(get_agent),
     ) -> AgentResponse:
         log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
-        result = agent.job_stop(params.get("job_context"))
+        result = agent.job_stop(params.get("job_context", {}))
         res_info = result.registration_info if result else {}
         return AgentResponse(
             name=agent.name,

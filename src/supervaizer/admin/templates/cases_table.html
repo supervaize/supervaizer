@@ -1,0 +1,134 @@
+<div class="bg-white shadow overflow-hidden rounded-md">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Case
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Job ID
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cost
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                </th>
+                <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for case in cases %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">{{ case.name }}</div>
+                        <div class="text-sm text-gray-500">{{ case.id }}</div>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm text-gray-900 max-w-xs truncate">{{ case.description or "-" }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        {% if case.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif case.status == 'in_progress' %}bg-blue-100 text-blue-800
+                        {% elif case.status == 'failed' %}bg-red-100 text-red-800
+                        {% elif case.status == 'cancelled' %}bg-gray-100 text-gray-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ case.status.replace('_', ' ').title() }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {% if case.job_id %}
+                        <a href="#" onclick="showJobDetails('{{ case.job_id }}')" class="text-blue-600 hover:text-blue-900">
+                            {{ case.job_id[:8] }}...
+                        </a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${{ "%.2f"|format(case.total_cost) }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {% if case.created_at %}
+                        {{ case.created_at[:10] }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                        onclick="showCaseDetails('{{ case.id }}')"
+                        class="text-blue-600 hover:text-blue-900 mr-4"
+                    >
+                        View
+                    </button>
+                    <button
+                        hx-delete="/admin/api/cases/{{ case.id }}"
+                        hx-confirm="Are you sure you want to delete this case?"
+                        hx-trigger="click"
+                        hx-on::after-request="if(event.detail.successful) { window.showToast('Case deleted successfully', 'success'); htmx.trigger('#cases-table-container', 'refresh'); }"
+                        class="text-red-600 hover:text-red-900"
+                    >
+                        Delete
+                    </button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="px-6 py-12 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No cases found</h3>
+                    <p class="mt-1 text-sm text-gray-500">Try adjusting your filters or search criteria.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if total > 0 %}
+    <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <p class="text-sm text-gray-700">
+                    Showing {{ skip + 1 }} to {{ skip + cases|length }} of {{ total }} results
+                </p>
+            </div>
+            <div class="flex space-x-2">
+                {% if has_prev %}
+                <button
+                    hx-get="/admin/api/cases?skip={{ skip - limit }}&limit={{ limit }}"
+                    hx-target="#cases-table-container"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                    Previous
+                </button>
+                {% endif %}
+
+                {% if has_next %}
+                <button
+                    hx-get="/admin/api/cases?skip={{ skip + limit }}&limit={{ limit }}"
+                    hx-target="#cases-table-container"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                    Next
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

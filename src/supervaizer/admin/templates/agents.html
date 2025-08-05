@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Agents - Supervaizer Admin{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="md:flex md:items-center md:justify-between">
+        <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                Agents
+            </h2>
+            <p class="mt-1 text-sm text-gray-500">Manage AI agents and their configurations</p>
+        </div>
+        <div class="mt-4 flex md:mt-0 space-x-3">
+            <button
+                hx-get="/admin/api/agents"
+                hx-target="#agents-table-container"
+                hx-indicator="#refresh-indicator"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+                <svg id="refresh-indicator" class="htmx-indicator -ml-1 mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refresh
+            </button>
+            <button
+                onclick="showCreateAgentModal()"
+                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+                <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                New Agent
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mt-6 bg-white shadow rounded-lg" x-data="{ filtersOpen: false }">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <button
+                @click="filtersOpen = !filtersOpen"
+                class="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z"></path>
+                </svg>
+                Filters
+                <svg class="w-4 h-4 ml-2 transition-transform" :class="filtersOpen ? 'rotate-180' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div x-show="filtersOpen" x-cloak class="px-6 py-4 border-b border-gray-200">
+            <form
+                hx-get="/admin/api/agents"
+                hx-target="#agents-table-container"
+                hx-trigger="change, submit"
+                class="grid grid-cols-1 gap-4 sm:grid-cols-4"
+            >
+                <!-- Status Filter -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select name="status" id="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="">All statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="error">Error</option>
+                        <option value="training">Training</option>
+                    </select>
+                </div>
+
+                <!-- Agent Type Filter -->
+                <div>
+                    <label for="agent_type" class="block text-sm font-medium text-gray-700">Type</label>
+                    <select name="agent_type" id="agent_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="">All types</option>
+                        <option value="conversational">Conversational</option>
+                        <option value="analytical">Analytical</option>
+                        <option value="specialist">Specialist</option>
+                        <option value="workflow">Workflow</option>
+                    </select>
+                </div>
+
+                <!-- Search -->
+                <div>
+                    <label for="search" class="block text-sm font-medium text-gray-700">Search</label>
+                    <input type="text" name="search" id="search" placeholder="Agent name or description..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                </div>
+
+                <!-- Sort -->
+                <div>
+                    <label for="sort" class="block text-sm font-medium text-gray-700">Sort by</label>
+                    <select name="sort" id="sort" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="-created_at">Newest first</option>
+                        <option value="created_at">Oldest first</option>
+                        <option value="name">Name A-Z</option>
+                        <option value="-name">Name Z-A</option>
+                        <option value="status">Status</option>
+                        <option value="-last_used">Last used</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Agents Grid -->
+    <div id="agents-table-container" class="mt-6">
+        {% include "agents_grid.html" %}
+    </div>
+</div>
+
+<!-- Agent Detail Modal -->
+<div id="agent-modal" class="fixed inset-0 z-50" x-data="{ open: false }" x-show="open" x-cloak>
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="open = false"></div>
+
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+            <div id="agent-modal-content">
+                <!-- Content will be loaded here via HTMX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Handle agent modal
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.target.id === 'agent-modal-content') {
+            console.log('Agent modal content loaded, showing modal');
+            // Show modal after content loads
+            const modal = document.getElementById('agent-modal');
+            if (modal && modal._x_dataStack && modal._x_dataStack[0]) {
+                modal._x_dataStack[0].open = true;
+                console.log('Modal opened via Alpine.js');
+            } else {
+                console.log('Alpine.js not available, using fallback');
+                // Fallback: remove x-cloak and set open state manually
+                modal.classList.remove('x-cloak');
+                modal.style.display = 'block';
+            }
+        }
+    });
+
+    // Global functions for agent actions
+    window.showAgentDetails = function(agentSlug) {
+        console.log('Showing agent details for slug:', agentSlug);
+        htmx.ajax('GET', `/admin/api/agents/${encodeURIComponent(agentSlug)}`, {target: '#agent-modal-content'});
+    };
+
+    window.editAgent = function(agentId) {
+        console.log('Edit agent:', agentId);
+        // Future: htmx.ajax('GET', `/admin/api/agents/${agentId}/edit`, {target: '#agent-modal-content'});
+    };
+
+    window.showCreateAgentModal = function() {
+        console.log('Create new agent');
+        // Future: htmx.ajax('GET', '/admin/api/agents/new', {target: '#agent-modal-content'});
+    };
+
+    // Auto-load and refresh agents
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load agents immediately
+        htmx.ajax('GET', '/admin/api/agents', {target: '#agents-table-container'});
+
+        // Set up auto-refresh interval
+        setInterval(function() {
+            htmx.ajax('GET', '/admin/api/agents', {target: '#agents-table-container'});
+        }, 30000); // Refresh every 30 seconds
+    });
+</script>
+{% endblock %}

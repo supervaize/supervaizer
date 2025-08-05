@@ -18,6 +18,7 @@ from supervaizer.agent import Agent
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.server_utils import ErrorType, create_error_response
+from supervaizer.parameter import ParametersSetup
 
 insp = inspect
 
@@ -83,7 +84,7 @@ def test_server_decrypt(server_fixture: Server) -> None:
 
 
 def test_get_job_status_endpoint(
-    server_fixture: Server, job_fixture: Job, mocker
+    server_fixture: Server, job_fixture: Job, mocker: Any
 ) -> None:
     """Test the get_job_status endpoint"""
     client = TestClient(server_fixture.app)
@@ -95,11 +96,10 @@ def test_get_job_status_endpoint(
     mock_jobs.return_value = mock_jobs_instance
 
     # Use the API key from the server fixture
-    headers = {"X-API-Key": server_fixture.api_key}
-    response = client.get("/supervaizer/jobs/test-job-id", headers=headers)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+    response = client.get(f"/supervaizer/jobs/{job_fixture.id}", headers=headers)
     assert response.status_code == 200
-    assert response.json()["id"] == "test-job-id"
-    assert response.json()["status"] == EntityStatus.IN_PROGRESS.value
+    assert response.json()["job_id"] == job_fixture.id
 
     # Test unauthorized access (missing API key)
     response = client.get("/supervaizer/jobs/test-job-id")
@@ -233,79 +233,58 @@ async def test_start_job_endpoint(
     server_fixture: Server,
     agent_fixture: Agent,
     job_fixture: Job,
+    context_fixture: JobContext,
+    parameters_fixture: ParametersSetup,
     monkeypatch: pytest.MonkeyPatch,
-    mocker,
-    no_response_validation,
-    exception: Optional[Exception],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
+    no_response_validation: Any,
+    exception: Exception,
+    expected_error_type: ErrorType,
+    expected_status: int,
 ) -> None:
     """Test the start_job endpoint with parametrization"""
     i_tested_something = False
 
-    # Create test data
-    test_context = mocker.MagicMock(spec=JobContext)
-    test_job_fields = mocker.MagicMock()
-    test_job_fields.to_dict.return_value = {"field1": "value1"}
+    # Use the real job context and parameters_fixture
+    # Remove MagicMock for job context, job fields, job model, etc.
 
-    # Create a mock job model that matches the agent's job_start_method.job_model
-    mock_job_model = mocker.MagicMock()
-    mock_job_model.job_context = test_context
-    mock_job_model.job_fields = test_job_fields
-    mock_job_model.encrypted_agent_parameters = "encrypted_params"
-
-    # Create a mock job
-    mock_job = mocker.MagicMock(spec=Job)
-    mock_job.id = "test-job-id"
-    mock_job.to_dict.return_value = {"id": "test-job-id"}
-
-    # Mock the Job.new method
+    # Monkeypatch Job.new to return the real job_fixture
     monkeypatch.setattr(
-        Job, "new", lambda job_context, agent_name, parameters: mock_job
+        Job, "new", lambda job_context, agent_name, parameters: job_fixture
     )
 
-    # Mock the Parameters.from_str method
+    # Patch Agent.job_start to raise exception or return job_fixture
+    def job_start_patch(self: Agent, *args: Any, **kwargs: Any) -> Job:
+        if exception:
+            raise exception
+        return job_fixture
+
+    monkeypatch.setattr(Agent, "job_start", job_start_patch)
+
+    # Patch Server.decrypt to return parameters_fixture as dict
     monkeypatch.setattr(
-        "supervaizer.parameter.Parameters.from_str",
-        lambda x: {"param1": "value1"},
+        Server,
+        "decrypt",
+        lambda self, encrypted: json.dumps({
+            k: v.value for k, v in parameters_fixture.definitions.items()
+        }),
     )
-
-    # Mock create_error_response to return proper error responses
-    mock_error_response = mocker.patch("supervaizer.routes.create_error_response")
-    if exception:
-        # Setup error response for exceptions
-        mock_error_response.return_value = JSONResponse(
-            status_code=expected_status, content={"detail": str(exception)}
-        )
-
-    # Use mocker.patch directly instead of with statement
-    mock_job_start = mocker.patch.object(Agent, "job_start")
-    mocker.patch.object(
-        Server, "decrypt", return_value=json.dumps({"param1": "value1"})
-    )
-
-    # Configure job_start based on the test case
-    if exception:
-        mock_job_start.side_effect = exception
-    else:
-        mock_job_start.return_value = mock_job
 
     # Set up client with API key
     client = TestClient(server_fixture.app)
-    headers = {"X-API-Key": server_fixture.api_key}
+    headers: dict[str, Any] = {"X-API-Key": server_fixture.api_key}
     url = f"/supervaizer/agents/{agent_fixture.name}/jobs"
 
     # Always make the API request regardless of exception case
     data = {
         "job_context": {
-            "workspace_id": "test",
-            "job_id": "test-job-id",
-            "started_by": "test-user",
-            "started_at": "2023-01-01T00:00:00",
-            "mission_id": "test-mission-id",
-            "mission_name": "test-mission",
+            "workspace_id": context_fixture.workspace_id,
+            "job_id": context_fixture.job_id,
+            "started_by": context_fixture.started_by,
+            "started_at": context_fixture.started_at.isoformat(),
+            "mission_id": context_fixture.mission_id,
+            "mission_name": context_fixture.mission_name,
         },
-        "job_fields": {"field1": "value1"},
+        "job_fields": {},
     }
 
     # Test with valid auth
@@ -317,10 +296,6 @@ async def test_start_job_endpoint(
 
     # Assert temporary expected status code
     assert response.status_code == expected_actual_status
-
-    # Skip the rest of the assertions since we know we're getting 404s
-    pytest.skip("Skipping rest of assertions since we know we're getting 404s")
-
     assert i_tested_something, "No test was performed"
 
 
@@ -348,8 +323,8 @@ async def test_get_agent_jobs_endpoint(
     server_fixture: Server,
     agent_fixture: Agent,
     job_fixture: Job,
-    mocker,
-    no_response_validation,
+    mocker: Any,
+    no_response_validation: Any,
     exception: Optional[Exception],
     status_filter: Optional[EntityStatus],
     expected_error_type: Optional[ErrorType],

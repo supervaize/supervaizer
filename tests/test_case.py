@@ -1,27 +1,39 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # https://mozilla.org/MPL/2.0/.
 
 
+from typing import Any
+
 import pytest
+from pytest_mock import MockerFixture
 
 from supervaizer import Account
-from supervaizer.case import Case, CaseNode, CaseNodeUpdate
+from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.lifecycle import EntityStatus
 
 
-def test_case(case_fixture: Case, case_node_fixture: CaseNode) -> None:
+def test_case(
+    case_fixture: Case,
+) -> None:
     assert isinstance(case_fixture, Case)
     assert case_fixture.id is not None
     assert case_fixture.name == "Test Case"
     assert case_fixture.description == "Test Case Description"
-    assert case_fixture.nodes == [case_node_fixture]
 
 
 def test_case_start(
-    account_fixture: Account, case_node_fixture: CaseNode, respx_mock, mocker
+    account_fixture: Account,
+    respx_mock: Any,
+    mocker: MockerFixture,
 ) -> None:
     api_url = account_fixture.api_url
     # mock the start case event response (example for reference only)
@@ -45,13 +57,6 @@ def test_case_start(
                 },
                 "description": "Test Case Description",
                 "status": "in_progress",
-                "nodes": [
-                    {
-                        "name": "Test Node",
-                        "description": "Test Node Description",
-                        "type": "node_type",
-                    }
-                ],
                 "updates": [],
             },
             "created_at": "2025-03-22T18:11:25.896139Z",
@@ -71,7 +76,6 @@ def test_case_start(
         account=account_fixture,
         name="New Case",
         description="Test Case Description",
-        nodes=[case_node_fixture],
     )
 
     assert isinstance(new_case, Case)
@@ -79,7 +83,10 @@ def test_case_start(
 
 
 def test_case_close(
-    account_fixture: Account, respx_mock, case_fixture: Case, mocker
+    account_fixture: Account,
+    respx_mock: Any,
+    case_fixture: Case,
+    mocker: MockerFixture,
 ) -> None:
     # Setup
     case = case_fixture
@@ -113,7 +120,10 @@ def test_case_close(
 
 @pytest.mark.asyncio
 async def test_case_close_without_final_cost(
-    account_fixture: Account, respx_mock, case_fixture: Case, mocker
+    account_fixture: Account,
+    respx_mock: Any,
+    case_fixture: Case,
+    mocker: MockerFixture,
 ) -> None:
     # Setup
     case = case_fixture
