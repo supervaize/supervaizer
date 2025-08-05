@@ -36,4 +36,4 @@ jobs:
           uv run ruff check . --exclude tools/,tests/ --select=I
       - name: Test with pytest
         run: |
-          pytest --no-cov
+          uv run pytest --no-cov
