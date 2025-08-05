@@ -6,17 +6,22 @@
 # https://mozilla.org/MPL/2.0/.
 
 import logging
+import os
 
 from loguru import logger
+from rich.console import Console
+
+from supervaizer.agent import Agent, AgentMethod, AgentMethods
+from supervaizer.server import Server
 
 
 class InterceptHandler(logging.Handler):
-    def emit(self, record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         # Get corresponding Loguru level if it exists
         try:
             level = logger.level(record.levelname).name
         except ValueError:
-            level = record.levelno
+            level = str(record.levelno)
         logger.log(level, record.getMessage())
 
 
@@ -28,12 +33,6 @@ for name in logging.root.manager.loggerDict:
 Supervaizer Server with Admin Interface
 """
 
-import os
-
-from rich.console import Console
-
-from supervaizer.agent import Agent, AgentMethod, AgentMethods
-from supervaizer.server import Server
 
 console = Console()
 

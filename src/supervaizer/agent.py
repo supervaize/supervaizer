@@ -490,7 +490,7 @@ class Agent(AbstractAgent):
         return self
 
     def update_parameters_from_server(
-        self, server: "Server", server_encrypted_parameters: str
+        self, server: "Server", server_encrypted_parameters: str | None
     ) -> None:
         if server_encrypted_parameters and self.parameters_setup:
             self.server_encrypted_parameters = server_encrypted_parameters
@@ -532,6 +532,8 @@ class Agent(AbstractAgent):
         Returns:
             Job: The updated job instance
         """
+        if not self.methods:
+            raise ValueError("Agent methods not defined")
         log.debug(
             f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
         )
@@ -560,6 +562,8 @@ class Agent(AbstractAgent):
         if method_name == "job_start":
             action = self.methods.job_start
         else:
+            if not self.methods.custom:
+                raise ValueError(f"Custom method {method_name} not found")
             action = self.methods.custom[method_name]
 
         action_method = action.method
@@ -622,15 +626,19 @@ class Agent(AbstractAgent):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
+        if not self.methods:
+            raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
+        if not self.methods:
+            raise ValueError("Agent methods not defined")
         method = self.methods.job_status.method
         return self._execute(method, params)
 
     def chat(self, context: str, message: str) -> Any:
-        if not self.methods.chat:
+        if not self.methods or not self.methods.chat:
             raise ValueError("Chat method not configured")
         method = self.methods.chat.method
         params = {"context": context, "message": message}
@@ -638,7 +646,7 @@ class Agent(AbstractAgent):
 
     @property
     def custom_methods_names(self) -> list[str] | None:
-        if self.methods.custom:
+        if self.methods and self.methods.custom:
             return list(self.methods.custom.keys())
         return None
 

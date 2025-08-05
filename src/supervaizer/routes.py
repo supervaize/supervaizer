@@ -350,7 +350,7 @@ def create_agents_routes(server: "Server") -> APIRouter:
     for agent in server.agents:
         routers.include_router(create_agent_route(server, agent))
         # Add custom method routes for each agent
-        if agent.methods.custom:
+        if agent.methods and agent.methods.custom:
             routers.include_router(create_agent_custom_routes(server, agent))
     return routers
 
@@ -383,11 +383,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
+    if not agent.methods:
+        raise ValueError(f"Agent {agent.name} has no methods defined")
+
     agent_job_model_name = f"{agent.slug}_Start_Job_Model"
     # Create the dynamic model with the custom name for FastAPI documentation
     AgentStartAbstractJob = type(
         agent_job_model_name,
-        (agent.methods.job_start.job_model,),  # type: ignore
+        (agent.methods.job_start.job_model,),
         {},
     )
 
@@ -407,13 +410,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors(job_conflict_check=True)
     async def start_job(
         background_tasks: BackgroundTasks,
-        body_params: AgentStartAbstractJob = Body(...),  # type: ignore
+        body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
-        sv_context: JobContext = body_params.job_context  # type: ignore[attr-defined]
-        job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
+        sv_context: JobContext = body_params.job_context
+        job_fields = body_params.job_fields.to_dict()
 
         # Get job encrypted parameters if available
         encrypted_agent_parameters = getattr(
@@ -591,6 +594,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
 def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
     """Create individual routes for each custom method of an agent."""
+    if not agent.methods or not agent.methods.custom:
+        raise ValueError(f"Agent {agent.name} has no custom methods defined")
+
     tags: list[str | Enum] = ["Supervision"]
     router = APIRouter(
         prefix=agent.path,
@@ -606,7 +612,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
         custom_job_model_name = f"{agent.slug}_Custom_{method_name}_Job_Model"
         AgentCustomAbstractJob = type(
             custom_job_model_name,
-            (method_config.job_model,),  # type: ignore
+            (method_config.job_model,),
             {},
         )
 
@@ -625,14 +631,14 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
         @handle_route_errors()
         async def custom_method_endpoint(
             background_tasks: BackgroundTasks,
-            body_params: AgentCustomAbstractJob = Body(...),
+            body_params: Any = Body(...),
             agent: Agent = Depends(get_agent),
         ) -> Union[JobResponse, JSONResponse]:
             log.info(
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )
-            sv_context: JobContext = body_params.job_context  # type: ignore[attr-defined]
-            job_fields = body_params.job_fields.to_dict()  # type: ignore[attr-defined]
+            sv_context: JobContext = body_params.job_context
+            job_fields = body_params.job_fields.to_dict()
 
             # Get job encrypted parameters if available
             encrypted_agent_parameters = getattr(

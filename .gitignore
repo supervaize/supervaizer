@@ -247,3 +247,5 @@ uv.lock
 /.devaigents
 
 /data/*
+
+.pypirc

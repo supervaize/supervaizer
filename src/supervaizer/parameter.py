@@ -62,10 +62,13 @@ class ParametersSetup(SvBaseModel):
         if not parameter_list:
             return None
 
-        if isinstance(parameter_list[0], dict):  # TODO: add test for this
+        if parameter_list and isinstance(
+            parameter_list[0], dict
+        ):  # TODO: add test for this
             parameter_list_casted = [
                 Parameter(**parameter)
                 for parameter in parameter_list
+                if isinstance(parameter, dict)
             ]
             parameter_list = parameter_list_casted  # type: ignore
         return cls(

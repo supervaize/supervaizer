@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.12
+    rev: v0.12.7
     hooks:
       - id: ruff
         args: [--fix, --select=I]
@@ -17,11 +17,13 @@ repos:
 
   # Add mypy type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.17.1
     hooks:
       - id: mypy
         language: python
         additional_dependencies: [".[dev]"]
+        args: []
+        exclude: ^(tests/|tools/)
 
   # Add copyright headers to files
   - repo: https://github.com/Lucas-C/pre-commit-hooks
@@ -41,7 +43,7 @@ repos:
       - id: conventional-gitmoji
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.6.0
+    rev: v4.8.3
     hooks:
       - id: commitizen
         additional_dependencies: [cz-conventional-gitmoji]

@@ -59,7 +59,9 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
     tools.append(
         {
             "name": "job_start",
-            "description": agent.methods.job_start.description
+            "description": (
+                agent.methods.job_start.description if agent.methods else None
+            )
             or f"Start a job with {agent.name}",
             "input_schema": {
                 "type": "object",
@@ -83,7 +85,7 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
     )
 
     # Add custom tools if available
-    if agent.methods.custom:
+    if agent.methods and agent.methods.custom:
         for name, method in agent.methods.custom.items():
             tools.append(
                 {
