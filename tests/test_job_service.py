@@ -12,9 +12,9 @@ from pytest_mock import MockerFixture
 
 from supervaizer.job import Job
 from supervaizer.job_service import (
-    service_job_start,
-    service_job_finished,
     service_job_custom,
+    service_job_finished,
+    service_job_start,
 )
 from supervaizer.lifecycle import EntityStatus
 
@@ -412,7 +412,7 @@ async def test_service_job_custom_no_job_id(
     method_name = "custom_method"
 
     # Remove job_id from context
-    context_fixture.job_id = None
+    context_fixture.job_id = None  # type: ignore
 
     with pytest.raises(ValueError, match="Job ID is required to start a custom job"):
         await service_job_custom(

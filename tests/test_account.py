@@ -14,9 +14,9 @@ from supervaizer.event import Event
 from supervaizer.server import Server
 from supervaizer.telemetry import (
     Telemetry,
-    TelemetryType,
     TelemetryCategory,
     TelemetrySeverity,
+    TelemetryType,
 )
 
 

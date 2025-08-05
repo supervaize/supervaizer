@@ -17,8 +17,8 @@ from supervaizer import Server
 from supervaizer.agent import Agent
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
-from supervaizer.server_utils import ErrorType, create_error_response
 from supervaizer.parameter import ParametersSetup
+from supervaizer.server_utils import ErrorType, create_error_response
 
 insp = inspect
 
@@ -137,8 +137,8 @@ async def test_get_all_jobs_endpoint(
     server_fixture: Server,
     agent_fixture: Agent,
     job_fixture: Job,
-    mocker,
-    no_response_validation,
+    mocker: Any,
+    no_response_validation: Any,
     exception: Optional[Exception],
     status_filter: Optional[EntityStatus],
     expected_error_type: Optional[ErrorType],
@@ -409,8 +409,8 @@ async def test_get_job_status_for_agent(
     server_fixture: Server,
     agent_fixture: Agent,
     job_fixture: Job,
-    mocker,
-    no_response_validation,
+    mocker: Any,
+    no_response_validation: Any,
     job_exists: bool,
     exception: Optional[Exception],
     expected_error_type: Optional[ErrorType],

@@ -7,6 +7,8 @@
 
 import json
 import re
+from dataclasses import dataclass
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,8 +23,6 @@ import shortuuid
 from pydantic import BaseModel, field_validator
 from rich import inspect, print
 from slugify import slugify
-from dataclasses import dataclass
-from enum import Enum
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiSuccess, SvBaseModel, log

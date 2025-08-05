@@ -32,7 +32,7 @@ from supervaizer.storage import (
 )
 
 
-def demo_storage_manager():
+def demo_storage_manager() -> None:
     """Demonstrate basic StorageManager operations."""
     print("=== StorageManager Demo ===")
 
@@ -74,7 +74,7 @@ def demo_storage_manager():
         storage.close()
 
 
-def demo_entity_repository():
+def demo_entity_repository() -> None:
     """Demonstrate EntityRepository usage."""
     print("\n=== EntityRepository Demo ===")
 
@@ -92,7 +92,7 @@ def demo_entity_repository():
         print(f"Case repository type: {case_repo.type_name}")
 
 
-def demo_full_workflow():
+def demo_full_workflow() -> None:
     """Demonstrate a complete workflow with Job/Case creation and persistence."""
     print("\n=== Full Workflow Demo ===")
 
@@ -168,7 +168,7 @@ def demo_full_workflow():
         storage.close()
 
 
-def demo_persistent_lifecycle():
+def demo_persistent_lifecycle() -> None:
     """Demonstrate auto-persistence with PersistentEntityLifecycle."""
     print("\n=== PersistentEntityLifecycle Demo ===")
 
@@ -227,7 +227,7 @@ def demo_persistent_lifecycle():
         storage.close()
 
 
-def demo_data_loading():
+def demo_data_loading() -> None:
     """Demonstrate loading entities from storage across sessions."""
     print("\n=== Data Loading Demo ===")
 

@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 """Test for CLI module to improve coverage."""
 
 import os
@@ -332,6 +338,7 @@ def test_main_execution(mock_app: Mock) -> None:
     """Test main execution when module is run directly."""
     # Import the module to trigger the if __name__ == "__main__" block
     import importlib
+
     import supervaizer.cli
 
     # Reload to trigger main execution

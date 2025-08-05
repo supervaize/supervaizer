@@ -6,9 +6,9 @@
 
 
 from datetime import datetime
-from uuid import uuid4
+from typing import Any, Dict
 from unittest.mock import patch
-from typing import Dict, Any
+from uuid import uuid4
 
 import pytest
 

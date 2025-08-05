@@ -6,11 +6,12 @@
 # https://mozilla.org/MPL/2.0/.
 
 import logging
+
 from loguru import logger
 
 
 class InterceptHandler(logging.Handler):
-    def emit(self, record):
+    def emit(self, record) -> None:
         # Get corresponding Loguru level if it exists
         try:
             level = logger.level(record.levelname).name

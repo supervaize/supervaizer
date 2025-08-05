@@ -60,8 +60,8 @@ def test_update_case_with_answer_success(
     # Verify the case was updated
     assert test_case.status == EntityStatus.IN_PROGRESS
     assert len(test_case.updates) == 1
-    assert test_case.updates[0].payload["answer"] == request_data["answer"]  # type: ignore
-    assert test_case.updates[0].payload["message"] == request_data["message"]  # type: ignore
+    assert test_case.updates[0].payload["answer"] == request_data["answer"]
+    assert test_case.updates[0].payload["message"] == request_data["message"]
 
     # Verify send_event was called (send_update_case calls send_event internally)
     assert mock_send_event.call_count == 1
@@ -78,7 +78,7 @@ def test_update_case_job_not_found(server_fixture: Server) -> None:
 
     response = client.post(
         "/supervaizer/jobs/nonexistent-job/cases/test-case/update",
-        headers=headers,  # type: ignore
+        headers=headers,
         json=request_data,
     )
 
@@ -100,7 +100,7 @@ def test_update_case_case_not_found(
 
     response = client.post(
         f"/supervaizer/jobs/{job_fixture.id}/cases/nonexistent-case/update",
-        headers=headers,  # type: ignore
+        headers=headers,
         json=request_data,
     )
 
@@ -136,7 +136,7 @@ def test_update_case_not_awaiting_input(
 
     response = client.post(
         f"/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
-        headers=headers,  # type: ignore
+        headers=headers,
         json=request_data,
     )
 

@@ -16,10 +16,10 @@ This script:
 5. Verifies entities are loaded correctly
 """
 
-import sys
-from pathlib import Path
-import tempfile
 import os
+import sys
+import tempfile
+from pathlib import Path
 
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -33,7 +33,7 @@ from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 
-def test_startup_loading():
+def test_startup_loading() -> None:
     """Test the startup loading functionality."""
     print("=== Testing Startup Loading ===")
 

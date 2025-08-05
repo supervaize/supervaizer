@@ -8,10 +8,10 @@
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from typing_extensions import deprecated
 
 import shortuuid
 from pydantic import ConfigDict
+from typing_extensions import deprecated
 
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus

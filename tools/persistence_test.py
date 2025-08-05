@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import sys
 from pathlib import Path
 
@@ -7,12 +13,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from datetime import datetime
-from supervaizer.storage import StorageManager
+
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.storage import StorageManager
 
 
-def test_persistence():
+def test_persistence() -> None:
     print("=== Testing Persistence ===")
 
     # Create storage manager

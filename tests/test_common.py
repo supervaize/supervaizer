@@ -56,13 +56,15 @@ def test_api_success_basic() -> None:
     assert json_data["log_message"] == "✅ success message"
 
     assert repr(success) == "ApiSuccess (success message)"
-    json_str = json.dumps({
-        "message": "success message",
-        "code": "200",
-        "detail": {"test": "data"},
-        "id": None,
-        "log_message": "\u2705 success message",
-    })
+    json_str = json.dumps(
+        {
+            "message": "success message",
+            "code": "200",
+            "detail": {"test": "data"},
+            "id": None,
+            "log_message": "\u2705 success message",
+        }
+    )
     assert str(success) == json_str
 
 
@@ -244,7 +246,7 @@ def test_encrypt_decrypt() -> None:
 
     # Test encryption failure
     with pytest.raises(AttributeError, match="object has no attribute"):
-        encrypt_value("test", None)  # type: ignore
+        encrypt_value("test", None)
 
     # Test decryption failure
     with pytest.raises(ValueError, match="Incorrect padding"):

@@ -77,11 +77,13 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append({
-                    "name": agent.name,
-                    "description": agent.description,
-                    "version": agent.version,
-                })
+                agents.append(
+                    {
+                        "name": agent.name,
+                        "description": agent.description,
+                        "version": agent.version,
+                    }
+                )
 
         # Create server info
         server_info = ServerInfo(

@@ -1,8 +1,15 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import pytest
 from pydantic import BaseModel
-from supervaizer.storage import EntityRepository
-from tinydb import TinyDB, Query
+from tinydb import Query, TinyDB
 from tinydb.storages import MemoryStorage
+
+from supervaizer.storage import EntityRepository
 
 
 class DummyEntity(BaseModel):
@@ -48,7 +55,7 @@ def repo() -> EntityRepository[DummyEntity]:
         def _from_dict(self, data: dict) -> DummyEntity:
             return DummyEntity.model_validate(data)
 
-    return DummyRepo(DummyEntity, storage_manager=storage)
+    return DummyRepo(DummyEntity, storage_manager=storage)  # type: ignore
 
 
 def test_save_and_get_by_id(

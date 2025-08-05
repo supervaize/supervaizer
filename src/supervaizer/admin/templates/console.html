@@ -107,7 +107,7 @@
         // Connect to the log stream endpoint with console token
         const consoleToken = '{{ console_token }}';
         const cacheBuster = Date.now();
-        
+
         // Better validation and error handling
         if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
             addLogMessage('ERROR', 'No console token available. Please refresh the page.', 'red');
@@ -116,7 +116,7 @@
         }
 
         const streamUrl = `/admin/log-stream?token=${encodeURIComponent(consoleToken)}&_t=${cacheBuster}`;
-        
+
         try {
             eventSource = new EventSource(streamUrl);
 
@@ -135,7 +135,7 @@
                     } else {
                         logData = JSON.parse(event.data);
                     }
-                    
+
                     if (logData && logData.level && logData.message) {
                         addLogMessage(logData.level, logData.message, getLevelColor(logData.level), logData.timestamp);
                     } else {
@@ -148,7 +148,7 @@
 
             eventSource.onerror = function(event) {
                 updateConnectionStatus('error');
-                
+
                 // More specific error handling
                 if (eventSource.readyState === EventSource.CLOSED) {
                     addLogMessage('ERROR', 'Connection to log stream closed by server', 'red');
@@ -174,10 +174,10 @@
     function updateConnectionStatus(status) {
         const statusElement = document.getElementById('connection-status');
         if (!statusElement) return;
-        
+
         const statusIndicator = statusElement.querySelector('.w-2.h-2');
         const statusText = statusElement.querySelector('span:last-child');
-        
+
         if (!statusIndicator || !statusText) return;
 
         switch (status) {
@@ -279,7 +279,7 @@
     function executeCommand() {
         const input = document.getElementById('command-input');
         if (!input) return;
-        
+
         const command = input.value.trim();
 
         if (!command) return;
@@ -302,7 +302,7 @@
             clearConsole();
             return;
         }
-        
+
         if (cmd === 'reconnect') {
             addLogMessage('INFO', 'Reconnecting to log stream...', 'blue');
             connectToLogStream();
@@ -315,7 +315,7 @@
 
     async function sendCommandToServer(command) {
         const consoleToken = '{{ console_token }}';
-        
+
         if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
             addLogMessage('ERROR', 'No console token available. Cannot execute command.', 'red');
             return;
@@ -337,12 +337,12 @@
             }
 
             const result = await response.json();
-            
+
             if (result.status === 'error') {
                 addLogMessage('ERROR', `Command failed: ${result.message}`, 'red');
             }
             // Success messages are handled by the log stream
-            
+
         } catch (error) {
             addLogMessage('ERROR', `Failed to execute command: ${error.message}`, 'red');
         }
@@ -361,7 +361,7 @@
         autoScroll = !autoScroll;
         const btn = document.getElementById('autoscroll-btn');
         const status = document.getElementById('autoscroll-status');
-        
+
         if (btn && status) {
             const newText = autoScroll ? 'Auto-scroll: ON' : 'Auto-scroll: OFF';
             btn.textContent = newText;

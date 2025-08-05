@@ -13,7 +13,7 @@ from supervaizer.agent import Agent, AgentMethod, AgentMethods
 from supervaizer.server import Server
 
 
-def main():
+def main() -> None:
     """Demo the admin interface."""
     print("🚀 Testing Supervaizer Admin Interface")
 

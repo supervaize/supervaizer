@@ -14,7 +14,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
-from supervaizer.agent import AgentMethodsModel, AgentMethodField, FieldTypeEnum
+from supervaizer.agent import AgentMethodField, AgentMethodsModel, FieldTypeEnum
 from supervaizer.job import Job, JobContext
 from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -336,10 +336,12 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"name": "parameter1", "value": "new_value1", "is_environment": True},
-            {"name": "parameter2", "value": "new_value2", "is_environment": False},
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [
+                {"name": "parameter1", "value": "new_value1", "is_environment": True},
+                {"name": "parameter2", "value": "new_value2", "is_environment": False},
+            ]
+        ),
     )
     # Ensure supervisor_account is not None
     assert server_fixture.supervisor_account is not None
@@ -374,9 +376,9 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"invalid_parameter": "invalid_value1"}
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [{"invalid_parameter": "invalid_value1"}]
+        ),
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)

@@ -119,7 +119,7 @@
             </div>
             {% endif %}
 
-         
+
 
             <!-- Case Updates -->
             {% if case.updates %}
@@ -142,7 +142,7 @@
                                     <div class="w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
                                     {% endif %}
                                 </div>
-                                
+
                                 <div class="flex-1 min-w-0">
                                     <!-- Update Header -->
                                     <div class="flex items-center justify-between">
@@ -157,11 +157,11 @@
                                             {{ update.timestamp or "Unknown time" }}
                                         </time>
                                     </div>
-                                    
+
                                     <!-- Update Message -->
                                     <div class="mt-2">
                                         <p class="text-sm text-gray-900">{{ update.message or "No message" }}</p>
-                                        
+
                                         <!-- Additional Details -->
                                         {% if update.details %}
                                         <div class="mt-2 bg-gray-50 rounded-md p-3">
@@ -172,7 +172,7 @@
                                             {% endif %}
                                         </div>
                                         {% endif %}
-                                        
+
                                         <!-- Cost Information -->
                                         {% if update.cost %}
                                         <div class="mt-2 flex items-center text-xs text-gray-500">
@@ -183,7 +183,7 @@
                                             Cost: ${{ "%.4f"|format(update.cost) }}
                                         </div>
                                         {% endif %}
-                                        
+
                                         <!-- Agent Information -->
                                         {% if update.agent %}
                                         <div class="mt-2 flex items-center text-xs text-gray-500">

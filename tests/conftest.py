@@ -208,12 +208,14 @@ def parameter_fixture() -> Annotated[Parameter, "fixture"]:
 
 @pytest.fixture
 def parameters_setup_fixture() -> Annotated[ParametersSetup, "fixture"]:
-    return ParametersSetup.from_list(
+    result = ParametersSetup.from_list(
         parameter_list=[
             Parameter(name="parameter1", value="value1", is_environment=True),
             Parameter(name="parameter2", value="value2", description="desc2"),
         ]
     )
+    assert result is not None
+    return result
 
 
 @pytest.fixture
@@ -268,12 +270,14 @@ def server_fixture(
 def parameters_fixture(
     parameters_setup_fixture: ParametersSetup,
 ) -> Annotated[ParametersSetup, "fixture"]:
-    return ParametersSetup.from_list(
+    result = ParametersSetup.from_list(
         parameter_list=[
             Parameter(name="parameter1", value="value1", is_environment=True),
             Parameter(name="parameter2", value="value2", description="desc2"),
         ]
     )
+    assert result is not None
+    return result
 
 
 @pytest.fixture(autouse=True, scope="function")

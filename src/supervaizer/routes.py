@@ -625,7 +625,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
         @handle_route_errors()
         async def custom_method_endpoint(
             background_tasks: BackgroundTasks,
-            body_params: AgentCustomAbstractJob = Body(...),  # type: ignore
+            body_params: AgentCustomAbstractJob = Body(...),
             agent: Agent = Depends(get_agent),
         ) -> Union[JobResponse, JSONResponse]:
             log.info(

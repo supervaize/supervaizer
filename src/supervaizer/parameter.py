@@ -8,7 +8,6 @@
 import os
 from typing import Any, Dict, List
 
-
 from supervaizer.common import SvBaseModel, log
 
 
@@ -65,7 +64,7 @@ class ParametersSetup(SvBaseModel):
 
         if isinstance(parameter_list[0], dict):  # TODO: add test for this
             parameter_list_casted = [
-                Parameter(**parameter)  # type: ignore # just checked that instance is dict
+                Parameter(**parameter)
                 for parameter in parameter_list
             ]
             parameter_list = parameter_list_casted  # type: ignore

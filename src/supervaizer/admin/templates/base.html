@@ -129,19 +129,19 @@
         // Live Console - Server-Sent Events
         function initializeLogStream() {
             console.log('initializeLogStream called, pathname:', window.location.pathname);
-            
+
             // Skip if we're on the dedicated console page to avoid conflicts
             if (window.location.pathname.includes('/console')) {
                 console.log('Skipping live console on console page');
                 return;
             }
-            
+
             const consoleComponent = document.querySelector('#live-console');
             if (!consoleComponent) {
                 console.error('Live console component not found');
                 return;
             }
-            
+
             console.log('Initializing live console log stream');
 
             let eventSource = null;

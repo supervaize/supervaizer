@@ -6,7 +6,9 @@
 
 import json
 from typing import TYPE_CHECKING, Any, Dict, Optional
+
 from rich import inspect
+
 from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
 from supervaizer.job import Job, Jobs
@@ -59,7 +61,7 @@ async def service_job_start(
     new_saas_job = Job.new(
         job_context=sv_context,
         agent_name=agent.name,
-        agent_parameters=agent_parameters,
+        agent_parameters=[agent_parameters] if agent_parameters else None,
         name=sv_context.job_id,
     )
 

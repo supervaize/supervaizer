@@ -1,7 +1,15 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 from typing import Any
+
 from fastapi.testclient import TestClient
-from supervaizer import Server, Agent, Job
-from supervaizer.routes import create_utils_routes, create_default_routes
+
+from supervaizer import Agent, Job, Server
+from supervaizer.routes import create_default_routes, create_utils_routes
 
 
 def test_utils_public_key_and_encrypt(server_fixture: Server, mocker: Any) -> None:

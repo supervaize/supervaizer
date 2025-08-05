@@ -4,8 +4,10 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-import pytest
 from typing import Any
+
+import pytest
+
 from supervaizer.lifecycle import (
     EntityEvents,
     EntityLifecycle,
@@ -41,7 +43,7 @@ class TestEntityStatus:
 class TestEntityTransitions:
     """Test the EntityTransitions class methods."""
 
-    def test_get_valid_transitions(self):
+    def test_get_valid_transitions(self) -> None:
         """Test getting valid transitions for a status."""
         # Test for a status with multiple transitions
         in_progress_transitions = Lifecycle.get_valid_transitions(
@@ -133,11 +135,11 @@ class TestEntityTransitions:
             ),  # Invalid event for this status
         ],
     )
-    def test_get_status_from_event(self, current_status, event, expected):
+    def test_get_status_from_event(self, current_status, event, expected) -> None:
         """Test getting the target status for an event."""
         assert Lifecycle.get_status_from_event(current_status, event) == expected
 
-    def test_generate_valid_transitions_dict(self):
+    def test_generate_valid_transitions_dict(self) -> None:
         """Test generating the valid transitions dictionary."""
         valid_transitions = Lifecycle.generate_valid_transitions_dict()
 
@@ -170,7 +172,7 @@ class TestEntityTransitions:
             EntityStatus.FAILED: {},
         }
 
-    def test_mermaid_diagram_all_steps(self):
+    def test_mermaid_diagram_all_steps(self) -> None:
         """Test generating a Mermaid state diagram."""
         steps = Lifecycle.mermaid_diagram_all_steps()
         expected_lines = [
@@ -201,7 +203,7 @@ class TestEntityTransitions:
             f"Different number of lines: expected {len(expected_lines)}, got {len(steps)}"
         )
 
-    def test_generate_mermaid_diagram(self):
+    def test_generate_mermaid_diagram(self) -> None:
         """Test generating a Mermaid state diagram."""
         diagram = Lifecycle.generate_mermaid_diagram(
             Lifecycle.mermaid_diagram_all_steps()
@@ -245,7 +247,7 @@ class TestEntityTransitions:
             f"Different number of lines: expected {len(expected_lines)}, got {len(actual_lines)}"
         )
 
-    def test_get_terminal_states(self):
+    def test_get_terminal_states(self) -> None:
         """Test identifying terminal states in the state machine."""
         terminal_states = Lifecycle.get_terminal_states()
 
@@ -256,9 +258,9 @@ class TestEntityTransitions:
         ]
 
         # Sort to ensure order-independent comparison
-        assert sorted([state.value for state in terminal_states]) == sorted([
-            state.value for state in expected_terminal
-        ])
+        assert sorted([state.value for state in terminal_states]) == sorted(
+            [state.value for state in expected_terminal]
+        )
 
         # Verify that these are indeed terminal states
         for state in terminal_states:
@@ -267,7 +269,7 @@ class TestEntityTransitions:
                 f"Terminal state {state} should have no outgoing transitions"
             )
 
-    def test_start_states_values(self):
+    def test_start_states_values(self) -> None:
         """Test specific expected values for start states."""
         start_states = Lifecycle.get_start_states()
 
@@ -288,7 +290,7 @@ class TestEntityLifecycle:
         entity.name = "Test Entity"
         return entity
 
-    def test_transition_success(self, mocker: Any):
+    def test_transition_success(self, mocker: Any) -> None:
         """Test successful transition."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -300,7 +302,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.IN_PROGRESS
         assert entity.finished_at is None  # Should not be set for non-terminal states
 
-    def test_transition_invalid(self, mocker: Any):
+    def test_transition_invalid(self, mocker: Any) -> None:
         """Test invalid transition."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -311,7 +313,7 @@ class TestEntityLifecycle:
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
 
-    def test_transition_to_terminal_state(self, mocker: Any):
+    def test_transition_to_terminal_state(self, mocker: Any) -> None:
         """Test transition to a terminal state sets finished_at."""
         entity = self.create_mock_entity(mocker, EntityStatus.IN_PROGRESS)
 
@@ -323,7 +325,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.COMPLETED
         assert entity.finished_at is not None
 
-    def test_handle_event_success(self, mocker: Any):
+    def test_handle_event_success(self, mocker: Any) -> None:
         """Test successful event handling."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -334,7 +336,7 @@ class TestEntityLifecycle:
         assert error == ""
         assert entity.status == EntityStatus.IN_PROGRESS
 
-    def test_handle_event_invalid(self, mocker: Any):
+    def test_handle_event_invalid(self, mocker: Any) -> None:
         """Test invalid event handling."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -347,7 +349,7 @@ class TestEntityLifecycle:
         assert error != ""  # Error message should not be empty
         assert entity.status == EntityStatus.STOPPED  # Status should not change
 
-    def test_sequential_transitions(self, mocker: Any):
+    def test_sequential_transitions(self, mocker: Any) -> None:
         """Test a sequence of transitions."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 
@@ -369,7 +371,7 @@ class TestEntityLifecycle:
         assert entity.status == EntityStatus.COMPLETED
         assert entity.finished_at is not None
 
-    def test_sequential_events(self, mocker: Any):
+    def test_sequential_events(self, mocker: Any) -> None:
         """Test a sequence of events."""
         entity = self.create_mock_entity(mocker, EntityStatus.STOPPED)
 

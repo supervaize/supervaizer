@@ -47,7 +47,7 @@ def start(
         os.environ.get("SUPERVAIZER_SCRIPT_PATH", None),
         help="Path to the supervaizer_control.py script",
     ),
-):
+) -> None:
     """Start the Supervaizer Controller server."""
     if script_path is None:
         # Try to find supervaizer_control.py in the current directory
@@ -87,7 +87,7 @@ def install(
         os.environ.get("SUPERVAIZER_FORCE_INSTALL", "False").lower() == "true",
         help="Overwrite existing file",
     ),
-):
+) -> None:
     """Create a draft supervaizer_control.py script."""
     # Check if file already exists
     if os.path.exists(output_path) and not force:
