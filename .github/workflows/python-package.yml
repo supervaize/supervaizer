@@ -27,8 +27,7 @@ jobs:
         uses: astral-sh/setup-uv@v1
       - name: Install dependencies
         run: |
-          uv pip install pytest
-          if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi
+          uv sync
       - name: Lint with uv
         run: |
           # Run uv lint which uses ruff under the hood
