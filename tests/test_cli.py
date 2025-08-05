@@ -319,18 +319,18 @@ class TestCLIApp:
         result = runner.invoke(app, ["start", "--help"])
 
         assert result.exit_code == 0
-        assert "Start the Supervaizer Controller server" in result.stdout
-        assert "--host" in result.stdout
-        assert "--port" in result.stdout
+        assert "Start the Supervaizer Controller server" in str(result.stdout)
+        assert "--host" in str(result.stdout)
+        assert "--port" in str(result.stdout)
 
     def test_install_command_help(self, runner: CliRunner) -> None:
         """Test install command help."""
         result = runner.invoke(app, ["install", "--help"])
 
         assert result.exit_code == 0
-        assert "Create a draft supervaizer_control.py script" in result.stdout
-        assert "--output-path" in result.stdout
-        assert "--force" in result.stdout
+        assert "Create a draft supervaizer_control.py script" in str(result.stdout)
+        assert "--output-path" in str(result.stdout)
+        assert "--force" in str(result.stdout)
 
 
 @patch("supervaizer.cli.app")
