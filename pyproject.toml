@@ -35,7 +35,13 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
+keywords = ["AI", "controller", "workflow", "supervaize", "agent", "agentic"]
 dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://supervaize.com"
+Repository = "https://github.com/supervaize/supervaizer"
+Documentation = "https://supervaize.com/docs"
 
 [project.scripts]
 supervaizer = "supervaizer.cli:app"
@@ -75,6 +81,9 @@ build-backend = "hatchling.build"
 
 [tool]
 [tool.hatch]
+[tool.hatch.build.targets.sdist]
+include = ["src/", "README.md"]
+
 [tool.hatch.version]
 path = "src/supervaizer/__version__.py"
 

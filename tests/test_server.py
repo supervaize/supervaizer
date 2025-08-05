@@ -66,7 +66,7 @@ def test_server(server_fixture: Server) -> None:
     assert isinstance(server_fixture, Server)
     assert server_fixture.host == "localhost"
     assert server_fixture.port == 8001
-    assert server_fixture.url == "http://localhost:8001"
+    assert server_fixture.url == "http://host.docker.internal:8001"
     assert server_fixture.environment == "test"
     assert server_fixture.debug
     assert len(server_fixture.agents) == 1
@@ -264,9 +264,9 @@ async def test_start_job_endpoint(
     monkeypatch.setattr(
         Server,
         "decrypt",
-        lambda self, encrypted: json.dumps(
-            {k: v.value for k, v in parameters_fixture.definitions.items()}
-        ),
+        lambda self, encrypted: json.dumps({
+            k: v.value for k, v in parameters_fixture.definitions.items()
+        }),
     )
 
     # Set up client with API key
@@ -543,14 +543,14 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert registration_info.pop("public_key").startswith("-----BEGIN PUBLIC KEY")
     assert len(registration_info.pop("agents")) == 1
     assert registration_info == {
-        "url": "http://localhost:8001",
+        "url": "http://host.docker.internal:8001",
         "uri": "server:E2-AC-ED-22-BF-B2",
         "api_version": "v1",
         "environment": "test",
         "api_key": "test-api-key",
         "docs": {
-            "swagger": "http://localhost:8001/docs",
-            "redoc": "http://localhost:8001/redoc",
-            "openapi": "http://localhost:8001/openapi.json",
+            "swagger": "http://host.docker.internal:8001/docs",
+            "redoc": "http://host.docker.internal:8001/redoc",
+            "openapi": "http://host.docker.internal:8001/openapi.json",
         },
     }
