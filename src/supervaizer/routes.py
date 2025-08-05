@@ -388,7 +388,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
     agent_job_model_name = f"{agent.slug}_Start_Job_Model"
     # Create the dynamic model with the custom name for FastAPI documentation
-    AgentStartAbstractJob = type(
+    _AgentStartAbstractJob = type(
         agent_job_model_name,
         (agent.methods.job_start.job_model,),
         {},
@@ -610,7 +610,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
     for method_name, method_config in agent.methods.custom.items():
         # Create the dynamic model with the custom name for FastAPI documentation
         custom_job_model_name = f"{agent.slug}_Custom_{method_name}_Job_Model"
-        AgentCustomAbstractJob = type(
+        _AgentCustomAbstractJob = type(
             custom_job_model_name,
             (method_config.job_model,),
             {},

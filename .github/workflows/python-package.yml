@@ -28,10 +28,10 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-      - name: Lint with uv
+      - name: Lint with ruff
         run: |
-          # Run uv lint which uses ruff under the hood
-          uv lint
+          # Run ruff linting with same args as pre-commit, excluding tools/ and tests/ directories
+          uv run ruff check . --exclude tools/,tests/ --select=I
       - name: Test with pytest
         run: |
           pytest

@@ -246,8 +246,8 @@ def create_admin_routes() -> APIRouter:
 
     # Initialize storage manager
     storage = StorageManager()
-    job_repo = create_job_repository()
-    case_repo = create_case_repository()
+    _job_repo = create_job_repository()
+    _case_repo = create_case_repository()
 
     @router.get("/", response_class=HTMLResponse)
     async def admin_dashboard(request: Request) -> Response:
@@ -948,7 +948,7 @@ def create_admin_routes() -> APIRouter:
                                 fallback_message, ensure_ascii=False
                             )
                             yield f"data: {event_data}\n\n"
-                    except:  # QueueEmpty or any other exception
+                    except Exception:  # QueueEmpty or any other exception
                         break
 
                 # Keep alive and wait for new messages

@@ -117,13 +117,13 @@ async def service_job_custom(
     log.info(
         f"[service_job_custom] /custom/{method_name} [custom job] {agent.name} with params {job_fields}"
     )
-    agent_parameters: dict[str, Any] | None = None
+    _agent_parameters: dict[str, Any] | None = None
     # If agent has parameters_setup defined, validate parameters
     if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-        agent_parameters = (
+        _agent_parameters = (
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
         log.debug("[Decrypted parameters] : parameters decrypted")
