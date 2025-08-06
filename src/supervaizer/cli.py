@@ -96,7 +96,7 @@ def install(
         sys.exit(1)
 
     # Get the path to the examples directory
-    examples_dir = Path(__file__).parent.parent / "examples"
+    examples_dir = Path(__file__) / "examples"
     example_file = examples_dir / "a2a-controller.py"
 
     if not example_file.exists():

@@ -6,18 +6,19 @@ A lightweight web-based admin interface for managing WorkflowEntity objects (Job
 
 ### 🎯 **Core Functionality**
 
-- **CRUD Operations**: Complete Create, Read, Update, Delete for Jobs and Cases
-- **Real-time Updates**: HTMX-powered dynamic content loading without page refreshes
-- **Responsive Design**: Modern UI built with Tailwind CSS
-- **Advanced Filtering**: Filter by status, agent, job relations, search terms
-- **Pagination**: Efficient handling of large datasets
-- **Status Management**: Update entity statuses with proper lifecycle transitions
+- **Dashboard**: Real-time system statistics and health monitoring
+- **Job Management**: Create, view, update, and delete jobs
+- **Case Management**: Manage workflow cases and their status
+- **Agent Monitoring**: View agent status and performance metrics
+- **Live Console**: Real-time logging and system monitoring
+- **Advanced Filtering**: Search and filter entities by various criteria
+- **Responsive Design**: Works on desktop and mobile devices
 
 ### 🔐 **Security**
 
-- **API Key Authentication**: Secure access using X-API-Key header
-- **Protected Endpoints**: All admin routes require valid API key
-- **Session Management**: Proper authentication flow
+- **API Key Required**: Admin interface requires a valid API key
+- **Authentication**: Add `X-API-Key` header to requests
+- **Secure Access**: All admin endpoints are protected
 
 ### 📊 **Dashboard**
 
@@ -293,7 +294,7 @@ X-API-Key: your-api-key
 Run the test script to verify everything works:
 
 ```bash
-python test_admin.py
+uv run python tools/test_admin.py
 ```
 
 Then visit `http://127.0.0.1:8000/admin/` with API key `test-admin-key-123` in the `X-API-Key` header.

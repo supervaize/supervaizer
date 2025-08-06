@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +34,21 @@ jobs:
         run: |
           # Run ruff linting with same args as pre-commit, excluding tools/ and tests/ directories
           uv run ruff check . --exclude tools/,tests/ --select=I
-      - name: Test with pytest
+      - name: Test with pytest and capture coverage
         run: |
-          uv run pytest --no-cov
+          uv run pytest --cov=supervaizer --cov-report=term-missing --no-cov-report=html > test_output.txt 2>&1
+          cat test_output.txt
+      - name: Update badges in README
+        run: |
+          # Update package version badge
+          VERSION=$(python -c "import sys; sys.path.append('src'); from supervaizer import __version__; print(__version__.VERSION)")
+          sed -i "s/Supervaizer-[0-9.]*-yellow/Supervaizer-$VERSION-yellow/g" README.md
+
+          # Update Python version badge to show tested versions (3.10, 3.11, 3.12)
+          sed -i "s/python-[0-9.]*%20%7C%20[0-9.]*-blue/python-3.10%20%7C%203.11%20%7C%203.12-blue/g" README.md
+
+          # Get test coverage percentage from captured test output
+          COVERAGE=$(grep "TOTAL" test_output.txt | awk '{print $4}' | sed 's/%//')
+          if [ -n "$COVERAGE" ]; then
+            sed -i "s/Coverage-[0-9]*%25-brightgreen/Coverage-${COVERAGE}%25-brightgreen/g" README.md
+          fi

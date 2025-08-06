@@ -1,7 +1,18 @@
 # SUPERVAIZER
 
+A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
+
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
+[![Package Version](https://img.shields.io/badge/Supervaizer-0.9.3-yellow.svg)](https://github.com/supervaize/supervaizer)
+[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
+[![ACP Protocol](https://img.shields.io/badge/A2A-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
+[![Test Coverage](https://img.shields.io/badge/Coverage-80%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
+[![Python Tests](https://github.com/supervaize/supervaizer/workflows/Python%20package/badge.svg)](https://github.com/supervaize/supervaizer/actions/workflows/python-package.yml)
+
 - [SUPERVAIZER](#supervaizer)
   - [Description](#description)
+  - [Quick Start](#quick-start)
+    - [Installation](#installation)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
     - [Google's Agent-to-Agent (A2A) protocol](#googles-agent-to-agent-a2a-protocol)
@@ -11,33 +22,13 @@
     - [Implemented ACP Features](#implemented-acp-features)
     - [Example: Discovering Agents](#example-discovering-agents)
     - [Enabling protocol Support](#enabling-protocol-support)
-  - [Installation](#installation)
-  - [Quick Start](#quick-start)
   - [Using the CLI](#using-the-cli)
-    - [CLI Commands](#cli-commands)
-    - [Environment Variables](#environment-variables)
   - [API Documentation \& User Interfaces](#api-documentation--user-interfaces)
-    - [Interactive API Documentation](#interactive-api-documentation)
-      - [Swagger UI (`/docs`)](#swagger-ui-docs)
-      - [ReDoc (`/redoc`)](#redoc-redoc)
-      - [OpenAPI Schema (`/openapi.json`)](#openapi-schema-openapijson)
     - [Admin Interface (`/admin`)](#admin-interface-admin)
-      - [Features](#features-1)
-      - [Access Requirements](#access-requirements)
       - [Quick Start](#quick-start-1)
-    - [Documentation URLs](#documentation-urls)
-    - [Authentication](#authentication)
-    - [Example: Testing with Swagger UI](#example-testing-with-swagger-ui)
 - [Calculating costs](#calculating-costs)
   - [Documentation](#documentation)
   - [License](#license)
-
-A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
-
-[![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/Supervaizer-0.6.0-yellow.svg)](https://github.com/supervaize/supervaizer)
-[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
-[![Test Coverage](https://img.shields.io/badge/Coverage-80%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
 ## Description
 
@@ -51,6 +42,95 @@ With comprehensive support for the A2A/ACP protocols, specification, SUPERVAIZER
 - Connect your agents to the growing ecosystem of A2A-compatible tools
 
 Beyond A2A interoperability, SUPERVAIZER provides a robust API for agent registration, job control, event handling, telemetry, and more, making it a crucial component for building and managing AI agent systems.
+
+## Quick Start
+
+### Installation
+
+```bash
+pip install supervaizer
+```
+
+```python
+# create supervaizer_control.py
+from supervaizer import (
+    Server,
+    Agent,
+    AgentMethod,
+    Parameter,
+    ParametersSetup,
+    AgentMethods,
+)
+# Define at least one AgentMethod
+agent_method = AgentMethod(
+    name="start",
+    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start - THIS MUST BE THE ABOLUTE PATH TO THE METHOD "module.submodule.method  - no parenthesis.
+    is_async=False,
+    params={"action": "start"},
+    fields=[
+        {
+            "name": "Variable to start agent job",
+            "type": str,
+            "field_type": "CharField",
+            "max_length": 100,
+            "required": True,
+        }]}
+
+# Define agent parameters (optional)
+agent_parameters = ParametersSetup.from_list([
+    Parameter(
+        name="OPEN_API_KEY",
+        description="OpenAPI Key",
+        is_environment=True,
+    )]),
+
+# Define at least one agent
+agent = Agent(
+    name="agent_name",
+    id="agent_id",
+    author="John Doe",
+    developer="Developer",
+    maintainer="Ive Maintained",
+    editor="Yuri Editor",
+    version="1.3",
+    description="This is a test agent",
+    urls={"dev": "http://host.docker.internal:8001", "prod": ""},
+    active_environment="dev",
+    tags=["testtag", "testtag2"],
+    methods=AgentMethods(
+        job_start=agent_method,
+        job_stop=agent_method, #should be different methods
+        job_status=agent_method, # should be different methods
+        chat=None,
+        custom=None}
+    ),
+    parameters_setup=agent_parameters,
+)
+
+# Initialize a connection to the SUPERVAIZE server
+server = Server(
+    agents=[agent],
+    acp_endpoints=True,  # Enable ACP protocol support
+    a2a_endpoints=True,  # Enable A2A protocol support
+    admin_interface=True,  # Enable web admin interface (requires api_key)
+    api_key="your-secure-api-key",  # Required for admin interface
+    supervisor_account=None,
+)
+
+# Start the server
+sv_server.launch(log_level="DEBUG")
+
+```
+
+For more comprehensive examples, check out the `examples/` directory:
+
+- `examples/a2a-controller.py` - A complete A2A-compatible controller implementation
+
+Run any example with:
+
+```bash
+python examples/a2a-controller.py
+```
 
 ## Features
 
@@ -138,205 +218,18 @@ server = Server(
 )
 ```
 
-## Installation
-
-```bash
-pip install supervaizer
-```
-
-## Quick Start
-
-```python
-from supervaizer import (
-    Server,
-    Agent,
-    AgentMethod,
-    Parameter,
-    ParametersSetup,
-    AgentMethods,
-)
-# Define at least one AgentMethod
-agent_method = AgentMethod(
-    name="start",
-    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start - THIS MUST BE THE ABOLUTE PATH TO THE METHOD "module.submodule.method  - no parenthesis.
-    is_async=False,
-    params={"action": "start"},
-    fields=[
-        {
-            "name": "Variable to start agent job",
-            "type": str,
-            "field_type": "CharField",
-            "max_length": 100,
-            "required": True,
-        }]}
-
-# Define agent parameters (optional)
-agent_parameters = ParametersSetup.from_list([
-    Parameter(
-        name="OPEN_API_KEY",
-        description="OpenAPI Key",
-        is_environment=True,
-    )]),
-
-# Define at least one agent
-agent = Agent(
-    name="agent_name",
-    id="agent_id",
-    author="John Doe",
-    developer="Developer",
-    maintainer="Ive Maintained",
-    editor="Yuri Editor",
-    version="1.3",
-    description="This is a test agent",
-    urls={"dev": "http://host.docker.internal:8001", "prod": ""},
-    active_environment="dev",
-    tags=["testtag", "testtag2"],
-    methods=AgentMethods(
-        job_start=agent_method,
-        job_stop=agent_method, #should be different methods
-        job_status=agent_method, # should be different methods
-        chat=None,
-        custom=None}
-    ),
-    parameters_setup=agent_parameters,
-)
-
-# Initialize a connection to the SUPERVAIZE server
-server = Server(
-    agents=[agent],
-    acp_endpoints=True,  # Enable ACP protocol support
-    a2a_endpoints=True,  # Enable A2A protocol support
-    admin_interface=True,  # Enable web admin interface (requires api_key)
-    api_key="your-secure-api-key",  # Required for admin interface
-    supervisor_account=None,
-)
-
-# Start the server
-sv_server.launch(log_level="DEBUG")
-
-```
-
-For more comprehensive examples, check out the `examples/` directory:
-
-- `examples/a2a-controller.py` - A complete A2A-compatible controller implementation
-
-Run any example with:
-
-```bash
-python examples/a2a-controller.py
-```
-
 ## Using the CLI
 
-SUPERVAIZER includes a command-line interface to simplify setup and operation:
-
-```bash
-# Install Supervaizer
-pip install supervaizer
-
-# Create a supervaizer_control.py file in your current directory
-supervaizer install
-
-# Start the server using the configuration file
-supervaizer start
-```
-
-### CLI Commands
-
-- **install**: Creates a starter configuration file (supervaizer_control.py)
-
-  ```bash
-  # Basic usage (creates supervaizer_control.py in current directory)
-  supervaizer install
-
-  # Specify a custom output path
-  supervaizer install --output-path=my_config.py
-
-  # Force overwrite if file already exists
-  supervaizer install --force
-  ```
-
-- **start**: Starts the Supervaizer server
-
-  ```bash
-  # Basic usage (loads supervaizer_control.py from current directory)
-  supervaizer start
-
-  # Specify a custom configuration file
-  supervaizer start my_config.py
-
-  # Configure server options
-  supervaizer start --host=0.0.0.0 --port=8080 --environment=production
-
-  # Enable debug mode and auto-reload
-  supervaizer start --debug --reload
-
-  # Set log level
-  supervaizer start --log-level=DEBUG
-  ```
-
-### Environment Variables
-
-All CLI options can also be configured through environment variables:
-
-| Environment Variable      | Description                     | Default Value          |
-| ------------------------- | ------------------------------- | ---------------------- |
-| SUPERVAIZER_HOST          | Host to bind the server to      | 0.0.0.0                |
-| SUPERVAIZER_PORT          | Port to bind the server to      | 8000                   |
-| SUPERVAIZER_ENVIRONMENT   | Environment name                | dev                    |
-| SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)   | INFO                   |
-| SUPERVAIZER_DEBUG         | Enable debug mode (true/false)  | false                  |
-| SUPERVAIZER_RELOAD        | Enable auto-reload (true/false) | false                  |
-| SUPERVAIZER_SCRIPT_PATH   | Path to configuration script    | -                      |
-| SUPERVAIZER_OUTPUT_PATH   | Path for install command output | supervaizer_control.py |
-| SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file   | false                  |
+SUPERVAIZER includes a command-line interface to simplify setup and operation. See [CLI Documentation](docs/CLI.md) for complete details.
 
 ## API Documentation & User Interfaces
 
-SUPERVAIZER provides multiple ways to interact with and explore the API:
-
-### Interactive API Documentation
-
-#### Swagger UI (`/docs`)
-
-- **Interactive Testing**: Test API endpoints directly from the browser
-- **Request Builder**: Build and execute API requests with real-time validation
-- **Authentication**: Test authenticated endpoints using the API key
-- **Schema Exploration**: Browse request/response schemas and data models
-- **Try It Out**: Execute requests and see live responses
-
-#### ReDoc (`/redoc`)
-
-- **Responsive Design**: Mobile-friendly documentation interface
-- **Searchable**: Full-text search across all endpoints and schemas
-- **Clean Layout**: Organized, easy-to-read API reference
-- **Schema Examples**: Detailed examples for all request/response formats
-
-#### OpenAPI Schema (`/openapi.json`)
-
-- **Machine Readable**: Complete OpenAPI 3.0 specification
-- **Integration Ready**: Use with API clients and code generators
-- **Schema Validation**: Validate requests against the specification
+SUPERVAIZER provides multiple ways to interact with and explore the API. See [REST API Documentation](docs/REST_API.md) for complete details.
 
 ### Admin Interface (`/admin`)
 
-A comprehensive web-based admin interface for managing your SUPERVAIZER instance:
-
-#### Features
-
-- **Dashboard**: Real-time system statistics and health monitoring
-- **Job Management**: Create, view, update, and delete jobs
-- **Case Management**: Manage workflow cases and their status
-- **Agent Monitoring**: View agent status and performance metrics
-- **Live Console**: Real-time logging and system monitoring
-- **Advanced Filtering**: Search and filter entities by various criteria
-- **Responsive Design**: Works on desktop and mobile devices
-
-#### Access Requirements
-
-- **API Key Required**: Admin interface requires a valid API key
-- **Authentication**: Add `X-API-Key` header to requests
-- **Secure Access**: All admin endpoints are protected
+A comprehensive web-based admin interface for managing your SUPERVAIZER instance
+See [Admin documentation](docs/ADMIN_README.md)
 
 #### Quick Start
 
@@ -353,33 +246,6 @@ server = Server(
 server.launch()
 print(f"Admin Interface: http://localhost:8000/admin/")
 ```
-
-### Documentation URLs
-
-When your server is running, you can access:
-
-| Interface       | URL                                  | Description                 |
-| --------------- | ------------------------------------ | --------------------------- |
-| Swagger UI      | `http://localhost:8000/docs`         | Interactive API testing     |
-| ReDoc           | `http://localhost:8000/redoc`        | API reference documentation |
-| OpenAPI Schema  | `http://localhost:8000/openapi.json` | Machine-readable API spec   |
-| Admin Dashboard | `http://localhost:8000/admin/`       | Web-based admin interface   |
-
-### Authentication
-
-Most endpoints support API key authentication:
-
-- **Header**: `X-API-Key: your-api-key`
-- **Auto-generated**: API key is automatically generated if not provided
-- **Admin Interface**: Requires valid API key for access
-
-### Example: Testing with Swagger UI
-
-1. Start your SUPERVAIZER server
-2. Navigate to `http://localhost:8000/docs`
-3. Click "Authorize" and enter your API key
-4. Browse available endpoints and test them directly
-5. View request/response schemas and examples
 
 # Calculating costs
 
@@ -399,6 +265,8 @@ A list of costs is maintained here:
 `https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json`
 
 ## Documentation
+
+- [Persistence Layer](docs/PERSISTENCE.md) - TinyDB-based storage for Jobs, Cases, and workflow entities
 
 - [API Reference](API_REFERENCE.md) - Complete documentation of classes and methods
 - [Contributing Guide](CONTRIBUTING.md) - How to set up your development environment and contribute
