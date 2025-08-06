@@ -28,8 +28,8 @@ jobs:
       - name: Build package
         run: hatch build
 
-      - name: Publish to TestPyPI on development
-        if: github.ref == 'refs/heads/development'
+      - name: Publish to TestPyPI on develop
+        if: github.ref == 'refs/heads/develop'
         run: hatch publish --repo testpypi
         env:
           HATCH_INDEX_USER: __token__
