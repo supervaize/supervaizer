@@ -31,13 +31,7 @@ jobs:
       - name: Publish to TestPyPI on develop
         if: github.ref == 'refs/heads/develop'
         run: hatch publish --repo testpypi
-        env:
-          HATCH_INDEX_USER: __token__
-          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TEST_API_TOKEN }}
 
       - name: Publish to PyPI on main
         if: github.ref == 'refs/heads/main'
         run: hatch publish
-        env:
-          HATCH_INDEX_USER: __token__
-          HATCH_INDEX_AUTH: ${{ secrets.PYPI_API_TOKEN }}

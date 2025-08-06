@@ -88,13 +88,19 @@ include = ["src/", "README.md"]
 path = "src/supervaizer/__version__.py"
 
 [tool.hatch.publish]
-[[tool.hatch.publish.repos]]
-name = "pypi"
+[tool.hatch.publish.repository.pypi]
 url = "https://pypi.org/legacy/"
 
-[[tool.hatch.publish.repos]]
-name = "testpypi"
+[tool.hatch.publish.repository.testpypi]
 url = "https://test.pypi.org/legacy/"
+
+[tool.hatch.publish.auth.pypi]
+username = "__token__"
+password = { env = "PYPI_API_TOKEN" }
+
+[tool.hatch.publish.auth.testpypi]
+username = "__token__"
+password = { env = "PYPI_TEST_API_TOKEN" }
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
