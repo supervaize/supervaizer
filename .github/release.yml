@@ -1,0 +1,52 @@
+# .github/release.yml
+# Configuration for automatically generated release notes
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - documentation
+      - chore
+    authors:
+      - dependabot[bot]
+      - renovate[bot]
+  categories:
+    - title: 🚀 New Features
+      labels:
+        - enhancement
+        - feature
+        - new-feature
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - bugfix
+        - fix
+    - title: 🔧 Improvements
+      labels:
+        - improvement
+        - refactor
+        - optimization
+    - title: 🔒 Security
+      labels:
+        - security
+        - vulnerability
+    - title: 📚 Documentation
+      labels:
+        - documentation
+        - docs
+    - title: 🧪 Testing
+      labels:
+        - test
+        - testing
+    - title: 🔄 Dependencies
+      labels:
+        - dependencies
+        - dependency
+    - title: 🏗️ Infrastructure
+      labels:
+        - infrastructure
+        - ci/cd
+        - deployment
+    - title: 📦 Other Changes
+      labels:
+        - "*"

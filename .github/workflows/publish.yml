@@ -1,0 +1,43 @@
+name: Publish Python Package
+
+on:
+  push:
+    branches:
+      - main
+      - development
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # required for trusted publishing if using PyPI's OIDC
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hatch
+        run: pip install hatch
+
+      - name: Build package
+        run: hatch build
+
+      - name: Publish to TestPyPI on development
+        if: github.ref == 'refs/heads/development'
+        run: hatch publish --repo testpypi
+        env:
+          HATCH_INDEX_USER: __token__
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TEST_API_TOKEN }}
+
+      - name: Publish to PyPI on main
+        if: github.ref == 'refs/heads/main'
+        run: hatch publish
+        env:
+          HATCH_INDEX_USER: __token__
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_API_TOKEN }}

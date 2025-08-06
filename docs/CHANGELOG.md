@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- CICD : release, deploy,
+
 ### Changed
 
 - Moved "example" to `src/supervaizer`
@@ -40,7 +44,7 @@ All notable changes to this project will be documented in this file.
 | ⚠️ Failed     | 0     |
 | ✅ Passed     | 281   |
 
-Test Coverage : 81%
+Test Coverage : [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
 > | Emoji Legend |                        |               |
 > | ------------ | ---------------------- | ------------- |
