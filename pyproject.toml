@@ -92,12 +92,7 @@ path = "src/supervaizer/__version__.py"
 url = "https://upload.pypi.org/legacy/"
 
 [tool.hatch.publish.repository.testpypi]
-url = "https://test.pypi.org/legacy/"
-auth = "testpypi"
-
-[tool.hatch.publish.auth.testpypi]
-username = "__token__"
-password = { env = "PYPI_TEST_API_TOKEN" }
+url = "https://__token__:${PYPI_TEST_API_TOKEN}@test.pypi.org/legacy/"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
