@@ -87,6 +87,15 @@ include = ["src/", "README.md"]
 [tool.hatch.version]
 path = "src/supervaizer/__version__.py"
 
+[tool.hatch.publish]
+[[tool.hatch.publish.repos]]
+name = "pypi"
+url = "https://pypi.org/legacy/"
+
+[[tool.hatch.publish.repos]]
+name = "testpypi"
+url = "https://test.pypi.org/legacy/"
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
 "tests/*" = ["N802", "N803", "N806"] # test function naming
