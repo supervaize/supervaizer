@@ -18,7 +18,7 @@ dependencies = [
     "orjson>=3.11.1",
     "psutil>=6.1.0",
     "pydantic>=2.11.7",
-    "pymongo>=4.13.2",
+    "pymongo>=4.14.0",
     "python-slugify>=8.0.4",
     "rich>=14.1.0",
     "shortuuid>=1.0.13",
@@ -48,7 +48,7 @@ supervaizer = "supervaizer.cli:app"
 
 [project.optional-dependencies]
 dev = [
-    "hatch>=1.9.3",
+    "hatch>=1.14.0",
     "jsonschema>=4.25.0",
     "mypy>=1.17.1",
     "pre-commit>=3.7.0",
@@ -92,7 +92,12 @@ path = "src/supervaizer/__version__.py"
 url = "https://upload.pypi.org/legacy/"
 
 [tool.hatch.publish.repository.testpypi]
-url = "https://__token__:${PYPI_TEST_API_TOKEN}@test.pypi.org/legacy/"
+url = "https://test.pypi.org/legacy/"
+auth = "testpypi"
+
+[tool.hatch.publish.auth.testpypi]
+username = "__token__"
+password = { env = "PYPI_TEST_API_TOKEN" }
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
