@@ -86,6 +86,27 @@ We follow PEP 8 with a line length of 120 characters. The project uses the follo
 
 All of these are run as pre-commit hooks, so make sure you install them as mentioned above.
 
-## License
 
-By contributing, you agree that your contributions will be licensed under the project's [Mozilla Public License 2.0](LICENSE.md).
+
+## 🔐 Licensing and Contribution Terms
+
+By submitting a contribution (code, documentation, or other content) to this project, you agree to license it under the terms of the Mozilla Public License 2.0 (MPL-2.0).
+
+You retain the copyright to your contribution, but you grant the project maintainers and all users the right to use, modify, and distribute it as part of the project under the MPL-2.0 license.
+
+This project uses the Developer Certificate of Origin (DCO) to ensure that contributions are made with clear rights. By submitting a contribution, you certify that:
+
+“I certify that the contribution was created in whole or in part by me and I have the right to submit it under the MPL-2.0 license.”
+
+You express this certification by signing off each commit using the -s flag in git commit:
+
+Example:
+
+```bash
+git commit -s -m "Fix bug in data sync logic"
+```
+
+
+Contributions without this sign-off may be rejected.
+
+⸻
