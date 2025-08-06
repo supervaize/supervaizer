@@ -30,8 +30,9 @@ jobs:
 
       - name: Publish to TestPyPI on develop
         if: github.ref == 'refs/heads/develop'
-        run: hatch publish --repo testpypi
-
+        run: hatch publish --no-prompt --repo testpypi
+        env:
+          PYPI_TEST_API_TOKEN: ${{ secrets.PYPI_TEST_API_TOKEN }}
       - name: Publish to PyPI on main
         if: github.ref == 'refs/heads/main'
-        run: hatch publish
+        run: hatch publish --no-prompt --repo pypi

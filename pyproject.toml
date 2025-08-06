@@ -93,6 +93,7 @@ url = "https://upload.pypi.org/legacy/"
 
 [tool.hatch.publish.repository.testpypi]
 url = "https://test.pypi.org/legacy/"
+auth = "testpypi"
 
 [tool.hatch.publish.auth.testpypi]
 username = "__token__"
