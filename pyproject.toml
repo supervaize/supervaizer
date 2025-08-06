@@ -94,6 +94,10 @@ url = "https://upload.pypi.org/legacy/"
 [tool.hatch.publish.repository.testpypi]
 url = "https://test.pypi.org/legacy/"
 
+[tool.hatch.publish.auth.testpypi]
+username = "__token__"
+password = { env = "PYPI_TEST_API_TOKEN" }
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
 "tests/*" = ["N802", "N803", "N806"] # test function naming
