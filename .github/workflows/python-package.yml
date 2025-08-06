@@ -36,7 +36,7 @@ jobs:
           uv run ruff check . --exclude tools/,tests/ --select=I
       - name: Test with pytest and capture coverage
         run: |
-          uv run pytest --cov=supervaizer --cov-report=term-missing --no-cov-report=html > test_output.txt 2>&1
+          uv run pytest > test_output.txt 2>&1
           cat test_output.txt
       - name: Update badges in README
         run: |

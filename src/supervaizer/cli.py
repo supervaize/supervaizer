@@ -96,7 +96,7 @@ def install(
         sys.exit(1)
 
     # Get the path to the examples directory
-    examples_dir = Path(__file__) / "examples"
+    examples_dir = Path(__file__).parent / "examples"
     example_file = examples_dir / "a2a-controller.py"
 
     if not example_file.exists():
@@ -105,10 +105,18 @@ def install(
 
     # Copy the example file to the output path
     shutil.copy(example_file, output_path)
-
-    console.print(f"[bold green]Success:[/] Created {output_path}")
-    console.print("Edit the file to configure your agents and then run:")
-    console.print("[bold]supervaizer start[/]")
+    console.print(
+        f"[bold green]Success:[/] Created an example file at [bold blue]{output_path}[/]"
+    )
+    console.print("1. Edit this file to configure your agent(s)")
+    console.print(
+        "2. (Optional) Get your API from [bold]supervaizer.com and setup your environment variables"
+    )
+    console.print(
+        "3. Run [bold]supervaizer start[/] to start the supervaizer controller"
+    )
+    console.print("4. Open [bold]http://localhost:8000/docs[/] to explore the API")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

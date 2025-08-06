@@ -160,22 +160,23 @@ class TestCLIInstall:
             mock_example_file = Mock()
             mock_example_file.exists.return_value = True
 
-            # Mock the chain: Path(__file__).parent.parent / "examples" / "a2a-controller.py"
+            # Mock the chain: Path(__file__).parent / "examples" / "a2a-controller.py"
             mock_file_path = Mock()
             mock_parent1 = Mock()
-            mock_parent2 = Mock()
 
             mock_path_class.return_value = mock_file_path
             mock_file_path.parent = mock_parent1
-            mock_parent1.parent = mock_parent2
-            mock_parent2.__truediv__ = Mock(return_value=mock_examples_dir)
+            mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
 
             result = runner.invoke(app, ["install"])
 
             assert result.exit_code == 0
-            assert "Success: Created supervaizer_control.py" in result.stdout
-            assert "Edit the file to configure your agents" in result.stdout
+            assert (
+                "Success: Created an example file at supervaizer_control.py"
+                in result.stdout
+            )
+            assert "Edit this file to configure your agent(s)" in result.stdout
             mock_copy.assert_called_once()
 
     def test_install_file_exists_without_force(self, runner: CliRunner) -> None:
@@ -201,18 +202,19 @@ class TestCLIInstall:
 
             mock_file_path = Mock()
             mock_parent1 = Mock()
-            mock_parent2 = Mock()
 
             mock_path_class.return_value = mock_file_path
             mock_file_path.parent = mock_parent1
-            mock_parent1.parent = mock_parent2
-            mock_parent2.__truediv__ = Mock(return_value=mock_examples_dir)
+            mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
 
             result = runner.invoke(app, ["install", "--force"])
 
             assert result.exit_code == 0
-            assert "Success: Created supervaizer_control.py" in result.stdout
+            assert (
+                "Success: Created an example file at supervaizer_control.py"
+                in result.stdout
+            )
             mock_copy.assert_called_once()
 
     def test_install_custom_output_path(self, runner: CliRunner) -> None:
@@ -231,18 +233,16 @@ class TestCLIInstall:
 
             mock_file_path = Mock()
             mock_parent1 = Mock()
-            mock_parent2 = Mock()
 
             mock_path_class.return_value = mock_file_path
             mock_file_path.parent = mock_parent1
-            mock_parent1.parent = mock_parent2
-            mock_parent2.__truediv__ = Mock(return_value=mock_examples_dir)
+            mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
 
             result = runner.invoke(app, ["install", "--output-path", custom_path])
 
             assert result.exit_code == 0
-            assert f"Success: Created {custom_path}" in result.stdout
+            assert f"Success: Created an example file at {custom_path}" in result.stdout
 
     def test_install_example_file_not_found(self, runner: CliRunner) -> None:
         """Test install when example file doesn't exist."""
@@ -257,12 +257,10 @@ class TestCLIInstall:
 
             mock_file_path = Mock()
             mock_parent1 = Mock()
-            mock_parent2 = Mock()
 
             mock_path_class.return_value = mock_file_path
             mock_file_path.parent = mock_parent1
-            mock_parent1.parent = mock_parent2
-            mock_parent2.__truediv__ = Mock(return_value=mock_examples_dir)
+            mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
 
             result = runner.invoke(app, ["install"])
@@ -284,12 +282,10 @@ class TestCLIInstall:
 
             mock_file_path = Mock()
             mock_parent1 = Mock()
-            mock_parent2 = Mock()
 
             mock_path_class.return_value = mock_file_path
             mock_file_path.parent = mock_parent1
-            mock_parent1.parent = mock_parent2
-            mock_parent2.__truediv__ = Mock(return_value=mock_examples_dir)
+            mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
 
             # Test with custom output path
@@ -298,7 +294,9 @@ class TestCLIInstall:
             )
 
             assert result.exit_code == 0
-            assert "Success: Created custom_script.py" in result.stdout
+            assert (
+                "Success: Created an example file at custom_script.py" in result.stdout
+            )
             mock_copy.assert_called_once()
 
 

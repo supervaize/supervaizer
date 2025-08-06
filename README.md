@@ -222,6 +222,8 @@ server = Server(
 
 SUPERVAIZER includes a command-line interface to simplify setup and operation. See [CLI Documentation](docs/CLI.md) for complete details.
 
+Also, check the list of [Environment variables](CLI.md#environment-variables).
+
 ## API Documentation & User Interfaces
 
 SUPERVAIZER provides multiple ways to interact with and explore the API. See [REST API Documentation](docs/REST_API.md) for complete details.

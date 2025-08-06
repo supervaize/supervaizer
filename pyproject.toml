@@ -8,7 +8,7 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "cryptography>=45.0.5",
+    "cryptography>=45.0.6",
     "demjson3>=3.0.6",
     "deprecated>=1.2.18",
     "fastapi>=0.116.1",
@@ -70,7 +70,7 @@ markers = [
     "db: calls to the database",
     "current: test under development",
 ]
-addopts = "--cov=supervaizer --cov-report=term-missing --cov-report=html"
+addopts = "--cov=supervaizer --cov-report=term --cov-report=html"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src"]
