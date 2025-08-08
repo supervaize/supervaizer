@@ -30,23 +30,20 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
     )
 
     # Define the secrets expected by the agent
-    agent_parameters = ParametersSetup.from_list(
-        [
-            Parameter(
-                name="OPEN_API_KEY",
-                description="OpenAPI Key",
-                is_environment=True,
-            ),
-            Parameter(
-                name="SERPER_API", description="Server API key", is_environment=True
-            ),
-        ]
-    )
+    agent_parameters = ParametersSetup.from_list([
+        Parameter(
+            name="OPEN_API_KEY",
+            description="OpenAPI Key",
+            is_environment=True,
+        ),
+        Parameter(name="SERPER_API", description="Server API key", is_environment=True),
+    ])
 
     job_start_method = AgentMethod(
         name="start",
         method="control.example_synchronous_job_start",
         params={"action": "start"},
+        is_async=False,
         fields=[
             {
                 "name": "full_name",
@@ -54,6 +51,10 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
                 "field_type": "CharField",
                 "max_length": 100,
                 "required": True,
+                "description": "Full name of the person",
+                "choices": None,
+                "default": None,
+                "widget": None,
             },
         ],
         description="Start the collection of new competitor summary",
@@ -64,18 +65,21 @@ def test_agent_setup(agent_fixture: Agent, job_fixture: Job) -> None:
         method="control.stop",
         params={"action": "stop"},
         description="Stop the agent",
+        is_async=False,
     )
     job_status_method = AgentMethod(
         name="status",
         method="hello.mystatus",
         params={"status": "statusvalue"},
         description="Get the status of the agent",
+        is_async=False,
     )
     custom_method = AgentMethod(
         name="custom",
         method="control.custom",
         params={"action": "custom"},
         description="Custom method",
+        is_async=False,
     )
     agent_name = "competitor_summary"
     agent = Agent(

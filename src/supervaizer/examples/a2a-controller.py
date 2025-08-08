@@ -21,23 +21,26 @@ console = Console(style="yellow")
 
 
 # Define the parameters and secrets expected by the agent
-agent_parameters = ParametersSetup.from_list(
-    [
-        Parameter(
-            name="OPEN_API_KEY",
-            description="OpenAPI Key",
-            is_environment=True,
-        ),
-        Parameter(
-            name="SERPER_API", description="Server API key updated", is_environment=True
-        ),
-        Parameter(
-            name="COMPETITOR_SUMMARY_URL",
-            description="Competitor Summary URL",
-            is_environment=True,
-        ),
-    ]
-)
+agent_parameters = ParametersSetup.from_list([
+    Parameter(
+        name="OPEN_API_KEY",
+        description="OpenAPI Key",
+        is_environment=True,
+        is_secret=True,
+    ),
+    Parameter(
+        name="SERPER_API",
+        description="Server API key updated",
+        is_environment=True,
+        is_secret=True,
+    ),
+    Parameter(
+        name="COMPETITOR_SUMMARY_URL",
+        description="Competitor Summary URL",
+        is_environment=True,
+        is_secret=False,
+    ),
+])
 
 # Define the method used to start a job
 job_start_method = AgentMethod(

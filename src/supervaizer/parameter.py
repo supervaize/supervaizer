@@ -5,6 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+from pydantic import Field
 import os
 from typing import Any, Dict, List
 
@@ -12,12 +13,29 @@ from supervaizer.common import SvBaseModel, log
 
 
 class ParameterModel(SvBaseModel):
-    name: str
-    description: str | None = None
-    is_environment: bool = False
-    value: str | None = None
-    is_secret: bool = True
-    is_required: bool = False
+    name: str = Field(
+        description="The name of the parameter, as used in the agent code"
+    )
+    description: str | None = Field(
+        default=None,
+        description="The description of the parameter, used in the Supervaize UI",
+    )
+    is_environment: bool = Field(
+        default=False,
+        description="Whether the parameter is set as an environment variable",
+    )
+    value: str | None = Field(
+        default=None,
+        description="The value of the parameter - provided by the Supervaize platform",
+    )
+    is_secret: bool = Field(
+        default=False,
+        description="Whether the parameter is a secret - hidden from the user in the Supervaize UI",
+    )
+    is_required: bool = Field(
+        default=False,
+        description="Whether the parameter is required, used in the Supervaize UI",
+    )
 
 
 class Parameter(ParameterModel):

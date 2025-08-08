@@ -110,6 +110,7 @@ def agent_method_fixture() -> Annotated[AgentMethod, "fixture"]:
         method="start",
         params={"param1": "value1"},
         description="Start the agent",
+        is_async=False,
     )
 
 

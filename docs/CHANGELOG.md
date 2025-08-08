@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- CICD : release, deploy,
+- CICD : release, deploy
+- `gen_model_docs.py` : to generate the documentation of the models.
 
 ### Changed
 

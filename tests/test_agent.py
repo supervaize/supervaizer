@@ -71,32 +71,47 @@ def test_fields_annotations_dynamic_model() -> None:
         name="start",
         method="control.job_start",
         params={"action": "start"},
+        is_async=False,
         fields=[
             AgentMethodField(
                 name="full_name",
                 type=str,
                 field_type=FieldTypeEnum.CHAR,
                 required=True,
+                description="Full name of the person",
+                choices=None,
+                default=None,
+                widget=None,
             ),
             AgentMethodField(
                 name="age",
                 type=int,
                 field_type=FieldTypeEnum.INT,
                 required=True,
+                description="Age of the person",
+                choices=None,
+                default=None,
+                widget=None,
             ),
             AgentMethodField(
                 name="subscribe",
                 type=bool,
                 field_type=FieldTypeEnum.BOOL,
                 required=False,
+                description="Subscribe to newsletter",
+                choices=None,
+                default=False,
+                widget=None,
             ),
             AgentMethodField(
                 name="gender",
                 type=str,
                 field_type=FieldTypeEnum.CHOICE,
-                choices=[["M", "Male"], ["F", "Female"]],
+                choices=["M", "F"],
                 widget="RadioSelect",
                 required=True,
+                description="Gender selection",
+                default=None,
             ),
             AgentMethodField(
                 name="bio",
@@ -104,20 +119,29 @@ def test_fields_annotations_dynamic_model() -> None:
                 field_type=FieldTypeEnum.CHAR,
                 widget="Textarea",
                 required=False,
+                description="Biography",
+                choices=None,
+                default=None,
             ),
             AgentMethodField(
                 name="country",
                 type=str,
                 field_type=FieldTypeEnum.CHOICE,
-                choices=[["US", "United States"], ["CA", "Canada"]],
+                choices=["US", "CA"],
                 required=True,
+                description="Country of residence",
+                default=None,
+                widget=None,
             ),
             AgentMethodField(
                 name="languages",
                 type=list[str],
                 field_type=FieldTypeEnum.MULTICHOICE,
-                choices=[["en", "English"], ["fr", "French"], ["es", "Spanish"]],
+                choices=["en", "fr", "es"],
                 required=False,
+                description="Languages spoken",
+                default=None,
+                widget=None,
             ),
         ],
         description="Start the collection of new competitor summary",
@@ -178,6 +202,7 @@ def test_fields_annotations_dynamic_model() -> None:
         name="empty",
         method="control.empty",
         params={},
+        is_async=False,
     )
     EmptyModel = empty_method.fields_annotations
     assert issubclass(EmptyModel, BaseModel)
@@ -192,18 +217,27 @@ def test_job_model_dynamic_model() -> None:
         name="start",
         method="control.job_start",
         params={"action": "start"},
+        is_async=False,
         fields=[
             {
                 "name": "full_name",
                 "type": str,
                 "field_type": "CharField",
                 "required": True,
+                "description": "Full name of the person",
+                "choices": None,
+                "default": None,
+                "widget": None,
             },
             {
                 "name": "age",
                 "type": int,
                 "field_type": "IntegerField",
                 "required": True,
+                "description": "Age of the person",
+                "choices": None,
+                "default": None,
+                "widget": None,
             },
         ],
         description="Start job test",
@@ -289,6 +323,7 @@ def test_job_model_dynamic_model() -> None:
         name="empty",
         method="control.empty",
         params={},
+        is_async=False,
     )
     EmptyAbstractJob = empty_method.job_model
     assert issubclass(EmptyAbstractJob, BaseModel)
@@ -336,12 +371,10 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps(
-            [
-                {"name": "parameter1", "value": "new_value1", "is_environment": True},
-                {"name": "parameter2", "value": "new_value2", "is_environment": False},
-            ]
-        ),
+        lambda self, encrypted_parameters: json.dumps([
+            {"name": "parameter1", "value": "new_value1", "is_environment": True},
+            {"name": "parameter2", "value": "new_value2", "is_environment": False},
+        ]),
     )
     # Ensure supervisor_account is not None
     assert server_fixture.supervisor_account is not None
@@ -376,9 +409,9 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps(
-            [{"invalid_parameter": "invalid_value1"}]
-        ),
+        lambda self, encrypted_parameters: json.dumps([
+            {"invalid_parameter": "invalid_value1"}
+        ]),
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)
@@ -421,7 +454,7 @@ def test_custom_method_key_validation() -> None:
 
     # Create a basic agent method for testing
     basic_method = AgentMethod(
-        name="test", method="test.method", description="Test method"
+        name="test", method="test.method", description="Test method", is_async=False
     )
 
     # Test valid custom method keys
@@ -482,7 +515,7 @@ def test_custom_method_key_validation_with_multiple_keys() -> None:
     """Test validation when multiple custom method keys are provided."""
 
     basic_method = AgentMethod(
-        name="test", method="test.method", description="Test method"
+        name="test", method="test.method", description="Test method", is_async=False
     )
 
     # Test with mix of valid and invalid keys
@@ -508,7 +541,7 @@ def test_custom_method_key_validation_none_value() -> None:
     """Test that validation passes when custom is None."""
 
     basic_method = AgentMethod(
-        name="test", method="test.method", description="Test method"
+        name="test", method="test.method", description="Test method", is_async=False
     )
 
     # Should not raise any validation error when custom is None
@@ -525,7 +558,7 @@ def test_custom_method_key_validation_empty_dict() -> None:
     """Test that validation passes when custom is an empty dict."""
 
     basic_method = AgentMethod(
-        name="test", method="test.method", description="Test method"
+        name="test", method="test.method", description="Test method", is_async=False
     )
 
     # Should not raise any validation error when custom is empty
@@ -546,10 +579,11 @@ def test_agent_method_fields_definitions() -> None:
             name="color",
             type=list[str],
             field_type="MultipleChoiceField",
-            choices=[["B", "Blue"], ["R", "Red"], ["G", "Green"]],
+            choices=["B", "R", "G"],
             widget="RadioSelect",
             required=True,
             description="Pick a color",
+            default=None,
         ),
         AgentMethodField(
             name="age",
@@ -559,12 +593,14 @@ def test_agent_method_fields_definitions() -> None:
             required=False,
             default=18,
             description="Enter your age",
+            choices=None,
         ),
     ]
     agent_method = AgentMethod(
         name="test",
         method="test.method",
         fields=fields,
+        is_async=False,
     )
     defs = agent_method.fields_definitions
     assert isinstance(defs, list)
@@ -573,11 +609,12 @@ def test_agent_method_fields_definitions() -> None:
         assert isinstance(d, dict)
     assert defs[0]["name"] == "color"
     assert defs[0]["field_type"] == "MultipleChoiceField"
-    assert defs[0]["choices"] == [["B", "Blue"], ["R", "Red"], ["G", "Green"]]
+    assert defs[0]["choices"] == ["B", "R", "G"]
     assert defs[0]["widget"] == "RadioSelect"
     assert defs[0]["required"] is True
     assert defs[0]["description"] == "Pick a color"
     assert defs[0]["type"] == "list"
+    assert defs[0]["default"] is None
     assert defs[1]["name"] == "age"
     assert defs[1]["field_type"] == "IntegerField"
     assert defs[1]["widget"] == "NumberInput"
@@ -585,3 +622,4 @@ def test_agent_method_fields_definitions() -> None:
     assert defs[1]["default"] == 18
     assert defs[1]["description"] == "Enter your age"
     assert defs[1]["type"] == "int"
+    assert defs[1]["choices"] is None

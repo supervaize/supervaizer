@@ -7,7 +7,6 @@
 
 import json
 import re
-from dataclasses import dataclass
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -18,12 +17,10 @@ from typing import (
     Optional,
     TypeVar,
 )
-
 import shortuuid
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from rich import inspect, print
 from slugify import slugify
-
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiSuccess, SvBaseModel, log
 from supervaizer.event import JobStartConfirmationEvent
@@ -53,16 +50,21 @@ class FieldTypeEnum(str, Enum):
     EMAIL = "EmailField"
 
 
-@dataclass
-class AgentMethodField:
-    name: str
-    type: Any  # Python type for pydantic validation
-    field_type: FieldTypeEnum = FieldTypeEnum.CHAR
-    description: str | None = None
-    choices: list[str] | None = None  # For choice fields
-    default: Any = None
-    widget: str | None = None
-    required: bool = False
+class AgentMethodField(BaseModel):
+    name: str = Field(description="The name of the field")
+    type: Any = Field(description="The type of the field - as a python type")
+    field_type: FieldTypeEnum = Field(
+        default=FieldTypeEnum.CHAR, description="The type of field for UI rendering"
+    )
+    description: str | None = Field(description="The description of the field")
+    choices: list[str] | None = Field(
+        description="For choice fields, list of [value, label] pairs"
+    )
+    default: Any = Field(description="Default value for the field")
+    widget: str | None = Field(
+        description="UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name"
+    )
+    required: bool = Field(description="Whether field is required")
 
 
 class AgentJobContextBase(BaseModel):
@@ -133,12 +135,24 @@ class AgentMethodModel(BaseModel):
 
     """
 
-    name: str
-    method: str
-    params: Dict[str, Any] | None = None
-    fields: List[AgentMethodField] | None = None
-    description: str | None = None
-    is_async: bool = False
+    name: str = Field(description="The name of the method")
+    method: str = Field(
+        description="The name of the method in the project's codebase that will be called with the provided parameters"
+    )
+    params: Dict[str, Any] | None = Field(
+        default=None,
+        description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
+    )
+    fields: List[AgentMethodField] | None = Field(
+        default=None,
+        description="A list of field specifications for generating forms/UI, following the django.forms.fields definition",
+    )
+    description: str | None = Field(
+        default=None, description="Optional description of what the method does"
+    )
+    is_async: bool = Field(
+        default=False, description="Whether the method is asynchronous"
+    )
 
 
 class AgentMethod(AgentMethodModel):
@@ -239,7 +253,10 @@ class AgentMethodParams(BaseModel):
 
     """
 
-    params: Dict[str, Any] = {"": ""}
+    params: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
+    )
 
 
 class AgentCustomMethodParams(AgentMethodParams):

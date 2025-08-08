@@ -41,7 +41,7 @@ dynamic = ["version"]
 [project.urls]
 Homepage = "https://supervaize.com"
 Repository = "https://github.com/supervaize/supervaizer"
-Documentation = "https://supervaize.com/docs"
+Documentation = "https://doc.supervaize.com"
 
 [project.scripts]
 supervaizer = "supervaizer.cli:app"
@@ -58,7 +58,7 @@ dev = [
     "pytest-sugar>=1.0.0",
     "pytest>=8.4.1",
     "respx>=0.22.0",
-    "ruff>=0.12.7",
+    "ruff>=0.12.8",
     "types-deprecated>=1.2.15.20250304",
     "types-python-slugify>=8.0.2.20240310",
 
@@ -107,3 +107,6 @@ allow_untyped_globals = false
 no_implicit_optional = true
 mypy_path = "src"
 disallow_any_expr = false
+
+[dependency-groups]
+dev = []
