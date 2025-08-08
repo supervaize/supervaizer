@@ -58,19 +58,19 @@ Agent model for the Supervaize Control API.
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `id` | `str` | **required** |  |
-| `author` | `Optional` | — |  |
-| `developer` | `Optional` | — |  |
-| `maintainer` | `Optional` | — |  |
-| `editor` | `Optional` | — |  |
+| `author` | `str` | `None` | — |  |
+| `developer` | `str` | `None` | — |  |
+| `maintainer` | `str` | `None` | — |  |
+| `editor` | `str` | `None` | — |  |
 | `version` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `tags` | `list[str] | None` | — |  |
-| `methods` | `supervaizer.agent.AgentMethods | None` | — |  |
-| `parameters_setup` | `supervaizer.parameter.ParametersSetup | None` | — |  |
-| `server_agent_id` | `str | None` | — |  |
-| `server_agent_status` | `str | None` | — |  |
-| `server_agent_onboarding_status` | `str | None` | — |  |
-| `server_encrypted_parameters` | `str | None` | — |  |
+| `tags` | `list[str]` | `None` | — |  |
+| `methods` | `AgentMethods` | `None` | — |  |
+| `parameters_setup` | `ParametersSetup` | `None` | — |  |
+| `server_agent_id` | `str` | `None` | — |  |
+| `server_agent_status` | `str` | `None` | — |  |
+| `server_agent_onboarding_status` | `str` | `None` | — |  |
+| `server_encrypted_parameters` | `str` | `None` | — |  |
 | `max_execution_time` | `int` | **required** |  |
 
 ## `agent.Agent`
@@ -81,19 +81,19 @@ Agent model for the Supervaize Control API.
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `id` | `str` | **required** |  |
-| `author` | `Optional` | — |  |
-| `developer` | `Optional` | — |  |
-| `maintainer` | `Optional` | — |  |
-| `editor` | `Optional` | — |  |
+| `author` | `str` | `None` | — |  |
+| `developer` | `str` | `None` | — |  |
+| `maintainer` | `str` | `None` | — |  |
+| `editor` | `str` | `None` | — |  |
 | `version` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `tags` | `list[str] | None` | — |  |
-| `methods` | `supervaizer.agent.AgentMethods | None` | — |  |
-| `parameters_setup` | `supervaizer.parameter.ParametersSetup | None` | — |  |
-| `server_agent_id` | `str | None` | — |  |
-| `server_agent_status` | `str | None` | — |  |
-| `server_agent_onboarding_status` | `str | None` | — |  |
-| `server_encrypted_parameters` | `str | None` | — |  |
+| `tags` | `list[str]` | `None` | — |  |
+| `methods` | `AgentMethods` | `None` | — |  |
+| `parameters_setup` | `ParametersSetup` | `None` | — |  |
+| `server_agent_id` | `str` | `None` | — |  |
+| `server_agent_status` | `str` | `None` | — |  |
+| `server_agent_onboarding_status` | `str` | `None` | — |  |
+| `server_encrypted_parameters` | `str` | `None` | — |  |
 | `max_execution_time` | `int` | **required** |  |
 
 ## `agent.AgentCustomMethodParams`
@@ -183,9 +183,9 @@ Attributes:
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the method |
 | `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `Optional` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `Optional` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
-| `description` | `str | None` | — | Optional description of what the method does |
+| `params` | `typing.Dict[str, typing.Any]` | `None` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
+| `description` | `str` | `None` | — | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 
 ## `agent.AgentMethodField`
@@ -196,11 +196,11 @@ A base class for creating Pydantic models.
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the field |
 | `type` | `Any` | **required** | The type of the field - as a python type |
-| `field_type` | `FieldTypeEnum` | <FieldTypeEnum.CHAR: 'CharField'> | The type of field for UI rendering |
-| `description` | `str | None` | **required** | The description of the field |
-| `choices` | `list[str] | None` | **required** | For choice fields, list of [value, label] pairs |
+| `field_type` | `FieldTypeEnum` | `CharField` | The type of field for UI rendering |
+| `description` | `str` | `None` | **required** | The description of the field |
+| `choices` | `list[str]` | `None` | **required** | For choice fields, list of [value, label] pairs |
 | `default` | `Any` | **required** | Default value for the field |
-| `widget` | `str | None` | **required** | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
+| `widget` | `str` | `None` | **required** | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | **required** | Whether field is required |
 
 ## `agent.AgentMethodModel`
@@ -272,9 +272,9 @@ Attributes:
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the method |
 | `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `Optional` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `Optional` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
-| `description` | `str | None` | — | Optional description of what the method does |
+| `params` | `typing.Dict[str, typing.Any]` | `None` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
+| `description` | `str` | `None` | — | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 
 ## `agent.AgentMethodParams`
@@ -294,8 +294,8 @@ A base class for creating Pydantic models.
 | `job_start` | `AgentMethod` | **required** |  |
 | `job_stop` | `AgentMethod` | **required** |  |
 | `job_status` | `AgentMethod` | **required** |  |
-| `chat` | `supervaizer.agent.AgentMethod | None` | — |  |
-| `custom` | `dict[str, supervaizer.agent.AgentMethod] | None` | — |  |
+| `chat` | `AgentMethod` | `None` | — |  |
+| `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
 
 ## `agent.AgentMethodsModel`
 
@@ -306,8 +306,8 @@ A base class for creating Pydantic models.
 | `job_start` | `AgentMethod` | **required** |  |
 | `job_stop` | `AgentMethod` | **required** |  |
 | `job_status` | `AgentMethod` | **required** |  |
-| `chat` | `supervaizer.agent.AgentMethod | None` | — |  |
-| `custom` | `dict[str, supervaizer.agent.AgentMethod] | None` | — |  |
+| `chat` | `AgentMethod` | `None` | — |  |
+| `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
 
 ## `agent.AgentResponse`
 
@@ -317,20 +317,20 @@ Response model for agent endpoints - values provided by Agent.registration_info
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `id` | `str` | **required** |  |
-| `author` | `Optional` | — |  |
-| `developer` | `Optional` | — |  |
-| `maintainer` | `Optional` | — |  |
-| `editor` | `Optional` | — |  |
+| `author` | `str` | `None` | — |  |
+| `developer` | `str` | `None` | — |  |
+| `maintainer` | `str` | `None` | — |  |
+| `editor` | `str` | `None` | — |  |
 | `version` | `str` | **required** |  |
 | `api_path` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `tags` | `Optional` | — |  |
-| `methods` | `Optional` | — |  |
-| `parameters_setup` | `Optional` | — |  |
-| `server_agent_id` | `Optional` | — |  |
-| `server_agent_status` | `Optional` | — |  |
-| `server_agent_onboarding_status` | `Optional` | — |  |
-| `server_encrypted_parameters` | `Optional` | — |  |
+| `tags` | `list[str]` | `None` | — |  |
+| `methods` | `AgentMethods` | `None` | — |  |
+| `parameters_setup` | `typing.List[typing.Dict[str, typing.Any]]` | `None` | — |  |
+| `server_agent_id` | `str` | `None` | — |  |
+| `server_agent_status` | `str` | `None` | — |  |
+| `server_agent_onboarding_status` | `str` | `None` | — |  |
+| `server_encrypted_parameters` | `str` | `None` | — |  |
 
 ## `job.Job`
 
@@ -355,13 +355,13 @@ Args:
 | `agent_name` | `str` | **required** |  |
 | `status` | `EntityStatus` | **required** |  |
 | `job_context` | `JobContext` | **required** |  |
-| `payload` | `typing.Any | None` | — |  |
-| `result` | `typing.Any | None` | — |  |
-| `error` | `str | None` | — |  |
+| `payload` | `Any` | `None` | — |  |
+| `result` | `Any` | `None` | — |  |
+| `error` | `str` | `None` | — |  |
 | `responses` | `list` | [] |  |
-| `finished_at` | `datetime.datetime | None` | — |  |
-| `created_at` | `datetime.datetime | None` | — |  |
-| `agent_parameters` | `Optional` | — |  |
+| `finished_at` | `datetime` | `None` | — |  |
+| `created_at` | `datetime` | `None` | — |  |
+| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
 | `case_ids` | `List` | [] |  |
 
 ## `job.JobContext`
@@ -377,7 +377,7 @@ Base model for all Supervaize models.
 | `mission_id` | `str` | **required** |  |
 | `mission_name` | `str` | **required** |  |
 | `mission_context` | `Any` | — |  |
-| `job_instructions` | `Optional` | — |  |
+| `job_instructions` | `JobInstructions` | `None` | — |  |
 
 ## `job.JobResponse`
 
@@ -388,9 +388,9 @@ Base model for all Supervaize models.
 | `job_id` | `str` | **required** |  |
 | `status` | `EntityStatus` | **required** |  |
 | `message` | `str` | **required** |  |
-| `payload` | `Optional` | — |  |
-| `error_message` | `Optional` | — |  |
-| `error_traceback` | `Optional` | — |  |
+| `payload` | `dict[str, typing.Any]` | `None` | — |  |
+| `error_message` | `str` | `None` | — |  |
+| `error_traceback` | `str` | `None` | — |  |
 
 ## `event.JobStartConfirmationEvent`
 
@@ -437,8 +437,8 @@ Base model for all Supervaize models.
 | `status` | `EntityStatus` | **required** |  |
 | `updates` | `List` | [] |  |
 | `total_cost` | `float` | 0.0 |  |
-| `final_delivery` | `Optional` | — |  |
-| `finished_at` | `Optional` | — |  |
+| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
+| `finished_at` | `datetime` | `None` | — |  |
 
 ## `case.CaseAbstractModel`
 
@@ -454,8 +454,8 @@ Base model for all Supervaize models.
 | `status` | `EntityStatus` | **required** |  |
 | `updates` | `List` | [] |  |
 | `total_cost` | `float` | 0.0 |  |
-| `final_delivery` | `Optional` | — |  |
-| `finished_at` | `Optional` | — |  |
+| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
+| `finished_at` | `datetime` | `None` | — |  |
 
 ## `case.CaseNode`
 
@@ -477,12 +477,12 @@ Returns:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `index` | `int | None` | — |  |
-| `cost` | `float | None` | — |  |
-| `name` | `str | None` | — |  |
-| `payload` | `Optional` | — |  |
+| `index` | `int` | `None` | — |  |
+| `cost` | `float` | `None` | — |  |
+| `name` | `str` | `None` | — |  |
+| `payload` | `typing.Dict[str, typing.Any]` | `None` | — |  |
 | `is_final` | `bool` | False |  |
-| `error` | `Optional` | — |  |
+| `error` | `str` | `None` | — |  |
 
 ## `event.AbstractEvent`
 
@@ -636,13 +636,13 @@ Base model for all Supervaize models.
 | `agent_name` | `str` | **required** |  |
 | `status` | `EntityStatus` | **required** |  |
 | `job_context` | `JobContext` | **required** |  |
-| `payload` | `typing.Any | None` | — |  |
-| `result` | `typing.Any | None` | — |  |
-| `error` | `str | None` | — |  |
+| `payload` | `Any` | `None` | — |  |
+| `result` | `Any` | `None` | — |  |
+| `error` | `str` | `None` | — |  |
 | `responses` | `list` | [] |  |
-| `finished_at` | `datetime.datetime | None` | — |  |
-| `created_at` | `datetime.datetime | None` | — |  |
-| `agent_parameters` | `Optional` | — |  |
+| `finished_at` | `datetime` | `None` | — |  |
+| `created_at` | `datetime` | `None` | — |  |
+| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
 | `case_ids` | `List` | [] |  |
 
 ## `job.JobInstructions`
@@ -651,12 +651,12 @@ Base model for all Supervaize models.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `max_cases` | `int | None` | — |  |
-| `max_duration` | `int | None` | — |  |
-| `max_cost` | `float | None` | — |  |
+| `max_cases` | `int` | `None` | — |  |
+| `max_duration` | `int` | `None` | — |  |
+| `max_cost` | `float` | `None` | — |  |
 | `stop_on_warning` | `bool` | False |  |
 | `stop_on_error` | `bool` | True |  |
-| `job_start_time` | `float | None` | — |  |
+| `job_start_time` | `float` | `None` | — |  |
 
 ## `parameter.Parameter`
 
@@ -665,9 +665,9 @@ Base model for all Supervaize models.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the parameter, as used in the agent code |
-| `description` | `str | None` | — | The description of the parameter, used in the Supervaize UI |
+| `description` | `str` | `None` | — | The description of the parameter, used in the Supervaize UI |
 | `is_environment` | `bool` | False | Whether the parameter is set as an environment variable |
-| `value` | `str | None` | — | The value of the parameter - provided by the Supervaize platform |
+| `value` | `str` | `None` | — | The value of the parameter - provided by the Supervaize platform |
 | `is_secret` | `bool` | False | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
 | `is_required` | `bool` | False | Whether the parameter is required, used in the Supervaize UI |
 
@@ -678,9 +678,9 @@ Base model for all Supervaize models.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the parameter, as used in the agent code |
-| `description` | `str | None` | — | The description of the parameter, used in the Supervaize UI |
+| `description` | `str` | `None` | — | The description of the parameter, used in the Supervaize UI |
 | `is_environment` | `bool` | False | Whether the parameter is set as an environment variable |
-| `value` | `str | None` | — | The value of the parameter - provided by the Supervaize platform |
+| `value` | `str` | `None` | — | The value of the parameter - provided by the Supervaize platform |
 | `is_secret` | `bool` | False | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
 | `is_required` | `bool` | False | Whether the parameter is required, used in the Supervaize UI |
 
@@ -691,7 +691,7 @@ Request model for updating a case with answer to a question.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `answer` | `Dict` | **required** |  |
-| `message` | `Optional` | — |  |
+| `message` | `str` | `None` | — |  |
 
 ## `server_utils.ErrorResponse`
 
@@ -701,8 +701,8 @@ Standard error response model
 |---|---|---|---|
 | `error` | `str` | **required** |  |
 | `error_type` | `ErrorType` | **required** |  |
-| `detail` | `str | None` | — |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 8, 17, 10, 18, 787596) |  |
+| `detail` | `str` | `None` | — |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 1, 50, 39, 848642) |  |
 | `status_code` | `int` | **required** |  |
 
 ## `server.AbstractServer`
@@ -720,14 +720,14 @@ API Server for the Supervaize Controller.
 | `agents` | `List` | **required** |  |
 | `app` | `FastAPI` | **required** |  |
 | `reload` | `bool` | **required** |  |
-| `supervisor_account` | `Optional` | — |  |
+| `supervisor_account` | `Account` | `None` | — |  |
 | `a2a_endpoints` | `bool` | True |  |
 | `acp_endpoints` | `bool` | True |  |
 | `private_key` | `RSAPrivateKey` | **required** |  |
 | `public_key` | `RSAPublicKey` | **required** |  |
-| `registration_host` | `Optional` | — |  |
-| `api_key` | `Optional` | — |  |
-| `api_key_header` | `Optional` | — |  |
+| `registration_host` | `str` | `None` | — |  |
+| `api_key` | `str` | `None` | — |  |
+| `api_key_header` | `APIKeyHeader` | `None` | — |  |
 
 ## `server.Server`
 
@@ -744,14 +744,14 @@ API Server for the Supervaize Controller.
 | `agents` | `List` | **required** |  |
 | `app` | `FastAPI` | **required** |  |
 | `reload` | `bool` | **required** |  |
-| `supervisor_account` | `Optional` | — |  |
+| `supervisor_account` | `Account` | `None` | — |  |
 | `a2a_endpoints` | `bool` | True |  |
 | `acp_endpoints` | `bool` | True |  |
 | `private_key` | `RSAPrivateKey` | **required** |  |
 | `public_key` | `RSAPublicKey` | **required** |  |
-| `registration_host` | `Optional` | — |  |
-| `api_key` | `Optional` | — |  |
-| `api_key_header` | `Optional` | — |  |
+| `registration_host` | `str` | `None` | — |  |
+| `api_key` | `str` | `None` | — |  |
+| `api_key_header` | `APIKeyHeader` | `None` | — |  |
 
 ## `server.ServerInfo`
 

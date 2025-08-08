@@ -32,7 +32,7 @@ import shutil
 import json
 from types import ModuleType
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Union
 from pydantic import BaseModel
 
 PACKAGE = "supervaizer"
@@ -125,13 +125,87 @@ def iter_modules(package: str) -> Iterator[ModuleType]:
             pass
 
 
+def sanitize_default_for_mdx(default_repr: str) -> str:
+    """Sanitize default value representation to avoid MDX parsing issues."""
+    # Replace enum representations that contain colons with a safer format
+    if "<" in default_repr and ":" in default_repr and ">" in default_repr:
+        # This looks like an enum representation like <Enum.VALUE: 'string'>
+        # Extract the enum name and value
+        try:
+            # Find the colon and extract the value part
+            colon_pos = default_repr.find(":")
+            if colon_pos != -1:
+                # Get the part after the colon, before the closing >
+                value_start = colon_pos + 1
+                value_end = default_repr.rfind(">")
+                if value_end != -1:
+                    value_part = default_repr[value_start:value_end].strip()
+                    # Remove quotes if present
+                    if value_part.startswith("'") and value_part.endswith("'"):
+                        value_part = value_part[1:-1]
+                    elif value_part.startswith('"') and value_part.endswith('"'):
+                        value_part = value_part[1:-1]
+                    return f"`{value_part}`"
+        except Exception:
+            pass
+        # Fallback: just escape the angle brackets
+        return default_repr.replace("<", "&lt;").replace(">", "&gt;")
+
+    return default_repr
+
+
 def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
     fields = getattr(model, "model_fields", {}) or getattr(model, "__fields__", {})
     result: list[tuple[str, str, str, str]] = []
     for name, field in fields.items():
         # Try to get type/annotation consistently across pydantic versions
         type_obj = getattr(field, "annotation", None) or getattr(field, "type_", None)
-        type_str = getattr(type_obj, "__name__", str(type_obj))
+
+        # Format type string properly
+        if (
+            type_obj is not None
+            and hasattr(type_obj, "__origin__")
+            and type_obj.__origin__ is Union
+        ) or (
+            type_obj is not None
+            and hasattr(type_obj, "__args__")
+            and type(type_obj).__name__ == "UnionType"
+        ):
+            # Handle Union types (e.g., str | None)
+            type_args = getattr(type_obj, "__args__", [])
+            type_parts = []
+            for arg in type_args:
+                if arg is type(None):
+                    type_parts.append("`None`")
+                else:
+                    # Handle complex types like list[str]
+                    arg_str = str(arg)
+                    if "[" in arg_str and "]" in arg_str:
+                        # Complex type like list[str], dict[str, int], etc.
+                        type_parts.append(f"`{arg_str}`")
+                    else:
+                        type_parts.append(
+                            f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                        )
+            type_str = " | ".join(type_parts)
+        elif type_obj is not None and str(type_obj).startswith("typing.Union"):
+            # Handle older Union syntax
+            type_str = (
+                str(type_obj)
+                .replace("typing.Union[", "")
+                .replace("]", "")
+                .replace(", ", " | ")
+            )
+            # Add backticks around each type
+            type_parts = type_str.split(" | ")
+            type_parts = [f"`{part.strip()}`" for part in type_parts]
+            type_str = " | ".join(type_parts)
+        elif type_obj is not None and str(type_obj).startswith("typing.Optional"):
+            # Handle Optional types (which are Union[T, None])
+            inner_type = str(type_obj).replace("typing.Optional[", "").replace("]", "")
+            type_str = f"`{inner_type}` | `None`"
+        else:
+            type_str = f"`{getattr(type_obj, '__name__', str(type_obj))}`"
 
         # Required detection compatible with pydantic v1/v2
         required: bool
@@ -164,7 +238,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
                     if "Undefined" in s or "PydanticUndefined" in s:
                         default_repr = "—"
                     else:
-                        default_repr = s
+                        default_repr = sanitize_default_for_mdx(s)
             else:
                 default_repr = "—"
 
@@ -177,7 +251,53 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
     result = []
     for name, field in fields.items():
         type_ = getattr(field, "type", str)
-        type_str = getattr(type_, "__name__", str(type_))
+
+        # Format type string properly
+        if (
+            type_ is not None
+            and hasattr(type_, "__origin__")
+            and type_.__origin__ is Union
+        ) or (
+            type_ is not None
+            and hasattr(type_, "__args__")
+            and type(type_).__name__ == "UnionType"
+        ):
+            # Handle Union types (e.g., str | None)
+            type_args = getattr(type_, "__args__", [])
+            type_parts = []
+            for arg in type_args:
+                if arg is type(None):
+                    type_parts.append("`None`")
+                else:
+                    # Handle complex types like list[str]
+                    arg_str = str(arg)
+                    if "[" in arg_str and "]" in arg_str:
+                        # Complex type like list[str], dict[str, int], etc.
+                        type_parts.append(f"`{arg_str}`")
+                    else:
+                        type_parts.append(
+                            f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                        )
+            type_str = " | ".join(type_parts)
+        elif type_ is not None and str(type_).startswith("typing.Union"):
+            # Handle older Union syntax
+            type_str = (
+                str(type_)
+                .replace("typing.Union[", "")
+                .replace("]", "")
+                .replace(", ", " | ")
+            )
+            # Add backticks around each type
+            type_parts = type_str.split(" | ")
+            type_parts = [f"`{part.strip()}`" for part in type_parts]
+            type_str = " | ".join(type_parts)
+        elif type_ is not None and str(type_).startswith("typing.Optional"):
+            # Handle Optional types (which are Union[T, None])
+            inner_type = str(type_).replace("typing.Optional[", "").replace("]", "")
+            type_str = f"`{inner_type}` | `None`"
+        else:
+            type_str = f"`{getattr(type_, '__name__', str(type_))}`"
+
         required = (
             field.default is dataclasses.MISSING
             and field.default_factory is dataclasses.MISSING
@@ -185,7 +305,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
         default = (
             "**required**"
             if required
-            else repr(field.default)
+            else sanitize_default_for_mdx(repr(field.default))
             if field.default is not dataclasses.MISSING
             else "factory"
         )
@@ -250,7 +370,8 @@ def generate_model_docs() -> None:
             out.append("| Field | Type | Default | Description |")
             out.append("|---|---|---|---|")
             for f, t, d, desc in rows:
-                out.append(f"| `{f}` | `{t}` | {d} | {desc} |")
+                # Types already have backticks, don't add extra ones
+                out.append(f"| `{f}` | {t} | {d} | {desc} |")
             out.append("")
 
     OUTPUT.write_text("\n".join(out))
