@@ -5,7 +5,7 @@ Model Documentation Generator
 
 This script automatically generates model reference documentation for the supervaizer package.
 It scans through all modules in the package and identifies Pydantic BaseModel classes and
-dataclasses, then generates a markdown file with their field definitions, types, defaults,
+dataclasses, then generates markdown files with their field definitions, types, defaults,
 and descriptions.
 
 Features:
@@ -14,13 +14,16 @@ Features:
 - Generates markdown tables for easy reading
 - Handles both Pydantic v1 and v2 field structures
 - Supports dataclass metadata for field descriptions
+- Groups models by reference_group configuration
 
 Usage:
     python tools/gen_model_docs.py
 
 Output:
-    Creates docs/model_reference.md with comprehensive model documentation
-    And also, copies the file to the external documentation directory
+    Creates docs/model_reference/ directory with multiple markdown files:
+    - model_extra.md: for models with no reference_group or "extra" value
+    - _{reference_group}.md: for models with specific reference_group values
+    And also, copies the entire output directory to the external documentation directory
 """
 
 from __future__ import annotations
@@ -32,13 +35,13 @@ import shutil
 import json
 from types import ModuleType
 from pathlib import Path
-from typing import Any, Iterator, Union
+from typing import Any, Iterator, Union, Dict, List
 from pydantic import BaseModel
 
 PACKAGE = "supervaizer"
-OUTPUT = Path("docs/model_reference.md")
+OUTPUT = Path("docs/model_reference")
 EXTERNAL_DOC_PATH = Path(
-    "../doc/supervaize-doc/docs/Supervaizer Controller/model_reference.md"
+    "../doc/supervaize-doc/docs/Supervaizer Controller/model_reference"
 )
 
 
@@ -155,7 +158,7 @@ def sanitize_default_for_mdx(default_repr: str) -> str:
 
 
 def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
-    fields = getattr(model, "model_fields", {}) or getattr(model, "__fields__", {})
+    fields = getattr(model, "model_fields", {})
     result: list[tuple[str, str, str, str]] = []
     for name, field in fields.items():
         # Try to get type/annotation consistently across pydantic versions
@@ -165,7 +168,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
         if (
             type_obj is not None
             and hasattr(type_obj, "__origin__")
-            and type_obj.__origin__ is Union
+            and getattr(type_obj, "__origin__", None) is Union
         ) or (
             type_obj is not None
             and hasattr(type_obj, "__args__")
@@ -256,7 +259,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
         if (
             type_ is not None
             and hasattr(type_, "__origin__")
-            and type_.__origin__ is Union
+            and getattr(type_, "__origin__", None) is Union
         ) or (
             type_ is not None
             and hasattr(type_, "__args__")
@@ -323,45 +326,73 @@ def generate_model_docs() -> None:
     except (ImportError, AttributeError):
         version = "N/A"
 
-    out = ["# Model Reference", ""]
-    out.append(f"**Version:** {version}\n")
+    # Ensure the output directory exists
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+
+    # Get all models and their reference_group
+    models_by_group: Dict[str, List[type[BaseModel]]] = {}
     seen = set()
+
     for mod in iter_modules(PACKAGE):
         for name, obj in inspect.getmembers(mod, inspect.isclass):
             if obj in seen or obj.__module__.startswith("pydantic"):
                 continue
             if issubclass(obj, BaseModel):
-                # Remove "supervaizer." prefix from module name
-                module_name = obj.__module__.replace("supervaizer.", "")
-                out.append(f"## `{module_name}.{obj.__name__}`\n")
-                doc = inspect.getdoc(obj)
-                if doc:
-                    # Filter out verbose Pydantic base class documentation
-                    if (
-                        "!!! abstract" in doc
-                        or "A base class for creating Pydantic models" in doc
-                    ):
-                        # Only show the essential base class description
-                        if "A base class for creating Pydantic models" in doc:
-                            out.append("A base class for creating Pydantic models.\n")
-                    else:
-                        # Format JSON content in documentation
-                        formatted_doc = format_json_in_doc(doc)
-                        out.append(formatted_doc + "\n")
-                rows = get_model_fields(obj)
+                # Get the reference_group from model_config
+                # Try different ways to access model_config
+                model_config = getattr(obj, "model_config", {})
+                if not model_config:
+                    # Try accessing it as a class attribute
+                    model_config = getattr(obj, "__dict__", {}).get("model_config", {})
+                if not model_config:
+                    # Try accessing it from the class itself
+                    model_config = getattr(type(obj), "model_config", {})
+                # Check for both reference_group and documentation fields
+                reference_group = model_config.get(
+                    "reference_group", model_config.get("documentation", "extra")
+                )
+                if reference_group not in models_by_group:
+                    models_by_group[reference_group] = []
+                models_by_group[reference_group].append(obj)
+                seen.add(obj)
             elif dataclasses.is_dataclass(obj):
-                # Remove "supervaizer." prefix from module name
-                module_name = obj.__module__.replace("supervaizer.", "")
-                out.append(f"## `{module_name}.{obj.__name__}`\n")
-                doc = inspect.getdoc(obj)
-                if doc:
+                # Dataclasses go to "extra" group
+                if "extra" not in models_by_group:
+                    models_by_group["extra"] = []
+                models_by_group["extra"].append(obj)
+                seen.add(obj)
+
+    # Generate documentation for each group
+    for group_name, models in models_by_group.items():
+        out = ["# Model Reference", ""]
+        out.append(f"**Version:** {version}\n")
+        out.append(f"## Models in Group: `{group_name}`\n")
+
+        for model in models:
+            # Remove "supervaizer." prefix from module name
+            module_name = model.__module__.replace("supervaizer.", "")
+            out.append(f"### `{module_name}.{model.__name__}`\n")
+            doc = inspect.getdoc(model)
+            if doc:
+                # Filter out verbose Pydantic base class documentation
+                if (
+                    "!!! abstract" in doc
+                    or "A base class for creating Pydantic models" in doc
+                ):
+                    # Only show the essential base class description
+                    if "A base class for creating Pydantic models" in doc:
+                        out.append("A base class for creating Pydantic models.\n")
+                else:
                     # Format JSON content in documentation
                     formatted_doc = format_json_in_doc(doc)
                     out.append(formatted_doc + "\n")
-                rows = get_dataclass_fields(obj)
+
+            if issubclass(model, BaseModel):
+                rows = get_model_fields(model)
+            elif dataclasses.is_dataclass(model):
+                rows = get_dataclass_fields(model)
             else:
                 continue
-            seen.add(obj)
 
             if not rows:
                 out.append("_No fields found._\n")
@@ -374,15 +405,27 @@ def generate_model_docs() -> None:
                 out.append(f"| `{f}` | {t} | {d} | {desc} |")
             out.append("")
 
-    OUTPUT.write_text("\n".join(out))
-    print(f"✅ Wrote model reference to {OUTPUT}")
+        # Determine output filename based on group name
+        if group_name == "extra":
+            filename = "model_extra.md".lower()
+        else:
+            filename = f"model_{group_name}.md".lower()
+
+        output_file = OUTPUT / filename
+        output_file.write_text("\n".join(out))
+        print(f"✅ Wrote model reference for group '{group_name}' to {output_file}")
 
     # Copy to external documentation directory
     try:
         # Ensure the target directory exists
         EXTERNAL_DOC_PATH.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(OUTPUT, EXTERNAL_DOC_PATH)
-        print(f"✅ Copied model reference to {EXTERNAL_DOC_PATH}")
+
+        # Remove existing directory if it exists
+        if EXTERNAL_DOC_PATH.exists():
+            shutil.rmtree(EXTERNAL_DOC_PATH)
+
+        shutil.copytree(OUTPUT, EXTERNAL_DOC_PATH)
+        print(f"✅ Copied model reference directory to {EXTERNAL_DOC_PATH}")
     except Exception as e:
         print(f"⚠️  Failed to copy to external directory: {e}")
 

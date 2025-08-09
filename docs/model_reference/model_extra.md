@@ -2,7 +2,9 @@
 
 **Version:** 0.9.4
 
-## `account.Account`
+## Models in Group: `extra`
+
+### `account.Account`
 
 Base model for all Supervaize models.
 
@@ -12,7 +14,7 @@ Base model for all Supervaize models.
 | `api_key` | `str` | **required** |  |
 | `api_url` | `str` | **required** |  |
 
-## `account.AccountModel`
+### `account.AccountModel`
 
 Base model for all Supervaize models.
 
@@ -22,13 +24,13 @@ Base model for all Supervaize models.
 | `api_key` | `str` | **required** |  |
 | `api_url` | `str` | **required** |  |
 
-## `common.SvBaseModel`
+### `common.SvBaseModel`
 
 Base model for all Supervaize models.
 
 _No fields found._
 
-## `telemetry.Telemetry`
+### `telemetry.Telemetry`
 
 Base class for all telemetry data in the Supervaize Control system.
 
@@ -50,7 +52,7 @@ Inherits from TelemetryModel which defines the core telemetry attributes:
 | `severity` | `TelemetrySeverity` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `agent.AbstractAgent`
+### `agent.AbstractAgent`
 
 Agent model for the Supervaize Control API.
 
@@ -73,7 +75,7 @@ Agent model for the Supervaize Control API.
 | `server_encrypted_parameters` | `str` | `None` | — |  |
 | `max_execution_time` | `int` | **required** |  |
 
-## `agent.Agent`
+### `agent.Agent`
 
 Agent model for the Supervaize Control API.
 
@@ -96,7 +98,7 @@ Agent model for the Supervaize Control API.
 | `server_encrypted_parameters` | `str` | `None` | — |  |
 | `max_execution_time` | `int` | **required** |  |
 
-## `agent.AgentCustomMethodParams`
+### `agent.AgentCustomMethodParams`
 
 Method parameters for agent operations.
 
@@ -105,7 +107,7 @@ Method parameters for agent operations.
 | `params` | `Dict` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
 | `method_name` | `str` | **required** |  |
 
-## `agent.AgentJobContextBase`
+### `agent.AgentJobContextBase`
 
 Base model for agent job context parameters
 
@@ -114,7 +116,7 @@ Base model for agent job context parameters
 | `job_context` | `JobContext` | **required** |  |
 | `job_fields` | `Dict` | **required** |  |
 
-## `agent.AgentMethod`
+### `agent.AgentMethod`
 
 Represents a method that can be called on an agent.
 
@@ -188,7 +190,7 @@ Attributes:
 | `description` | `str` | `None` | — | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 
-## `agent.AgentMethodField`
+### `agent.AgentMethodField`
 
 A base class for creating Pydantic models.
 
@@ -203,7 +205,7 @@ A base class for creating Pydantic models.
 | `widget` | `str` | `None` | **required** | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | **required** | Whether field is required |
 
-## `agent.AgentMethodModel`
+### `agent.AgentMethodModel`
 
 Represents a method that can be called on an agent.
 
@@ -277,7 +279,7 @@ Attributes:
 | `description` | `str` | `None` | — | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 
-## `agent.AgentMethodParams`
+### `agent.AgentMethodParams`
 
 Method parameters for agent operations.
 
@@ -285,7 +287,7 @@ Method parameters for agent operations.
 |---|---|---|---|
 | `params` | `Dict` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
 
-## `agent.AgentMethods`
+### `agent.AgentMethods`
 
 A base class for creating Pydantic models.
 
@@ -297,7 +299,7 @@ A base class for creating Pydantic models.
 | `chat` | `AgentMethod` | `None` | — |  |
 | `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
 
-## `agent.AgentMethodsModel`
+### `agent.AgentMethodsModel`
 
 A base class for creating Pydantic models.
 
@@ -309,7 +311,7 @@ A base class for creating Pydantic models.
 | `chat` | `AgentMethod` | `None` | — |  |
 | `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
 
-## `agent.AgentResponse`
+### `agent.AgentResponse`
 
 Response model for agent endpoints - values provided by Agent.registration_info
 
@@ -332,7 +334,7 @@ Response model for agent endpoints - values provided by Agent.registration_info
 | `server_agent_onboarding_status` | `str` | `None` | — |  |
 | `server_encrypted_parameters` | `str` | `None` | — |  |
 
-## `job.Job`
+### `job.Job`
 
 Jobs are typically created by the platform and are not created by the agent.
 
@@ -364,7 +366,7 @@ Args:
 | `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
 | `case_ids` | `List` | [] |  |
 
-## `job.JobContext`
+### `job.JobContext`
 
 Base model for all Supervaize models.
 
@@ -379,7 +381,7 @@ Base model for all Supervaize models.
 | `mission_context` | `Any` | — |  |
 | `job_instructions` | `JobInstructions` | `None` | — |  |
 
-## `job.JobResponse`
+### `job.JobResponse`
 
 Base model for all Supervaize models.
 
@@ -392,7 +394,7 @@ Base model for all Supervaize models.
 | `error_message` | `str` | `None` | — |  |
 | `error_traceback` | `str` | `None` | — |  |
 
-## `event.JobStartConfirmationEvent`
+### `event.JobStartConfirmationEvent`
 
 Base class for all events in the Supervaize Control system.
 
@@ -415,7 +417,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `parameter.ParametersSetup`
+### `parameter.ParametersSetup`
 
 Base model for all Supervaize models.
 
@@ -423,7 +425,7 @@ Base model for all Supervaize models.
 |---|---|---|---|
 | `definitions` | `Dict` | **required** |  |
 
-## `case.Case`
+### `case.Case`
 
 Base model for all Supervaize models.
 
@@ -440,7 +442,7 @@ Base model for all Supervaize models.
 | `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
 | `finished_at` | `datetime` | `None` | — |  |
 
-## `case.CaseAbstractModel`
+### `case.CaseAbstractModel`
 
 Base model for all Supervaize models.
 
@@ -457,7 +459,7 @@ Base model for all Supervaize models.
 | `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
 | `finished_at` | `datetime` | `None` | — |  |
 
-## `case.CaseNode`
+### `case.CaseNode`
 
 Base model for all Supervaize models.
 
@@ -467,7 +469,7 @@ Base model for all Supervaize models.
 | `description` | `str` | **required** |  |
 | `type` | `CaseNoteType` | **required** |  |
 
-## `case.CaseNodeUpdate`
+### `case.CaseNodeUpdate`
 
 CaseNodeUpdate is a class that represents an update to a case node.
 
@@ -484,7 +486,7 @@ Returns:
 | `is_final` | `bool` | False |  |
 | `error` | `str` | `None` | — |  |
 
-## `event.AbstractEvent`
+### `event.AbstractEvent`
 
 Base model for all Supervaize models.
 
@@ -496,7 +498,7 @@ Base model for all Supervaize models.
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.AgentRegisterEvent`
+### `event.AgentRegisterEvent`
 
 Event sent when an agent registers with the control system.
 
@@ -510,7 +512,7 @@ Test in tests/test_agent_register_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.CaseStartEvent`
+### `event.CaseStartEvent`
 
 Base class for all events in the Supervaize Control system.
 
@@ -533,7 +535,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.CaseUpdateEvent`
+### `event.CaseUpdateEvent`
 
 Base class for all events in the Supervaize Control system.
 
@@ -556,7 +558,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.Event`
+### `event.Event`
 
 Base class for all events in the Supervaize Control system.
 
@@ -579,7 +581,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.JobFinishedEvent`
+### `event.JobFinishedEvent`
 
 Base class for all events in the Supervaize Control system.
 
@@ -602,7 +604,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `event.ServerRegisterEvent`
+### `event.ServerRegisterEvent`
 
 Base class for all events in the Supervaize Control system.
 
@@ -625,7 +627,7 @@ Tests in tests/test_event.py
 | `object_type` | `str` | **required** |  |
 | `details` | `Dict` | **required** |  |
 
-## `job.AbstractJob`
+### `job.AbstractJob`
 
 Base model for all Supervaize models.
 
@@ -645,7 +647,7 @@ Base model for all Supervaize models.
 | `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
 | `case_ids` | `List` | [] |  |
 
-## `job.JobInstructions`
+### `job.JobInstructions`
 
 Base model for all Supervaize models.
 
@@ -658,33 +660,7 @@ Base model for all Supervaize models.
 | `stop_on_error` | `bool` | True |  |
 | `job_start_time` | `float` | `None` | — |  |
 
-## `parameter.Parameter`
-
-Base model for all Supervaize models.
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the parameter, as used in the agent code |
-| `description` | `str` | `None` | — | The description of the parameter, used in the Supervaize UI |
-| `is_environment` | `bool` | False | Whether the parameter is set as an environment variable |
-| `value` | `str` | `None` | — | The value of the parameter - provided by the Supervaize platform |
-| `is_secret` | `bool` | False | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
-| `is_required` | `bool` | False | Whether the parameter is required, used in the Supervaize UI |
-
-## `parameter.ParameterModel`
-
-Base model for all Supervaize models.
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the parameter, as used in the agent code |
-| `description` | `str` | `None` | — | The description of the parameter, used in the Supervaize UI |
-| `is_environment` | `bool` | False | Whether the parameter is set as an environment variable |
-| `value` | `str` | `None` | — | The value of the parameter - provided by the Supervaize platform |
-| `is_secret` | `bool` | False | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
-| `is_required` | `bool` | False | Whether the parameter is required, used in the Supervaize UI |
-
-## `routes.CaseUpdateRequest`
+### `routes.CaseUpdateRequest`
 
 Request model for updating a case with answer to a question.
 
@@ -693,7 +669,7 @@ Request model for updating a case with answer to a question.
 | `answer` | `Dict` | **required** |  |
 | `message` | `str` | `None` | — |  |
 
-## `server_utils.ErrorResponse`
+### `server_utils.ErrorResponse`
 
 Standard error response model
 
@@ -702,10 +678,10 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `ErrorType` | **required** |  |
 | `detail` | `str` | `None` | — |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 1, 50, 39, 848642) |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 11, 32, 52, 6848) |  |
 | `status_code` | `int` | **required** |  |
 
-## `server.AbstractServer`
+### `server.AbstractServer`
 
 API Server for the Supervaize Controller.
 
@@ -729,7 +705,7 @@ API Server for the Supervaize Controller.
 | `api_key` | `str` | `None` | — |  |
 | `api_key_header` | `APIKeyHeader` | `None` | — |  |
 
-## `server.Server`
+### `server.Server`
 
 API Server for the Supervaize Controller.
 
@@ -753,7 +729,7 @@ API Server for the Supervaize Controller.
 | `api_key` | `str` | `None` | — |  |
 | `api_key_header` | `APIKeyHeader` | `None` | — |  |
 
-## `server.ServerInfo`
+### `server.ServerInfo`
 
 Complete server information for storage.
 
@@ -769,7 +745,7 @@ Complete server information for storage.
 | `created_at` | `str` | **required** |  |
 | `updated_at` | `str` | **required** |  |
 
-## `telemetry.TelemetryModel`
+### `telemetry.TelemetryModel`
 
 A base class for creating Pydantic models.
 

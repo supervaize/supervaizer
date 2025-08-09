@@ -19,6 +19,13 @@ from supervaizer import (
 # Create a console with default style set to yellow
 console = Console(style="yellow")
 
+# Public url of your hosted agent  (including port if needed)
+# Use loca.lt or ngrok to get a public url during development.
+# This can be setup from environment variables.
+# SUPERVAIZER_HOST and SUPERVAIZER_PORT
+DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
+# Public url of your hosted agent
+PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
 
 # Define the parameters and secrets expected by the agent
 agent_parameters = ParametersSetup.from_list([
@@ -148,7 +155,7 @@ agent = Agent(
     editor="Yuri Editor",
     version="1.3",
     description="This is a test agent",
-    urls={"dev": "http://host.docker.internal:8001", "prod": ""},
+    urls={"dev": "DEV_PUBLIC_URL", "prod": "PROD_PUBLIC_URL"},
     active_environment="dev",
     tags=["testtag", "testtag2"],
     methods=AgentMethods(

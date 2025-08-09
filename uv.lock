@@ -1214,9 +1214,6 @@ requires-dist = [
 ]
 provides-extras = ["dev"]
 
-[package.metadata.requires-dev]
-dev = []
-
 [[package]]
 name = "termcolor"
 version = "3.0.1"

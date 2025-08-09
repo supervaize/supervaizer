@@ -78,9 +78,9 @@ def start(
 
 
 @app.command()
-def install(
+def create_example(
     output_path: str = typer.Option(
-        os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control.py"),
+        os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control_example.py"),
         help="Path to save the script",
     ),
     force: bool = typer.Option(
@@ -88,7 +88,7 @@ def install(
         help="Overwrite existing file",
     ),
 ) -> None:
-    """Create a draft supervaizer_control.py script."""
+    """Create a draft supervaizer_control_example.py script."""
     # Check if file already exists
     if os.path.exists(output_path) and not force:
         console.print(f"[bold red]Error:[/] {output_path} already exists")
@@ -97,7 +97,7 @@ def install(
 
     # Get the path to the examples directory
     examples_dir = Path(__file__).parent / "examples"
-    example_file = examples_dir / "a2a-controller.py"
+    example_file = examples_dir / "controller-template.py"
 
     if not example_file.exists():
         console.print("[bold red]Error:[/] Example file not found")

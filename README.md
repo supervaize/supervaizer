@@ -189,6 +189,8 @@ A list of costs is maintained here:
 
 ## Documentation
 
+Note: run `just generate_model_docs` to update the `docs/model_reference.md` file (this also updates this file in the doc.supervaize.com project)
+
 - [Persistence Layer](docs/PERSISTENCE.md) - TinyDB-based storage for Jobs, Cases, and workflow entities
 
 - [API Reference](API_REFERENCE.md) - Complete documentation of classes and methods

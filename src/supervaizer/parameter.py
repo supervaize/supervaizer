@@ -13,6 +13,14 @@ from supervaizer.common import SvBaseModel, log
 
 
 class ParameterModel(SvBaseModel):
+    """
+    Base model for agent parameters that defines configuration and metadata.
+
+    Parameters can be environment variables, secrets, or regular configuration values
+    that are used by agents during execution. The Supervaize platform uses this
+    model to manage parameter definitions and values.
+    """
+
     name: str = Field(
         description="The name of the parameter, as used in the agent code"
     )
@@ -36,6 +44,17 @@ class ParameterModel(SvBaseModel):
         default=False,
         description="Whether the parameter is required, used in the Supervaize UI",
     )
+
+    model_config = {
+        "reference_group": "Core",
+        "example_dict": {
+            "name": "OPEN_API_KEY",
+            "description": "OpenAPI Key",
+            "is_environment": True,
+            "is_secret": True,
+            "is_required": True,
+        },
+    }
 
 
 class Parameter(ParameterModel):

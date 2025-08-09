@@ -84,6 +84,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.sdist]
 include = ["src/", "README.md"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/supervaizer/py.typed" = "supervaizer/py.typed"
+
 [tool.hatch.version]
 path = "src/supervaizer/__version__.py"
 
@@ -107,6 +110,3 @@ allow_untyped_globals = false
 no_implicit_optional = true
 mypy_path = "src"
 disallow_any_expr = false
-
-[dependency-groups]
-dev = []
