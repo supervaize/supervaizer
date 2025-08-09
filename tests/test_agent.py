@@ -14,7 +14,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
-from supervaizer.agent import AgentMethodField, AgentMethodsModel, FieldTypeEnum
+from supervaizer.agent import AgentMethodField, AgentMethodsAbstract, FieldTypeEnum
 from supervaizer.job import Job, JobContext
 from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
@@ -450,7 +450,7 @@ def test_agent_job_context(agent_fixture: Agent) -> None:
 
 
 def test_custom_method_key_validation() -> None:
-    """Test validation of custom method keys in AgentMethodsModel."""
+    """Test validation of custom method keys in AbstractAgentMethods."""
 
     # Create a basic agent method for testing
     basic_method = AgentMethod(
@@ -470,7 +470,7 @@ def test_custom_method_key_validation() -> None:
 
     for key in valid_keys:
         # Should not raise any validation error
-        methods = AgentMethodsModel(
+        methods = AgentMethodsAbstract(
             job_start=basic_method,
             job_stop=basic_method,
             job_status=basic_method,
@@ -497,7 +497,7 @@ def test_custom_method_key_validation() -> None:
 
     for invalid_key, expected_error_part in invalid_cases:
         with pytest.raises(ValidationError) as exc_info:
-            AgentMethodsModel(
+            AgentMethodsAbstract(
                 job_start=basic_method,
                 job_stop=basic_method,
                 job_status=basic_method,
@@ -520,7 +520,7 @@ def test_custom_method_key_validation_with_multiple_keys() -> None:
 
     # Test with mix of valid and invalid keys
     with pytest.raises(ValidationError) as exc_info:
-        AgentMethodsModel(
+        AgentMethodsAbstract(
             job_start=basic_method,
             job_stop=basic_method,
             job_status=basic_method,
@@ -545,7 +545,7 @@ def test_custom_method_key_validation_none_value() -> None:
     )
 
     # Should not raise any validation error when custom is None
-    methods = AgentMethodsModel(
+    methods = AgentMethodsAbstract(
         job_start=basic_method,
         job_stop=basic_method,
         job_status=basic_method,
@@ -562,7 +562,7 @@ def test_custom_method_key_validation_empty_dict() -> None:
     )
 
     # Should not raise any validation error when custom is empty
-    methods = AgentMethodsModel(
+    methods = AgentMethodsAbstract(
         job_start=basic_method,
         job_stop=basic_method,
         job_status=basic_method,

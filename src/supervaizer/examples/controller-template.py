@@ -4,6 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import os
 import shortuuid
 from rich.console import Console
 
@@ -15,6 +16,7 @@ from supervaizer import (
     ParametersSetup,
     Server,
 )
+from supervaizer.account import Account
 
 # Create a console with default style set to yellow
 console = Console(style="yellow")
@@ -28,7 +30,7 @@ DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
 PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
 
 # Define the parameters and secrets expected by the agent
-agent_parameters = ParametersSetup.from_list([
+agent_parameters: ParametersSetup = ParametersSetup.from_list([
     Parameter(
         name="OPEN_API_KEY",
         description="OpenAPI Key",
@@ -50,18 +52,19 @@ agent_parameters = ParametersSetup.from_list([
 ])
 
 # Define the method used to start a job
-job_start_method = AgentMethod(
-    name="start",
-    method="example_agent.example_synchronous_job_start",
-    is_async=False,
-    params={"action": "start"},
+job_start_method: AgentMethod = AgentMethod(
+    name="start",  # This is required
+    method="example_agent.example_synchronous_job_start",  # Path to the main function in dotted notation.
+    is_async=False,  # Only use sync methods for the moment
+    params={"action": "start"},  # If default parameters must be passed to the function.
     fields=[
         {
-            "name": "Company to research",
-            "type": str,
-            "field_type": "CharField",
-            "max_length": 100,
-            "required": True,
+            "name": "Company to research",  # Field name - displayed in the UI
+            "type": str,  # Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]
+            "field_type": "CharField",  # Field type for persistence.
+            "description": "Company to research",  # Optional -  Description of the field - displayed in the UI
+            "default": "Google",  # Optional - Default value for the field
+            "required": True,  # Whether the field is required
         },
         {
             "name": "Max number of results",
@@ -116,26 +119,26 @@ job_start_method = AgentMethod(
     description="Start the collection of new competitor summary",
 )
 
-job_stop_method = AgentMethod(
+job_stop_method: AgentMethod = AgentMethod(
     name="stop",
     method="control.stop",
     params={"action": "stop"},
     description="Stop the agent",
 )
-job_status_method = AgentMethod(
+job_status_method: AgentMethod = AgentMethod(
     name="status",
     method="hello.mystatus",
     params={"status": "statusvalue"},
     description="Get the status of the agent",
 )
-custom_method = AgentMethod(
+custom_method: AgentMethod = AgentMethod(
     name="custom",
     method="control.custom",
     params={"action": "custom"},
     description="Custom method",
 )
 
-custom_method2 = AgentMethod(
+custom_method2: AgentMethod = AgentMethod(
     name="custom2",
     method="control.custom2",
     params={"action": "custom2"},
@@ -146,17 +149,15 @@ custom_method2 = AgentMethod(
 agent_name = "competitor_summary"
 
 # Define the Agent
-agent = Agent(
+agent: Agent = Agent(
     name=agent_name,
     id=shortuuid.uuid(f"{agent_name}"),
-    author="John Doe",
-    developer="Developer",
-    maintainer="Ive Maintained",
-    editor="Yuri Editor",
-    version="1.3",
+    author="John Doe",  # Author of the agent
+    developer="Developer",  # Developer of the controller integration
+    maintainer="Ive Maintained",  # Maintainer of the integration
+    editor="DevAiExperts",  # Editor (usually a company)
+    version="1.3",  # Version string
     description="This is a test agent",
-    urls={"dev": "DEV_PUBLIC_URL", "prod": "PROD_PUBLIC_URL"},
-    active_environment="dev",
     tags=["testtag", "testtag2"],
     methods=AgentMethods(
         job_start=job_start_method,
@@ -168,11 +169,18 @@ agent = Agent(
     parameters_setup=agent_parameters,
 )
 
-# Define the Server
-sv_server = Server(
+account: Account = Account(
+    workspace_id=os.getenv("SUPERVAIZE_WORKSPACE_ID"),  # From supervaize.com
+    api_key=os.getenv("SUPERVAIZE_API_KEY"),  # From supervaize
+    api_url=os.getenv("SUPERVAIZE_API_URL"),  # From supervaize
+)
+
+# Define the supervaizer server capabilities
+sv_server: Server = Server(
     agents=[agent],
-    a2a_enabled=True,
-    supervisor_account=None,
+    a2a_endpoints=True,  # Enable A2A endpoints
+    acp_endpoints=True,  # Enable ACP endpoints
+    supervisor_account=account,  # Account of the supervisor from Supervaize
 )
 
 

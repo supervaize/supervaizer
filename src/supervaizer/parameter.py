@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 from supervaizer.common import SvBaseModel, log
 
 
-class ParameterModel(SvBaseModel):
+class ParameterAbstract(SvBaseModel):
     """
     Base model for agent parameters that defines configuration and metadata.
 
@@ -45,7 +45,7 @@ class ParameterModel(SvBaseModel):
         description="Whether the parameter is required, used in the Supervaize UI",
     )
 
-    model_config = {
+    model_config = {  # type: ignore
         "reference_group": "Core",
         "example_dict": {
             "name": "OPEN_API_KEY",
@@ -57,7 +57,7 @@ class ParameterModel(SvBaseModel):
     }
 
 
-class Parameter(ParameterModel):
+class Parameter(ParameterAbstract):
     @property
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -90,7 +90,29 @@ class Parameter(ParameterModel):
 
 
 class ParametersSetup(SvBaseModel):
-    definitions: Dict[str, Parameter]
+    """
+    ParametersSetup model for the Supervaize Control API.
+
+    This represents a collection of parameters that can be used by an agent.
+    It contains a dictionary of parameters, where the key is the parameter name
+    and the value is the parameter object.
+
+    Example:
+    ```python
+    ParametersSetup.from_list([
+        Parameter(name="parameter1", value="value1"),
+        Parameter(name="parameter2", value="value2", description="desc2"),
+    ])
+    ```
+    """
+
+    definitions: Dict[str, Parameter] = Field(
+        description="A dictionary of Parameters Dict[str, Parameter], where the key is the parameter name and the value is the parameter object.",
+    )
+
+    model_config = {  # type: ignore
+        "reference_group": "Core",
+    }
 
     @classmethod
     def from_list(

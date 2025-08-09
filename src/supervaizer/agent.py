@@ -51,20 +51,74 @@ class FieldTypeEnum(str, Enum):
 
 
 class AgentMethodField(BaseModel):
-    name: str = Field(description="The name of the field")
-    type: Any = Field(description="The type of the field - as a python type")
+    """
+    Represents a field specification for generating forms/UI in the Supervaize platform.
+
+    Fields are used to define user input parameters that will be collected through
+    the UI and passed as kwargs to the AgentMethod.method. They follow Django forms
+    field definitions for consistency.
+
+
+    - [Django Widgets](https://docs.djangoproject.com/en/5.2/ref/forms/widgets/)
+
+
+    ** field_type  - available field types ** [Django Field classes](https://docs.djangoproject.com/en/5.2/ref/forms/fields/#built-in-field-classes)
+
+        - `CharField` - Text input
+        - `IntegerField` - Number input
+        - `BooleanField` - Checkbox
+        - `ChoiceField` - Dropdown with options
+        - `MultipleChoiceField` - Multi-select
+        - `JSONField` - JSON data input
+
+    """
+
+    name: str = Field(description="The name of the field - displayed in the UI")
+    type: Any = Field(
+        description="Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]"
+    )
     field_type: FieldTypeEnum = Field(
-        default=FieldTypeEnum.CHAR, description="The type of field for UI rendering"
+        default=FieldTypeEnum.CHAR, description="Field type for persistence"
     )
-    description: str | None = Field(description="The description of the field")
-    choices: list[str] | None = Field(
-        description="For choice fields, list of [value, label] pairs"
+    description: str | None = Field(
+        default=None, description="Description of the field - displayed in the UI"
     )
-    default: Any = Field(description="Default value for the field")
+    choices: list[list[str, str]] | None = Field(
+        default=None, description="For choice fields, list of [value, label] pairs"
+    )
+    default: Any = Field(
+        default=None, description="Default value for the field - displayed in the UI"
+    )
     widget: str | None = Field(
-        description="UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name"
+        default=None,
+        description="UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name",
     )
-    required: bool = Field(description="Whether field is required")
+    required: bool = Field(
+        default=False, description="Whether field is required for form submission"
+    )
+
+    model_config = {  # type: ignore
+        "reference_group": "Core",
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "color",
+                    "type": "list[str]",
+                    "field_type": "MultipleChoiceField",
+                    "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
+                    "widget": "RadioSelect",
+                    "required": True,
+                },
+                {
+                    "name": "age",
+                    "type": "int",
+                    "field_type": "IntegerField",
+                    "widget": "NumberInput",
+                    "required": False,
+                },
+            ]
+        },
+    }
 
 
 class AgentJobContextBase(BaseModel):
@@ -76,7 +130,7 @@ class AgentJobContextBase(BaseModel):
     job_fields: Dict[str, Any]
 
 
-class AgentMethodModel(BaseModel):
+class AgentMethodAbstract(BaseModel):
     """
     Represents a method that can be called on an agent.
 
@@ -114,24 +168,6 @@ class AgentMethodModel(BaseModel):
        - required: Whether field is required
 
 
-       Example:
-       [
-           {
-                "name": "color",
-                "type": list[str],
-                "field_type": "MultipleChoiceField",
-                "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
-                "widget": "RadioSelect",
-                "required": True,
-            },
-            {
-                "name": "age",
-                "type": int,
-                "field_type": "IntegerField",
-                "widget": "NumberInput",
-                "required": False,
-            },
-       ]
 
     """
 
@@ -154,8 +190,27 @@ class AgentMethodModel(BaseModel):
         default=False, description="Whether the method is asynchronous"
     )
 
+    model_config = {  # type: ignore
+        "reference_group": "Core",
+        "example_dict": {
+            "name": "start",
+            "method": "example_agent.example_synchronous_job_start",
+            "params": {"action": "start"},
+            "fields": [
+                {
+                    "name": "Company to research",
+                    "type": str,
+                    "field_type": "CharField",
+                    "max_length": 100,
+                    "required": True,
+                },
+            ],
+            "description": "Start the collection of new competitor summary",
+        },
+    }
 
-class AgentMethod(AgentMethodModel):
+
+class AgentMethod(AgentMethodAbstract):
     @property
     def fields_definitions(self) -> list[Dict[str, Any]]:
         """
@@ -222,7 +277,7 @@ class AgentMethod(AgentMethodModel):
         fields_model = self.fields_annotations
 
         return type(
-            "AgentAbstractJob",
+            "AgentJobAbstract",
             (AgentJobContextBase,),
             {
                 "__annotations__": {
@@ -263,7 +318,7 @@ class AgentCustomMethodParams(AgentMethodParams):
     method_name: str
 
 
-class AgentMethodsModel(BaseModel):
+class AgentMethodsAbstract(BaseModel):
     job_start: AgentMethod
     job_stop: AgentMethod
     job_status: AgentMethod
@@ -296,7 +351,7 @@ class AgentMethodsModel(BaseModel):
         return value
 
 
-class AgentMethods(AgentMethodsModel):
+class AgentMethods(AgentMethodsAbstract):
     @property
     def registration_info(self) -> Dict[str, Any]:
         return {
@@ -311,32 +366,102 @@ class AgentMethods(AgentMethodsModel):
         }
 
 
-class AbstractAgent(SvBaseModel):
+class AgentAbstract(SvBaseModel):
     """
-    Agent model for the Supervaize Control API.
+            Agent model for the Supervaize Control API.
 
+            This represents an agent that can be registered with the Supervaize Control API.
+            It contains metadata about the agent like name, version, description etc. as well as
+            the methods it supports and any parameter configurations.
+
+            The agent ID is automatically generated from the name and must match.
+
+            Example:
+            ```python
+            Agent(
+        name="Email AI Agent",
+        author="@parthshr370",  # Author of the agent
+        developer="@alain_sv",  # Developer of the controller
+        maintainer="@aintainer",
+        editor="AI Editor",
+        version="1.0.0",
+        description="AI-powered email processing agent that can fetch, analyze, generate responses, and send/draft emails",
+        tags=["email", "ai", "automation", "communication"],
+        methods=AgentMethods(
+            job_start=process_email_method, # Job start method
+            job_stop=job_stop, # Job stop method
+            job_status=job_status, # Job status method
+            chat=None,
+            custom=None,
+        ),
+        parameters_setup=ParametersSetup.from_list([
+            Parameter(
+                name="IMAP_USERNAME",
+                description="IMAP username for email access",
+                is_environment=True,
+                is_secret=False,
+            ),
+            Parameter(
+                name="IMAP_PASSWORD",
+                description="IMAP password for email access",
+                is_environment=True,
+                is_secret=True,
+            ),
+        ]),
+    )
+            ```
     """
 
     supervaizer_VERSION: ClassVar[str] = VERSION
-    name: str
-    id: str
-    author: Optional[str] = None
-    developer: Optional[str] = None
-    maintainer: Optional[str] = None
-    editor: Optional[str] = None
-    version: str
-    description: str
-    tags: list[str] | None = None
-    methods: AgentMethods | None = None
-    parameters_setup: ParametersSetup | None = None
-    server_agent_id: str | None = None
-    server_agent_status: str | None = None
-    server_agent_onboarding_status: str | None = None
-    server_encrypted_parameters: str | None = None
-    max_execution_time: int
+    name: str = Field(description="Display name of the agent")
+    id: str = Field(description="Unique ID generated from name")
+    author: Optional[str] = Field(default=None, description="Author of the agent")
+    developer: Optional[str] = Field(
+        default=None, description="Developer of the controller integration"
+    )
+    maintainer: Optional[str] = Field(
+        default=None, description="Maintainer of the integration"
+    )
+    editor: Optional[str] = Field(
+        default=None, description="Editor (usually a company)"
+    )
+    version: str = Field(default="", description="Version string")
+    description: str = Field(
+        default="", description="Description of what the agent does"
+    )
+    tags: list[str] | None = Field(
+        default=None, description="Tags for categorizing the agent"
+    )
+    methods: AgentMethods | None = Field(
+        default=None, description="Methods supported by this agent"
+    )
+    parameters_setup: ParametersSetup | None = Field(
+        default=None, description="Parameter configuration"
+    )
+    server_agent_id: str | None = Field(
+        default=None, description="ID assigned by server - Do not set this manually"
+    )
+    server_agent_status: str | None = Field(
+        default=None, description="Current status on server - Do not set this manually"
+    )
+    server_agent_onboarding_status: str | None = Field(
+        default=None, description="Onboarding status - Do not set this manually"
+    )
+    server_encrypted_parameters: str | None = Field(
+        default=None,
+        description="Encrypted parameters from server - Do not set this manually",
+    )
+    max_execution_time: int = Field(
+        default=60 * 60,
+        description="Maximum execution time in seconds, defaults to 1 hour",
+    )
+
+    model_config = {  # type: ignore
+        "reference_group": "Core",
+    }
 
 
-class Agent(AbstractAgent):
+class Agent(AgentAbstract):
     def __init__(
         self,
         name: str,

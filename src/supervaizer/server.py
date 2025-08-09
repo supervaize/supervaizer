@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
@@ -77,13 +77,11 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append(
-                    {
-                        "name": agent.name,
-                        "description": agent.description,
-                        "version": agent.version,
-                    }
-                )
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                })
 
         # Create server info
         server_info = ServerInfo(
@@ -118,28 +116,90 @@ def get_server_info_from_storage() -> Optional[ServerInfo]:
     return None
 
 
-class AbstractServer(SvBaseModel):
-    """API Server for the Supervaize Controller."""
+class ServerAbstract(SvBaseModel):
+    """
+    API Server for the Supervaize Controller.
 
-    model_config = {"arbitrary_types_allowed": True}  # for FastAPI
+    This represents the main server instance that manages agents and provides
+    the API endpoints for the Supervaize Control API. It handles agent registration,
+    job execution, and communication with the Supervaize platform.
+
+    The server can be configured with various endpoints (A2A, ACP, admin interface)
+    and supports encryption/decryption of parameters using RSA keys.
+
+    registration_host: Host to use for outbound connections and registration.
+                This is especially important in Docker environments where the binding
+                address (0.0.0.0) can't be used for outbound connections. Set to
+                'host.docker.internal' for Docker or the appropriate service name
+                in container environments.
+                Examples:
+                - In Docker, set to 'host.docker.internal' to reach the host machine
+                - In Kubernetes, might be set to the service name or external DNS
+                If not provided, falls back to using the listening host.
+
+    """
+
     supervaizer_VERSION: ClassVar[str] = VERSION
-    scheme: str
-    host: str
-    port: int
-    environment: str
-    mac_addr: str
-    debug: bool
-    agents: List[Agent]
-    app: FastAPI
-    reload: bool
-    supervisor_account: Optional[Account] = None
-    a2a_endpoints: bool = True
-    acp_endpoints: bool = True
-    private_key: RSAPrivateKey
-    public_key: RSAPublicKey
-    registration_host: Optional[str] = None
-    api_key: Optional[str] = None
-    api_key_header: Optional[APIKeyHeader] = None
+    scheme: str = Field(description="URL scheme (http or https)")
+    host: str = Field(
+        description="Host to bind the server to (e.g., 0.0.0.0 for all interfaces)"
+    )
+    port: int = Field(description="Port to bind the server to")
+    environment: str = Field(description="Environment name (e.g., dev, staging, prod)")
+    mac_addr: str = Field(description="MAC address to use for server identification")
+    debug: bool = Field(description="Whether to enable debug mode")
+    agents: List[Agent] = Field(
+        description="List of agents to register with the server"
+    )
+    app: FastAPI = Field(description="FastAPI application instance")
+    reload: bool = Field(description="Whether to enable auto-reload")
+    supervisor_account: Optional[Account] = Field(
+        default=None, description="Account of the supervisor"
+    )
+    a2a_endpoints: bool = Field(
+        default=True, description="Whether to enable A2A endpoints"
+    )
+    acp_endpoints: bool = Field(
+        default=True, description="Whether to enable ACP endpoints"
+    )
+    private_key: RSAPrivateKey = Field(description="RSA private key for encryption")
+    public_key: RSAPublicKey = Field(description="RSA public key for encryption")
+    registration_host: Optional[str] = Field(
+        default=None,
+        description="Host to use for outbound connections and registration",
+    )
+    api_key: Optional[str] = Field(
+        default=None,
+        description="Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated",
+    )
+    api_key_header: Optional[APIKeyHeader] = Field(
+        default=None, description="API key header for authentication"
+    )
+
+    model_config = {  # type: ignore
+        "reference_group": "Core",
+        "arbitrary_types_allowed": True,  # for FastAPI
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "agents": "[agent]",
+                    "a2a_enabled": True,
+                    "supervisor_account": None,
+                },
+                {
+                    "scheme": "http",
+                    "host": "0.0.0.0",
+                    "port": 8000,
+                    "environment": "dev",
+                    "mac_addr": "00-11-22-33-44-55",
+                    "debug": False,
+                    "reload": False,
+                    "a2a_endpoints": True,
+                    "acp_endpoints": True,
+                },
+            ]
+        },
+    }
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:
@@ -160,7 +220,7 @@ class AbstractServer(SvBaseModel):
         return None
 
 
-class Server(AbstractServer):
+class Server(ServerAbstract):
     def __init__(
         self,
         agents: List[Agent],
@@ -200,15 +260,7 @@ class Server(AbstractServer):
             reload: Whether to enable auto-reload
             mac_addr: MAC address to use for server identification
             private_key: RSA private key for encryption
-            registration_host: Host to use for outbound connections and registration.
-                This is especially important in Docker environments where the binding
-                address (0.0.0.0) can't be used for outbound connections. Set to
-                'host.docker.internal' for Docker or the appropriate service name
-                in container environments.
-                Examples:
-                - In Docker, set to 'host.docker.internal' to reach the host machine
-                - In Kubernetes, might be set to the service name or external DNS
-                If not provided, falls back to using the listening host.
+
             api_key: API key for securing endpoints
 
         """

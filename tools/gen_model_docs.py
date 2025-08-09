@@ -33,6 +33,7 @@ import pkgutil
 import dataclasses
 import shutil
 import json
+from datetime import datetime
 from types import ModuleType
 from pathlib import Path
 from typing import Any, Iterator, Union, Dict, List
@@ -534,7 +535,7 @@ def generate_model_docs() -> None:
                     out.append(f"| `{f}` | {t} | {d} | {desc} |")
                 out.append("")
 
-            # Add example if available in model_config
+            # Add examples if available in model_config
             if issubclass(model, BaseModel):
                 model_config = getattr(model, "model_config", {})
                 if not model_config:
@@ -544,6 +545,14 @@ def generate_model_docs() -> None:
                 if not model_config:
                     model_config = getattr(type(model), "model_config", {})
 
+                # Custom JSON encoder to handle type objects
+                class TypeEncoder(json.JSONEncoder):
+                    def default(self, obj: Any) -> Any:
+                        if isinstance(obj, type):
+                            return obj.__name__
+                        return super().default(obj)
+
+                # Check for example_dict
                 example_dict = model_config.get("example_dict")
                 if example_dict:
                     # Check if parent also has the same example to avoid duplication
@@ -566,8 +575,50 @@ def generate_model_docs() -> None:
                     if not parent_has_same_example:
                         out.append("#### Example\n")
                         out.append("```json\n")
-                        out.append(json.dumps(example_dict, indent=2))
+                        out.append(json.dumps(example_dict, indent=2, cls=TypeEncoder))
                         out.append("\n```\n")
+
+                # Check for json_schema_extra["examples"]
+                json_schema_extra = model_config.get("json_schema_extra", {})
+                examples = json_schema_extra.get("examples", [])
+                if examples:
+                    # Check if parent also has the same examples to avoid duplication
+                    parent_has_same_examples = False
+                    if parent_model:
+                        parent_model_config = getattr(parent_model, "model_config", {})
+                        if not parent_model_config:
+                            parent_model_config = getattr(
+                                parent_model, "__dict__", {}
+                            ).get("model_config", {})
+                        if not parent_model_config:
+                            parent_model_config = getattr(
+                                type(parent_model), "model_config", {}
+                            )
+
+                        parent_json_schema_extra = parent_model_config.get(
+                            "json_schema_extra", {}
+                        )
+                        parent_examples = parent_json_schema_extra.get("examples", [])
+                        if parent_examples == examples:
+                            parent_has_same_examples = True
+
+                    if not parent_has_same_examples:
+                        if len(examples) == 1:
+                            out.append("#### Example\n")
+                            out.append("```json\n")
+                            out.append(
+                                json.dumps(examples[0], indent=2, cls=TypeEncoder)
+                            )
+                            out.append("\n```\n")
+                        else:
+                            out.append("#### Examples\n")
+                            for i, example in enumerate(examples, 1):
+                                out.append(f"**Example {i}:**\n")
+                                out.append("```json\n")
+                                out.append(
+                                    json.dumps(example, indent=2, cls=TypeEncoder)
+                                )
+                                out.append("\n```\n")
 
         # Determine output filename based on group name
         if group_name == "extra":
@@ -576,6 +627,12 @@ def generate_model_docs() -> None:
             filename = f"model_{group_name}.md".lower()
 
         output_file = OUTPUT / filename
+
+        # Add timestamp at the bottom
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        out.append("")
+        out.append(f"*Updated on {timestamp}*")
+
         output_file.write_text("\n".join(out))
         print(f"✅ Wrote model reference for group '{group_name}' to {output_file}")
 
