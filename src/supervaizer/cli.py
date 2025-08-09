@@ -78,7 +78,7 @@ def start(
 
 
 @app.command()
-def create_example(
+def scaffold(
     output_path: str = typer.Option(
         os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control_example.py"),
         help="Path to save the script",

@@ -41,7 +41,7 @@ from pydantic import BaseModel
 PACKAGE = "supervaizer"
 OUTPUT = Path("docs/model_reference")
 EXTERNAL_DOC_PATH = Path(
-    "../doc/supervaize-doc/docs/Supervaizer Controller/model_reference"
+    "../doc/supervaize-doc/docs/supervaizer-controller/model_reference"
 )
 
 
@@ -177,20 +177,41 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
             # Handle Union types (e.g., str | None)
             type_args = getattr(type_obj, "__args__", [])
             type_parts = []
+            non_none_types = []
             for arg in type_args:
                 if arg is type(None):
-                    type_parts.append("`None`")
+                    # Skip None types, we'll handle them via default value
+                    continue
                 else:
                     # Handle complex types like list[str]
                     arg_str = str(arg)
                     if "[" in arg_str and "]" in arg_str:
                         # Complex type like list[str], dict[str, int], etc.
-                        type_parts.append(f"`{arg_str}`")
+                        non_none_types.append(f"`{arg_str}`")
                     else:
-                        type_parts.append(
+                        non_none_types.append(
                             f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
                         )
-            type_str = " | ".join(type_parts)
+
+            # If we have non-None types, use them; otherwise fall back to original logic
+            if non_none_types:
+                type_str = " \\| ".join(non_none_types)
+            else:
+                # Fallback to original logic if no non-None types found
+                for arg in type_args:
+                    if arg is type(None):
+                        type_parts.append("`None`")
+                    else:
+                        # Handle complex types like list[str]
+                        arg_str = str(arg)
+                        if "[" in arg_str and "]" in arg_str:
+                            # Complex type like list[str], dict[str, int], etc.
+                            type_parts.append(f"`{arg_str}`")
+                        else:
+                            type_parts.append(
+                                f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                            )
+                type_str = " \\| ".join(type_parts)
         elif type_obj is not None and str(type_obj).startswith("typing.Union"):
             # Handle older Union syntax
             type_str = (
@@ -202,7 +223,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
             # Add backticks around each type
             type_parts = type_str.split(" | ")
             type_parts = [f"`{part.strip()}`" for part in type_parts]
-            type_str = " | ".join(type_parts)
+            type_str = " \\| ".join(type_parts)
         elif type_obj is not None and str(type_obj).startswith("typing.Optional"):
             # Handle Optional types (which are Union[T, None])
             inner_type = str(type_obj).replace("typing.Optional[", "").replace("]", "")
@@ -235,7 +256,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
                 default_val = getattr(field, "default")
                 # Hide Pydantic undefined sentinels
                 if default_val is None:
-                    default_repr = "—"
+                    default_repr = "`None`"
                 else:
                     s = repr(default_val)
                     if "Undefined" in s or "PydanticUndefined" in s:
@@ -247,6 +268,39 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
 
         result.append((name, type_str, default_repr, desc))
     return result
+
+
+def get_parent_model(
+    model: type[BaseModel], models_by_group: Dict[str, List[type[BaseModel]]]
+) -> type[BaseModel] | None:
+    """Find the parent model that is also documented in the same group."""
+    if not issubclass(model, BaseModel):
+        return None
+
+    # Get all bases that are Pydantic models
+    bases = [
+        base
+        for base in model.__bases__
+        if issubclass(base, BaseModel) and base != BaseModel
+    ]
+
+    # Find the parent that is also in our documented models
+    for base in bases:
+        for group_models in models_by_group.values():
+            if base in group_models:
+                return base
+
+    return None
+
+
+def get_model_group(
+    model: type[BaseModel], models_by_group: Dict[str, List[type[BaseModel]]]
+) -> str:
+    """Find which group a model belongs to."""
+    for group_name, group_models in models_by_group.items():
+        if model in group_models:
+            return group_name
+    return "extra"  # fallback
 
 
 def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
@@ -268,20 +322,41 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
             # Handle Union types (e.g., str | None)
             type_args = getattr(type_, "__args__", [])
             type_parts = []
+            non_none_types = []
             for arg in type_args:
                 if arg is type(None):
-                    type_parts.append("`None`")
+                    # Skip None types, we'll handle them via default value
+                    continue
                 else:
                     # Handle complex types like list[str]
                     arg_str = str(arg)
                     if "[" in arg_str and "]" in arg_str:
                         # Complex type like list[str], dict[str, int], etc.
-                        type_parts.append(f"`{arg_str}`")
+                        non_none_types.append(f"`{arg_str}`")
                     else:
-                        type_parts.append(
+                        non_none_types.append(
                             f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
                         )
-            type_str = " | ".join(type_parts)
+
+            # If we have non-None types, use them; otherwise fall back to original logic
+            if non_none_types:
+                type_str = " \\| ".join(non_none_types)
+            else:
+                # Fallback to original logic if no non-None types found
+                for arg in type_args:
+                    if arg is type(None):
+                        type_parts.append("`None`")
+                    else:
+                        # Handle complex types like list[str]
+                        arg_str = str(arg)
+                        if "[" in arg_str and "]" in arg_str:
+                            # Complex type like list[str], dict[str, int], etc.
+                            type_parts.append(f"`{arg_str}`")
+                        else:
+                            type_parts.append(
+                                f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                            )
+                type_str = " \\| ".join(type_parts)
         elif type_ is not None and str(type_).startswith("typing.Union"):
             # Handle older Union syntax
             type_str = (
@@ -293,7 +368,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
             # Add backticks around each type
             type_parts = type_str.split(" | ")
             type_parts = [f"`{part.strip()}`" for part in type_parts]
-            type_str = " | ".join(type_parts)
+            type_str = " \\| ".join(type_parts)
         elif type_ is not None and str(type_).startswith("typing.Optional"):
             # Handle Optional types (which are Union[T, None])
             inner_type = str(type_).replace("typing.Optional[", "").replace("]", "")
@@ -308,6 +383,8 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
         default = (
             "**required**"
             if required
+            else "`None`"
+            if field.default is None
             else sanitize_default_for_mdx(repr(field.default))
             if field.default is not dataclasses.MISSING
             else "factory"
@@ -364,28 +441,58 @@ def generate_model_docs() -> None:
 
     # Generate documentation for each group
     for group_name, models in models_by_group.items():
-        out = ["# Model Reference", ""]
+        out = [f"# Model Reference {group_name}", ""]
         out.append(f"**Version:** {version}\n")
-        out.append(f"## Models in Group: `{group_name}`\n")
 
         for model in models:
             # Remove "supervaizer." prefix from module name
             module_name = model.__module__.replace("supervaizer.", "")
             out.append(f"### `{module_name}.{model.__name__}`\n")
+
+            # Check if this model inherits from another documented model
+            parent_model = get_parent_model(model, models_by_group)
+            if parent_model:
+                parent_module = parent_model.__module__.replace("supervaizer.", "")
+                parent_group = get_model_group(parent_model, models_by_group)
+
+                # Generate appropriate link based on whether parent is in same file
+                if parent_group == group_name:
+                    link = f"#{parent_module}-{parent_model.__name__.lower()}"
+                else:
+                    # Cross-file link
+                    if parent_group == "extra":
+                        link = f"../model_extra.md#{parent_module}-{parent_model.__name__.lower()}"
+                    else:
+                        link = f"../model_{parent_group.lower()}.md#{parent_module}-{parent_model.__name__.lower()}"
+
+                out.append(
+                    f"**Inherits from:** [`{parent_module}.{parent_model.__name__}`]({link})\n"
+                )
+
+            # Show class description, but hide if it's the same as parent's
             doc = inspect.getdoc(model)
             if doc:
-                # Filter out verbose Pydantic base class documentation
-                if (
-                    "!!! abstract" in doc
-                    or "A base class for creating Pydantic models" in doc
-                ):
-                    # Only show the essential base class description
-                    if "A base class for creating Pydantic models" in doc:
-                        out.append("A base class for creating Pydantic models.\n")
-                else:
-                    # Format JSON content in documentation
-                    formatted_doc = format_json_in_doc(doc)
-                    out.append(formatted_doc + "\n")
+                # Check if parent has the same description
+                parent_has_same_doc = False
+                if parent_model:
+                    parent_doc = inspect.getdoc(parent_model)
+                    if parent_doc == doc:
+                        parent_has_same_doc = True
+
+                # Only show description if it's different from parent or if there's no parent
+                if not parent_has_same_doc:
+                    # Filter out verbose Pydantic base class documentation
+                    if (
+                        "!!! abstract" in doc
+                        or "A base class for creating Pydantic models" in doc
+                    ):
+                        # Only show the essential base class description
+                        if "A base class for creating Pydantic models" in doc:
+                            out.append("A base class for creating Pydantic models.\n")
+                    else:
+                        # Format JSON content in documentation
+                        formatted_doc = format_json_in_doc(doc)
+                        out.append(formatted_doc + "\n")
 
             if issubclass(model, BaseModel):
                 rows = get_model_fields(model)
@@ -398,12 +505,69 @@ def generate_model_docs() -> None:
                 out.append("_No fields found._\n")
                 continue
 
-            out.append("| Field | Type | Default | Description |")
-            out.append("|---|---|---|---|")
-            for f, t, d, desc in rows:
-                # Types already have backticks, don't add extra ones
-                out.append(f"| `{f}` | {t} | {d} | {desc} |")
-            out.append("")
+            # If this model inherits from another documented model, show only new fields
+            if parent_model:
+                parent_fields = (
+                    get_model_fields(parent_model)
+                    if issubclass(parent_model, BaseModel)
+                    else get_dataclass_fields(parent_model)
+                )
+                parent_field_names = {field[0] for field in parent_fields}
+                new_fields = [
+                    field for field in rows if field[0] not in parent_field_names
+                ]
+
+                if new_fields:
+                    out.append("#### Model Fields\n")
+                    out.append("| Field | Type | Default | Description |")
+                    out.append("|---|---|---|---|")
+                    for f, t, d, desc in new_fields:
+                        out.append(f"| `{f}` | {t} | {d} | {desc} |")
+                    out.append("")
+                else:
+                    out.append("_No additional fields beyond parent class._\n")
+            else:
+                # Show all fields for models without inheritance
+                out.append("| Field | Type | Default | Description |")
+                out.append("|---|---|---|---|")
+                for f, t, d, desc in rows:
+                    out.append(f"| `{f}` | {t} | {d} | {desc} |")
+                out.append("")
+
+            # Add example if available in model_config
+            if issubclass(model, BaseModel):
+                model_config = getattr(model, "model_config", {})
+                if not model_config:
+                    model_config = getattr(model, "__dict__", {}).get(
+                        "model_config", {}
+                    )
+                if not model_config:
+                    model_config = getattr(type(model), "model_config", {})
+
+                example_dict = model_config.get("example_dict")
+                if example_dict:
+                    # Check if parent also has the same example to avoid duplication
+                    parent_has_same_example = False
+                    if parent_model:
+                        parent_model_config = getattr(parent_model, "model_config", {})
+                        if not parent_model_config:
+                            parent_model_config = getattr(
+                                parent_model, "__dict__", {}
+                            ).get("model_config", {})
+                        if not parent_model_config:
+                            parent_model_config = getattr(
+                                type(parent_model), "model_config", {}
+                            )
+
+                        parent_example = parent_model_config.get("example_dict")
+                        if parent_example == example_dict:
+                            parent_has_same_example = True
+
+                    if not parent_has_same_example:
+                        out.append("#### Example\n")
+                        out.append("```json\n")
+                        out.append(json.dumps(example_dict, indent=2))
+                        out.append("\n```\n")
 
         # Determine output filename based on group name
         if group_name == "extra":

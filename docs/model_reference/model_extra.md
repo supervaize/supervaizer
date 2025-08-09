@@ -1,22 +1,18 @@
-# Model Reference
+# Model Reference extra
 
 **Version:** 0.9.4
 
-## Models in Group: `extra`
-
 ### `account.Account`
 
-Base model for all Supervaize models.
+**Inherits from:** [`account.AccountModel`](#account-accountmodel)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `workspace_id` | `str` | **required** |  |
-| `api_key` | `str` | **required** |  |
-| `api_url` | `str` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `account.AccountModel`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -32,6 +28,8 @@ _No fields found._
 
 ### `telemetry.Telemetry`
 
+**Inherits from:** [`telemetry.TelemetryModel`](#telemetry-telemetrymodel)
+
 Base class for all telemetry data in the Supervaize Control system.
 
 Telemetry represents monitoring and observability data sent from agents to the control system.
@@ -44,67 +42,49 @@ Inherits from TelemetryModel which defines the core telemetry attributes:
     - severity: The TelemetrySeverity enum indicating importance (debug, info, warning, etc)
     - details: A dictionary containing telemetry-specific details
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `agentId` | `str` | **required** |  |
-| `type` | `TelemetryType` | **required** |  |
-| `category` | `TelemetryCategory` | **required** |  |
-| `severity` | `TelemetrySeverity` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `agent.AbstractAgent`
 
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
 Agent model for the Supervaize Control API.
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `id` | `str` | **required** |  |
-| `author` | `str` | `None` | — |  |
-| `developer` | `str` | `None` | — |  |
-| `maintainer` | `str` | `None` | — |  |
-| `editor` | `str` | `None` | — |  |
+| `author` | `str` | `None` |  |
+| `developer` | `str` | `None` |  |
+| `maintainer` | `str` | `None` |  |
+| `editor` | `str` | `None` |  |
 | `version` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `tags` | `list[str]` | `None` | — |  |
-| `methods` | `AgentMethods` | `None` | — |  |
-| `parameters_setup` | `ParametersSetup` | `None` | — |  |
-| `server_agent_id` | `str` | `None` | — |  |
-| `server_agent_status` | `str` | `None` | — |  |
-| `server_agent_onboarding_status` | `str` | `None` | — |  |
-| `server_encrypted_parameters` | `str` | `None` | — |  |
+| `tags` | `list[str]` | `None` |  |
+| `methods` | `AgentMethods` | `None` |  |
+| `parameters_setup` | `ParametersSetup` | `None` |  |
+| `server_agent_id` | `str` | `None` |  |
+| `server_agent_status` | `str` | `None` |  |
+| `server_agent_onboarding_status` | `str` | `None` |  |
+| `server_encrypted_parameters` | `str` | `None` |  |
 | `max_execution_time` | `int` | **required** |  |
 
 ### `agent.Agent`
 
-Agent model for the Supervaize Control API.
+**Inherits from:** [`agent.AbstractAgent`](#agent-abstractagent)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** |  |
-| `id` | `str` | **required** |  |
-| `author` | `str` | `None` | — |  |
-| `developer` | `str` | `None` | — |  |
-| `maintainer` | `str` | `None` | — |  |
-| `editor` | `str` | `None` | — |  |
-| `version` | `str` | **required** |  |
-| `description` | `str` | **required** |  |
-| `tags` | `list[str]` | `None` | — |  |
-| `methods` | `AgentMethods` | `None` | — |  |
-| `parameters_setup` | `ParametersSetup` | `None` | — |  |
-| `server_agent_id` | `str` | `None` | — |  |
-| `server_agent_status` | `str` | `None` | — |  |
-| `server_agent_onboarding_status` | `str` | `None` | — |  |
-| `server_encrypted_parameters` | `str` | `None` | — |  |
-| `max_execution_time` | `int` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `agent.AgentCustomMethodParams`
 
-Method parameters for agent operations.
+**Inherits from:** [`agent.AgentMethodParams`](#agent-agentmethodparams)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `params` | `Dict` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
 | `method_name` | `str` | **required** |  |
 
 ### `agent.AgentJobContextBase`
@@ -118,77 +98,9 @@ Base model for agent job context parameters
 
 ### `agent.AgentMethod`
 
-Represents a method that can be called on an agent.
+**Inherits from:** [`agent.AgentMethodModel`](#agent-agentmethodmodel)
 
-Attributes:
-    name: Display name of the method
-    method: Name of the actual method in the project's codebase that will be called with the provided parameters
-    params: see below
-    fields: see below
-    description: Optional description of what the method does
-
-
-1. params : Dictionary format
-   A simple key-value dictionary of parameters what will be passed to the
-   AgentMethod.method as kwargs.
-   Example:
-
-```json
-{
-  "verbose": true,
-  "timeout": 60,
-  "max_retries": 3
-}
-```
-
-
-2. fields : Form fields format
-   These are the values that will be requested from the user in the Supervaize UI
-   and also passed as kwargs to the AgentMethod.method.
-   A list of field specifications for generating forms/UI, following the
-   django.forms.fields definition
-   see : https://docs.djangoproject.com/en/5.1/ref/forms/fields/
-   Each field is a dictionary with properties like:
-   - name: Field identifier
-   - type: Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]
-   - field_type: Field type (one of: CharField, IntegerField, BooleanField, ChoiceField, MultipleChoiceField)
-   - choices: For choice fields, list of [value, label] pairs
-   - default: (optional) Default value for the field
-   - widget: UI widget to use (e.g. RadioSelect, TextInput)
-   - required: Whether field is required
-
-
-   Example:
-
-```json
-   [
-       {
-            "name": "color",
-            "type": list[str],
-            "field_type": "MultipleChoiceField",
-            "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
-            "widget": "RadioSelect",
-            "required": True,
-        },
-        {
-            "name": "age",
-            "type": int,
-            "field_type": "IntegerField",
-            "widget": "NumberInput",
-            "required": False,
-        },
-   ]
-```
-
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the method |
-| `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `typing.Dict[str, typing.Any]` | `None` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
-| `description` | `str` | `None` | — | Optional description of what the method does |
-| `is_async` | `bool` | False | Whether the method is asynchronous |
+_No additional fields beyond parent class._
 
 ### `agent.AgentMethodField`
 
@@ -199,10 +111,10 @@ A base class for creating Pydantic models.
 | `name` | `str` | **required** | The name of the field |
 | `type` | `Any` | **required** | The type of the field - as a python type |
 | `field_type` | `FieldTypeEnum` | `CharField` | The type of field for UI rendering |
-| `description` | `str` | `None` | **required** | The description of the field |
-| `choices` | `list[str]` | `None` | **required** | For choice fields, list of [value, label] pairs |
+| `description` | `str` | **required** | The description of the field |
+| `choices` | `list[str]` | **required** | For choice fields, list of [value, label] pairs |
 | `default` | `Any` | **required** | Default value for the field |
-| `widget` | `str` | `None` | **required** | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
+| `widget` | `str` | **required** | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | **required** | Whether field is required |
 
 ### `agent.AgentMethodModel`
@@ -274,9 +186,9 @@ Attributes:
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the method |
 | `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `typing.Dict[str, typing.Any]` | `None` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | — | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
-| `description` | `str` | `None` | — | Optional description of what the method does |
+| `params` | `typing.Dict[str, typing.Any]` | `None` | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
+| `description` | `str` | `None` | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 
 ### `agent.AgentMethodParams`
@@ -289,15 +201,9 @@ Method parameters for agent operations.
 
 ### `agent.AgentMethods`
 
-A base class for creating Pydantic models.
+**Inherits from:** [`agent.AgentMethodsModel`](#agent-agentmethodsmodel)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `job_start` | `AgentMethod` | **required** |  |
-| `job_stop` | `AgentMethod` | **required** |  |
-| `job_status` | `AgentMethod` | **required** |  |
-| `chat` | `AgentMethod` | `None` | — |  |
-| `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
+_No additional fields beyond parent class._
 
 ### `agent.AgentMethodsModel`
 
@@ -308,8 +214,8 @@ A base class for creating Pydantic models.
 | `job_start` | `AgentMethod` | **required** |  |
 | `job_stop` | `AgentMethod` | **required** |  |
 | `job_status` | `AgentMethod` | **required** |  |
-| `chat` | `AgentMethod` | `None` | — |  |
-| `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` | — |  |
+| `chat` | `AgentMethod` | `None` |  |
+| `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` |  |
 
 ### `agent.AgentResponse`
 
@@ -319,22 +225,24 @@ Response model for agent endpoints - values provided by Agent.registration_info
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `id` | `str` | **required** |  |
-| `author` | `str` | `None` | — |  |
-| `developer` | `str` | `None` | — |  |
-| `maintainer` | `str` | `None` | — |  |
-| `editor` | `str` | `None` | — |  |
+| `author` | `str` | `None` |  |
+| `developer` | `str` | `None` |  |
+| `maintainer` | `str` | `None` |  |
+| `editor` | `str` | `None` |  |
 | `version` | `str` | **required** |  |
 | `api_path` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `tags` | `list[str]` | `None` | — |  |
-| `methods` | `AgentMethods` | `None` | — |  |
-| `parameters_setup` | `typing.List[typing.Dict[str, typing.Any]]` | `None` | — |  |
-| `server_agent_id` | `str` | `None` | — |  |
-| `server_agent_status` | `str` | `None` | — |  |
-| `server_agent_onboarding_status` | `str` | `None` | — |  |
-| `server_encrypted_parameters` | `str` | `None` | — |  |
+| `tags` | `list[str]` | `None` |  |
+| `methods` | `AgentMethods` | `None` |  |
+| `parameters_setup` | `typing.List[typing.Dict[str, typing.Any]]` | `None` |  |
+| `server_agent_id` | `str` | `None` |  |
+| `server_agent_status` | `str` | `None` |  |
+| `server_agent_onboarding_status` | `str` | `None` |  |
+| `server_encrypted_parameters` | `str` | `None` |  |
 
 ### `job.Job`
+
+**Inherits from:** [`job.AbstractJob`](#job-abstractjob)
 
 Jobs are typically created by the platform and are not created by the agent.
 
@@ -350,25 +258,13 @@ Args:
     finished_at (datetime, optional): When job completed. Defaults to None
     created_at (datetime, optional): When job was created. Defaults to None
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `id` | `str` | **required** |  |
-| `name` | `str` | **required** |  |
-| `agent_name` | `str` | **required** |  |
-| `status` | `EntityStatus` | **required** |  |
-| `job_context` | `JobContext` | **required** |  |
-| `payload` | `Any` | `None` | — |  |
-| `result` | `Any` | `None` | — |  |
-| `error` | `str` | `None` | — |  |
-| `responses` | `list` | [] |  |
-| `finished_at` | `datetime` | `None` | — |  |
-| `created_at` | `datetime` | `None` | — |  |
-| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
-| `case_ids` | `List` | [] |  |
+_No additional fields beyond parent class._
 
 ### `job.JobContext`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -378,48 +274,35 @@ Base model for all Supervaize models.
 | `started_at` | `datetime` | **required** |  |
 | `mission_id` | `str` | **required** |  |
 | `mission_name` | `str` | **required** |  |
-| `mission_context` | `Any` | — |  |
-| `job_instructions` | `JobInstructions` | `None` | — |  |
+| `mission_context` | `Any` | `None` |  |
+| `job_instructions` | `JobInstructions` | `None` |  |
 
 ### `job.JobResponse`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `job_id` | `str` | **required** |  |
 | `status` | `EntityStatus` | **required** |  |
 | `message` | `str` | **required** |  |
-| `payload` | `dict[str, typing.Any]` | `None` | — |  |
-| `error_message` | `str` | `None` | — |  |
-| `error_traceback` | `str` | `None` | — |  |
+| `payload` | `dict[str, typing.Any]` | `None` |  |
+| `error_message` | `str` | `None` |  |
+| `error_traceback` | `str` | `None` |  |
 
 ### `event.JobStartConfirmationEvent`
 
-Base class for all events in the Supervaize Control system.
+**Inherits from:** [`event.Event`](#event-event)
 
-Events represent messages sent from agents to the control system to communicate
-status, anomalies, deliverables and other information.
-
-Inherits from AbstractEvent which defines the core event attributes:
-    - source: The source/origin of the event (e.g. agent/server URI)
-    - type: The EventType enum indicating the event category
-    - account: The account that the event belongs to
-    - details: A dictionary containing event-specific details
-
-Tests in tests/test_event.py
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `parameter.ParametersSetup`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -427,24 +310,15 @@ Base model for all Supervaize models.
 
 ### `case.Case`
 
-Base model for all Supervaize models.
+**Inherits from:** [`case.CaseAbstractModel`](#case-caseabstractmodel)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `id` | `str` | **required** |  |
-| `job_id` | `str` | **required** |  |
-| `name` | `str` | **required** |  |
-| `account` | `Account` | **required** |  |
-| `description` | `str` | **required** |  |
-| `status` | `EntityStatus` | **required** |  |
-| `updates` | `List` | [] |  |
-| `total_cost` | `float` | 0.0 |  |
-| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
-| `finished_at` | `datetime` | `None` | — |  |
+_No additional fields beyond parent class._
 
 ### `case.CaseAbstractModel`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -456,12 +330,14 @@ Base model for all Supervaize models.
 | `status` | `EntityStatus` | **required** |  |
 | `updates` | `List` | [] |  |
 | `total_cost` | `float` | 0.0 |  |
-| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` | — |  |
-| `finished_at` | `datetime` | `None` | — |  |
+| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `finished_at` | `datetime` | `None` |  |
 
 ### `case.CaseNode`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -471,24 +347,30 @@ Base model for all Supervaize models.
 
 ### `case.CaseNodeUpdate`
 
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
 CaseNodeUpdate is a class that represents an update to a case node.
 
 
 Returns:
     CaseNodeUpdate: CaseNodeUpdate object
 
+#### Model Fields
+
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `index` | `int` | `None` | — |  |
-| `cost` | `float` | `None` | — |  |
-| `name` | `str` | `None` | — |  |
-| `payload` | `typing.Dict[str, typing.Any]` | `None` | — |  |
+| `index` | `int` | `None` |  |
+| `cost` | `float` | `None` |  |
+| `name` | `str` | `None` |  |
+| `payload` | `typing.Dict[str, typing.Any]` | `None` |  |
 | `is_final` | `bool` | False |  |
-| `error` | `str` | `None` | — |  |
+| `error` | `str` | `None` |  |
 
 ### `event.AbstractEvent`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -500,66 +382,30 @@ Base model for all Supervaize models.
 
 ### `event.AgentRegisterEvent`
 
+**Inherits from:** [`event.Event`](#event-event)
+
 Event sent when an agent registers with the control system.
 
 Test in tests/test_agent_register_event.py
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `event.CaseStartEvent`
 
-Base class for all events in the Supervaize Control system.
+**Inherits from:** [`event.Event`](#event-event)
 
-Events represent messages sent from agents to the control system to communicate
-status, anomalies, deliverables and other information.
-
-Inherits from AbstractEvent which defines the core event attributes:
-    - source: The source/origin of the event (e.g. agent/server URI)
-    - type: The EventType enum indicating the event category
-    - account: The account that the event belongs to
-    - details: A dictionary containing event-specific details
-
-Tests in tests/test_event.py
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `event.CaseUpdateEvent`
 
-Base class for all events in the Supervaize Control system.
+**Inherits from:** [`event.Event`](#event-event)
 
-Events represent messages sent from agents to the control system to communicate
-status, anomalies, deliverables and other information.
-
-Inherits from AbstractEvent which defines the core event attributes:
-    - source: The source/origin of the event (e.g. agent/server URI)
-    - type: The EventType enum indicating the event category
-    - account: The account that the event belongs to
-    - details: A dictionary containing event-specific details
-
-Tests in tests/test_event.py
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `event.Event`
 
+**Inherits from:** [`event.AbstractEvent`](#event-abstractevent)
+
 Base class for all events in the Supervaize Control system.
 
 Events represent messages sent from agents to the control system to communicate
@@ -573,63 +419,25 @@ Inherits from AbstractEvent which defines the core event attributes:
 
 Tests in tests/test_event.py
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `event.JobFinishedEvent`
 
-Base class for all events in the Supervaize Control system.
+**Inherits from:** [`event.Event`](#event-event)
 
-Events represent messages sent from agents to the control system to communicate
-status, anomalies, deliverables and other information.
-
-Inherits from AbstractEvent which defines the core event attributes:
-    - source: The source/origin of the event (e.g. agent/server URI)
-    - type: The EventType enum indicating the event category
-    - account: The account that the event belongs to
-    - details: A dictionary containing event-specific details
-
-Tests in tests/test_event.py
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `event.ServerRegisterEvent`
 
-Base class for all events in the Supervaize Control system.
+**Inherits from:** [`event.Event`](#event-event)
 
-Events represent messages sent from agents to the control system to communicate
-status, anomalies, deliverables and other information.
-
-Inherits from AbstractEvent which defines the core event attributes:
-    - source: The source/origin of the event (e.g. agent/server URI)
-    - type: The EventType enum indicating the event category
-    - account: The account that the event belongs to
-    - details: A dictionary containing event-specific details
-
-Tests in tests/test_event.py
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `source` | `Dict` | **required** |  |
-| `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
-| `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+_No additional fields beyond parent class._
 
 ### `job.AbstractJob`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -638,36 +446,42 @@ Base model for all Supervaize models.
 | `agent_name` | `str` | **required** |  |
 | `status` | `EntityStatus` | **required** |  |
 | `job_context` | `JobContext` | **required** |  |
-| `payload` | `Any` | `None` | — |  |
-| `result` | `Any` | `None` | — |  |
-| `error` | `str` | `None` | — |  |
+| `payload` | `Any` | `None` |  |
+| `result` | `Any` | `None` |  |
+| `error` | `str` | `None` |  |
 | `responses` | `list` | [] |  |
-| `finished_at` | `datetime` | `None` | — |  |
-| `created_at` | `datetime` | `None` | — |  |
-| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` | — |  |
+| `finished_at` | `datetime` | `None` |  |
+| `created_at` | `datetime` | `None` |  |
+| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` |  |
 | `case_ids` | `List` | [] |  |
 
 ### `job.JobInstructions`
 
-Base model for all Supervaize models.
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `max_cases` | `int` | `None` | — |  |
-| `max_duration` | `int` | `None` | — |  |
-| `max_cost` | `float` | `None` | — |  |
+| `max_cases` | `int` | `None` |  |
+| `max_duration` | `int` | `None` |  |
+| `max_cost` | `float` | `None` |  |
 | `stop_on_warning` | `bool` | False |  |
 | `stop_on_error` | `bool` | True |  |
-| `job_start_time` | `float` | `None` | — |  |
+| `job_start_time` | `float` | `None` |  |
 
 ### `routes.CaseUpdateRequest`
 
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
 Request model for updating a case with answer to a question.
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `answer` | `Dict` | **required** |  |
-| `message` | `str` | `None` | — |  |
+| `message` | `str` | `None` |  |
 
 ### `server_utils.ErrorResponse`
 
@@ -677,13 +491,17 @@ Standard error response model
 |---|---|---|---|
 | `error` | `str` | **required** |  |
 | `error_type` | `ErrorType` | **required** |  |
-| `detail` | `str` | `None` | — |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 11, 32, 52, 6848) |  |
+| `detail` | `str` | `None` |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 15, 42, 34, 950064) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.AbstractServer`
 
+**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+
 API Server for the Supervaize Controller.
+
+#### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -696,38 +514,20 @@ API Server for the Supervaize Controller.
 | `agents` | `List` | **required** |  |
 | `app` | `FastAPI` | **required** |  |
 | `reload` | `bool` | **required** |  |
-| `supervisor_account` | `Account` | `None` | — |  |
+| `supervisor_account` | `Account` | `None` |  |
 | `a2a_endpoints` | `bool` | True |  |
 | `acp_endpoints` | `bool` | True |  |
 | `private_key` | `RSAPrivateKey` | **required** |  |
 | `public_key` | `RSAPublicKey` | **required** |  |
-| `registration_host` | `str` | `None` | — |  |
-| `api_key` | `str` | `None` | — |  |
-| `api_key_header` | `APIKeyHeader` | `None` | — |  |
+| `registration_host` | `str` | `None` |  |
+| `api_key` | `str` | `None` |  |
+| `api_key_header` | `APIKeyHeader` | `None` |  |
 
 ### `server.Server`
 
-API Server for the Supervaize Controller.
+**Inherits from:** [`server.AbstractServer`](#server-abstractserver)
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `scheme` | `str` | **required** |  |
-| `host` | `str` | **required** |  |
-| `port` | `int` | **required** |  |
-| `environment` | `str` | **required** |  |
-| `mac_addr` | `str` | **required** |  |
-| `debug` | `bool` | **required** |  |
-| `agents` | `List` | **required** |  |
-| `app` | `FastAPI` | **required** |  |
-| `reload` | `bool` | **required** |  |
-| `supervisor_account` | `Account` | `None` | — |  |
-| `a2a_endpoints` | `bool` | True |  |
-| `acp_endpoints` | `bool` | True |  |
-| `private_key` | `RSAPrivateKey` | **required** |  |
-| `public_key` | `RSAPublicKey` | **required** |  |
-| `registration_host` | `str` | `None` | — |  |
-| `api_key` | `str` | `None` | — |  |
-| `api_key_header` | `APIKeyHeader` | `None` | — |  |
+_No additional fields beyond parent class._
 
 ### `server.ServerInfo`
 
