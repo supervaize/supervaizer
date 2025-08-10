@@ -131,6 +131,8 @@ class ServerAbstract(SvBaseModel):
     The server can be configured with various endpoints (A2A, ACP, admin interface)
     and supports encryption/decryption of parameters using RSA keys.
 
+    Note that when the supervisor ccount is set, the A2A protocol is automatically activated to provide HEALTH CHECK endpoints.
+
     public_url: full url (including scheme and port) to use for outbound connections and registration.
                 This is especially important in Docker environments where the binding
                 address (0.0.0.0) can't be used for outbound connections. Set to
@@ -359,12 +361,15 @@ class Server(ServerAbstract):
 
         # Create routes
         if self.supervisor_account:
-            log.info("[Server launch] 🚀 Deploy Supervaizer routes")
+            log.info(
+                "[Server launch] 🚀 Deploy Supervaizer routes - also activates A2A routes"
+            )
             self.app.include_router(create_default_routes(self))
             self.app.include_router(create_utils_routes(self))
             self.app.include_router(create_agents_routes(self))
+            self.a2a_endpoints = True  # Needed by supervaize.
         if self.a2a_endpoints:
-            log.info("[Server launch] 📢 Deploy A2A routes")
+            log.info("[Server launch] 📢 Deploy A2A routes  ")
             self.app.include_router(create_a2a_routes(self))
         if self.acp_endpoints:
             log.info("[Server launch] 📢 Deploy ACP routes")

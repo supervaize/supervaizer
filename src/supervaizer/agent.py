@@ -553,7 +553,7 @@ class Agent(AgentAbstract):
         """Returns registration info for the agent"""
         return {
             "name": self.name,
-            "id": self.id,
+            "id": f"{self.id}",
             "author": self.author,
             "developer": self.developer,
             "maintainer": self.maintainer,
@@ -567,7 +567,7 @@ class Agent(AgentAbstract):
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
             else None,
-            "server_agent_id": self.server_agent_id,
+            "server_agent_id": f"{self.server_agent_id}",
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
             "server_encrypted_parameters": self.server_encrypted_parameters,

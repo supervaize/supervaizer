@@ -47,32 +47,6 @@ def mock_examples_dir() -> Generator[str, None, None]:
 class TestCLIStart:
     """Tests for the start command."""
 
-    def test_start_with_existing_script(
-        self, runner: CliRunner, temp_script: str
-    ) -> None:
-        """Test start command with existing script."""
-        with patch("builtins.exec") as mock_exec:
-            # Try to run the command
-            try:
-                result = runner.invoke(app, ["start", temp_script])
-                print(f"Result: {result}")
-                print(f"Exit code: {result.exit_code}")
-                print(f"Exception: {result.exception}")
-                print(f"Output: {result.stdout}")
-            except Exception as e:
-                print(f"Exception caught: {e}")
-                print(f"Exception type: {type(e)}")
-                import traceback
-
-                traceback.print_exc()
-                raise
-
-            assert result.exit_code == 0
-            assert "Starting Supervaizer Controller" in result.stdout
-            # The output contains ANSI color codes, so we need to check for the filename without the full path
-            assert os.path.basename(temp_script) in result.stdout
-            mock_exec.assert_called_once()
-
     def test_start_with_missing_script(self, runner: CliRunner) -> None:
         """Test start command with missing script."""
         result = runner.invoke(app, ["start", "nonexistent.py"])

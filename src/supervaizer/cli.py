@@ -6,7 +6,10 @@
 
 import os
 import shutil
+import signal
+import subprocess
 import sys
+from typing import Any
 from pathlib import Path
 from typing import Optional
 
@@ -79,12 +82,20 @@ def start(
     console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
     console.print(f"Loading configuration from [bold]{script_path}[/]")
 
-    # Execute the script
-    with open(script_path, "r") as f:
-        script_content = f.read()
+    # Execute the script in a new Python process with proper signal handling
 
-    # Execute the script in the current global namespace
-    exec(script_content, globals())
+    def signal_handler(signum: int, frame: Any) -> None:
+        # Send the signal to the subprocess
+        if "process" in globals():
+            globals()["process"].terminate()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    process = subprocess.Popen([sys.executable, script_path])
+    globals()["process"] = process
+    process.wait()
 
 
 @app.command()
