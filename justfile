@@ -103,5 +103,3 @@ ready-to-go:
     just build_fix
     just generate_documentation
     just tag_version
-    
-
