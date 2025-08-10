@@ -60,9 +60,9 @@ class StorageManager:
             indent=2,
         )
 
-        log.info(
-            f"[StorageManager] 🗃️ Local DB initialized at {self.db_path.absolute()}"
-        )
+        # log.debug(
+        #    f"[StorageManager] 🗃️ Local DB initialized at {self.db_path.absolute()}"
+        # )
 
     def save_object(self, type: str, obj: Dict[str, Any]) -> None:
         """

@@ -24,8 +24,8 @@ precommit-autoupdate:
     pre-commit autoupdate
 
 # Run tests without coverage
-test-no-cov:
-    pytest --no-cov
+test-no-cov *args:
+    pytest --no-cov {{args}}
 
 # Run only previously failed tests
 test-failed:
@@ -89,5 +89,12 @@ tag_version:
 
 
 # Generate model reference documentation
-generate_model_docs:
+generate_documentation:
     python tools/gen_model_docs.py
+
+
+# Deployment sequence
+ready-to-go:
+    just test-no-cov
+    just precommit
+    just generate_documentation

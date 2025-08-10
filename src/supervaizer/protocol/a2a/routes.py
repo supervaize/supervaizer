@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 def create_routes(server: "Server") -> APIRouter:
     """Create A2A protocol routes for the server."""
     router = APIRouter(prefix="/.well-known", tags=["Protocol A2A"])
-    base_url = server.public_url
+    base_url = server.public_url or ""
 
     @router.get(
         "/agents.json",

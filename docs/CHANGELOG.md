@@ -9,10 +9,20 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Setup : missing `py.typed` in pyproject
+- clarified public_url (replaced registration_host by public_url)
 
 ### Added
 
 - `gen_model_docs.py`: tool for documentation generation - see disclaimer
+
+### Unit tests results
+
+| Status        | Count |
+| ------------- | ----- |
+| 🤔 Skipped    | 6     |
+| ☑️ Deselected | 0     |
+| ⚠️ Failed     | 0     |
+| ✅ Passed     | 278   |
 
 ## [0.9.4]
 

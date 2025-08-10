@@ -131,13 +131,13 @@ class ServerAbstract(SvBaseModel):
     The server can be configured with various endpoints (A2A, ACP, admin interface)
     and supports encryption/decryption of parameters using RSA keys.
 
-    registration_host: Host to use for outbound connections and registration.
+    public_url: full url (including scheme and port) to use for outbound connections and registration.
                 This is especially important in Docker environments where the binding
                 address (0.0.0.0) can't be used for outbound connections. Set to
                 'host.docker.internal' for Docker or the appropriate service name
                 in container environments.
                 Examples:
-                - In Docker, set to 'host.docker.internal' to reach the host machine
+                - In Docker, set to 'http://host.docker.internal' to reach the host machine
                 - In Kubernetes, might be set to the service name or external DNS
                 If not provided, falls back to using the listening host.
 
@@ -173,9 +173,9 @@ class ServerAbstract(SvBaseModel):
     public_key: RSAPublicKey = Field(
         description="RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user"
     )
-    registration_host: Optional[str] = Field(
+    public_url: Optional[str] = Field(
         default=None,
-        description="Host to use for outbound connections and registration - May be used for Docker or Kubernetes environments",
+        description="Public including scheme and port to use for inbound connections",
     )
     api_key: Optional[str] = Field(
         default=None,
@@ -245,9 +245,7 @@ class Server(ServerAbstract):
         reload: bool = False,
         mac_addr: str = "",
         private_key: Optional[RSAPrivateKey] = None,
-        registration_host: Optional[str] = os.getenv(
-            "SUPERVAIZER_REGISTRATION_HOST", None
-        ),
+        public_url: Optional[str] = os.getenv("SUPERVAIZER_PUBLIC_URL", None),
         api_key: Optional[str] = os.getenv(
             "SUPERVAIZER_API_KEY", secrets.token_urlsafe(32)
         ),
@@ -299,7 +297,7 @@ class Server(ServerAbstract):
             description=(
                 f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
                 "API for controlling and managing Supervaize agents. \n\nMore information at "
-                "[https://supervaize.com/docs/integration](https://supervaize.com/docs/integration)\n\n"
+                "[https://doc.supervaize.com](https://doc.supervaize.com)\n\n"
                 "## Authentication\n\n"
                 "Some endpoints require API key authentication. Protected endpoints expect "
                 "the API key in the X-API-Key header.\n\n"
@@ -353,7 +351,7 @@ class Server(ServerAbstract):
             acp_endpoints=acp_endpoints,
             private_key=private_key,
             public_key=public_key,
-            registration_host=registration_host,
+            public_url=public_url,
             api_key=api_key,
             api_key_header=api_key_header,
             **kwargs,
@@ -404,6 +402,9 @@ class Server(ServerAbstract):
         else:
             log.info("[Server launch] API Key authentication disabled")
 
+        if not self.public_url:
+            self.public_url = f"{self.scheme}://{self.host}:{self.port}"
+
     async def verify_api_key(
         self, api_key: str = Security(APIKeyHeader(name="X-API-Key"))
     ) -> bool:
@@ -433,13 +434,7 @@ class Server(ServerAbstract):
 
     @property
     def url(self) -> str:
-        """Get the server's base URL."""
-        host = self.registration_host if self.registration_host else self.host
-        return urlunparse((self.scheme, f"{host}:{self.port}", "", "", "", ""))
-
-    @property
-    def public_url(self) -> str:
-        """Get the server's base URL."""
+        """Get the server's local URL."""
         return urlunparse((self.scheme, f"{self.host}:{self.port}", "", "", "", ""))
 
     @property
@@ -452,7 +447,7 @@ class Server(ServerAbstract):
         """Get registration info for the server."""
         assert self.public_key is not None, "Public key not initialized"
         return {
-            "url": self.url,
+            "url": self.public_url,
             "uri": self.uri,
             "api_version": API_VERSION,
             "environment": self.environment,
@@ -464,9 +459,9 @@ class Server(ServerAbstract):
             ),
             "api_key": self.api_key,
             "docs": {
-                "swagger": f"{self.url}{self.app.docs_url}",
-                "redoc": f"{self.url}{self.app.redoc_url}",
-                "openapi": f"{self.url}{self.app.openapi_url}",
+                "swagger": f"{self.public_url}{self.app.docs_url}",
+                "redoc": f"{self.public_url}{self.app.redoc_url}",
+                "openapi": f"{self.public_url}{self.app.openapi_url}",
             },
             "agents": [agent.registration_info for agent in self.agents],
         }

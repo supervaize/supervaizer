@@ -137,7 +137,7 @@ class TestDisplayInstructions:
         status_message = "Test status"
 
         with (
-            patch("supervaizer.instructions.Console") as mock_console,
+            patch("supervaizer.instructions.Console") as _mock_console,
             patch("sys.exit") as mock_exit,
         ):
             display_instructions(server_url, status_message)
@@ -149,14 +149,14 @@ class TestDisplayInstructions:
         status_message = "Test status"
 
         with (
-            patch("supervaizer.instructions.print") as mock_print,
+            patch("supervaizer.instructions.print") as _mock_print,
             patch("sys.exit"),
         ):
             display_instructions(server_url, status_message)
 
             # Verify that print was called with a Layout
-            mock_print.assert_called_once()
-            printed_arg = mock_print.call_args[0][0]
+            _mock_print.assert_called_once()
+            printed_arg = _mock_print.call_args[0][0]
             assert isinstance(printed_arg, Layout)
 
     def test_display_instructions_calls_all_components(
@@ -204,7 +204,7 @@ class TestMainExecution:
         """Test that main execution block works correctly."""
         # Mock the display_instructions function
         with (
-            patch("supervaizer.instructions.display_instructions") as mock_display,
+            patch("supervaizer.instructions.display_instructions") as _mock_display,
             patch("supervaizer.server.Server") as mock_server_class,
         ):
             mock_server_class.return_value = server_fixture

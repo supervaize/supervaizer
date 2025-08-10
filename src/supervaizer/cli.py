@@ -23,11 +23,15 @@ console = Console()
 
 @app.command()
 def start(
+    public_url: Optional[str] = typer.Option(
+        os.environ.get("SUPERVAIZER_PUBLIC_URL") or None,
+        help="Public URL to use for inbound connections",
+    ),
     host: str = typer.Option(
         os.environ.get("SUPERVAIZER_HOST", "0.0.0.0"), help="Host to bind the server to"
     ),
     port: int = typer.Option(
-        int(os.environ.get("SUPERVAIZER_PORT", "8000")),
+        int(os.environ.get("SUPERVAIZER_PORT") or "8000"),
         help="Port to bind the server to",
     ),
     log_level: str = typer.Option(
@@ -35,29 +39,31 @@ def start(
         help="Log level (DEBUG, INFO, WARNING, ERROR)",
     ),
     debug: bool = typer.Option(
-        os.environ.get("SUPERVAIZER_DEBUG", "False").lower() == "true",
+        (os.environ.get("SUPERVAIZER_DEBUG") or "False").lower() == "true",
         help="Enable debug mode",
     ),
     reload: bool = typer.Option(
-        os.environ.get("SUPERVAIZER_RELOAD", "False").lower() == "true",
+        (os.environ.get("SUPERVAIZER_RELOAD") or "False").lower() == "true",
         help="Enable auto-reload",
     ),
     environment: str = typer.Option(
         os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"), help="Environment name"
     ),
     script_path: Optional[str] = typer.Argument(
-        os.environ.get("SUPERVAIZER_SCRIPT_PATH", None),
+        None,
         help="Path to the supervaizer_control.py script",
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
     if script_path is None:
-        # Try to find supervaizer_control.py in the current directory
-        script_path = "supervaizer_control.py"
+        # Try to get from environment variable first, then default
+        script_path = (
+            os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
+        )
 
     if not os.path.exists(script_path):
         console.print(f"[bold red]Error:[/] {script_path} not found")
-        console.print("Run [bold]supervaizer install[/] to create a default script")
+        console.print("Run [bold]supervaizer scaffold[/] to create a default script")
         sys.exit(1)
 
     # Set environment variables for the server configuration
@@ -67,6 +73,8 @@ def start(
     os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
     os.environ["SUPERVAIZER_DEBUG"] = str(debug)
     os.environ["SUPERVAIZER_RELOAD"] = str(reload)
+    if public_url is not None:
+        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
     console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
     console.print(f"Loading configuration from [bold]{script_path}[/]")
@@ -82,15 +90,15 @@ def start(
 @app.command()
 def scaffold(
     output_path: str = typer.Option(
-        os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control_example.py"),
+        os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control.py"),
         help="Path to save the script",
     ),
     force: bool = typer.Option(
-        os.environ.get("SUPERVAIZER_FORCE_INSTALL", "False").lower() == "true",
+        (os.environ.get("SUPERVAIZER_FORCE_INSTALL") or "False").lower() == "true",
         help="Overwrite existing file",
     ),
 ) -> None:
-    """Create a draft supervaizer_control_example.py script."""
+    """Create a draft supervaizer_control.py script."""
     # Check if file already exists
     if os.path.exists(output_path) and not force:
         console.print(f"[bold red]Error:[/] {output_path} already exists")

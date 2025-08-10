@@ -336,7 +336,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 10, 11, 46, 27, 899140) |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 10, 21, 43, 59, 71187) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.ServerInfo`
@@ -368,4 +368,4 @@ A base class for creating Pydantic models.
 | `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Updated on 2025-08-10 11:46:28*
+*Uploaded on 2025-08-10 21:43:59*

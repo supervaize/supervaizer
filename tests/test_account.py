@@ -321,7 +321,7 @@ def test_send_telemetry_http_error(
     )
 
     # Mock httpx.post to raise an error
-    mock_post = mocker.patch(
+    _mock_post = mocker.patch(
         "httpx.post", side_effect=httpx.HTTPError("Connection failed")
     )
 

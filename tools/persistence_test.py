@@ -41,7 +41,7 @@ def test_persistence() -> None:
 
     # Create test job
     print("Creating test job...")
-    job = Job(
+    _job = Job(
         id="test-job-456",
         name="Test Job for Persistence",
         agent_name="test-agent",

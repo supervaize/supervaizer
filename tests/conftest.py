@@ -284,3 +284,23 @@ def parameters_fixture(
 @pytest.fixture(autouse=True, scope="function")
 def reset_storage_manager_singleton_global():
     storage_module.StorageManager._singleton_instance = None
+
+
+@pytest.fixture(autouse=True, scope="function")
+def reset_supervaizer_environment():
+    """Reset Supervaizer environment variables to defaults between tests."""
+    # Store original values
+    original_env = {}
+    for key in os.environ:
+        if key.startswith("SUPERVAIZER_"):
+            original_env[key] = os.environ[key]
+
+    yield
+
+    # Restore original values
+    for key in original_env:
+        os.environ[key] = original_env[key]
+    # Remove any new SUPERVAIZER_ variables that were added
+    for key in list(os.environ.keys()):
+        if key.startswith("SUPERVAIZER_") and key not in original_env:
+            del os.environ[key]

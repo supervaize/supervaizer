@@ -118,11 +118,11 @@ async def test_service_job_start_with_empty_decrypted_params(
     mock_job_new = mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
 
     # Mock decrypt returning empty string
-    mock_decrypt_value = mocker.patch(
+    _mock_decrypt_value = mocker.patch(
         "supervaizer.job_service.decrypt_value", return_value=""
     )
 
-    result = await service_job_start(
+    _result = await service_job_start(
         server=server_fixture,
         background_tasks=background_tasks,
         agent=agent_fixture,
@@ -157,7 +157,7 @@ async def test_service_job_start_without_parameters_setup(
     mock_job = mocker.MagicMock(spec=Job)
     mock_job_new = mocker.patch("supervaizer.job.Job.new", return_value=mock_job)
 
-    result = await service_job_start(
+    _result = await service_job_start(
         server=server_fixture,
         background_tasks=background_tasks,
         agent=agent_fixture,
@@ -264,7 +264,7 @@ async def test_service_job_custom_new_job(
     # Mock Jobs().get_job to return None (no existing job)
     mock_jobs = mocker.MagicMock()
     mock_jobs.get_job.return_value = None
-    mock_jobs_class = mocker.patch(
+    _mock_jobs_class = mocker.patch(
         "supervaizer.job_service.Jobs", return_value=mock_jobs
     )
 
@@ -324,7 +324,7 @@ async def test_service_job_custom_existing_job(
     # Mock Jobs().get_job to return existing job
     mock_jobs = mocker.MagicMock()
     mock_jobs.get_job.return_value = existing_job
-    mock_jobs_class = mocker.patch(
+    _mock_jobs_class = mocker.patch(
         "supervaizer.job_service.Jobs", return_value=mock_jobs
     )
 
@@ -367,13 +367,13 @@ async def test_service_job_custom_with_parameters(
     # Mock Jobs().get_job to return None
     mock_jobs = mocker.MagicMock()
     mock_jobs.get_job.return_value = None
-    mock_jobs_class = mocker.patch(
+    _mock_jobs_class = mocker.patch(
         "supervaizer.job_service.Jobs", return_value=mock_jobs
     )
 
     # Mock Job constructor
     mock_job = mocker.MagicMock(spec=Job)
-    mock_job_class = mocker.patch("supervaizer.job_service.Job", return_value=mock_job)
+    _mock_job_class = mocker.patch("supervaizer.job_service.Job", return_value=mock_job)
 
     # Mock decrypt_value
     mock_decrypt_value = mocker.patch(

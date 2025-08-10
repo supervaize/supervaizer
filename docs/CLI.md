@@ -6,11 +6,19 @@ SUPERVAIZER includes a command-line interface to simplify setup and operation:
 # Install Supervaizer
 pip install supervaizer
 
+# Get Help
+supervaizer --help
+
 # Create a supervaizer_control.py file in your current directory
-supervaizer install
+supervaizer scaffold
+
+
 
 # Start the server using the configuration file
 supervaizer start
+
+# To get all the start options
+supervaizer start --help
 ```
 
 ## CLI Commands
@@ -21,13 +29,12 @@ Creates a starter configuration file (supervaizer_control.py)
 
 ```bash
 # Basic usage (creates supervaizer_control.py in current directory)
-supervaizer install
-
+supervaizer scaffold
 # Specify a custom output path
-supervaizer install --output-path=my_config.py
+supervaizer scaffold --output-path=my_config.py
 
 # Force overwrite if file already exists
-supervaizer install --force
+supervaizer scaffold --force
 ```
 
 ### start
@@ -55,14 +62,15 @@ supervaizer start --log-level=DEBUG
 
 All CLI options can also be configured through environment variables:
 
-| Environment Variable      | Description                     | Default Value          |
-| ------------------------- | ------------------------------- | ---------------------- |
-| SUPERVAIZER_HOST          | Host to bind the server to      | 0.0.0.0                |
-| SUPERVAIZER_PORT          | Port to bind the server to      | 8000                   |
-| SUPERVAIZER_ENVIRONMENT   | Environment name                | dev                    |
-| SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)   | INFO                   |
-| SUPERVAIZER_DEBUG         | Enable debug mode (true/false)  | false                  |
-| SUPERVAIZER_RELOAD        | Enable auto-reload (true/false) | false                  |
-| SUPERVAIZER_SCRIPT_PATH   | Path to configuration script    | -                      |
-| SUPERVAIZER_OUTPUT_PATH   | Path for install command output | supervaizer_control.py |
-| SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file   | false                  |
+| Environment Variable      | Description                      | Default Value                |
+| ------------------------- | -------------------------------- | ---------------------------- |
+| SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to http://host:port |
+| SUPERVAIZER_HOST          | Host to bind the server to       | 0.0.0.0                      |
+| SUPERVAIZER_PORT          | Port to bind the server to       | 8000                         |
+| SUPERVAIZER_ENVIRONMENT   | Environment name                 | dev                          |
+| SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)    | INFO                         |
+| SUPERVAIZER_DEBUG         | Enable debug mode (true/false)   | false                        |
+| SUPERVAIZER_RELOAD        | Enable auto-reload (true/false)  | false                        |
+| SUPERVAIZER_SCRIPT_PATH   | Path to configuration script     | -                            |
+| SUPERVAIZER_OUTPUT_PATH   | Path for install command output  | supervaizer_control.py       |
+| SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file    | false                        |

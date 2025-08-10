@@ -50,16 +50,35 @@ import dataclasses
 import shutil
 import json
 from datetime import datetime
+import sys
 from types import ModuleType
 from pathlib import Path
 from typing import Any, Iterator, Union, Dict, List, Set
 from pydantic import BaseModel
+from rich import print
 
 PACKAGE = "supervaizer"
-OUTPUT = Path("docs/model_reference")
-EXTERNAL_DOC_PATH = Path(
-    os.environ.get("PATH_TO_DOC", "../"), "docs/supervaizer-controller/model_reference"
-)
+LOCAL_DOCS = Path("./docs")
+LOCAL_MODEL_DOCS = LOCAL_DOCS / "model_reference"
+EXTERNAL_DOCS = Path(os.environ.get("EXTERNAL_DOCS", "../"))
+EXTERNAL_DOC_PATH = EXTERNAL_DOCS / "supervaizer-controller/model_reference"
+EXTERNAL_REF_PATH = EXTERNAL_DOCS / "supervaizer-controller/ref"
+
+
+if not LOCAL_MODEL_DOCS.exists():
+    print(f"⚠️  LOCAL_MODEL_DOCS directory {LOCAL_MODEL_DOCS} does not exist")
+    sys.exit(1)
+if not EXTERNAL_DOC_PATH.exists():
+    print(f"⚠️  EXTERNAL_DOC_PATH directory {EXTERNAL_DOC_PATH} does not exist")
+    sys.exit(1)
+if not EXTERNAL_REF_PATH.exists():
+    print(f"⚠️  EXTERNAL_REF_PATH directory {EXTERNAL_REF_PATH} does not exist")
+    sys.exit(1)
+
+print(f"LOCAL_MODEL_DOCS: {LOCAL_MODEL_DOCS}")
+print(f"EXTERNAL_DOCS: {EXTERNAL_DOCS}")
+print(f"EXTERNAL_DOC_PATH: {EXTERNAL_DOC_PATH}")
+print(f"EXTERNAL_REF_PATH: {EXTERNAL_REF_PATH}")
 
 
 def generate_slug(text: str) -> str:
@@ -100,7 +119,9 @@ def format_json_in_doc(doc: str) -> str:
             if brace_count == 0 and bracket_count == 0:
                 in_json_block = False
                 json_content_raw = "\n".join(json_lines_raw)
-                json_content_stripped = "\n".join(l.strip() for l in json_lines_raw)
+                json_content_stripped = "\n".join(
+                    line.strip() for line in json_lines_raw
+                )
 
                 # Try parsing as JSON (raw first, then with common fixes)
                 def fence(raw: str) -> str:
@@ -464,6 +485,21 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
     return result
 
 
+def add_header(page_name: str) -> list[str]:
+    """Add header content to the documentation."""
+    out = [page_name, ""]
+    return out
+
+
+def add_footer() -> list[str]:
+    """Add footer content with timestamp to the documentation."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    out = []
+    out.append("")
+    out.append(f"*Uploaded on {timestamp}*")
+    return out
+
+
 def generate_model_docs() -> None:
     # Get the supervaizer version
     try:
@@ -474,7 +510,7 @@ def generate_model_docs() -> None:
         version = "N/A"
 
     # Ensure the output directory exists
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    LOCAL_MODEL_DOCS.mkdir(parents=True, exist_ok=True)
 
     # Get all models and their reference_group
     models_by_group: Dict[str, List[Union[type[BaseModel], type]]] = {}
@@ -524,7 +560,7 @@ def generate_model_docs() -> None:
 
     # Second pass: generate documentation for each group
     for group_name, models in models_by_group.items():
-        out = [f"# Model Reference {group_name}", ""]
+        out = add_header(f"# Model Reference {group_name}")
         out.append(f"**Version:** {version}\n")
 
         for model in models:
@@ -734,12 +770,10 @@ def generate_model_docs() -> None:
         else:
             filename = f"model_{group_name}.md".lower()
 
-        output_file = OUTPUT / filename
+        output_file = LOCAL_MODEL_DOCS / filename
 
         # Add timestamp at the bottom
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        out.append("")
-        out.append(f"*Updated on {timestamp}*")
+        out.extend(add_footer())
 
         output_file.write_text("\n".join(out))
         print(f"✅ Wrote model reference for group '{group_name}' to {output_file}")
@@ -753,11 +787,58 @@ def generate_model_docs() -> None:
         if EXTERNAL_DOC_PATH.exists():
             shutil.rmtree(EXTERNAL_DOC_PATH)
 
-        shutil.copytree(OUTPUT, EXTERNAL_DOC_PATH)
+        shutil.copytree(LOCAL_MODEL_DOCS, EXTERNAL_DOC_PATH)
         print(f"✅ Copied model reference directory to {EXTERNAL_DOC_PATH}")
     except Exception as e:
         print(f"⚠️  Failed to copy to external directory: {e}")
 
 
+def copy_to_docs_dir() -> None:
+    """Copy all docs/*.md and some root files to the OUTPUT/ref folder."""
+
+    # Get all .md files from docs directory
+    docs_md_files = list(LOCAL_DOCS.glob("*.md"))
+    print(f"docs_md_files: {docs_md_files}")
+
+    # Add root directory markdown files
+    root_md_files = [
+        Path("./CODE_OF_CONDUCT.md"),
+        Path("./CONTRIBUTING.md"),
+        Path("./LICENSE.md"),
+        Path("./README.md"),
+    ]
+
+    # Combine all markdown files
+    md_files = docs_md_files + [f for f in root_md_files if f.exists()]
+
+    for md_file in md_files:
+        try:
+            # Read the content of the markdown file
+            content = md_file.read_text()
+
+            # Replace "docs/" links with empty strings
+            content = content.replace("(docs/", "(")
+
+            # Add footer to the content
+            footer_lines = add_footer()
+            content_with_footer = content + "\n" + "\n".join(footer_lines)
+
+            # Write the content with footer to the output directory
+            output_path = EXTERNAL_REF_PATH / md_file.name
+            output_path.write_text(content_with_footer)
+
+            print(f"✅ Copied {md_file} to {output_path} (with footer)")
+        except Exception as e:
+            print(f"⚠️  Failed to copy {md_file}: {e}")
+
+    if md_files:
+        print(
+            f"✅ Copied {len(md_files)} markdown files from docs/ and root to {EXTERNAL_REF_PATH}"
+        )
+    else:
+        print("ℹ️  No .md files found in docs/ directory or root")
+
+
 if __name__ == "__main__":
     generate_model_docs()
+    copy_to_docs_dir()
