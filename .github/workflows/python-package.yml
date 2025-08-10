@@ -12,7 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.repository == 'supervaizer/supervaizer' # Only run on public remote
 
     strategy:
       fail-fast: false

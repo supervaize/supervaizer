@@ -12,7 +12,7 @@ jobs:
   security-scan:
     name: TruffleHog Security Scan
     runs-on: ubuntu-latest
-    if: github.repository == 'supervaizer/supervaizer' # Only run on public remote
+    if: github.repository == 'supervaize/supervaizer' # Only run on public remote
 
     steps:
       - name: Checkout code
