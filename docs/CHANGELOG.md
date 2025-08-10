@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Public release to Pypi
 - Fixed the gihut workflows
-- Improve readme
+- Improve README.md
 
 ## [0.9.5]
 
