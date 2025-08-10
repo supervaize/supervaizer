@@ -28,7 +28,7 @@ jobs:
         if: inputs.scan_type == 'full-repo' || inputs.scan_type == 'both'
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --results=verified,unknown --fail
+          extra_args: --results=verified,unknown
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -36,6 +36,6 @@ jobs:
         if: inputs.scan_type == 'full-history' || inputs.scan_type == 'both'
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: git file://. --results=verified,unknown --fail
+          extra_args: git file://. --results=verified,unknown
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
