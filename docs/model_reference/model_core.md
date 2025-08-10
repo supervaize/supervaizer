@@ -4,13 +4,13 @@
 
 ### `account.Account`
 
-**Inherits from:** [`account.AccountAbstract`](#account-accountabstract)
+**Inherits from:** [`account.AccountAbstract`](#accountaccountabstract)
 
 _No additional fields beyond parent class._
 
 ### `account.AccountAbstract`
 
-**Inherits from:** [`common.SvBaseModel`](../model_extra.md#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](model_extra.md#commonsvbasemodel)
 
 Account model for the Supervaize Control API.
 
@@ -54,13 +54,13 @@ Attributes:
 
 ### `agent.Agent`
 
-**Inherits from:** [`agent.AgentAbstract`](#agent-agentabstract)
+**Inherits from:** [`agent.AgentAbstract`](#agentagentabstract)
 
 _No additional fields beyond parent class._
 
 ### `agent.AgentAbstract`
 
-**Inherits from:** [`common.SvBaseModel`](../model_extra.md#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](model_extra.md#commonsvbasemodel)
 
         Agent model for the Supervaize Control API.
 
@@ -128,7 +128,7 @@ _No additional fields beyond parent class._
 
 ### `agent.AgentMethod`
 
-**Inherits from:** [`agent.AgentMethodAbstract`](#agent-agentmethodabstract)
+**Inherits from:** [`agent.AgentMethodAbstract`](#agentagentmethodabstract)
 
 _No additional fields beyond parent class._
 
@@ -231,9 +231,9 @@ field definitions for consistency.
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the field - displayed in the UI |
 | `type` | `Any` | **required** | Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str] |
-| `field_type` | `FieldTypeEnum` | `CharField` | Field type for persistence |
+| `field_type` | `<enum 'FieldTypeEnum'>` | `CharField` | Field type for persistence |
 | `description` | `str` | `None` | Description of the field - displayed in the UI |
-| `choices` | `list[list[str, str]]` | `None` | For choice fields, list of [value, label] pairs |
+| `choices` | `list[str]` | `None` | For choice fields, list of [value, label] pairs |
 | `default` | `Any` | `None` | Default value for the field - displayed in the UI |
 | `widget` | `str` | `None` | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | False | Whether field is required for form submission |
@@ -284,7 +284,7 @@ field definitions for consistency.
 
 ### `parameter.ParametersSetup`
 
-**Inherits from:** [`common.SvBaseModel`](../model_extra.md#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](model_extra.md#commonsvbasemodel)
 
 ParametersSetup model for the Supervaize Control API.
 
@@ -304,17 +304,17 @@ ParametersSetup.from_list([
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `definitions` | `Dict` | **required** | A dictionary of Parameters Dict[str, Parameter] , where the key is the parameter name and the value is the parameter object. |
+| `definitions` | `Dict[str, parameter.Parameter]` | **required** | A dictionary of Parameters, where the key is the parameter name and the value is the parameter object. |
 
 ### `parameter.Parameter`
 
-**Inherits from:** [`parameter.ParameterAbstract`](#parameter-parameterabstract)
+**Inherits from:** [`parameter.ParameterAbstract`](#parameterparameterabstract)
 
 _No additional fields beyond parent class._
 
 ### `parameter.ParameterAbstract`
 
-**Inherits from:** [`common.SvBaseModel`](../model_extra.md#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](model_extra.md#commonsvbasemodel)
 
 Base model for agent parameters that defines configuration and metadata.
 
@@ -349,15 +349,17 @@ model to manage parameter definitions and values.
 
 ### `server.Server`
 
-**Inherits from:** [`server.ServerAbstract`](#server-serverabstract)
+**Inherits from:** [`server.ServerAbstract`](#serverserverabstract)
 
 _No additional fields beyond parent class._
 
 ### `server.ServerAbstract`
 
-**Inherits from:** [`common.SvBaseModel`](../model_extra.md#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](model_extra.md#commonsvbasemodel)
 
 API Server for the Supervaize Controller.
+
+The server is a FastAPI application (see https://fastapi.tiangolo.com/ for details and advanced parameters)
 
 This represents the main server instance that manages agents and provides
 the API endpoints for the Supervaize Control API. It handles agent registration,
@@ -386,15 +388,15 @@ registration_host: Host to use for outbound connections and registration.
 | `environment` | `str` | **required** | Environment name (e.g., dev, staging, prod) |
 | `mac_addr` | `str` | **required** | MAC address to use for server identification |
 | `debug` | `bool` | **required** | Whether to enable debug mode |
-| `agents` | `List` | **required** | List of agents to register with the server |
+| `agents` | `List[agent.Agent]` | **required** | List of agents to register with the server |
 | `app` | `FastAPI` | **required** | FastAPI application instance |
 | `reload` | `bool` | **required** | Whether to enable auto-reload |
-| `supervisor_account` | `Account` | `None` | Account of the supervisor |
+| `supervisor_account` | `Account` | `None` | Account of the supervisor - can be created at supervaize.com |
 | `a2a_endpoints` | `bool` | True | Whether to enable A2A endpoints |
 | `acp_endpoints` | `bool` | True | Whether to enable ACP endpoints |
-| `private_key` | `RSAPrivateKey` | **required** | RSA private key for encryption |
-| `public_key` | `RSAPublicKey` | **required** | RSA public key for encryption |
-| `registration_host` | `str` | `None` | Host to use for outbound connections and registration |
+| `private_key` | `RSAPrivateKey` | **required** | RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user |
+| `public_key` | `RSAPublicKey` | **required** | RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user |
+| `registration_host` | `str` | `None` | Host to use for outbound connections and registration - May be used for Docker or Kubernetes environments |
 | `api_key` | `str` | `None` | Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated |
 | `api_key_header` | `APIKeyHeader` | `None` | API key header for authentication |
 
@@ -431,4 +433,4 @@ registration_host: Host to use for outbound connections and registration.
 ```
 
 
-*Updated on 2025-08-09 23:26:48*
+*Updated on 2025-08-10 11:46:28*

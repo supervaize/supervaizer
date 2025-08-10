@@ -4,6 +4,10 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+# This is an example file.
+# It must be copied / renamed to supervaizer_control.py
+# and edited to configure your agent(s)
+
 import os
 import shortuuid
 from rich.console import Console
@@ -30,26 +34,28 @@ DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
 PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
 
 # Define the parameters and secrets expected by the agent
-agent_parameters: ParametersSetup = ParametersSetup.from_list([
-    Parameter(
-        name="OPEN_API_KEY",
-        description="OpenAPI Key",
-        is_environment=True,
-        is_secret=True,
-    ),
-    Parameter(
-        name="SERPER_API",
-        description="Server API key updated",
-        is_environment=True,
-        is_secret=True,
-    ),
-    Parameter(
-        name="COMPETITOR_SUMMARY_URL",
-        description="Competitor Summary URL",
-        is_environment=True,
-        is_secret=False,
-    ),
-])
+agent_parameters: ParametersSetup | None = ParametersSetup.from_list(
+    [
+        Parameter(
+            name="OPEN_API_KEY",
+            description="OpenAPI Key",
+            is_environment=True,
+            is_secret=True,
+        ),
+        Parameter(
+            name="SERPER_API",
+            description="Server API key updated",
+            is_environment=True,
+            is_secret=True,
+        ),
+        Parameter(
+            name="COMPETITOR_SUMMARY_URL",
+            description="Competitor Summary URL",
+            is_environment=True,
+            is_secret=False,
+        ),
+    ]
+)
 
 # Define the method used to start a job
 job_start_method: AgentMethod = AgentMethod(

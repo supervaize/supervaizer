@@ -10,7 +10,7 @@ _No fields found._
 
 ### `telemetry.Telemetry`
 
-**Inherits from:** [`telemetry.TelemetryModel`](#telemetry-telemetrymodel)
+**Inherits from:** [`telemetry.TelemetryModel`](#telemetrytelemetrymodel)
 
 Base class for all telemetry data in the Supervaize Control system.
 
@@ -28,7 +28,7 @@ _No additional fields beyond parent class._
 
 ### `agent.AgentCustomMethodParams`
 
-**Inherits from:** [`agent.AgentMethodParams`](#agent-agentmethodparams)
+**Inherits from:** [`agent.AgentMethodParams`](#agentagentmethodparams)
 
 #### Model Fields
 
@@ -43,7 +43,7 @@ Base model for agent job context parameters
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `job_context` | `JobContext` | **required** |  |
-| `job_fields` | `Dict` | **required** |  |
+| `job_fields` | `Dict[str, Any]` | **required** |  |
 
 ### `agent.AgentMethodParams`
 
@@ -51,11 +51,11 @@ Method parameters for agent operations.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `params` | `Dict` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `params` | `Dict[str, Any]` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
 
 ### `agent.AgentMethods`
 
-**Inherits from:** [`agent.AgentMethodsAbstract`](#agent-agentmethodsabstract)
+**Inherits from:** [`agent.AgentMethodsAbstract`](#agentagentmethodsabstract)
 
 _No additional fields beyond parent class._
 
@@ -96,7 +96,7 @@ Response model for agent endpoints - values provided by Agent.registration_info
 
 ### `job.Job`
 
-**Inherits from:** [`job.AbstractJob`](#job-abstractjob)
+**Inherits from:** [`job.AbstractJob`](#jobabstractjob)
 
 Jobs are typically created by the platform and are not created by the agent.
 
@@ -116,7 +116,7 @@ _No additional fields beyond parent class._
 
 ### `job.JobContext`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
@@ -133,14 +133,14 @@ _No additional fields beyond parent class._
 
 ### `job.JobResponse`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `job_id` | `str` | **required** |  |
-| `status` | `EntityStatus` | **required** |  |
+| `status` | `<enum 'EntityStatus'>` | **required** |  |
 | `message` | `str` | **required** |  |
 | `payload` | `dict[str, typing.Any]` | `None` |  |
 | `error_message` | `str` | `None` |  |
@@ -148,19 +148,19 @@ _No additional fields beyond parent class._
 
 ### `event.JobStartConfirmationEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 _No additional fields beyond parent class._
 
 ### `case.Case`
 
-**Inherits from:** [`case.CaseAbstractModel`](#case-caseabstractmodel)
+**Inherits from:** [`case.CaseAbstractModel`](#casecaseabstractmodel)
 
 _No additional fields beyond parent class._
 
 ### `case.CaseAbstractModel`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
@@ -171,15 +171,15 @@ _No additional fields beyond parent class._
 | `name` | `str` | **required** |  |
 | `account` | `ForwardRef('Account')` | **required** |  |
 | `description` | `str` | **required** |  |
-| `status` | `EntityStatus` | **required** |  |
-| `updates` | `List` | [] |  |
+| `status` | `<enum 'EntityStatus'>` | **required** |  |
+| `updates` | `List[case.CaseNodeUpdate]` | [] |  |
 | `total_cost` | `float` | 0.0 |  |
 | `final_delivery` | `typing.Dict[str, typing.Any]` | `None` |  |
 | `finished_at` | `datetime` | `None` |  |
 
 ### `case.CaseNode`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
@@ -187,11 +187,11 @@ _No additional fields beyond parent class._
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
-| `type` | `CaseNoteType` | **required** |  |
+| `type` | `<enum 'CaseNoteType'>` | **required** |  |
 
 ### `case.CaseNodeUpdate`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 CaseNodeUpdate is a class that represents an update to a case node.
 
@@ -212,21 +212,21 @@ Returns:
 
 ### `event.AbstractEvent`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `source` | `Dict` | **required** |  |
+| `source` | `Dict[str, Any]` | **required** |  |
 | `account` | `Any` | **required** |  |
-| `type` | `EventType` | **required** |  |
+| `type` | `<enum 'EventType'>` | **required** |  |
 | `object_type` | `str` | **required** |  |
-| `details` | `Dict` | **required** |  |
+| `details` | `Dict[str, Any]` | **required** |  |
 
 ### `event.AgentRegisterEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 Event sent when an agent registers with the control system.
 
@@ -236,19 +236,19 @@ _No additional fields beyond parent class._
 
 ### `event.CaseStartEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 _No additional fields beyond parent class._
 
 ### `event.CaseUpdateEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 _No additional fields beyond parent class._
 
 ### `event.Event`
 
-**Inherits from:** [`event.AbstractEvent`](#event-abstractevent)
+**Inherits from:** [`event.AbstractEvent`](#eventabstractevent)
 
 Base class for all events in the Supervaize Control system.
 
@@ -267,19 +267,19 @@ _No additional fields beyond parent class._
 
 ### `event.JobFinishedEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 _No additional fields beyond parent class._
 
 ### `event.ServerRegisterEvent`
 
-**Inherits from:** [`event.Event`](#event-event)
+**Inherits from:** [`event.Event`](#eventevent)
 
 _No additional fields beyond parent class._
 
 ### `job.AbstractJob`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
@@ -288,20 +288,20 @@ _No additional fields beyond parent class._
 | `id` | `str` | **required** |  |
 | `name` | `str` | **required** |  |
 | `agent_name` | `str` | **required** |  |
-| `status` | `EntityStatus` | **required** |  |
+| `status` | `<enum 'EntityStatus'>` | **required** |  |
 | `job_context` | `JobContext` | **required** |  |
 | `payload` | `Any` | `None` |  |
 | `result` | `Any` | `None` |  |
 | `error` | `str` | `None` |  |
-| `responses` | `list` | [] |  |
+| `responses` | `list[job.JobResponse]` | [] |  |
 | `finished_at` | `datetime` | `None` |  |
 | `created_at` | `datetime` | `None` |  |
 | `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` |  |
-| `case_ids` | `List` | [] |  |
+| `case_ids` | `List[str]` | [] |  |
 
 ### `job.JobInstructions`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 #### Model Fields
 
@@ -316,7 +316,7 @@ _No additional fields beyond parent class._
 
 ### `routes.CaseUpdateRequest`
 
-**Inherits from:** [`common.SvBaseModel`](#common-svbasemodel)
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
 
 Request model for updating a case with answer to a question.
 
@@ -324,7 +324,7 @@ Request model for updating a case with answer to a question.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `answer` | `Dict` | **required** |  |
+| `answer` | `Dict[str, Any]` | **required** |  |
 | `message` | `str` | `None` |  |
 
 ### `server_utils.ErrorResponse`
@@ -334,9 +334,9 @@ Standard error response model
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `error` | `str` | **required** |  |
-| `error_type` | `ErrorType` | **required** |  |
+| `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 9, 23, 26, 48, 229314) |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 10, 11, 46, 27, 899140) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.ServerInfo`
@@ -350,7 +350,7 @@ Complete server information for storage.
 | `port` | `int` | **required** |  |
 | `api_version` | `str` | **required** |  |
 | `environment` | `str` | **required** |  |
-| `agents` | `List` | **required** |  |
+| `agents` | `List[Dict[str, str]]` | **required** |  |
 | `start_time` | `float` | **required** |  |
 | `created_at` | `str` | **required** |  |
 | `updated_at` | `str` | **required** |  |
@@ -362,10 +362,10 @@ A base class for creating Pydantic models.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `agentId` | `str` | **required** |  |
-| `type` | `TelemetryType` | **required** |  |
-| `category` | `TelemetryCategory` | **required** |  |
-| `severity` | `TelemetrySeverity` | **required** |  |
-| `details` | `Dict` | **required** |  |
+| `type` | `<enum 'TelemetryType'>` | **required** |  |
+| `category` | `<enum 'TelemetryCategory'>` | **required** |  |
+| `severity` | `<enum 'TelemetrySeverity'>` | **required** |  |
+| `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Updated on 2025-08-09 23:26:48*
+*Updated on 2025-08-10 11:46:28*

@@ -168,7 +168,7 @@ def test_get_agent_by_http_error(
     account_fixture: Account, mocker: MockerFixture
 ) -> None:
     """Test get_agent_by method with HTTP error."""
-    mock_get = mocker.patch(
+    _mock_get = mocker.patch(
         "httpx.get", side_effect=httpx.HTTPError("Connection failed")
     )
 

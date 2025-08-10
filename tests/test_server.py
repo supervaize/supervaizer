@@ -267,9 +267,9 @@ async def test_start_job_endpoint(
     monkeypatch.setattr(
         Server,
         "decrypt",
-        lambda self, encrypted: json.dumps({
-            k: v.value for k, v in parameters_fixture.definitions.items()
-        }),
+        lambda self, encrypted: json.dumps(
+            {k: v.value for k, v in parameters_fixture.definitions.items()}
+        ),
     )
 
     # Set up client with API key

@@ -45,7 +45,7 @@ class ParameterAbstract(SvBaseModel):
         description="Whether the parameter is required, used in the Supervaize UI",
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
         "example_dict": {
             "name": "OPEN_API_KEY",
@@ -107,10 +107,10 @@ class ParametersSetup(SvBaseModel):
     """
 
     definitions: Dict[str, Parameter] = Field(
-        description="A dictionary of Parameters Dict[str, Parameter], where the key is the parameter name and the value is the parameter object.",
+        description="A dictionary of Parameters, where the key is the parameter name and the value is the parameter object.",
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
     }
 

@@ -54,7 +54,7 @@ class AccountAbstract(SvBaseModel):
         description="The URL of the Supervaize SaaS API provided by Supervaize.com"
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
         "json_schema_extra": {
             "examples": [

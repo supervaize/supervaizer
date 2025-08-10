@@ -15,7 +15,9 @@ from rich.console import Console
 
 from supervaizer.__version__ import VERSION
 
-app = typer.Typer(help=f"Supervaizer Controller CLI v{VERSION}")
+app = typer.Typer(
+    help=f"Supervaizer Controller CLI v{VERSION} - Documentation @ https://docs.supervaize.com"
+)
 console = Console()
 
 
@@ -108,7 +110,9 @@ def scaffold(
     console.print(
         f"[bold green]Success:[/] Created an example file at [bold blue]{output_path}[/]"
     )
-    console.print("1. Edit this file to configure your agent(s)")
+    console.print(
+        "1. Copy this file to [bold]supervaizer_control.py[/] and edit it to configure your agent(s)"
+    )
     console.print(
         "2. (Optional) Get your API from [bold]supervaizer.com and setup your environment variables"
     )

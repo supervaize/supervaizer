@@ -77,11 +77,13 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append({
-                    "name": agent.name,
-                    "description": agent.description,
-                    "version": agent.version,
-                })
+                agents.append(
+                    {
+                        "name": agent.name,
+                        "description": agent.description,
+                        "version": agent.version,
+                    }
+                )
 
         # Create server info
         server_info = ServerInfo(
@@ -120,6 +122,8 @@ class ServerAbstract(SvBaseModel):
     """
     API Server for the Supervaize Controller.
 
+    The server is a FastAPI application (see https://fastapi.tiangolo.com/ for details and advanced parameters)
+
     This represents the main server instance that manages agents and provides
     the API endpoints for the Supervaize Control API. It handles agent registration,
     job execution, and communication with the Supervaize platform.
@@ -154,7 +158,8 @@ class ServerAbstract(SvBaseModel):
     app: FastAPI = Field(description="FastAPI application instance")
     reload: bool = Field(description="Whether to enable auto-reload")
     supervisor_account: Optional[Account] = Field(
-        default=None, description="Account of the supervisor"
+        default=None,
+        description="Account of the supervisor - can be created at supervaize.com",
     )
     a2a_endpoints: bool = Field(
         default=True, description="Whether to enable A2A endpoints"
@@ -162,11 +167,15 @@ class ServerAbstract(SvBaseModel):
     acp_endpoints: bool = Field(
         default=True, description="Whether to enable ACP endpoints"
     )
-    private_key: RSAPrivateKey = Field(description="RSA private key for encryption")
-    public_key: RSAPublicKey = Field(description="RSA public key for encryption")
+    private_key: RSAPrivateKey = Field(
+        description="RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user"
+    )
+    public_key: RSAPublicKey = Field(
+        description="RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user"
+    )
     registration_host: Optional[str] = Field(
         default=None,
-        description="Host to use for outbound connections and registration",
+        description="Host to use for outbound connections and registration - May be used for Docker or Kubernetes environments",
     )
     api_key: Optional[str] = Field(
         default=None,
@@ -176,7 +185,7 @@ class ServerAbstract(SvBaseModel):
         default=None, description="API key header for authentication"
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
         "arbitrary_types_allowed": True,  # for FastAPI
         "json_schema_extra": {

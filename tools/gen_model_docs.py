@@ -1,7 +1,21 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # gen_model_docs.py
 
 """
 Model Documentation Generator
+
+** DISCLAIMER **
+This script has been almost completely written by Cursor and has not really been reviewed.
+It does the job (more or less). It probably deserves a good review...
+Most importantly, it should not be used as a reference for code quality / style of the supervaizer library.
+***
+
+# TODO: full review / optimization / testing
 
 This script automatically generates model reference documentation for the supervaizer package.
 It scans through all modules in the package and identifies Pydantic BaseModel classes and
@@ -27,8 +41,10 @@ Output:
 """
 
 from __future__ import annotations
+import re
 import importlib
 import inspect
+import os
 import pkgutil
 import dataclasses
 import shutil
@@ -36,14 +52,22 @@ import json
 from datetime import datetime
 from types import ModuleType
 from pathlib import Path
-from typing import Any, Iterator, Union, Dict, List
+from typing import Any, Iterator, Union, Dict, List, Set
 from pydantic import BaseModel
 
 PACKAGE = "supervaizer"
 OUTPUT = Path("docs/model_reference")
 EXTERNAL_DOC_PATH = Path(
-    "../doc/supervaize-doc/docs/supervaizer-controller/model_reference"
+    os.environ.get("PATH_TO_DOC", "../"), "docs/supervaizer-controller/model_reference"
 )
+
+
+def generate_slug(text: str) -> str:
+    """Generate a URL-friendly slug from heading text."""
+    # Convert to lowercase and replace spaces/hyphens with hyphens
+    slug = re.sub(r"[^\w\s-]", "", text.lower())
+    slug = re.sub(r"[-\s]+", "-", slug)
+    return slug.strip("-")
 
 
 def format_json_in_doc(doc: str) -> str:
@@ -158,6 +182,31 @@ def sanitize_default_for_mdx(default_repr: str) -> str:
     return default_repr
 
 
+def clean_type_string(type_str: str) -> str:
+    """Clean up type strings to make them more readable."""
+    # Remove typing. prefix from common types
+    type_str = type_str.replace("typing.", "")
+
+    # Clean up module paths for common types
+    type_str = type_str.replace("supervaizer.", "")
+
+    # Handle <class 'type'> format
+    if type_str.startswith("<class '") and type_str.endswith("'>"):
+        inner_type = type_str[8:-2]  # Remove "<class '" and "'>"
+        # Extract just the type name, not the full module path
+        if "." in inner_type:
+            inner_type = inner_type.split(".")[-1]
+        return inner_type
+
+    # Handle specific cases for better readability
+    type_str = type_str.replace("Dict", "Dict")
+    type_str = type_str.replace("List", "List")
+    type_str = type_str.replace("Optional", "Optional")
+    type_str = type_str.replace("Union", "Union")
+
+    return type_str
+
+
 def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
     fields = getattr(model, "model_fields", {})
     result: list[tuple[str, str, str, str]] = []
@@ -228,9 +277,18 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
         elif type_obj is not None and str(type_obj).startswith("typing.Optional"):
             # Handle Optional types (which are Union[T, None])
             inner_type = str(type_obj).replace("typing.Optional[", "").replace("]", "")
-            type_str = f"`{inner_type}` | `None`"
+            cleaned_inner_type = clean_type_string(inner_type)
+            type_str = f"`{cleaned_inner_type}` | `None`"
         else:
-            type_str = f"`{getattr(type_obj, '__name__', str(type_obj))}`"
+            # Handle generic types and other types
+            type_str_raw = str(type_obj)
+            if "[" in type_str_raw and "]" in type_str_raw:
+                # Complex type like list[str], dict[str, int], etc.
+                cleaned_type = clean_type_string(type_str_raw)
+                type_str = f"`{cleaned_type}`"
+            else:
+                cleaned_type = clean_type_string(type_str_raw)
+                type_str = f"`{cleaned_type}`"
 
         # Required detection compatible with pydantic v1/v2
         required: bool
@@ -272,7 +330,8 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
 
 
 def get_parent_model(
-    model: type[BaseModel], models_by_group: Dict[str, List[type[BaseModel]]]
+    model: type[BaseModel],
+    models_by_group: Dict[str, List[Union[type[BaseModel], type]]],
 ) -> type[BaseModel] | None:
     """Find the parent model that is also documented in the same group."""
     if not issubclass(model, BaseModel):
@@ -295,7 +354,8 @@ def get_parent_model(
 
 
 def get_model_group(
-    model: type[BaseModel], models_by_group: Dict[str, List[type[BaseModel]]]
+    model: type[BaseModel],
+    models_by_group: Dict[str, List[Union[type[BaseModel], type]]],
 ) -> str:
     """Find which group a model belongs to."""
     for group_name, group_models in models_by_group.items():
@@ -373,9 +433,18 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
         elif type_ is not None and str(type_).startswith("typing.Optional"):
             # Handle Optional types (which are Union[T, None])
             inner_type = str(type_).replace("typing.Optional[", "").replace("]", "")
-            type_str = f"`{inner_type}` | `None`"
+            cleaned_inner_type = clean_type_string(inner_type)
+            type_str = f"`{cleaned_inner_type}` | `None`"
         else:
-            type_str = f"`{getattr(type_, '__name__', str(type_))}`"
+            # Handle generic types and other types
+            type_str_raw = str(type_)
+            if "[" in type_str_raw and "]" in type_str_raw:
+                # Complex type like list[str], dict[str, int], etc.
+                cleaned_type = clean_type_string(type_str_raw)
+                type_str = f"`{cleaned_type}`"
+            else:
+                cleaned_type = clean_type_string(type_str_raw)
+                type_str = f"`{cleaned_type}`"
 
         required = (
             field.default is dataclasses.MISSING
@@ -408,8 +477,11 @@ def generate_model_docs() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     # Get all models and their reference_group
-    models_by_group: Dict[str, List[type[BaseModel]]] = {}
+    models_by_group: Dict[str, List[Union[type[BaseModel], type]]] = {}
     seen = set()
+
+    # Track all generated slugs across all files for link validation
+    all_slugs: Dict[str, Set[str]] = {}
 
     for mod in iter_modules(PACKAGE):
         for name, obj in inspect.getmembers(mod, inspect.isclass):
@@ -440,7 +512,17 @@ def generate_model_docs() -> None:
                 models_by_group["extra"].append(obj)
                 seen.add(obj)
 
-    # Generate documentation for each group
+    # First pass: build all slugs for link validation
+    for group_name, models in models_by_group.items():
+        if group_name not in all_slugs:
+            all_slugs[group_name] = set()
+        for model in models:
+            module_name = model.__module__.replace("supervaizer.", "")
+            heading_text = f"{module_name}.{model.__name__}"
+            slug = generate_slug(heading_text)
+            all_slugs[group_name].add(slug)
+
+    # Second pass: generate documentation for each group
     for group_name, models in models_by_group.items():
         out = [f"# Model Reference {group_name}", ""]
         out.append(f"**Version:** {version}\n")
@@ -448,7 +530,9 @@ def generate_model_docs() -> None:
         for model in models:
             # Remove "supervaizer." prefix from module name
             module_name = model.__module__.replace("supervaizer.", "")
-            out.append(f"### `{module_name}.{model.__name__}`\n")
+            heading_text = f"{module_name}.{model.__name__}"
+            slug = generate_slug(heading_text)
+            out.append(f"### `{heading_text}`\n")
 
             # Check if this model inherits from another documented model
             parent_model = get_parent_model(model, models_by_group)
@@ -456,19 +540,43 @@ def generate_model_docs() -> None:
                 parent_module = parent_model.__module__.replace("supervaizer.", "")
                 parent_group = get_model_group(parent_model, models_by_group)
 
+                # Generate the expected slug for the parent
+                parent_heading = f"{parent_module}.{parent_model.__name__}"
+                parent_slug = generate_slug(parent_heading)
+
+                # Check if the parent slug exists in the target group
+                parent_slug_exists = (
+                    parent_group in all_slugs and parent_slug in all_slugs[parent_group]
+                )
+
                 # Generate appropriate link based on whether parent is in same file
                 if parent_group == group_name:
-                    link = f"#{parent_module}-{parent_model.__name__.lower()}"
-                else:
-                    # Cross-file link
-                    if parent_group == "extra":
-                        link = f"../model_extra.md#{parent_module}-{parent_model.__name__.lower()}"
+                    if parent_slug_exists:
+                        link = f"#{parent_slug}"
+                        out.append(
+                            f"**Inherits from:** [`{parent_module}.{parent_model.__name__}`]({link})\n"
+                        )
                     else:
-                        link = f"../model_{parent_group.lower()}.md#{parent_module}-{parent_model.__name__.lower()}"
+                        out.append(
+                            f"**Inherits from:** `{parent_module}.{parent_model.__name__}`\n"
+                        )
+                else:
+                    # Cross-file link - check if parent slug exists in the target group
+                    target_group_slugs = all_slugs.get(parent_group, set())
+                    parent_slug_exists_in_target = parent_slug in target_group_slugs
 
-                out.append(
-                    f"**Inherits from:** [`{parent_module}.{parent_model.__name__}`]({link})\n"
-                )
+                    if parent_slug_exists_in_target:
+                        if parent_group == "extra":
+                            link = f"model_extra.md#{parent_slug}"
+                        else:
+                            link = f"model_{parent_group.lower()}.md#{parent_slug}"
+                        out.append(
+                            f"**Inherits from:** [`{parent_module}.{parent_model.__name__}`]({link})\n"
+                        )
+                    else:
+                        out.append(
+                            f"**Inherits from:** `{parent_module}.{parent_model.__name__}`\n"
+                        )
 
             # Show class description, but hide if it's the same as parent's
             doc = inspect.getdoc(model)

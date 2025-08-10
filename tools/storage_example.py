@@ -143,7 +143,6 @@ def demo_full_workflow() -> None:
                 name="Demo Case",
                 account=account,
                 description="Demo Case Description",
-                nodes=case_nodes,
                 case_id="demo-case-456",
             )
 

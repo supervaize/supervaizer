@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 
 - Setup : missing `py.typed` in pyproject
 
+### Added
+
+- `gen_model_docs.py`: tool for documentation generation - see disclaimer
+
 ## [0.9.4]
 
 ### Added

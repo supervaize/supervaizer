@@ -89,7 +89,7 @@ def mock_entity_class() -> Any:
 @pytest.fixture
 def mock_entity_repository(
     storage_manager: "StorageManager", mock_entity_class: Any
-) -> "EntityRepository[MockEntity]":  # type: ignore
+) -> "EntityRepository[Any]":  # type: ignore
     """Create a repository with mock entity class for testing."""
     return EntityRepository(mock_entity_class, storage_manager)
 

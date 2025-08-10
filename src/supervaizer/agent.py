@@ -83,9 +83,11 @@ class AgentMethodField(BaseModel):
     description: str | None = Field(
         default=None, description="Description of the field - displayed in the UI"
     )
-    choices: list[list[str, str]] | None = Field(
+    # TODO: confirm the structure of choices (list[str] or list[tuple(str)) - How do we integrate it in Supervaize
+    choices: list[str] | None = Field(
         default=None, description="For choice fields, list of [value, label] pairs"
     )
+
     default: Any = Field(
         default=None, description="Default value for the field - displayed in the UI"
     )
@@ -97,7 +99,7 @@ class AgentMethodField(BaseModel):
         default=False, description="Whether field is required for form submission"
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
         "json_schema_extra": {
             "examples": [
@@ -190,7 +192,7 @@ class AgentMethodAbstract(BaseModel):
         default=False, description="Whether the method is asynchronous"
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
         "example_dict": {
             "name": "start",
@@ -456,7 +458,7 @@ class AgentAbstract(SvBaseModel):
         description="Maximum execution time in seconds, defaults to 1 hour",
     )
 
-    model_config = {  # type: ignore
+    model_config = {
         "reference_group": "Core",
     }
 
