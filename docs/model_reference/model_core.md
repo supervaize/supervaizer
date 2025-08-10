@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.9.4
+**Version:** 0.9.5
 
 ### `account.Account`
 
@@ -433,4 +433,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2025-08-10 21:43:59*
+*Uploaded on 2025-08-10 21:57:26*

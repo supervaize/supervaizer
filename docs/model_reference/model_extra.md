@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 0.9.4
+**Version:** 0.9.5
 
 ### `common.SvBaseModel`
 
@@ -336,7 +336,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 10, 21, 43, 59, 71187) |  |
+| `timestamp` | `datetime` | datetime.datetime(2025, 8, 10, 21, 57, 26, 242091) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.ServerInfo`
@@ -368,4 +368,4 @@ A base class for creating Pydantic models.
 | `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Uploaded on 2025-08-10 21:43:59*
+*Uploaded on 2025-08-10 21:57:26*
