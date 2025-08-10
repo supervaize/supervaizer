@@ -102,4 +102,5 @@ ready-to-go:
     just precommit
     just build_fix
     just generate_documentation
+    git add . && git commit -m "chore: update documentation"
     just tag_version

@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.9.6
+**Version:** 0.9.7
 
 ### `account.Account`
 
@@ -368,6 +368,8 @@ job execution, and communication with the Supervaize platform.
 The server can be configured with various endpoints (A2A, ACP, admin interface)
 and supports encryption/decryption of parameters using RSA keys.
 
+Note that when the supervisor ccount is set, the A2A protocol is automatically activated to provide HEALTH CHECK endpoints.
+
 public_url: full url (including scheme and port) to use for outbound connections and registration.
             This is especially important in Docker environments where the binding
             address (0.0.0.0) can't be used for outbound connections. Set to
@@ -433,4 +435,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2025-08-10 23:34:48*
+*Uploaded on 2025-08-11 02:52:31*

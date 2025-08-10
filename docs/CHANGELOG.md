@@ -37,7 +37,7 @@ All notable changes to this project will be documented in this file.
 | 🤔 Skipped    | 6     |
 | ☑️ Deselected | 0     |
 | ⚠️ Failed     | 0     |
-| ✅ Passed     | 278   |
+| ✅ Passed     | 277   |
 
 ## [0.9.4]
 
