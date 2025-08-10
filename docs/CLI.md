@@ -13,7 +13,6 @@ supervaizer --help
 supervaizer scaffold
 
 
-
 # Start the server using the configuration file
 supervaizer start
 
