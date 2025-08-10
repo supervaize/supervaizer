@@ -30,12 +30,6 @@ jobs:
         run: hatch build
 
       - name: Publish to PyPI on main
-<<<<<<< HEAD
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
-=======
-        run: hatch publish --no-prompt
-        env:
-          HATCH_INDEX_REPO: https://pypi.org/legacy/
->>>>>>> main
