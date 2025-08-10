@@ -10,8 +10,6 @@ on:
         type: choice
         options:
           - full-repo
-          - full-history
-          - both
 
 jobs:
   full-security-scan:
@@ -25,17 +23,9 @@ jobs:
           fetch-depth: 0 # Full git history for complete scanning
 
       - name: Full Repository Scan
-        if: inputs.scan_type == 'full-repo' || inputs.scan_type == 'both'
+        if: inputs.scan_type == 'full-repo'
         uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --results=verified,unknown
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Full Commit History Scan
-        if: inputs.scan_type == 'full-history' || inputs.scan_type == 'both'
-        uses: trufflesecurity/trufflehog@main
-        with:
-          extra_args: git file://. --results=verified,unknown
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

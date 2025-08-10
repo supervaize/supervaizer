@@ -87,6 +87,9 @@ unicorn:
 tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
 
+# Check git history for secret leaks
+trufflehog_scan_git_history:
+    trufflehog git file://. --results=verified,unknown --fail
 
 # Generate model reference documentation
 generate_documentation:
@@ -97,4 +100,8 @@ generate_documentation:
 ready-to-go:
     just test-no-cov
     just precommit
+    just build_fix
     just generate_documentation
+    just tag_version
+    
+
