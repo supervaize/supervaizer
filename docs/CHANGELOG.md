@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ## [0.9.6]
 
 - Public release to Pypi
+- Fixed the gihut workflows
+- Improve readme
 
 ## [0.9.5]
 

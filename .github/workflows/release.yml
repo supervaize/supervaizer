@@ -8,6 +8,8 @@ on:
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    if: github.repository == 'supervaizer/supervaizer' # Only run on public remote
+
     permissions:
       contents: write
     steps:
