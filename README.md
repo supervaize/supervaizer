@@ -1,17 +1,24 @@
 # SUPERVAIZER
 
-A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) protocol support.
+[[Operate AI Agents with confidence]]
+
+A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) and [Agent Communication Protocol (ACP)](https://github.com/i-am-bee/ACP) support.
 
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/Supervaizer-0.9.4-yellow.svg)](https://github.com/supervaize/supervaizer)
+[![Package Version](https://img.shields.io/badge/Supervaizer-0.9.6-yellow.svg)](https://github.com/supervaize/supervaizer)
 [![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
-[![ACP Protocol](https://img.shields.io/badge/A2A-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
+[![ACP Protocol](https://img.shields.io/badge/ACP-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
 [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
 - [SUPERVAIZER](#supervaizer)
   - [Description](#description)
   - [Quick Start](#quick-start)
-    - [Installation](#installation)
+    - [What we'll do](#what-well-do)
+    - [1. Install Supervaizer](#1-install-supervaizer)
+    - [3. Scaffold the controller](#3-scaffold-the-controller)
+    - [(Optional) 4. Configure your Supervaize account \& environment](#optional-4-configure-your-supervaize-account--environment)
+    - [5. Start the server 🚀](#5-start-the-server-)
+    - [What's next?](#whats-next)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
   - [Using the CLI](#using-the-cli)
@@ -20,6 +27,7 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
       - [Quick Start](#quick-start-1)
 - [Calculating costs](#calculating-costs)
   - [Documentation](#documentation)
+  - [Contributing](#contributing)
   - [License](#license)
 
 ## Description
@@ -37,92 +45,75 @@ Beyond A2A interoperability, SUPERVAIZER provides a robust API for agent registr
 
 ## Quick Start
 
-### Installation
+Kickstart a **Python** agent with the **Supervaizer Controller** so it's discoverable and operable by Supervaize.
+
+### What we'll do
+
+1. **Install Supervaizer** in that project
+2. **Scaffold the controller** and map it to your agent
+3. **Configure secrets & env**, then **start** the server 🚀
+
+### 1. Install Supervaizer
+
+First, navigate to your existing Python AI agent project. This could be built with any framework - LangChain, CrewAI, AutoGen, or your own custom implementation. Supervaizer works as a wrapper around your existing agent, regardless of the underlying framework you're using.
 
 ```bash
 pip install supervaizer
 ```
 
-```python
-# create supervaizer_control.py
-from supervaizer import (
-    Server,
-    Agent,
-    AgentMethod,
-    Parameter,
-    ParametersSetup,
-    AgentMethods,
-)
-# Define at least one AgentMethod
-agent_method = AgentMethod(
-    name="start",
-    method="example_agent.example_synchronous_job_start", #This is the function that is triggered when agent start - THIS MUST BE THE ABOLUTE PATH TO THE METHOD "module.submodule.method  - no parenthesis.
-    is_async=False,
-    params={"action": "start"},
-    fields=[
-        {
-            "name": "Variable to start agent job",
-            "type": str,
-            "field_type": "CharField",
-            "max_length": 100,
-            "required": True,
-        }]}
+### 3. Scaffold the controller
 
-# Define agent parameters (optional)
-agent_parameters = ParametersSetup.from_list([
-    Parameter(
-        name="OPEN_API_KEY",
-        description="OpenAPI Key",
-        is_environment=True,
-    )]),
-
-# Define at least one agent
-agent = Agent(
-    name="agent_name",
-    id="agent_id",
-    author="John Doe",
-    developer="Developer",
-    maintainer="Ive Maintained",
-    editor="Yuri Editor",
-    version="1.3",
-    description="This is a test agent",
-    urls={"dev": "http://host.docker.internal:8001", "prod": ""},
-    active_environment="dev",
-    tags=["testtag", "testtag2"],
-    methods=AgentMethods(
-        job_start=agent_method,
-        job_stop=agent_method, #should be different methods
-        job_status=agent_method, # should be different methods
-        chat=None,
-        custom=None}
-    ),
-    parameters_setup=agent_parameters,
-)
-
-# Initialize a connection to the SUPERVAIZE server
-server = Server(
-    agents=[agent],
-    acp_endpoints=True,  # Enable ACP protocol support
-    a2a_endpoints=True,  # Enable A2A protocol support
-    admin_interface=True,  # Enable web admin interface (requires api_key)
-    api_key="your-secure-api-key",  # Required for admin interface
-    supervisor_account=None,
-)
-
-# Start the server
-sv_server.launch(log_level="DEBUG")
-
-```
-
-For more comprehensive examples, check out the `examples/` directory:
-
-- `examples/a2a-controller.py` - A complete A2A-compatible controller implementation
-
-Run any example with:
+Generate a starter controller in your project:
 
 ```bash
-python examples/a2a-controller.py
+supervaizer scaffold
+# Success: Created an example file at supervaizer_control_example.py
 ```
+
+This creates **`supervaizer_control_example.py`**. You'll customize it to:
+
+- Define **agent parameters** (secrets, env, required inputs)
+- Define **agent methods** (start/stop/status, etc.)
+- Map those methods to **your agent's functions**
+
+### (Optional) 4. Configure your Supervaize account & environment
+
+Create your developer account on the [Supervaize platform](https://www.supervaize.com).
+
+Create your API Key and collect your environment variables:
+
+```bash
+export SUPERVAIZE_API_KEY=...
+export SUPERVAIZE_WORKSPACE_ID=team_1
+export SUPERVAIZE_API_URL=https://app.supervaize.com
+```
+
+### 5. Start the server 🚀
+
+```bash
+# with the virtual environment active
+supervaizer start
+```
+
+Or run directly:
+
+```bash
+python supervaizer_control.py
+```
+
+Once the server is running, you'll have:
+
+- **API docs**: `http://127.0.0.1:8000/docs` (Swagger) and `/redoc`
+- **A2A discovery**: `/.well-known/agents.json`
+- **ACP discovery**: `/agents`
+
+### What's next?
+
+- Add more **custom methods** (`chat`, `custom`) to extend control
+- Turn on **A2A / ACP** discovery for interoperability
+- Hook your controller into Supervaize to **monitor, audit, and operate** the agent
+
+For detailed instructions on customizing your controller, see the [Controller Setup Guide](https://doc.supervaize.com/docs/supervaizer-controller/controller-setup-guide).
 
 ## Features
 
@@ -189,12 +180,13 @@ A list of costs is maintained here:
 
 ## Documentation
 
-Note: run `just generate_model_docs` to update the `docs/model_reference.md` file (this also updates this file in the doc.supervaize.com project)
+For a full tutorial and example usage, go to [doc.supervaize.com](https://doc.supervaize.com)
 
-- [Persistence Layer](docs/PERSISTENCE.md) - TinyDB-based storage for Jobs, Cases, and workflow entities
+## Contributing
 
-- [API Reference](API_REFERENCE.md) - Complete documentation of classes and methods
-- [Contributing Guide](CONTRIBUTING.md) - How to set up your development environment and contribute
+We welcome contributions from the community! Whether you're fixing bugs, adding features, improving documentation, or sharing feedback, your contributions help make SUPERVAIZER better for everyone.
+
+Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started, coding standards, and the contribution process.
 
 ## License
 
