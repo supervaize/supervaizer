@@ -83,8 +83,7 @@ class AgentMethodField(BaseModel):
     description: str | None = Field(
         default=None, description="Description of the field - displayed in the UI"
     )
-    # TODO: confirm the structure of choices (list[str] or list[tuple(str)) - How do we integrate it in Supervaize
-    choices: list[str] | None = Field(
+    choices: list[tuple[str, str]] | list[str] | None = Field(
         default=None, description="For choice fields, list of [value, label] pairs"
     )
 
