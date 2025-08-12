@@ -345,6 +345,29 @@ def create_admin_routes() -> APIRouter:
                 status_code=503, detail="Server information unavailable"
             ) from e
 
+    @router.get("/job-start-test", response_class=HTMLResponse)
+    async def admin_job_start_test_page(request: Request) -> Response:
+        """Job start form test page."""
+        return templates.TemplateResponse(
+            "job_start_test.html",
+            {
+                "request": request,
+                "api_version": API_VERSION,
+                "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+            },
+        )
+
+    @router.get("/static/js/job-start-form.js")
+    async def serve_job_start_form_js() -> Response:
+        """Serve the JobStartForm JavaScript file."""
+        js_file_path = Path(__file__).parent / "static" / "js" / "job-start-form.js"
+        if js_file_path.exists():
+            with open(js_file_path, "r") as f:
+                content = f.read()
+            return Response(content=content, media_type="application/javascript")
+        else:
+            raise HTTPException(status_code=404, detail="JavaScript file not found")
+
     @router.get("/console", response_class=HTMLResponse)
     async def admin_console_page(request: Request) -> Response:
         """Interactive console page - publicly accessible, authentication handled by frontend."""

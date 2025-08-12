@@ -1,0 +1,3388 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Supervaize API",
+    "description": "API version: v1  Controller version: 0.9.8\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "termsOfService": "https://supervaize.com/terms/",
+    "contact": {
+      "name": "Support Team",
+      "url": "https://supervaize.com/dev_contact/",
+      "email": "integration_support@supervaize.com"
+    },
+    "license": {
+      "name": "Mozilla Public License 2.0",
+      "url": "https://mozilla.org/MPL/2.0/"
+    },
+    "version": "v1"
+  },
+  "paths": {
+    "/supervaizer/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get Job Status",
+        "description": "Get the status of a job by its ID",
+        "operationId": "get_job_status_supervaizer_jobs__job_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/jobs": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get All Jobs",
+        "description": "Get all jobs across all agents with pagination and optional status filtering",
+        "operationId": "get_all_jobs_supervaizer_jobs_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of jobs to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of jobs to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of jobs to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Number of jobs to return"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EntityStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter jobs by status",
+              "title": "Status"
+            },
+            "description": "Filter jobs by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/JobResponse"
+                    }
+                  },
+                  "title": "Response Get All Jobs Supervaizer Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/jobs/{job_id}/cases/{case_id}/update": {
+      "post": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Update case with answer to question",
+        "description": "Provide an answer to a question that was requested by a case step",
+        "operationId": "update_case_with_answer_supervaizer_jobs__job_id__cases__case_id__update_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response 200 Update Case With Answer Supervaizer Jobs  Job Id  Cases  Case Id  Update Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/agents": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get All Agents",
+        "description": "Get all registered agents with pagination",
+        "operationId": "get_all_agents_supervaizer_agents_get",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of jobs to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of jobs to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of jobs to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Number of jobs to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentResponse"
+                  },
+                  "title": "Response Get All Agents Supervaizer Agents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/agent/{agent_id}": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get Agent Details",
+        "description": "Get details of a specific agent by ID",
+        "operationId": "get_agent_details_supervaizer_agent__agent_id__get",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/utils/public_key": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get server's public key",
+        "description": "Returns the server's public key in PEM format",
+        "operationId": "get_public_key_supervaizer_utils_public_key_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Get Public Key Supervaizer Utils Public Key Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/utils/encrypt": {
+      "post": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Encrypt a string",
+        "description": "Encrypts a string using the server's public key. Example: {'key':'value'}",
+        "operationId": "encrypt_string_supervaizer_utils_encrypt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string",
+                "title": "Text"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The encrypted string",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Encrypt String Supervaizer Utils Encrypt Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/agents/competitor-summary/": {
+      "get": {
+        "tags": [
+          "Supervision",
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get information about the agent competitor_summary",
+        "description": "Detailed information about the agent, returned as a JSON object with Agent class fields",
+        "operationId": "agent_info_supervaizer_agents_competitor_summary__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/validate-agent-parameters": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Validate agent parameters for agent: competitor_summary",
+        "description": "Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
+        "operationId": "validate_agent_parameters_supervaizer_agents_competitor_summary_validate_agent_parameters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/validate-method-fields": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Validate method fields for agent: competitor_summary",
+        "description": "Validate job input fields against the method's field definitions before starting a job",
+        "operationId": "validate_method_fields_supervaizer_agents_competitor_summary_validate_method_fields_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/jobs": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Start a job with agent: competitor_summary",
+        "description": "Start the collection of new competitor summary",
+        "operationId": "start_job_supervaizer_agents_competitor_summary_jobs_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response 400 Start Job Supervaizer Agents Competitor Summary Jobs Post"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get all jobs for agent: competitor_summary",
+        "description": "Get all jobs for this agent with pagination and optional status filtering",
+        "operationId": "get_agent_jobs_supervaizer_agents_competitor_summary_jobs_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of jobs to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of jobs to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of jobs to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Number of jobs to return"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EntityStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter jobs by status",
+              "title": "Status"
+            },
+            "description": "Filter jobs by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobResponse"
+                  },
+                  "title": "Response 200 Get Agent Jobs Supervaizer Agents Competitor Summary Jobs Get"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/agents/competitor-summary/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get job status for agent: competitor_summary",
+        "description": "Get the status and details of a specific job",
+        "operationId": "get_job_status_supervaizer_agents_competitor_summary_jobs__job_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/supervaizer/agents/competitor-summary/stop": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Stop the agent: competitor_summary",
+        "description": "Stop the agent",
+        "operationId": "stop_agent_supervaizer_agents_competitor_summary_stop_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/status": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get the status of the agent: competitor_summary",
+        "description": "Get the status of the agent",
+        "operationId": "status_agent_supervaizer_agents_competitor_summary_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMethodParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/parameters": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Server updates agent: competitor_summary",
+        "description": "Server updates agent onboarding status and/or encrypted parameters",
+        "operationId": "server_update_agent_supervaizer_agents_competitor_summary_parameters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/custom/custom1": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Trigger custom method 'custom1' for agent: competitor_summary",
+        "description": "Custom method",
+        "operationId": "competitor_summary_custom_custom1_supervaizer_agents_competitor_summary_custom_custom1_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Competitor Summary Custom Custom1 Supervaizer Agents Competitor Summary Custom Custom1 Post"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/custom/custom2": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Trigger custom method 'custom2' for agent: competitor_summary",
+        "description": "Custom method",
+        "operationId": "competitor_summary_custom_custom2_supervaizer_agents_competitor_summary_custom_custom2_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Competitor Summary Custom Custom2 Supervaizer Agents Competitor Summary Custom Custom2 Post"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/.well-known/agents.json": {
+      "get": {
+        "tags": [
+          "Protocol A2A"
+        ],
+        "summary": "A2A Agents Discovery",
+        "description": "Returns a list of all agents according to A2A protocol specification",
+        "operationId": "get_a2a_agents__well_known_agents_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get A2A Agents  Well Known Agents Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/health": {
+      "get": {
+        "tags": [
+          "Protocol A2A"
+        ],
+        "summary": "A2A Health Status",
+        "description": "Returns health information about the server and agents",
+        "operationId": "get_health__well_known_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Health  Well Known Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agents/v1.3/competitor-summary_agent.json": {
+      "get": {
+        "tags": [
+          "Protocol A2A"
+        ],
+        "summary": "A2A Agent Card for competitor_summary (v1)",
+        "description": "Returns agent card for competitor_summary according to A2A protocol specification",
+        "operationId": "get_agent_card__well_known_agents_v1_3_competitor_summary_agent_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Agent Card  Well Known Agents V1 3 Competitor Summary Agent Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agents/competitor-summary_agent.json": {
+      "get": {
+        "tags": [
+          "Protocol A2A"
+        ],
+        "summary": "A2A Agent Card for competitor_summary (Legacy)",
+        "description": "Legacy endpoint for competitor_summary agent card",
+        "operationId": "get_agent_card_legacy__well_known_agents_competitor_summary_agent_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Agent Card Legacy  Well Known Agents Competitor Summary Agent Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "tags": [
+          "Protocol ACP"
+        ],
+        "summary": "ACP Agents Discovery",
+        "description": "Returns a list of all agents according to ACP protocol specification",
+        "operationId": "get_acp_agents_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Acp Agents Agents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/competitor-summary": {
+      "get": {
+        "tags": [
+          "Protocol ACP"
+        ],
+        "summary": "ACP Agent Detail for competitor_summary",
+        "description": "Returns details for agent competitor_summary according to ACP protocol specification",
+        "operationId": "get_agent_detail_agents_competitor_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Agent Detail Agents Competitor Summary Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/health": {
+      "get": {
+        "tags": [
+          "Protocol ACP"
+        ],
+        "summary": "ACP Health Status",
+        "description": "Returns health information about the server and agents",
+        "operationId": "get_acp_health_agents_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Acp Health Agents Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Dashboard",
+        "description": "Admin dashboard page.",
+        "operationId": "admin_dashboard_admin__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/jobs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Jobs Page",
+        "description": "Jobs management page.",
+        "operationId": "admin_jobs_page_admin_jobs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/cases": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Cases Page",
+        "description": "Cases management page.",
+        "operationId": "admin_cases_page_admin_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/server": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Server Page",
+        "description": "Server status and configuration page.",
+        "operationId": "admin_server_page_admin_server_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/agents": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Agents Page",
+        "description": "Agents management page.",
+        "operationId": "admin_agents_page_admin_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/job-start-test": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Job Start Test Page",
+        "description": "Job start form test page.",
+        "operationId": "admin_job_start_test_page_admin_job_start_test_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/static/js/job-start-form.js": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Serve Job Start Form Js",
+        "description": "Serve the JobStartForm JavaScript file.",
+        "operationId": "serve_job_start_form_js_admin_static_js_job_start_form_js_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/console": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Console Page",
+        "description": "Interactive console page - publicly accessible, authentication handled by frontend.",
+        "operationId": "admin_console_page_admin_console_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/stats": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Stats",
+        "description": "Get system statistics.",
+        "operationId": "get_stats_admin_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/server/status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Server Status Api",
+        "description": "Get current server status for HTMX refresh.",
+        "operationId": "get_server_status_api_admin_api_server_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/agents": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Agents Api",
+        "description": "Get agents with filtering for HTMX refresh.",
+        "operationId": "get_agents_api_admin_api_agents_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "agent_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Type"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "-created_at",
+              "title": "Sort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/agents/{agent_slug}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Agent Details",
+        "description": "Get detailed agent information.",
+        "operationId": "get_agent_details_admin_api_agents__agent_slug__get",
+        "parameters": [
+          {
+            "name": "agent_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/jobs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Jobs Api",
+        "description": "Get jobs with filtering and pagination.",
+        "operationId": "get_jobs_api_admin_api_jobs_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "agent_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Name"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "-created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Job Details",
+        "description": "Get detailed job information.",
+        "operationId": "get_job_details_admin_api_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Job",
+        "description": "Delete a job and its related cases.",
+        "operationId": "delete_job_admin_api_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Job Admin Api Jobs  Job Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/cases": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Cases Api",
+        "description": "Get cases with filtering and pagination.",
+        "operationId": "get_cases_api_admin_api_cases_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "-created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Case Details",
+        "description": "Get detailed case information.",
+        "operationId": "get_case_details_admin_api_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Case",
+        "description": "Delete a case.",
+        "operationId": "delete_case_admin_api_cases__case_id__delete",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Case Admin Api Cases  Case Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/jobs/{job_id}/status": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Job Status",
+        "description": "Update job status.",
+        "operationId": "update_job_status_admin_api_jobs__job_id__status_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Status Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Update Job Status Admin Api Jobs  Job Id  Status Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/cases/{case_id}/status": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Case Status",
+        "description": "Update case status.",
+        "operationId": "update_case_status_admin_api_cases__case_id__status_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Status Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Update Case Status Admin Api Cases  Case Id  Status Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/recent-activity": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Recent Activity",
+        "description": "Get recent entity activity.",
+        "operationId": "get_recent_activity_admin_api_recent_activity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/log-stream": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Log Stream",
+        "description": "Stream log messages via Server-Sent Events.",
+        "operationId": "log_stream_admin_log_stream_get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/test-log": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Test Log",
+        "description": "Test endpoint to generate a log message.",
+        "operationId": "test_log_admin_test_log_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Test Log Admin Test Log Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/debug-tokens": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Debug Tokens",
+        "description": "Debug endpoint to see current tokens.",
+        "operationId": "debug_tokens_admin_debug_tokens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Debug Tokens Admin Debug Tokens Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/test-loguru": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Test Loguru",
+        "description": "Test endpoint to generate loguru messages.",
+        "operationId": "test_loguru_admin_test_loguru_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Test Loguru Admin Test Loguru Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/debug-queue": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Debug Queue",
+        "description": "Debug endpoint to check log queue status.",
+        "operationId": "debug_queue_admin_debug_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Debug Queue Admin Debug Queue Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/console/execute": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Execute Console Command",
+        "description": "Execute a console command and add output to log stream.",
+        "operationId": "execute_console_command_admin_api_console_execute_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Command Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Execute Console Command Admin Api Console Execute Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminStats": {
+        "properties": {
+          "jobs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Jobs"
+          },
+          "cases": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Cases"
+          },
+          "collections": {
+            "type": "integer",
+            "title": "Collections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "cases",
+          "collections"
+        ],
+        "title": "AdminStats",
+        "description": "Statistics for admin dashboard."
+      },
+      "AgentMethod": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the method"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "description": "The name of the method in the project's codebase that will be called with the provided parameters"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params",
+            "description": "A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AgentMethodField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "A list of field specifications for generating forms/UI, following the django.forms.fields definition"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Optional description of what the method does"
+          },
+          "is_async": {
+            "type": "boolean",
+            "title": "Is Async",
+            "description": "Whether the method is asynchronous",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "method"
+        ],
+        "title": "AgentMethod"
+      },
+      "AgentMethodField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the field - displayed in the UI"
+          },
+          "type": {
+            "title": "Type",
+            "description": "Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]"
+          },
+          "field_type": {
+            "$ref": "#/components/schemas/FieldTypeEnum",
+            "description": "Field type for persistence",
+            "default": "CharField"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the field - displayed in the UI"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices",
+            "description": "For choice fields, list of [value, label] pairs"
+          },
+          "default": {
+            "title": "Default",
+            "description": "Default value for the field - displayed in the UI"
+          },
+          "widget": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widget",
+            "description": "UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "description": "Whether field is required for form submission",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "AgentMethodField",
+        "description": "Represents a field specification for generating forms/UI in the Supervaize platform.\n\nFields are used to define user input parameters that will be collected through\nthe UI and passed as kwargs to the AgentMethod.method. They follow Django forms\nfield definitions for consistency.\n\n\n- [Django Widgets](https://docs.djangoproject.com/en/5.2/ref/forms/widgets/)\n\n\n** field_type  - available field types ** [Django Field classes](https://docs.djangoproject.com/en/5.2/ref/forms/fields/#built-in-field-classes)\n\n    - `CharField` - Text input\n    - `IntegerField` - Number input\n    - `BooleanField` - Checkbox\n    - `ChoiceField` - Dropdown with options\n    - `MultipleChoiceField` - Multi-select\n    - `JSONField` - JSON data input",
+        "examples": [
+          {
+            "choices": [
+              [
+                "B",
+                "Blue"
+              ],
+              [
+                "R",
+                "Red"
+              ],
+              [
+                "G",
+                "Green"
+              ]
+            ],
+            "field_type": "MultipleChoiceField",
+            "name": "color",
+            "required": true,
+            "type": "list[str]",
+            "widget": "RadioSelect"
+          },
+          {
+            "field_type": "IntegerField",
+            "name": "age",
+            "required": false,
+            "type": "int",
+            "widget": "NumberInput"
+          }
+        ]
+      },
+      "AgentMethodParams": {
+        "properties": {
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs"
+          }
+        },
+        "type": "object",
+        "title": "AgentMethodParams",
+        "description": "Method parameters for agent operations."
+      },
+      "AgentMethods": {
+        "properties": {
+          "job_start": {
+            "$ref": "#/components/schemas/AgentMethod"
+          },
+          "job_stop": {
+            "$ref": "#/components/schemas/AgentMethod"
+          },
+          "job_status": {
+            "$ref": "#/components/schemas/AgentMethod"
+          },
+          "chat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "custom": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/AgentMethod"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_start",
+          "job_stop",
+          "job_status"
+        ],
+        "title": "AgentMethods"
+      },
+      "AgentResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "developer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Developer"
+          },
+          "maintainer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maintainer"
+          },
+          "editor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Editor"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "api_path": {
+            "type": "string",
+            "title": "Api Path"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "methods": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMethods"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameters_setup": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Setup"
+          },
+          "server_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Agent Id"
+          },
+          "server_agent_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Agent Status"
+          },
+          "server_agent_onboarding_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Agent Onboarding Status"
+          },
+          "server_encrypted_parameters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Encrypted Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "version",
+          "api_path",
+          "description"
+        ],
+        "title": "AgentResponse",
+        "description": "Response model for agent endpoints - values provided by Agent.registration_info"
+      },
+      "Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post": {
+        "properties": {
+          "onboarding_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onboarding Status"
+          },
+          "parameters_encrypted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Encrypted"
+          }
+        },
+        "type": "object",
+        "title": "Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post"
+      },
+      "CaseUpdateRequest": {
+        "properties": {
+          "answer": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Answer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "CaseUpdateRequest",
+        "description": "Request model for updating a case with answer to a question."
+      },
+      "EntityStatus": {
+        "type": "string",
+        "enum": [
+          "stopped",
+          "in_progress",
+          "cancelling",
+          "awaiting",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "EntityStatus",
+        "description": "Base status enum for workflow entities."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "error_type": {
+            "$ref": "#/components/schemas/ErrorType"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "default": "2025-08-12T14:19:39.099352"
+          },
+          "status_code": {
+            "type": "integer",
+            "title": "Status Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "error_type",
+          "status_code"
+        ],
+        "title": "ErrorResponse",
+        "description": "Standard error response model"
+      },
+      "ErrorType": {
+        "type": "string",
+        "enum": [
+          "job_not_found",
+          "job_already_exists",
+          "agent_not_found",
+          "invalid_request",
+          "internal_error",
+          "invalid_parameters"
+        ],
+        "title": "ErrorType",
+        "description": "Enumeration of possible error types"
+      },
+      "FieldTypeEnum": {
+        "type": "string",
+        "enum": [
+          "CharField",
+          "IntegerField",
+          "BooleanField",
+          "ChoiceField",
+          "MultipleChoiceField",
+          "DateField",
+          "DateTimeField",
+          "FloatField",
+          "EmailField"
+        ],
+        "title": "FieldTypeEnum"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Job": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntityStatus"
+          },
+          "job_context": {
+            "$ref": "#/components/schemas/JobContext"
+          },
+          "payload": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "result": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "responses": {
+            "items": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "array",
+            "title": "Responses",
+            "default": []
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "agent_parameters": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Parameters"
+          },
+          "case_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "agent_name",
+          "status",
+          "job_context"
+        ],
+        "title": "Job",
+        "description": "Jobs are typically created by the platform and are not created by the agent.\n\nArgs:\n    id (str): Unique identifier for the job - provided by the platform\n    agent_name (str): Name (slug) of the agent running the job\n    status (EntityStatus): Current status of the job\n    job_context (JobContext): Context information for the job\n    payload (Any, optional): Job payload data. Defaults to None\n    result (Any, optional): Job result data. Defaults to None\n    error (str, optional): Error message if job failed. Defaults to None\n    responses (list[JobResponse], optional): List of job responses. Defaults to empty list\n    finished_at (datetime, optional): When job completed. Defaults to None\n    created_at (datetime, optional): When job was created. Defaults to None"
+      },
+      "JobContext": {
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "started_by": {
+            "type": "string",
+            "title": "Started By"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "mission_id": {
+            "type": "string",
+            "title": "Mission Id"
+          },
+          "mission_name": {
+            "type": "string",
+            "title": "Mission Name"
+          },
+          "mission_context": {
+            "title": "Mission Context"
+          },
+          "job_instructions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobInstructions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "job_id",
+          "started_by",
+          "started_at",
+          "mission_id",
+          "mission_name"
+        ],
+        "title": "JobContext"
+      },
+      "JobInstructions": {
+        "properties": {
+          "max_cases": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cases"
+          },
+          "max_duration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration"
+          },
+          "max_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost"
+          },
+          "stop_on_warning": {
+            "type": "boolean",
+            "title": "Stop On Warning",
+            "default": false
+          },
+          "stop_on_error": {
+            "type": "boolean",
+            "title": "Stop On Error",
+            "default": true
+          },
+          "job_start_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Start Time"
+          }
+        },
+        "type": "object",
+        "title": "JobInstructions"
+      },
+      "JobResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntityStatus"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "error_traceback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Traceback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "message"
+        ],
+        "title": "JobResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}

@@ -118,7 +118,7 @@ def scaffold(
 
     # Get the path to the examples directory
     examples_dir = Path(__file__).parent / "examples"
-    example_file = examples_dir / "controller-template.py"
+    example_file = examples_dir / "controller_template.py"
 
     if not example_file.exists():
         console.print("[bold red]Error:[/] Example file not found")

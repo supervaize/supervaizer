@@ -171,3 +171,51 @@ class ParametersSetup(SvBaseModel):
                 raise ValueError(message)
 
         return self
+
+    def validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate parameters against their expected types and return validation errors.
+
+        Args:
+            parameters: Dictionary of parameter names and values to validate
+
+        Returns:
+            Dictionary with validation results:
+            - "valid": bool - whether all parameters are valid
+            - "errors": List[str] - list of validation error messages
+            - "invalid_parameters": Dict[str, str] - parameter name to error message mapping
+        """
+        errors = []
+        invalid_parameters = {}
+
+        # First check for missing required parameters
+        for param_name, param_def in self.definitions.items():
+            if param_def.is_required and param_name not in parameters:
+                error_msg = f"Required parameter '{param_name}' is missing"
+                errors.append(error_msg)
+                invalid_parameters[param_name] = error_msg
+
+        # Then validate the provided parameters
+        for param_name, param_value in parameters.items():
+            if param_name not in self.definitions:
+                error_msg = f"Unknown parameter '{param_name}'"
+                errors.append(error_msg)
+                invalid_parameters[param_name] = error_msg
+                continue
+
+            param_def = self.definitions[param_name]
+
+            # Skip validation for None values (optional parameters)
+            if param_value is None:
+                continue
+
+            # Since Parameter values are always strings, validate that input parameters are strings
+            if not isinstance(param_value, str):
+                error_msg = f"Parameter '{param_name}' must be a string, got {type(param_value).__name__}"
+                errors.append(error_msg)
+                invalid_parameters[param_name] = error_msg
+
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "invalid_parameters": invalid_parameters,
+        }

@@ -70,7 +70,7 @@ markers = [
     "db: calls to the database",
     "current: test under development",
 ]
-addopts = "--cov=supervaizer --cov-report=term --cov-report=html"
+#addopts = "--cov=supervaizer --cov-report=term --cov-report=html"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src"]

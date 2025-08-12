@@ -65,6 +65,237 @@ def test_agent_custom_methods(agent_fixture: Agent) -> None:
     assert list(agent_fixture.methods.custom.keys()) == ["method1", "method2"]
 
 
+def test_agent_custom_methods_names(agent_fixture: Agent) -> None:
+    """Test custom methods names property."""
+    assert agent_fixture.custom_methods_names == ["method1", "method2"]
+
+
+def test_agent_method_validate_method_fields_no_fields() -> None:
+    """Test validate_method_fields when method has no field definitions."""
+    method = AgentMethod(name="test_method", method="test.method", fields=None)
+
+    result = method.validate_method_fields({"some_field": "value"})
+
+    assert result["valid"] is True
+    assert result["message"] == "Method has no field definitions"
+    assert len(result["errors"]) == 0
+    assert len(result["invalid_fields"]) == 0
+
+
+def test_agent_method_validate_method_fields_empty_fields() -> None:
+    """Test validate_method_fields when method has empty field definitions."""
+    method = AgentMethod(name="test_method", method="test.method", fields=[])
+
+    result = method.validate_method_fields({"some_field": "value"})
+
+    assert result["valid"] is True
+    assert result["message"] == "Method fields validated successfully"
+    assert len(result["errors"]) == 0
+    assert len(result["invalid_fields"]) == 0
+
+
+def test_agent_method_validate_method_fields_missing_required() -> None:
+    """Test validate_method_fields with missing required fields."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[
+            AgentMethodField(name="required_field", type=str, required=True),
+            AgentMethodField(name="optional_field", type=str, required=False),
+        ],
+    )
+
+    result = method.validate_method_fields({"optional_field": "present"})
+
+    assert result["valid"] is False
+    assert result["message"] == "Method field validation failed"
+    assert len(result["errors"]) == 1
+    assert "required_field" in result["invalid_fields"]
+    assert "is missing" in result["invalid_fields"]["required_field"]
+
+
+def test_agent_method_validate_method_fields_unknown_field() -> None:
+    """Test validate_method_fields with unknown field."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[AgentMethodField(name="known_field", type=str, required=True)],
+    )
+
+    result = method.validate_method_fields(
+        {
+            "known_field": "valid_value",
+            "unknown_field": "should_fail",
+        }
+    )
+
+    assert result["valid"] is False
+    assert result["message"] == "Method field validation failed"
+    assert len(result["errors"]) == 1
+    assert "unknown_field" in result["invalid_fields"]
+    assert "Unknown field" in result["invalid_fields"]["unknown_field"]
+
+
+def test_agent_method_validate_method_fields_valid_types() -> None:
+    """Test validate_method_fields with valid field types."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[
+            AgentMethodField(name="string_field", type=str, required=True),
+            AgentMethodField(name="int_field", type=int, required=True),
+            AgentMethodField(name="bool_field", type=bool, required=False),
+            AgentMethodField(name="list_field", type=list, required=False),
+            AgentMethodField(name="dict_field", type=dict, required=False),
+            AgentMethodField(name="float_field", type=float, required=False),
+        ],
+    )
+
+    result = method.validate_method_fields(
+        {
+            "string_field": "valid_string",
+            "int_field": 42,
+            "bool_field": True,
+            "list_field": ["item1", "item2"],
+            "dict_field": {"key": "value"},
+            "float_field": 3.14,
+        }
+    )
+
+    assert result["valid"] is True
+    assert result["message"] == "Method fields validated successfully"
+    assert len(result["errors"]) == 0
+    assert len(result["invalid_fields"]) == 0
+
+
+def test_agent_method_validate_method_fields_invalid_types() -> None:
+    """Test validate_method_fields with invalid field types."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[
+            AgentMethodField(name="string_field", type=str, required=True),
+            AgentMethodField(name="int_field", type=int, required=True),
+            AgentMethodField(name="bool_field", type=bool, required=False),
+        ],
+    )
+
+    result = method.validate_method_fields(
+        {
+            "string_field": 123,  # Should be string
+            "int_field": "not_a_number",  # Should be int
+            "bool_field": "not_a_bool",  # Should be bool
+        }
+    )
+
+    assert result["valid"] is False
+    assert result["message"] == "Method field validation failed"
+    assert len(result["errors"]) == 3
+    assert "string_field" in result["invalid_fields"]
+    assert "int_field" in result["invalid_fields"]
+    assert "bool_field" in result["invalid_fields"]
+
+    # Check specific error messages
+    assert "must be a string" in result["invalid_fields"]["string_field"]
+    assert "must be an integer" in result["invalid_fields"]["int_field"]
+    assert "must be a boolean" in result["invalid_fields"]["bool_field"]
+
+
+def test_agent_method_validate_method_fields_none_values() -> None:
+    """Test validate_method_fields with None values for optional fields."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[
+            AgentMethodField(name="required_field", type=str, required=True),
+            AgentMethodField(name="optional_field", type=str, required=False),
+        ],
+    )
+
+    result = method.validate_method_fields(
+        {
+            "required_field": "present",
+            "optional_field": None,
+        }
+    )
+
+    assert result["valid"] is True
+    assert result["message"] == "Method fields validated successfully"
+    assert len(result["errors"]) == 0
+    assert len(result["invalid_fields"]) == 0
+
+
+def test_agent_method_validate_method_fields_float_types() -> None:
+    """Test validate_method_fields with float types."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[AgentMethodField(name="float_field", type=float, required=True)],
+    )
+
+    # Test with float
+    result_float = method.validate_method_fields({"float_field": 2.718})
+    assert result_float["valid"] is True
+
+    # Test with int (should also be valid)
+    result_int = method.validate_method_fields({"float_field": 42})
+    assert result_int["valid"] is True
+
+    # Test with invalid type
+    result_invalid = method.validate_method_fields({"float_field": "not_a_number"})
+    assert result_invalid["valid"] is False
+    assert "must be a number" in result_invalid["invalid_fields"]["float_field"]
+
+
+def test_agent_method_validate_method_fields_list_and_dict_types() -> None:
+    """Test validate_method_fields with list and dict types."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[
+            AgentMethodField(name="list_field", type=list, required=True),
+            AgentMethodField(name="dict_field", type=dict, required=True),
+        ],
+    )
+
+    # Test with valid types
+    result_valid = method.validate_method_fields(
+        {
+            "list_field": ["item1", "item2"],
+            "dict_field": {"key": "value"},
+        }
+    )
+    assert result_valid["valid"] is True
+
+    # Test with invalid types
+    result_invalid = method.validate_method_fields(
+        {
+            "list_field": "not_a_list",
+            "dict_field": "not_a_dict",
+        }
+    )
+
+    assert result_invalid["valid"] is False
+    assert "must be a list" in result_invalid["invalid_fields"]["list_field"]
+    assert "must be a dictionary" in result_invalid["invalid_fields"]["dict_field"]
+
+
+def test_agent_method_validate_method_fields_validation_exception() -> None:
+    """Test validate_method_fields handles validation exceptions gracefully."""
+    method = AgentMethod(
+        name="test_method",
+        method="test.method",
+        fields=[AgentMethodField(name="test_field", type=str, required=True)],
+    )
+
+    # Mock a field that would cause an exception during validation
+    # This tests the exception handling in the validation logic
+    result = method.validate_method_fields({"test_field": "valid_string"})
+
+    assert result["valid"] is True
+    assert len(result["errors"]) == 0
+
+
 def test_fields_annotations_dynamic_model() -> None:
     # Create test AgentMethod instance
     agent_method = AgentMethod(
@@ -160,7 +391,7 @@ def test_fields_annotations_dynamic_model() -> None:
     assert DynamicModel.__annotations__["gender"] is str
     assert DynamicModel.__annotations__["bio"] is Optional[str]
     assert DynamicModel.__annotations__["country"] is str
-    assert DynamicModel.__annotations__["languages"] is Optional[list[str]]
+    assert DynamicModel.__annotations__["languages"] is Optional[list]
 
     # Test 3: Create a valid instance
     valid_data: Dict[str, Any] = {

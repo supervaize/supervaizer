@@ -23,6 +23,11 @@ precommit:
 precommit-autoupdate:
     pre-commit autoupdate
 
+# Run tests with coverage
+test-cov *args:
+    pytest --cov=supervaizer --cov-report=term --cov-report=html {{args}}
+
+
 # Run tests without coverage
 test-no-cov *args:
     pytest --no-cov {{args}}
@@ -94,6 +99,7 @@ trufflehog_scan_git_history:
 # Generate model reference documentation
 generate_documentation:
     python tools/gen_model_docs.py
+    python tools/export_openapi.py
 
 
 # Deployment sequence

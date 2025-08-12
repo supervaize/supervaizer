@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">Job Start Form Test</h1>
+
+        <!-- Validation Errors Container -->
+        <div id="validation-errors" class="mb-6"></div>
+
+        <!-- Agent Parameter Errors Container -->
+        <div id="agent-parameter-errors" class="mb-6"></div>
+
+        <!-- Job Start Form -->
+        <form data-job-start method="POST" class="space-y-6">
+            <!-- Job Fields -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-medium text-gray-900">Job Parameters</h3>
+
+                <div>
+                    <label for="company_name" class="block text-sm font-medium text-gray-700">
+                        Company Name *
+                    </label>
+                    <input
+                        type="text"
+                        id="company_name"
+                        name="company_name"
+                        required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="Enter company name"
+                    >
+                </div>
+
+                <div>
+                    <label for="max_results" class="block text-sm font-medium text-gray-700">
+                        Max Results *
+                    </label>
+                    <input
+                        type="number"
+                        id="max_results"
+                        name="max_results"
+                        required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="Enter maximum results"
+                    >
+                </div>
+
+                <div>
+                    <label for="subscribe_updates" class="block text-sm font-medium text-gray-700">
+                        Subscribe to Updates
+                    </label>
+                    <input
+                        type="checkbox"
+                        id="subscribe_updates"
+                        name="subscribe_updates"
+                        class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    >
+                    <span class="ml-2 text-sm text-gray-600">Receive email updates about this job</span>
+                </div>
+            </div>
+
+            <!-- Hidden Fields for Testing -->
+            <input type="hidden" name="encrypted_agent_parameters" value="test_encrypted_params">
+            <input type="hidden" name="api_key" value="{{ api_key }}">
+
+            <!-- Submit Button -->
+            <div class="flex justify-end">
+                <button
+                    type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                    Start Job
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Initialize JobStartForm when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for JobStartForm class to be available
+        function waitForJobStartForm() {
+            if (typeof window.JobStartForm !== 'undefined') {
+                console.log('JobStartForm class found, initializing...');
+
+                // Initialize the form with the current agent path
+                const form = new JobStartForm('/test-agent');
+
+                // Set up callbacks
+                form.setOnJobStarted(function(jobData) {
+                    console.log('Job started successfully:', jobData);
+                });
+
+                form.setOnJobError(function(error) {
+                    console.error('Job failed:', error);
+                });
+
+                console.log('JobStartForm initialized successfully');
+            } else {
+                console.log('JobStartForm class not ready yet, waiting...');
+                setTimeout(waitForJobStartForm, 100);
+            }
+        }
+
+        waitForJobStartForm();
+    });
+</script>
+{% endblock %}

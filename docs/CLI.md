@@ -63,7 +63,7 @@ All CLI options can also be configured through environment variables:
 
 | Environment Variable      | Description                      | Default Value                |
 | ------------------------- | -------------------------------- | ---------------------------- |
-| SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to http://host:port |
+| SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to scheme+host+port |
 | SUPERVAIZER_HOST          | Host to bind the server to       | 0.0.0.0                      |
 | SUPERVAIZER_PORT          | Port to bind the server to       | 8000                         |
 | SUPERVAIZER_ENVIRONMENT   | Environment name                 | dev                          |

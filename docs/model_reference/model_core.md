@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.9.7
+**Version:** 0.9.8
 
 ### `account.Account`
 
@@ -233,7 +233,7 @@ field definitions for consistency.
 | `type` | `Any` | **required** | Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str] |
 | `field_type` | `<enum 'FieldTypeEnum'>` | `CharField` | Field type for persistence |
 | `description` | `str` | `None` | Description of the field - displayed in the UI |
-| `choices` | `list[str]` | `None` | For choice fields, list of [value, label] pairs |
+| `choices` | `list[tuple[str, str]]` \| `list[str]` | `None` | For choice fields, list of [value, label] pairs |
 | `default` | `Any` | `None` | Default value for the field - displayed in the UI |
 | `widget` | `str` | `None` | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | False | Whether field is required for form submission |
@@ -435,4 +435,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2025-08-11 02:52:31*
+*Uploaded on 2025-08-12 14:19:38*

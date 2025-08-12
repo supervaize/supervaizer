@@ -175,10 +175,11 @@ agent: Agent = Agent(
     parameters_setup=agent_parameters,
 )
 
+# For export purposes, use dummy values if environment variables are not set
 account: Account = Account(
-    workspace_id=os.getenv("SUPERVAIZE_WORKSPACE_ID"),  # From supervaize.com
-    api_key=os.getenv("SUPERVAIZE_API_KEY"),  # From supervaize
-    api_url=os.getenv("SUPERVAIZE_API_URL"),  # From supervaize
+    workspace_id=os.getenv("SUPERVAIZE_WORKSPACE_ID") or "dummy_workspace_id",
+    api_key=os.getenv("SUPERVAIZE_API_KEY") or "dummy_api_key",
+    api_url=os.getenv("SUPERVAIZE_API_URL") or "https://api.supervaize.com",
 )
 
 # Define the supervaizer server capabilities
