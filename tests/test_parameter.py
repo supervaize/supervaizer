@@ -239,3 +239,40 @@ def test_parameters_setup_validation_list_and_dict_types() -> None:
     assert result_invalid["valid"] is False
     assert "must be a string" in result_invalid["invalid_parameters"]["list_param"]
     assert "must be a string" in result_invalid["invalid_parameters"]["dict_param"]
+
+
+def test_parameters_setup_validation_non_dict_input():
+    """Test that validate_parameters handles non-dict inputs gracefully"""
+    # Create a parameters setup with some required parameters
+    param1 = Parameter(
+        name="api_key",
+        description="API key for the service",
+        is_required=True,
+        is_secret=True,
+    )
+    param2 = Parameter(
+        name="base_url",
+        description="Base URL for the service",
+        is_required=False,
+        is_secret=False,
+    )
+
+    params_setup = ParametersSetup.from_list([param1, param2])
+
+    # Test with list input (should fail gracefully)
+    result = params_setup.validate_parameters(["invalid", "input"])
+    assert result["valid"] is False
+    assert "Parameters must be a dictionary" in result["errors"][0]
+    assert "parameters" in result["invalid_parameters"]
+
+    # Test with None input (should fail gracefully)
+    result = params_setup.validate_parameters(None)
+    assert result["valid"] is False
+    assert "Parameters must be a dictionary" in result["errors"][0]
+    assert "parameters" in result["invalid_parameters"]
+
+    # Test with string input (should fail gracefully)
+    result = params_setup.validate_parameters("invalid")
+    assert result["valid"] is False
+    assert "Parameters must be a dictionary" in result["errors"][0]
+    assert "parameters" in result["invalid_parameters"]

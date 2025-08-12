@@ -406,18 +406,24 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
 
         if not agent.parameters_setup:
-            return {
+            result = {
                 "valid": True,
                 "message": "Agent has no parameter setup defined",
                 "errors": [],
                 "invalid_parameters": {},
             }
+            log.info(f"📤 Agent {agent.name}: No parameter setup defined → {result}")
+            return result
 
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
-        # Decrypt agent parameters if provided
         agent_parameters: Dict[str, Any] = {}
         if encrypted_agent_parameters:
+            # Basic debug trace
+            log.info(
+                f"📥 Received encrypted_agent_parameters, length: {len(encrypted_agent_parameters)}"
+            )
+
             try:
                 from supervaizer.common import decrypt_value
                 import json
@@ -428,8 +434,30 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 agent_parameters = (
                     json.loads(agent_parameters_str) if agent_parameters_str else {}
                 )
+
+                # Debug: Log the parsed data type and structure
+                log.info(f"🔍 Parsed agent_parameters type: {type(agent_parameters)}")
+                if isinstance(agent_parameters, list):
+                    log.info(
+                        f"🔍 Converting list to dict with {len(agent_parameters)} items"
+                    )
+                    # Convert list to dict if needed (common when frontend sends array)
+                    agent_parameters = {
+                        f"param_{i}": param for i, param in enumerate(agent_parameters)
+                    }
+                elif isinstance(agent_parameters, dict):
+                    log.info(
+                        f"🔍 Agent parameters keys: {list(agent_parameters.keys())}"
+                    )
+                else:
+                    log.warning(
+                        f"🔍 Unexpected type: {type(agent_parameters)}, converting to empty dict"
+                    )
+                    agent_parameters = {}
+
             except Exception as e:
-                return {
+                log.error(f"❌ Decryption failed: {type(e).__name__}: {str(e)}")
+                result = {
                     "valid": False,
                     "message": f"Failed to decrypt agent parameters: {str(e)}",
                     "errors": [f"Decryption failed: {str(e)}"],
@@ -437,11 +465,18 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                         "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
                     },
                 }
+                log.info(f"📤 Agent {agent.name}: Decryption failed → {result}")
+                return result
+
+        # Log the incoming request details
+        log.info(
+            f"🔍 Agent {agent.name}: Incoming request - encrypted_params: {bool(encrypted_agent_parameters)}, parsed_params: {agent_parameters}"
+        )
 
         # Validate agent parameters
         validation_result = agent.parameters_setup.validate_parameters(agent_parameters)
 
-        return {
+        result = {
             "valid": validation_result["valid"],
             "message": "Agent parameters validated successfully"
             if validation_result["valid"]
@@ -449,6 +484,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             "errors": validation_result["errors"],
             "invalid_parameters": validation_result["invalid_parameters"],
         }
+
+        log.info(f"📤 Agent {agent.name}: Validation result → {result}")
+        return result
 
     @router.post(
         "/validate-method-fields",
@@ -475,36 +513,52 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         method_name = body_params.get("method_name", "job_start")
         job_fields = body_params.get("job_fields", {})
 
+        # Log the incoming request details
+        log.info(
+            f"🔍 Agent {agent.name}: Incoming request - method: {method_name}, fields: {job_fields}"
+        )
+
         # Get the method to validate against
         if not agent.methods:
-            return {
+            result = {
                 "valid": False,
                 "message": "Agent has no methods defined",
                 "errors": ["Agent has no methods defined"],
                 "invalid_fields": {},
             }
+            log.info(f"📤 Agent {agent.name}: No methods defined → {result}")
+            return result
 
         if method_name == "job_start":
             method = agent.methods.job_start
         elif agent.methods.custom and method_name in agent.methods.custom:
             method = agent.methods.custom[method_name]
         else:
-            return {
+            result = {
                 "valid": False,
                 "message": f"Method '{method_name}' not found",
                 "errors": [f"Method '{method_name}' not found"],
                 "invalid_fields": {},
             }
+            log.info(
+                f"📤 Agent {agent.name}: Method '{method_name}' not found → {result}"
+            )
+            return result
 
         # Validate method fields
         validation_result = method.validate_method_fields(job_fields)
 
-        return {
+        result = {
             "valid": validation_result["valid"],
             "message": validation_result["message"],
             "errors": validation_result["errors"],
             "invalid_fields": validation_result["invalid_fields"],
         }
+
+        log.info(
+            f"📤 Agent {agent.name}: Method '{method_name}' validation result → {result}"
+        )
+        return result
 
     if not agent.methods:
         raise ValueError(f"Agent {agent.name} has no methods defined")

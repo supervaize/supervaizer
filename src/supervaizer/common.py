@@ -251,8 +251,24 @@ def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
         ValueError: If decryption fails
     """
 
+    # Basic validation
+    if not encrypted_value:
+        raise ValueError("Empty encrypted value")
+
+    # Clean the string
+    encrypted_value = encrypted_value.strip()
+
     # Decode base64
-    combined = base64.b64decode(encrypted_value)
+    try:
+        combined = base64.b64decode(encrypted_value)
+    except Exception as e:
+        raise ValueError(f"Base64 decode failed: {str(e)}")
+
+    # Validate combined data structure
+    if len(combined) < 272:
+        raise ValueError(
+            f"Invalid encrypted data structure: too short ({len(combined)} bytes)"
+        )
 
     # Extract components - first 256 bytes are RSA encrypted key
     encrypted_key = combined[:256]  # RSA-2048 output is 256 bytes
