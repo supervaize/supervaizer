@@ -1,4 +1,4 @@
-# Parameter Validation Implementation Guide
+# Parameter Validation Guide
 
 This document provides instructions for implementing parameter validation in the Supervaize web application to leverage the new parameter validation system.
 
@@ -19,25 +19,23 @@ There are two different types of parameters in the Supervaizer system:
 
 2. **Job Fields** (`AgentMethod.fields`): These are the input fields for job execution and can have different types (str, int, bool, list, etc.). The validation system validates these against their expected types.
 
-The parameter validation system primarily validates **agent parameters** to ensure they are provided as strings, while **job field validation** is handled separately in the job creation process.
+The parameter validation system now provides **separate endpoints** for each type of validation:
+
+- **Agent Parameters**: Validated through `/validate-agent-parameters` endpoint
+- **Method Fields**: Validated through `/validate-method-fields` endpoint
 
 ## New API Endpoints
 
-### 1. Parameter Validation Endpoint
+### 1. Agent Parameters Validation Endpoint
 
-**Endpoint**: `POST /{agent_path}/validate-parameters`
+**Endpoint**: `POST /{agent_path}/validate-agent-parameters`
 
-**Purpose**: Validate job parameters before starting a job to provide immediate feedback to users.
+**Purpose**: Validate agent configuration parameters (secrets, API keys, etc.) before starting a job.
 
 **Request Body**:
 
 ```json
 {
-  "job_fields": {
-    "company_name": "Google",
-    "max_results": 10,
-    "subscribe_updates": true
-  },
   "encrypted_agent_parameters": "encrypted_string_here"
 }
 ```
@@ -47,7 +45,7 @@ The parameter validation system primarily validates **agent parameters** to ensu
 ```json
 {
   "valid": true,
-  "message": "Parameters validated successfully",
+  "message": "Agent parameters validated successfully",
   "errors": [],
   "invalid_parameters": {}
 }
@@ -58,35 +56,82 @@ The parameter validation system primarily validates **agent parameters** to ensu
 ```json
 {
   "valid": false,
-  "message": "Parameter validation failed",
+  "message": "Agent parameter validation failed",
   "errors": [
-    "Parameter 'company_name' must be a string, got integer",
-    "Parameter 'max_results' must be an integer, got string"
+    "Required parameter 'API_KEY' is missing",
+    "Parameter 'MAX_RETRIES' must be a string, got integer"
   ],
   "invalid_parameters": {
-    "company_name": "Parameter 'company_name' must be a string, got integer",
-    "max_results": "Parameter 'max_results' must be an integer, got string"
+    "API_KEY": "Required parameter 'API_KEY' is missing",
+    "MAX_RETRIES": "Parameter 'MAX_RETRIES' must be a string, got integer"
   }
 }
 ```
 
-### 2. Enhanced Job Start Endpoints
+### 2. Method Fields Validation Endpoint
 
-The existing job start endpoints now include parameter validation:
+**Endpoint**: `POST /{agent_path}/validate-method-fields`
+
+**Purpose**: Validate job input fields against the method's field definitions before starting a job.
+
+**Request Body**:
+
+```json
+{
+  "method_name": "job_start",
+  "job_fields": {
+    "company_name": "Google",
+    "max_results": 10,
+    "subscribe_updates": true
+  }
+}
+```
+
+**Response**:
+
+```json
+{
+  "valid": true,
+  "message": "Method fields validated successfully",
+  "errors": [],
+  "invalid_fields": {}
+}
+```
+
+**Error Response Example**:
+
+```json
+{
+  "valid": false,
+  "message": "Method field validation failed",
+  "errors": [
+    "Required field 'company_name' is missing",
+    "Field 'max_results' must be an integer, got string"
+  ],
+  "invalid_fields": {
+    "company_name": "Required field 'company_name' is missing",
+    "max_results": "Field 'max_results' must be an integer, got string"
+  }
+}
+```
+
+### 4. Enhanced Job Start Endpoints
+
+The existing job start endpoints now focus on job execution without redundant validation:
 
 - `POST /{agent_path}/jobs` - Main job start endpoint
 - `POST /{agent_path}/custom/{method_name}` - Custom method endpoints
 
-These endpoints now return HTTP 400 with validation errors instead of failing during job execution.
+These endpoints no longer perform validation, as it should be done separately using the dedicated validation endpoints.
 
 ## Implementation in Supervaize Web Application
 
 ### 1. Frontend Form Validation
 
-Implement real-time parameter validation in job creation forms:
+Implement real-time parameter validation in job creation forms using the separate validation endpoints:
 
 ```javascript
-// Example implementation for job start form
+// Example implementation for job start form with separate validation
 class JobStartForm {
   constructor(agentPath) {
     this.agentPath = agentPath;
@@ -101,44 +146,116 @@ class JobStartForm {
     // Validate on form change
     this.form.addEventListener(
       "input",
-      this.debounce(this.validateParameters.bind(this), 500)
+      this.debounce(this.validateAllParameters.bind(this), 500)
     );
 
     // Validate before submit
     this.form.addEventListener("submit", this.handleSubmit.bind(this));
   }
 
-  async validateParameters() {
-    const formData = this.getFormData();
+  async validateAllParameters() {
+    // Validate both agent parameters and method fields
+    const [agentParamsValid, methodFieldsValid] = await Promise.all([
+      this.validateAgentParameters(),
+      this.validateMethodFields(),
+    ]);
+
+    if (agentParamsValid && methodFieldsValid) {
+      this.clearErrors();
+      this.enableSubmit();
+    } else {
+      this.disableSubmit();
+    }
+  }
+
+  async validateAgentParameters() {
+    const encryptedParams = this.getEncryptedParameters();
+    if (!encryptedParams) {
+      return true; // No agent parameters to validate
+    }
 
     try {
       const response = await fetch(
-        `/api/${this.agentPath}/validate-parameters`,
+        `/api/${this.agentPath}/validate-agent-parameters`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${this.getAuthToken()}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            encrypted_agent_parameters: encryptedParams,
+          }),
         }
       );
 
       const result = await response.json();
 
-      if (result.valid) {
-        this.clearErrors();
-        this.enableSubmit();
-      } else {
-        this.displayValidationErrors(result);
-        this.disableSubmit();
+      if (!result.valid) {
+        this.displayAgentParameterErrors(result);
+        return false;
       }
+
+      return true;
     } catch (error) {
-      console.error("Validation error:", error);
+      console.error("Agent parameter validation error:", error);
+      return false;
     }
   }
 
-  displayValidationErrors(validationResult) {
+  async validateMethodFields() {
+    const formData = this.getFormData();
+
+    try {
+      const response = await fetch(
+        `/api/${this.agentPath}/validate-method-fields`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.getAuthToken()}`,
+          },
+          body: JSON.stringify({
+            method_name: "job_start",
+            job_fields: formData,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.valid) {
+        this.displayMethodFieldErrors(result);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Method field validation error:", error);
+      return false;
+    }
+  }
+
+  displayAgentParameterErrors(validationResult) {
+    // Display agent parameter errors in a separate section
+    const agentErrorSection = document.getElementById("agent-parameter-errors");
+    if (agentErrorSection) {
+      agentErrorSection.innerHTML = `
+        <div class="alert alert-warning">
+          <strong>Agent Configuration Issues:</strong> ${
+            validationResult.message
+          }
+          <ul>
+            ${validationResult.errors
+              .map((error) => `<li>${error}</li>`)
+              .join("")}
+          </ul>
+        </div>
+      `;
+    }
+  }
+
+  displayMethodFieldErrors(validationResult) {
     this.errorContainer.innerHTML = "";
 
     // Display general error message
@@ -148,7 +265,7 @@ class JobStartForm {
     this.errorContainer.appendChild(errorMessage);
 
     // Display specific field errors
-    Object.entries(validationResult.invalid_parameters).forEach(
+    Object.entries(validationResult.invalid_fields).forEach(
       ([fieldName, errorMsg]) => {
         const field = this.form.querySelector(`[name="${fieldName}"]`);
         if (field) {
@@ -167,6 +284,14 @@ class JobStartForm {
 
   clearErrors() {
     this.errorContainer.innerHTML = "";
+
+    // Clear agent parameter errors
+    const agentErrorSection = document.getElementById("agent-parameter-errors");
+    if (agentErrorSection) {
+      agentErrorSection.innerHTML = "";
+    }
+
+    // Clear field errors
     this.form.querySelectorAll(".is-invalid").forEach((field) => {
       field.classList.remove("is-invalid");
     });
@@ -232,7 +357,7 @@ class JobStartForm {
     event.preventDefault();
 
     // Final validation before submit
-    await this.validateParameters();
+    await this.validateAllParameters();
 
     if (this.form.checkValidity()) {
       this.submitJob();
@@ -303,7 +428,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 ### 2. Backend Integration
 
-Ensure your backend properly handles the validation responses:
+Ensure your backend properly handles the validation responses using the separate endpoints:
 
 ```python
 # Example backend integration (Python/FastAPI)
@@ -312,39 +437,71 @@ from typing import Dict, Any
 
 async def start_job_with_validation(agent_path: str, job_data: Dict[str, Any]):
     """
-    Start a job with parameter validation
+    Start a job with separate parameter validation
     """
-    # First validate parameters
-    validation_response = await validate_job_parameters(agent_path, job_data)
-
-    if not validation_response.get("valid", False):
-        # Return validation errors
+    # First validate agent parameters
+    agent_params_valid = await validate_agent_parameters(agent_path, job_data)
+    if not agent_params_valid.get("valid", False):
         raise HTTPException(
             status_code=400,
             detail={
                 "valid": False,
-                "message": "Parameter validation failed",
-                "errors": validation_response.get("errors", []),
-                "invalid_parameters": validation_response.get("invalid_parameters", {})
+                "message": "Agent parameter validation failed",
+                "errors": agent_params_valid.get("errors", []),
+                "invalid_parameters": agent_params_valid.get("invalid_parameters", {})
             }
         )
 
-    # If validation passes, start the job
+    # Then validate method fields
+    method_fields_valid = await validate_method_fields(agent_path, job_data)
+    if not method_fields_valid.get("valid", False):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "valid": False,
+                "message": "Method field validation failed",
+                "errors": method_fields_valid.get("errors", []),
+                "invalid_fields": method_fields_valid.get("invalid_fields", {})
+            }
+        )
+
+    # If both validations pass, start the job
     return await start_job(agent_path, job_data)
 
-async def validate_job_parameters(agent_path: str, job_data: Dict[str, Any]):
+async def validate_agent_parameters(agent_path: str, job_data: Dict[str, Any]):
     """
-    Call the Supervaizer validation endpoint
+    Call the Supervaizer agent parameter validation endpoint
     """
     # Implementation depends on your HTTP client
     # This is a pseudo-code example
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{SUPERVAIZER_BASE_URL}/{agent_path}/validate-parameters",
-            json=job_data,
+            f"{SUPERVAIZER_BASE_URL}/{agent_path}/validate-agent-parameters",
+            json={
+                "encrypted_agent_parameters": job_data.get("encrypted_agent_parameters")
+            },
             headers={"Authorization": f"Bearer {SUPERVAIZER_API_KEY}"}
         )
         return response.json()
+
+async def validate_method_fields(agent_path: str, job_data: Dict[str, Any]):
+    """
+    Call the Supervaizer method field validation endpoint
+    """
+    # Implementation depends on your HTTP client
+    # This is a pseudo-code example
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{SUPERVAIZER_BASE_URL}/{agent_path}/validate-method-fields",
+            json={
+                "method_name": job_data.get("method_name", "job_start"),
+                "job_fields": job_data.get("job_fields", {})
+            },
+            headers={"Authorization": f"Bearer {SUPERVAIZER_API_KEY}"}
+        )
+        return response.json()
+
+
 ```
 
 ### 3. Error Handling
@@ -423,55 +580,89 @@ Consider these UI/UX improvements:
 
 ### 5. Testing
 
-Test the validation system thoroughly:
+Test the validation system thoroughly using the separate endpoints:
 
 ```javascript
-// Example test cases
+// Example test cases for separate validation endpoints
 describe("Parameter Validation", () => {
-  test("should validate required parameters", async () => {
-    const form = new JobStartForm("/test-agent");
-    const result = await form.validateParameters({
-      job_fields: {},
-      encrypted_agent_parameters: null,
+  describe("Agent Parameters Validation", () => {
+    test("should validate required agent parameters", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateAgentParameters({
+        encrypted_agent_parameters: "encrypted_string",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain(
+        "Required parameter 'API_KEY' is missing"
+      );
     });
 
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain(
-      "Required parameter 'company_name' is missing"
-    );
+    test("should validate agent parameter types", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateAgentParameters({
+        encrypted_agent_parameters: "encrypted_string",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.invalid_parameters.MAX_RETRIES).toContain(
+        "must be a string"
+      );
+    });
+
+    test("should accept valid agent parameters", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateAgentParameters({
+        encrypted_agent_parameters: "encrypted_string",
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
   });
 
-  test("should validate parameter types", async () => {
-    const form = new JobStartForm("/test-agent");
-    const result = await form.validateParameters({
-      job_fields: {
-        company_name: 123, // Should be string
-        max_results: "not_a_number", // Should be integer
-      },
-      encrypted_agent_parameters: null,
+  describe("Method Fields Validation", () => {
+    test("should validate required method fields", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateMethodFields({
+        method_name: "job_start",
+        job_fields: {},
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain(
+        "Required field 'company_name' is missing"
+      );
     });
 
-    expect(result.valid).toBe(false);
-    expect(result.invalid_parameters.company_name).toContain(
-      "must be a string"
-    );
-    expect(result.invalid_parameters.max_results).toContain(
-      "must be an integer"
-    );
-  });
+    test("should validate method field types", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateMethodFields({
+        method_name: "job_start",
+        job_fields: {
+          company_name: 123, // Should be string
+          max_results: "not_a_number", // Should be integer
+        },
+      });
 
-  test("should accept valid parameters", async () => {
-    const form = new JobStartForm("/test-agent");
-    const result = await form.validateParameters({
-      job_fields: {
-        company_name: "Google",
-        max_results: 10,
-      },
-      encrypted_agent_parameters: null,
+      expect(result.valid).toBe(false);
+      expect(result.invalid_fields.company_name).toContain("must be a string");
+      expect(result.invalid_fields.max_results).toContain("must be an integer");
     });
 
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    test("should accept valid method fields", async () => {
+      const form = new JobStartForm("/test-agent");
+      const result = await form.validateMethodFields({
+        method_name: "job_start",
+        job_fields: {
+          company_name: "Google",
+          max_results: 10,
+        },
+      });
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
   });
 });
 ```
@@ -481,23 +672,35 @@ describe("Parameter Validation", () => {
 ### For Existing Applications
 
 1. **Update API Calls**: Ensure your job start API calls handle the new 400 responses for validation errors
-2. **Add Validation Endpoint**: Implement the new validation endpoint in your routing
-3. **Update Error Handling**: Modify error handling to display validation errors appropriately
+2. **Add Validation Endpoints**: Implement the new separate validation endpoints in your routing:
+   - `/validate-agent-parameters` for agent configuration validation
+   - `/validate-method-fields` for job input validation
+3. **Update Error Handling**: Modify error handling to display validation errors appropriately for each type
 4. **Test Thoroughly**: Test with various parameter combinations to ensure validation works correctly
 
 ### Breaking Changes
 
-- Job start endpoints now return HTTP 400 instead of 500 for parameter validation failures
+- Job start endpoints no longer perform validation (removed redundant validation code)
+- New separate validation endpoints are required for optimal user experience
 - Error response format has changed to include structured validation information
-- New validation endpoint is required for optimal user experience
+- Legacy `/validate-parameters` endpoint has been removed for cleaner architecture
+
+### Recommended Migration Path
+
+1. **Phase 1**: Implement the new separate validation endpoints
+2. **Phase 2**: Update frontend to use separate validation for better user experience
+3. **Phase 3**: Clean up any remaining references to the old validation approach
 
 ## Benefits
 
-1. **Better User Experience**: Users get immediate feedback about parameter issues
+1. **Better User Experience**: Users get immediate feedback about parameter issues with clear separation of concerns
 2. **Reduced Job Failures**: Jobs won't start with invalid parameters
 3. **Clearer Error Messages**: Specific error messages help users fix issues quickly
-4. **Improved Debugging**: Developers can easily identify parameter problems
+4. **Improved Debugging**: Developers can easily identify parameter problems by type
 5. **Consistent Validation**: Centralized validation logic across all endpoints
+6. **Separation of Concerns**: Agent configuration validation vs. job input validation are now distinct operations
+7. **Code Maintainability**: Eliminated redundant validation code and improved code organization
+8. **Flexible Validation**: Can validate agent parameters and method fields independently or together
 
 ## Support
 

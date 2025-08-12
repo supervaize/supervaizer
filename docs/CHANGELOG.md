@@ -9,9 +9,11 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **Parameter Validation System**: Added comprehensive parameter validation for job creation with clean error messages
-  - New `validate_parameters()` method in `ParametersSetup` class for type checking and validation
-  - New `/validate-parameters` endpoint for pre-job parameter validation
-  - Enhanced job start endpoints with parameter validation before execution
+  - New `validate_parameters()` method in `ParametersSetup` class for agent parameter validation
+  - New `validate_method_fields()` method in `AgentMethod` class for job field validation
+  - Two separate validation endpoints for different validation needs:
+    - `/validate-agent-parameters` - Validate agent configuration parameters (secrets, API keys, etc.)
+    - `/validate-method-fields` - Validate job input fields against method definitions
   - Support for validating both job fields and encrypted agent parameters
   - Clean error messages with specific details about invalid parameter types and missing required parameters
 
@@ -23,17 +25,21 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Job Start Endpoints**: Enhanced with parameter validation to prevent jobs from starting with incorrect parameters
-  - `/jobs` endpoint now validates parameters before starting jobs
-  - Custom method endpoints now include parameter validation
-  - Returns HTTP 400 with detailed validation errors instead of failing during execution
-  - Improved error handling for encrypted parameter decryption failures
+- **Parameter Validation System**: Refactored to provide separate validation endpoints for different concerns
+
+  - **Agent Parameters**: Now validated separately through `/validate-agent-parameters` endpoint
+  - **Method Fields**: Now validated separately through `/validate-method-fields` endpoint
+  - **Clean Architecture**: Removed legacy endpoint for cleaner, more focused API design
+  - **Code Deduplication**: Eliminated redundant validation code in job start endpoints
+  - **Clearer Separation**: Agent configuration validation vs. job input validation are now distinct operations
+
+- pytest does not run with coverage by default (change in pyproject.toml)
 
 ### Unit tests results
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 284   |
+| ✅ Passed  | 308   |
 | 🤔 Skipped | 6     |
 
 ## [0.9.6]

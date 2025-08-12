@@ -23,6 +23,11 @@ precommit:
 precommit-autoupdate:
     pre-commit autoupdate
 
+# Run tests with coverage
+test-cov *args:
+    pytest --cov=supervaizer --cov-report=term --cov-report=html {{args}}
+
+
 # Run tests without coverage
 test-no-cov *args:
     pytest --no-cov {{args}}

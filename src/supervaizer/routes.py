@@ -384,9 +384,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
 
     @router.post(
-        "/validate-parameters",
-        summary=f"Validate job parameters for agent: {agent.name}",
-        description="Validate job parameters against the agent's parameter setup before starting a job",
+        "/validate-agent-parameters",
+        summary=f"Validate agent parameters for agent: {agent.name}",
+        description="Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
         response_model=Dict[str, Any],
         responses={
             http_status.HTTP_200_OK: {"model": Dict[str, Any]},
@@ -396,12 +396,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
-    async def validate_job_parameters(
+    async def validate_agent_parameters(
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
     ) -> Dict[str, Any]:
-        """Validate job parameters for this agent"""
-        log.info(f"📥 POST /validate-parameters [Validate parameters] {agent.name}")
+        """Validate agent parameters for this agent"""
+        log.info(
+            f"📥 POST /validate-agent-parameters [Validate agent parameters] {agent.name}"
+        )
 
         if not agent.parameters_setup:
             return {
@@ -411,8 +413,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 "invalid_parameters": {},
             }
 
-        # Extract parameters from the request body
-        job_fields = body_params.get("job_fields", {})
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
         # Decrypt agent parameters if provided
@@ -425,8 +425,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 agent_parameters_str = decrypt_value(
                     encrypted_agent_parameters, server.private_key
                 )
-                if agent_parameters_str:
-                    agent_parameters = json.loads(agent_parameters_str)
+                agent_parameters = (
+                    json.loads(agent_parameters_str) if agent_parameters_str else {}
+                )
             except Exception as e:
                 return {
                     "valid": False,
@@ -437,19 +438,64 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     },
                 }
 
-        # Combine job fields and agent parameters for validation
-        all_parameters = {**job_fields, **agent_parameters}
-
-        # Validate parameters
-        validation_result = agent.parameters_setup.validate_parameters(all_parameters)
+        # Validate agent parameters
+        validation_result = agent.parameters_setup.validate_parameters(agent_parameters)
 
         return {
             "valid": validation_result["valid"],
-            "message": "Parameters validated successfully"
+            "message": "Agent parameters validated successfully"
             if validation_result["valid"]
-            else "Parameter validation failed",
+            else "Agent parameter validation failed",
             "errors": validation_result["errors"],
             "invalid_parameters": validation_result["invalid_parameters"],
+        }
+
+    @router.post(
+        "/validate-method-fields",
+        summary=f"Validate method fields for agent: {agent.name}",
+        description="Validate job input fields against the method's field definitions before starting a job",
+        response_model=Dict[str, Any],
+        responses={
+            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
+            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[Security(server.verify_api_key)],
+    )
+    @handle_route_errors()
+    async def validate_method_fields(
+        body_params: Any = Body(...),
+        agent: Agent = Depends(get_agent),
+    ) -> Dict[str, Any]:
+        """Validate method fields for this agent"""
+        log.info(
+            f"📥 POST /validate-method-fields [Validate method fields] {agent.name}"
+        )
+
+        method_name = body_params.get("method_name", "job_start")
+        job_fields = body_params.get("job_fields", {})
+
+        # Get the method to validate against
+        if method_name == "job_start":
+            method = agent.methods.job_start
+        elif agent.methods.custom and method_name in agent.methods.custom:
+            method = agent.methods.custom[method_name]
+        else:
+            return {
+                "valid": False,
+                "message": f"Method '{method_name}' not found",
+                "errors": [f"Method '{method_name}' not found"],
+                "invalid_fields": {},
+            }
+
+        # Validate method fields
+        validation_result = method.validate_method_fields(job_fields)
+
+        return {
+            "valid": validation_result["valid"],
+            "message": validation_result["message"],
+            "errors": validation_result["errors"],
+            "invalid_fields": validation_result["invalid_fields"],
         }
 
     if not agent.methods:
@@ -485,55 +531,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
-
-        # Validate parameters before starting the job
-        if agent.parameters_setup:
-            job_fields = body_params.get("job_fields", {})
-            encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
-
-            # Decrypt agent parameters if provided
-            agent_parameters = {}
-            if encrypted_agent_parameters:
-                try:
-                    from supervaizer.common import decrypt_value
-                    import json
-
-                    agent_parameters_str = decrypt_value(
-                        encrypted_agent_parameters, server.private_key
-                    )
-                    if agent_parameters_str:
-                        agent_parameters = json.loads(agent_parameters_str)
-                except Exception as e:
-                    return JSONResponse(
-                        status_code=http_status.HTTP_400_BAD_REQUEST,
-                        content={
-                            "valid": False,
-                            "message": f"Failed to decrypt agent parameters: {str(e)}",
-                            "errors": [f"Decryption failed: {str(e)}"],
-                            "invalid_parameters": {
-                                "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
-                            },
-                        },
-                    )
-
-            # Combine job fields and agent parameters for validation
-            all_parameters = {**job_fields, **agent_parameters}
-
-            # Validate parameters
-            validation_result = agent.parameters_setup.validate_parameters(
-                all_parameters
-            )
-
-            if not validation_result["valid"]:
-                return JSONResponse(
-                    status_code=http_status.HTTP_400_BAD_REQUEST,
-                    content={
-                        "valid": False,
-                        "message": "Job parameters validation failed",
-                        "errors": validation_result["errors"],
-                        "invalid_parameters": validation_result["invalid_parameters"],
-                    },
-                )
 
         sv_context: JobContext = JobContext(**body_params["job_context"])
         job_fields = body_params["job_fields"]
@@ -757,59 +754,6 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )
             log.info(f"body_params: {body_params}")
-
-            # Validate parameters before starting the custom job
-            if agent.parameters_setup:
-                job_fields = body_params.job_fields.to_dict()
-                encrypted_agent_parameters = getattr(
-                    body_params, "encrypted_agent_parameters", None
-                )
-
-                # Decrypt agent parameters if provided
-                agent_parameters = {}
-                if encrypted_agent_parameters:
-                    try:
-                        from supervaizer.common import decrypt_value
-                        import json
-
-                        agent_parameters_str = decrypt_value(
-                            encrypted_agent_parameters, server.private_key
-                        )
-                        if agent_parameters_str:
-                            agent_parameters = json.loads(agent_parameters_str)
-                    except Exception as e:
-                        return JSONResponse(
-                            status_code=http_status.HTTP_400_BAD_REQUEST,
-                            content={
-                                "valid": False,
-                                "message": f"Failed to decrypt agent parameters: {str(e)}",
-                                "errors": [f"Decryption failed: {str(e)}"],
-                                "invalid_parameters": {
-                                    "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
-                                },
-                            },
-                        )
-
-                # Combine job fields and agent parameters for validation
-                all_parameters = {**job_fields, **agent_parameters}
-
-                # Validate parameters
-                validation_result = agent.parameters_setup.validate_parameters(
-                    all_parameters
-                )
-
-                if not validation_result["valid"]:
-                    return JSONResponse(
-                        status_code=http_status.HTTP_400_BAD_REQUEST,
-                        content={
-                            "valid": False,
-                            "message": f"Custom method '{method_name}' parameters validation failed",
-                            "errors": validation_result["errors"],
-                            "invalid_parameters": validation_result[
-                                "invalid_parameters"
-                            ],
-                        },
-                    )
 
             sv_context: JobContext = body_params.job_context
             job_fields = body_params.job_fields.to_dict()
