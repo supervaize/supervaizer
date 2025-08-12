@@ -383,6 +383,75 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
+    @router.post(
+        "/validate-parameters",
+        summary=f"Validate job parameters for agent: {agent.name}",
+        description="Validate job parameters against the agent's parameter setup before starting a job",
+        response_model=Dict[str, Any],
+        responses={
+            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
+            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[Security(server.verify_api_key)],
+    )
+    @handle_route_errors()
+    async def validate_job_parameters(
+        body_params: Any = Body(...),
+        agent: Agent = Depends(get_agent),
+    ) -> Dict[str, Any]:
+        """Validate job parameters for this agent"""
+        log.info(f"📥 POST /validate-parameters [Validate parameters] {agent.name}")
+
+        if not agent.parameters_setup:
+            return {
+                "valid": True,
+                "message": "Agent has no parameter setup defined",
+                "errors": [],
+                "invalid_parameters": {},
+            }
+
+        # Extract parameters from the request body
+        job_fields = body_params.get("job_fields", {})
+        encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
+
+        # Decrypt agent parameters if provided
+        agent_parameters = {}
+        if encrypted_agent_parameters:
+            try:
+                from supervaizer.common import decrypt_value
+                import json
+
+                agent_parameters_str = decrypt_value(
+                    encrypted_agent_parameters, server.private_key
+                )
+                if agent_parameters_str:
+                    agent_parameters = json.loads(agent_parameters_str)
+            except Exception as e:
+                return {
+                    "valid": False,
+                    "message": f"Failed to decrypt agent parameters: {str(e)}",
+                    "errors": [f"Decryption failed: {str(e)}"],
+                    "invalid_parameters": {
+                        "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
+                    },
+                }
+
+        # Combine job fields and agent parameters for validation
+        all_parameters = {**job_fields, **agent_parameters}
+
+        # Validate parameters
+        validation_result = agent.parameters_setup.validate_parameters(all_parameters)
+
+        return {
+            "valid": validation_result["valid"],
+            "message": "Parameters validated successfully"
+            if validation_result["valid"]
+            else "Parameter validation failed",
+            "errors": validation_result["errors"],
+            "invalid_parameters": validation_result["invalid_parameters"],
+        }
+
     if not agent.methods:
         raise ValueError(f"Agent {agent.name} has no methods defined")
 
@@ -400,6 +469,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         description=f"{agent.methods.job_start.description}",
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": Job},
+            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
             http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
@@ -415,13 +485,61 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     ) -> Union[Job, JSONResponse]:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
-        sv_context: JobContext = body_params.job_context
-        job_fields = body_params.job_fields.to_dict()
+
+        # Validate parameters before starting the job
+        if agent.parameters_setup:
+            job_fields = body_params.get("job_fields", {})
+            encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
+
+            # Decrypt agent parameters if provided
+            agent_parameters = {}
+            if encrypted_agent_parameters:
+                try:
+                    from supervaizer.common import decrypt_value
+                    import json
+
+                    agent_parameters_str = decrypt_value(
+                        encrypted_agent_parameters, server.private_key
+                    )
+                    if agent_parameters_str:
+                        agent_parameters = json.loads(agent_parameters_str)
+                except Exception as e:
+                    return JSONResponse(
+                        status_code=http_status.HTTP_400_BAD_REQUEST,
+                        content={
+                            "valid": False,
+                            "message": f"Failed to decrypt agent parameters: {str(e)}",
+                            "errors": [f"Decryption failed: {str(e)}"],
+                            "invalid_parameters": {
+                                "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
+                            },
+                        },
+                    )
+
+            # Combine job fields and agent parameters for validation
+            all_parameters = {**job_fields, **agent_parameters}
+
+            # Validate parameters
+            validation_result = agent.parameters_setup.validate_parameters(
+                all_parameters
+            )
+
+            if not validation_result["valid"]:
+                return JSONResponse(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    content={
+                        "valid": False,
+                        "message": "Job parameters validation failed",
+                        "errors": validation_result["errors"],
+                        "invalid_parameters": validation_result["invalid_parameters"],
+                    },
+                )
+
+        sv_context: JobContext = JobContext(**body_params["job_context"])
+        job_fields = body_params["job_fields"]
 
         # Get job encrypted parameters if available
-        encrypted_agent_parameters = getattr(
-            body_params, "encrypted_agent_parameters", None
-        )
+        encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
         # Delegate job creation and scheduling to the service
         new_job = await service_job_start(
@@ -623,6 +741,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             response_model=JobResponse,
             responses={
                 http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
+                http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
                 http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
             },
             dependencies=[Security(server.verify_api_key)],
@@ -637,6 +756,61 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             log.info(
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )
+            log.info(f"body_params: {body_params}")
+
+            # Validate parameters before starting the custom job
+            if agent.parameters_setup:
+                job_fields = body_params.job_fields.to_dict()
+                encrypted_agent_parameters = getattr(
+                    body_params, "encrypted_agent_parameters", None
+                )
+
+                # Decrypt agent parameters if provided
+                agent_parameters = {}
+                if encrypted_agent_parameters:
+                    try:
+                        from supervaizer.common import decrypt_value
+                        import json
+
+                        agent_parameters_str = decrypt_value(
+                            encrypted_agent_parameters, server.private_key
+                        )
+                        if agent_parameters_str:
+                            agent_parameters = json.loads(agent_parameters_str)
+                    except Exception as e:
+                        return JSONResponse(
+                            status_code=http_status.HTTP_400_BAD_REQUEST,
+                            content={
+                                "valid": False,
+                                "message": f"Failed to decrypt agent parameters: {str(e)}",
+                                "errors": [f"Decryption failed: {str(e)}"],
+                                "invalid_parameters": {
+                                    "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
+                                },
+                            },
+                        )
+
+                # Combine job fields and agent parameters for validation
+                all_parameters = {**job_fields, **agent_parameters}
+
+                # Validate parameters
+                validation_result = agent.parameters_setup.validate_parameters(
+                    all_parameters
+                )
+
+                if not validation_result["valid"]:
+                    return JSONResponse(
+                        status_code=http_status.HTTP_400_BAD_REQUEST,
+                        content={
+                            "valid": False,
+                            "message": f"Custom method '{method_name}' parameters validation failed",
+                            "errors": validation_result["errors"],
+                            "invalid_parameters": validation_result[
+                                "invalid_parameters"
+                            ],
+                        },
+                    )
+
             sv_context: JobContext = body_params.job_context
             job_fields = body_params.job_fields.to_dict()
 

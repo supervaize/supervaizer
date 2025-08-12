@@ -6,11 +6,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Parameter Validation System**: Added comprehensive parameter validation for job creation with clean error messages
+  - New `validate_parameters()` method in `ParametersSetup` class for type checking and validation
+  - New `/validate-parameters` endpoint for pre-job parameter validation
+  - Enhanced job start endpoints with parameter validation before execution
+  - Support for validating both job fields and encrypted agent parameters
+  - Clean error messages with specific details about invalid parameter types and missing required parameters
+
 ### Fixed
 
 - Execution of `supervaizer start` was not maintaining the _main_ namespace so the fastapi server was never starting. Replaced execution by sub-process.
+- Type of agent.choice. #TODO: test and decide which to keep (list[str] or list [tuple[str,str]])
+- When supervisor_account is provided, A2A endpoints are automatically activated, because Supervaize needs to be able to trigger the healthchecks. -`export_openapi.py` tool to generate openapi.json (for docusaurus documentation) - automation in docusaurus to do.
 
-- When supervisor_account is provided, A2A endpoints are automatically activated, because Supervaize needs to be able to trigger the healthchecks.
+### Changed
+
+- **Job Start Endpoints**: Enhanced with parameter validation to prevent jobs from starting with incorrect parameters
+  - `/jobs` endpoint now validates parameters before starting jobs
+  - Custom method endpoints now include parameter validation
+  - Returns HTTP 400 with detailed validation errors instead of failing during execution
+  - Improved error handling for encrypted parameter decryption failures
+
+### Unit tests results
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 284   |
+| 🤔 Skipped | 6     |
 
 ## [0.9.6]
 
@@ -32,12 +56,10 @@ All notable changes to this project will be documented in this file.
 
 ### Unit tests results
 
-| Status        | Count |
-| ------------- | ----- |
-| 🤔 Skipped    | 6     |
-| ☑️ Deselected | 0     |
-| ⚠️ Failed     | 0     |
-| ✅ Passed     | 277   |
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 277   |
+| 🤔 Skipped | 6     |
 
 ## [0.9.4]
 
@@ -73,12 +95,11 @@ All notable changes to this project will be documented in this file.
 
 ### Unit tests results
 
-| Status        | Count |
-| ------------- | ----- |
-| 🤔 Skipped    | 6     |
-| ☑️ Deselected | 0     |
-| ⚠️ Failed     | 0     |
-| ✅ Passed     | 281   |
+| Status     | Count |
+| ---------- | ----- |
+| 🤔 Skipped | 6     |
+| ⚠️ Failed  | 0     |
+| ✅ Passed  | 281   |
 
 Test Coverage : [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
