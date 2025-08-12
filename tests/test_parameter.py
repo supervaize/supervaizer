@@ -90,12 +90,14 @@ def test_parameters_setup_value(parameters_setup_fixture: ParametersSetup) -> No
 
 def test_parameters_setup_validation_valid_parameters() -> None:
     """Test parameter validation with valid parameters."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="string_param", value="test", is_required=True),
-        Parameter(name="int_param", value="42", is_required=True),
-        Parameter(name="bool_param", value="true", is_required=False),
-        Parameter(name="list_param", value="a,b", is_required=False),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="string_param", value="test", is_required=True),
+            Parameter(name="int_param", value="42", is_required=True),
+            Parameter(name="bool_param", value="true", is_required=False),
+            Parameter(name="list_param", value="a,b", is_required=False),
+        ]
+    )
 
     test_parameters = {
         "string_param": "new_string",
@@ -112,11 +114,13 @@ def test_parameters_setup_validation_valid_parameters() -> None:
 
 def test_parameters_setup_validation_invalid_types() -> None:
     """Test parameter validation with invalid types."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="string_param", value="test", is_required=True),
-        Parameter(name="int_param", value="42", is_required=True),
-        Parameter(name="bool_param", value="true", is_required=False),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="string_param", value="test", is_required=True),
+            Parameter(name="int_param", value="42", is_required=True),
+            Parameter(name="bool_param", value="true", is_required=False),
+        ]
+    )
 
     test_parameters = {
         "string_param": 123,  # Should be string
@@ -133,10 +137,12 @@ def test_parameters_setup_validation_invalid_types() -> None:
 
 def test_parameters_setup_validation_missing_required() -> None:
     """Test parameter validation with missing required parameters."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="required_param", value="test", is_required=True),
-        Parameter(name="optional_param", value="test", is_required=False),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="required_param", value="test", is_required=True),
+            Parameter(name="optional_param", value="test", is_required=False),
+        ]
+    )
 
     test_parameters = {
         "optional_param": "present",
@@ -152,9 +158,11 @@ def test_parameters_setup_validation_missing_required() -> None:
 
 def test_parameters_setup_validation_unknown_parameters() -> None:
     """Test parameter validation with unknown parameters."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="known_param", value="test", is_required=True),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="known_param", value="test", is_required=True),
+        ]
+    )
 
     test_parameters = {"known_param": "valid_value", "unknown_param": "should_fail"}
 
@@ -167,10 +175,12 @@ def test_parameters_setup_validation_unknown_parameters() -> None:
 
 def test_parameters_setup_validation_none_values() -> None:
     """Test parameter validation with None values for optional parameters."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="required_param", value="test", is_required=True),
-        Parameter(name="optional_param", value="test", is_required=False),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="required_param", value="test", is_required=True),
+            Parameter(name="optional_param", value="test", is_required=False),
+        ]
+    )
 
     test_parameters = {"required_param": "present", "optional_param": None}
 
@@ -182,9 +192,11 @@ def test_parameters_setup_validation_none_values() -> None:
 
 def test_parameters_setup_validation_float_types() -> None:
     """Test parameter validation with float types."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="float_param", value="3.14", is_required=True),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="float_param", value="3.14", is_required=True),
+        ]
+    )
 
     # Test with float string
     test_parameters_float = {"float_param": "2.718"}
@@ -205,10 +217,12 @@ def test_parameters_setup_validation_float_types() -> None:
 
 def test_parameters_setup_validation_list_and_dict_types() -> None:
     """Test parameter validation with list and dict types."""
-    parameters_setup = ParametersSetup.from_list([
-        Parameter(name="list_param", value="", is_required=True),
-        Parameter(name="dict_param", value="", is_required=True),
-    ])
+    parameters_setup = ParametersSetup.from_list(
+        [
+            Parameter(name="list_param", value="", is_required=True),
+            Parameter(name="dict_param", value="", is_required=True),
+        ]
+    )
 
     test_parameters = {"list_param": "item1,item2", "dict_param": "key:value"}
 

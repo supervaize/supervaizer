@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.9.7\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 0.9.8\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -460,6 +460,150 @@
         ]
       }
     },
+    "/supervaizer/agents/competitor-summary/validate-agent-parameters": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Validate agent parameters for agent: competitor_summary",
+        "description": "Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
+        "operationId": "validate_agent_parameters_supervaizer_agents_competitor_summary_validate_agent_parameters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/validate-method-fields": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Validate method fields for agent: competitor_summary",
+        "description": "Validate job input fields against the method's field definitions before starting a job",
+        "operationId": "validate_method_fields_supervaizer_agents_competitor_summary_validate_method_fields_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/supervaizer/agents/competitor-summary/jobs": {
       "post": {
         "tags": [
@@ -494,6 +638,18 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response 400 Start Job Supervaizer Agents Competitor Summary Jobs Post"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "409": {
             "content": {
@@ -909,6 +1065,18 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Competitor Summary Custom Custom1 Supervaizer Agents Competitor Summary Custom Custom1 Post"
+                }
+              }
+            }
+          },
           "405": {
             "description": "Method Not Allowed",
             "content": {
@@ -973,6 +1141,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 400 Competitor Summary Custom Custom2 Supervaizer Agents Competitor Summary Custom Custom2 Post"
                 }
               }
             }
@@ -1280,6 +1460,48 @@
                 "schema": {
                   "type": "string"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/job-start-test": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Job Start Test Page",
+        "description": "Job start form test page.",
+        "operationId": "admin_job_start_test_page_admin_job_start_test_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/static/js/job-start-form.js": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Serve Job Start Form Js",
+        "description": "Serve the JobStartForm JavaScript file.",
+        "operationId": "serve_job_start_form_js_admin_static_js_job_start_form_js_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -2397,6 +2619,12 @@
                 "type": "array"
               },
               {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -2774,7 +3002,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2025-08-11T16:55:53.997732"
+            "default": "2025-08-12T14:19:39.099352"
           },
           "status_code": {
             "type": "integer",

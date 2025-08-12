@@ -122,10 +122,12 @@ def test_agent_method_validate_method_fields_unknown_field() -> None:
         fields=[AgentMethodField(name="known_field", type=str, required=True)],
     )
 
-    result = method.validate_method_fields({
-        "known_field": "valid_value",
-        "unknown_field": "should_fail",
-    })
+    result = method.validate_method_fields(
+        {
+            "known_field": "valid_value",
+            "unknown_field": "should_fail",
+        }
+    )
 
     assert result["valid"] is False
     assert result["message"] == "Method field validation failed"
@@ -149,14 +151,16 @@ def test_agent_method_validate_method_fields_valid_types() -> None:
         ],
     )
 
-    result = method.validate_method_fields({
-        "string_field": "valid_string",
-        "int_field": 42,
-        "bool_field": True,
-        "list_field": ["item1", "item2"],
-        "dict_field": {"key": "value"},
-        "float_field": 3.14,
-    })
+    result = method.validate_method_fields(
+        {
+            "string_field": "valid_string",
+            "int_field": 42,
+            "bool_field": True,
+            "list_field": ["item1", "item2"],
+            "dict_field": {"key": "value"},
+            "float_field": 3.14,
+        }
+    )
 
     assert result["valid"] is True
     assert result["message"] == "Method fields validated successfully"
@@ -176,11 +180,13 @@ def test_agent_method_validate_method_fields_invalid_types() -> None:
         ],
     )
 
-    result = method.validate_method_fields({
-        "string_field": 123,  # Should be string
-        "int_field": "not_a_number",  # Should be int
-        "bool_field": "not_a_bool",  # Should be bool
-    })
+    result = method.validate_method_fields(
+        {
+            "string_field": 123,  # Should be string
+            "int_field": "not_a_number",  # Should be int
+            "bool_field": "not_a_bool",  # Should be bool
+        }
+    )
 
     assert result["valid"] is False
     assert result["message"] == "Method field validation failed"
@@ -206,10 +212,12 @@ def test_agent_method_validate_method_fields_none_values() -> None:
         ],
     )
 
-    result = method.validate_method_fields({
-        "required_field": "present",
-        "optional_field": None,
-    })
+    result = method.validate_method_fields(
+        {
+            "required_field": "present",
+            "optional_field": None,
+        }
+    )
 
     assert result["valid"] is True
     assert result["message"] == "Method fields validated successfully"
@@ -251,17 +259,21 @@ def test_agent_method_validate_method_fields_list_and_dict_types() -> None:
     )
 
     # Test with valid types
-    result_valid = method.validate_method_fields({
-        "list_field": ["item1", "item2"],
-        "dict_field": {"key": "value"},
-    })
+    result_valid = method.validate_method_fields(
+        {
+            "list_field": ["item1", "item2"],
+            "dict_field": {"key": "value"},
+        }
+    )
     assert result_valid["valid"] is True
 
     # Test with invalid types
-    result_invalid = method.validate_method_fields({
-        "list_field": "not_a_list",
-        "dict_field": "not_a_dict",
-    })
+    result_invalid = method.validate_method_fields(
+        {
+            "list_field": "not_a_list",
+            "dict_field": "not_a_dict",
+        }
+    )
 
     assert result_invalid["valid"] is False
     assert "must be a list" in result_invalid["invalid_fields"]["list_field"]
@@ -590,10 +602,12 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"name": "parameter1", "value": "new_value1", "is_environment": True},
-            {"name": "parameter2", "value": "new_value2", "is_environment": False},
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [
+                {"name": "parameter1", "value": "new_value1", "is_environment": True},
+                {"name": "parameter2", "value": "new_value2", "is_environment": False},
+            ]
+        ),
     )
     # Ensure supervisor_account is not None
     assert server_fixture.supervisor_account is not None
@@ -628,9 +642,9 @@ def test_agent_update_agent_from_server(
     monkeypatch.setattr(
         server_fixture.__class__,
         "decrypt",
-        lambda self, encrypted_parameters: json.dumps([
-            {"invalid_parameter": "invalid_value1"}
-        ]),
+        lambda self, encrypted_parameters: json.dumps(
+            [{"invalid_parameter": "invalid_value1"}]
+        ),
     )
     with pytest.raises(ValueError):
         agent_fixture.update_agent_from_server(server_fixture)

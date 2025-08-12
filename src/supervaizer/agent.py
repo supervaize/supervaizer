@@ -248,17 +248,17 @@ class AgentMethod(AgentMethodAbstract):
             field_type = field.type
 
             # Convert Python types to proper typing annotations
-            if field_type == str:
-                annotation_type = str
-            elif field_type == int:
+            if field_type is str:
+                annotation_type: type = str
+            elif field_type is int:
                 annotation_type = int
-            elif field_type == bool:
+            elif field_type is bool:
                 annotation_type = bool
-            elif field_type == list:
+            elif field_type is list:
                 annotation_type = list
-            elif field_type == dict:
+            elif field_type is dict:
                 annotation_type = dict
-            elif field_type == float:
+            elif field_type is float:
                 annotation_type = float
             elif hasattr(field_type, "__origin__") and field_type.__origin__ is list:
                 # Handle generic list types like list[str]
@@ -345,32 +345,32 @@ class AgentMethod(AgentMethodAbstract):
             if expected_type:
                 try:
                     # Handle special cases for type validation
-                    if expected_type == str:
+                    if expected_type is str:
                         if not isinstance(field_value, str):
                             error_msg = f"Field '{field_name}' must be a string, got {type(field_value).__name__}"
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
-                    elif expected_type == int:
+                    elif expected_type is int:
                         if not isinstance(field_value, int):
                             error_msg = f"Field '{field_name}' must be an integer, got {type(field_value).__name__}"
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
-                    elif expected_type == bool:
+                    elif expected_type is bool:
                         if not isinstance(field_value, bool):
                             error_msg = f"Field '{field_name}' must be a boolean, got {type(field_value).__name__}"
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
-                    elif expected_type == list:
+                    elif expected_type is list:
                         if not isinstance(field_value, list):
                             error_msg = f"Field '{field_name}' must be a list, got {type(field_value).__name__}"
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
-                    elif expected_type == dict:
+                    elif expected_type is dict:
                         if not isinstance(field_value, dict):
                             error_msg = f"Field '{field_name}' must be a dictionary, got {type(field_value).__name__}"
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
-                    elif expected_type == float:
+                    elif expected_type is float:
                         if not isinstance(field_value, (int, float)):
                             error_msg = f"Field '{field_name}' must be a number, got {type(field_value).__name__}"
                             errors.append(error_msg)

@@ -416,7 +416,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
         # Decrypt agent parameters if provided
-        agent_parameters = {}
+        agent_parameters: Dict[str, Any] = {}
         if encrypted_agent_parameters:
             try:
                 from supervaizer.common import decrypt_value
@@ -476,6 +476,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         job_fields = body_params.get("job_fields", {})
 
         # Get the method to validate against
+        if not agent.methods:
+            return {
+                "valid": False,
+                "message": "Agent has no methods defined",
+                "errors": ["Agent has no methods defined"],
+                "invalid_fields": {},
+            }
+
         if method_name == "job_start":
             method = agent.methods.job_start
         elif agent.methods.custom and method_name in agent.methods.custom:

@@ -99,6 +99,7 @@ trufflehog_scan_git_history:
 # Generate model reference documentation
 generate_documentation:
     python tools/gen_model_docs.py
+    python tools/export_openapi.py
 
 
 # Deployment sequence
