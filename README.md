@@ -1,11 +1,10 @@
 # SUPERVAIZER
 
-[[Operate AI Agents with confidence]]
+[Operate AI Agents with confidence]
 
 A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) and [Agent Communication Protocol (ACP)](https://github.com/i-am-bee/ACP) support.
 
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
-[![Package Version](https://img.shields.io/badge/Supervaizer-0.9.6-yellow.svg)](https://github.com/supervaize/supervaizer)
 [![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
 [![ACP Protocol](https://img.shields.io/badge/ACP-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
 [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
@@ -43,9 +42,13 @@ With comprehensive support for the A2A/ACP protocols, specification, SUPERVAIZER
 
 Beyond A2A interoperability, SUPERVAIZER provides a robust API for agent registration, job control, event handling, telemetry, and more, making it a crucial component for building and managing AI agent systems.
 
+SUPERVAIZER is the recommended controller to integrate AI Agents into the [supervaize](https://supervaize.com) plateform.
+
 ## Quick Start
 
 Kickstart a **Python** agent with the **Supervaizer Controller** so it's discoverable and operable by Supervaize.
+
+See full our full [documentation](https://doc.supervaize.com/docs/category/supervaizer-controller)
 
 ### What we'll do
 
@@ -113,7 +116,7 @@ Once the server is running, you'll have:
 - Turn on **A2A / ACP** discovery for interoperability
 - Hook your controller into Supervaize to **monitor, audit, and operate** the agent
 
-For detailed instructions on customizing your controller, see the [Controller Setup Guide](https://doc.supervaize.com/docs/supervaizer-controller/controller-setup-guide).
+For detailed instructions on customizing your controller, see the [Controller Setup Guide](https://doc.supervaize.com/docs/supervaizer-controller/controller-setup)
 
 ## Features
 
