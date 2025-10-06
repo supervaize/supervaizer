@@ -77,13 +77,11 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append(
-                    {
-                        "name": agent.name,
-                        "description": agent.description,
-                        "version": agent.version,
-                    }
-                )
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                })
 
         # Create server info
         server_info = ServerInfo(
@@ -519,6 +517,8 @@ class Server(ServerAbstract):
             server_registration_result: ApiResult = (
                 self.supervisor_account.register_server(server=self)
             )
+            # log.debug(f"[Server launch] Server registration result: {server_registration_result}")
+            # inspect(server_registration_result)
             assert isinstance(
                 server_registration_result, ApiSuccess
             )  # If ApiError, exception should have been raised before
