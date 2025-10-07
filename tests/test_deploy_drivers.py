@@ -154,29 +154,9 @@ class TestAWSAppRunnerDriver:
     @pytest.fixture
     def driver(self, mocker: MockerFixture):
         """Create AWS App Runner driver instance."""
-        # Mock boto3 clients
-        mock_apprunner = mocker.Mock()
-        mock_ecr = mocker.Mock()
-        mock_secrets = mocker.Mock()
-        mock_sts = mocker.Mock()
-
-        # Mock STS get_caller_identity response
-        mock_sts.get_caller_identity.return_value = {"Account": "123456789012"}
-
-        def mock_client(service_name, **kwargs):
-            if service_name == "apprunner":
-                return mock_apprunner
-            elif service_name == "ecr":
-                return mock_ecr
-            elif service_name == "secretsmanager":
-                return mock_secrets
-            elif service_name == "sts":
-                return mock_sts
-            return mocker.Mock()
-
         mocker.patch(
             "supervaizer.deploy.drivers.aws_app_runner.boto3.client",
-            side_effect=mock_client,
+            return_value=mocker.Mock(),
         )
         return AWSAppRunnerDriver("us-east-1", "test-account")
 
@@ -192,20 +172,43 @@ class TestAWSAppRunnerDriver:
 
     def test_plan_deployment_new_service(self, driver, mocker: MockerFixture):
         """Test planning deployment for new service."""
+        # Mock account ID method
+        mocker.patch.object(driver, "_get_account_id", return_value="123456789012")
+
         # Mock botocore exceptions
         error_response = {"Error": {"Code": "ResourceNotFoundException"}}
         mock_exception = ClientError(error_response, "DescribeService")
 
+        def mock_describe_service(*args, **kwargs):
+            raise mock_exception
+
         mocker.patch.object(
             driver.apprunner_client,
             "describe_service",
-            side_effect=mock_exception,
+            side_effect=mock_describe_service,
         )
+
         repo_error_response = {"Error": {"Code": "RepositoryNotFoundException"}}
+
+        def mock_describe_repositories(*args, **kwargs):
+            raise ClientError(repo_error_response, "DescribeRepositories")
+
         mocker.patch.object(
             driver.ecr_client,
             "describe_repositories",
-            side_effect=ClientError(repo_error_response, "DescribeRepositories"),
+            side_effect=mock_describe_repositories,
+        )
+
+        # Mock secrets client to avoid any additional calls
+        def mock_describe_secret(*args, **kwargs):
+            raise ClientError(
+                {"Error": {"Code": "ResourceNotFoundException"}}, "DescribeSecret"
+            )
+
+        mocker.patch.object(
+            driver.secrets_client,
+            "describe_secret",
+            side_effect=mock_describe_secret,
         )
         plan = driver.plan_deployment(
             service_name="test-service",

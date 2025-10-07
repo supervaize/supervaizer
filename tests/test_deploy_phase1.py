@@ -531,7 +531,9 @@ class TestDeployCommands:
         # Mock the StateManager
         mock_state_manager = mocker.Mock(spec=StateManager)
         mock_state_manager.load_state.return_value = mocker.Mock()
-        mock_state_manager.state_file.exists.return_value = True
+        mock_state_file = mocker.Mock()
+        mock_state_file.exists.return_value = True
+        mock_state_manager.state_file = mock_state_file
         mocker.patch(
             "supervaizer.deploy.commands.down.StateManager",
             return_value=mock_state_manager,
