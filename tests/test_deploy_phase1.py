@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from docker.errors import DockerException
 from pytest_mock import MockerFixture
 
 from supervaizer.deploy.docker import DockerManager, ensure_docker_running, get_git_sha
@@ -41,7 +42,7 @@ class TestDockerManager:
         """Test Docker manager initialization failure."""
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
-        mock_client.ping.side_effect = Exception("Docker not running")
+        mock_client.ping.side_effect = DockerException("Docker not running")
         mock_docker_client.from_env.return_value = mock_client
 
         with pytest.raises(RuntimeError, match="Docker is not running"):
@@ -255,7 +256,7 @@ class TestUtilityFunctions:
         """Test Docker not running check."""
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
-        mock_client.ping.side_effect = Exception("Docker not running")
+        mock_client.ping.side_effect = DockerException("Docker not running")
         mock_docker_client.from_env.return_value = mock_client
 
         assert ensure_docker_running() is False
