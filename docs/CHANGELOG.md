@@ -15,10 +15,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count  |
 | ---------- | ------ |
-| ✅ Passed  | 405    |
+| ✅ Passed  | 407    |
 | 🤔 Skipped | 6      |
 | 🔴 Failed  | 0      |
-| ⏱️ in      | 49.71s |
+| ⏱️ in      | 49.13s |
 
 ## [0.9.8]
 

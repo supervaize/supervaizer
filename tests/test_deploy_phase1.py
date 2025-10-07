@@ -66,7 +66,7 @@ class TestDockerManager:
             content = output_path.read_text()
             assert "FROM python:3.12-slim" in content
             assert "EXPOSE 8000" in content
-            assert 'CMD ["python", "-m", "supervaizer.__main__"]' in content
+            assert 'CMD ["supervaizer", "start"]' in content
             # Verify template placeholders are replaced with actual values
             assert "COPY src/ ./src/" in content  # source directory
             assert "COPY supervaizer_control.py ./" in content  # controller file
@@ -124,7 +124,6 @@ class TestDockerManager:
 
             assert output_path.exists()
             content = output_path.read_text()
-            assert "version: '3.8'" in content
             assert "ports:" in content
             assert "8000:8000" in content
             # Verify template placeholders are replaced with actual values

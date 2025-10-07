@@ -31,4 +31,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:{{APP_PORT}}/.well-known/health || exit 1
 
 # Run the application
-CMD ["supervaizer",  "start"]
+CMD ["supervaizer", "start"]

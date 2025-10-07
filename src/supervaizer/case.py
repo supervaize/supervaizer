@@ -132,8 +132,7 @@ class CaseNode(SvBaseModel):
     description: str
     type: CaseNoteType
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @property
     def registration_info(self) -> Dict[str, Any]:

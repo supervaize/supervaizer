@@ -11,7 +11,7 @@ This module handles deployment state persistence and management.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -45,10 +45,10 @@ class DeploymentState(BaseModel):
 
     # Timestamps
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Deployment creation time"
+        default_factory=lambda: datetime.now(timezone.utc), description="Deployment creation time"
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Last update time"
+        default_factory=lambda: datetime.now(timezone.utc), description="Last update time"
     )
 
     # Status
@@ -121,7 +121,7 @@ class StateManager:
         """Save deployment state to file."""
         try:
             # Update timestamp
-            state.updated_at = datetime.utcnow()
+            state.updated_at = datetime.now(timezone.utc)
 
             # Convert to dict and handle datetime serialization
             data = state.model_dump()
