@@ -6,7 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- [RFC001 - cloud-deployment-cli](docs/rfc/001-cloud-deployment-cli.md)
+### Added
+
+-🏹 Start implementation of [RFC001 - cloud-deployment-cli](docs/rfc/001-cloud-deployment-cli.md)
+-🛣️ Updated pyproject.toml dependency versions
+
+### Unit tests results
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 350   |
+| 🤔 Skipped | 6     |
+| 🔴 Failed  | 4     |
 
 ## [0.9.8]
 

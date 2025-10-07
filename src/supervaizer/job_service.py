@@ -43,7 +43,7 @@ async def service_job_start(
     Returns:
         The created job
     """
-
+    agent_parameters = None
     # If agent has parameters_setup defined, validate parameters
     if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(

@@ -22,6 +22,8 @@ from supervaizer.common import log
 
 console = Console()
 
+TEMPLATE_DIR = Path(__file__).parent / "templates"
+
 
 class DockerManager:
     """Manages Docker operations for deployment."""
@@ -37,138 +39,19 @@ class DockerManager:
 
     def generate_dockerfile(self, output_path: Path) -> None:
         """Generate a Dockerfile for Supervaizer deployment."""
-        dockerfile_content = """# Supervaizer Deployment Dockerfile
-FROM python:3.12-slim
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \\
-    gcc \\
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app && \\
-    chown -R app:app /app
-USER app
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:8000/.well-known/health || exit 1
-
-# Run the application
-CMD ["python", "-m", "supervaizer.__main__"]
-"""
-
+        dockerfile_content = (TEMPLATE_DIR / "Dockerfile.template").read_text()
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
 
     def generate_dockerignore(self, output_path: Path) -> None:
         """Generate a .dockerignore file."""
-        dockerignore_content = """# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Git
-.git/
-.gitignore
-
-# Documentation
-docs/
-*.md
-README*
-
-# Tests
-tests/
-test_*
-*_test.py
-
-# Deployment artifacts
-.deployment/
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-tmp/
-temp/
-"""
-
+        dockerignore_content = (TEMPLATE_DIR / "dockerignore.template").read_text()
         output_path.write_text(dockerignore_content)
         log.info(f"Generated .dockerignore at {output_path}")
 
     def generate_docker_compose(self, output_path: Path) -> None:
         """Generate a docker-compose.yml for local testing."""
-        compose_content = """version: '3.8'
-
-services:
-  supervaizer:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - SUPERVAIZER_HOST=0.0.0.0
-      - SUPERVAIZER_PORT=8000
-      - SUPERVAIZER_ENVIRONMENT=dev
-      - SUPERVAIZER_LOG_LEVEL=INFO
-    volumes:
-      - .:/app
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/.well-known/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-"""
-
+        compose_content = (TEMPLATE_DIR / "docker-compose.yml.template").read_text()
         output_path.write_text(compose_content)
         log.info(f"Generated docker-compose.yml at {output_path}")
 
@@ -224,7 +107,8 @@ services:
         """Get the digest of a Docker image."""
         try:
             image = self.client.images.get(tag)
-            return image.attrs.get("RepoDigests", [None])[0]
+            repo_digests = image.attrs.get("RepoDigests", [])
+            return repo_digests[0] if repo_digests else None
         except DockerException as e:
             log.error(f"Failed to get image digest: {e}")
             return None

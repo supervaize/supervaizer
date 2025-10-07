@@ -10,31 +10,18 @@ Status Command
 Show deployment status and health information.
 """
 
-import typer
 from rich.console import Console
 
 console = Console()
 
-app = typer.Typer(name="status", help="Show deployment status")
 
-
-@app.command()
 def deploy_status(
-    platform: str = typer.Option(
-        ...,
-        "--platform",
-        "-p",
-        help="Target platform (cloud-run|aws-app-runner|do-app-platform)",
-    ),
-    name: str = typer.Option(None, "--name", "-n", help="Service name"),
-    env: str = typer.Option(
-        "dev", "--env", "-e", help="Environment (dev|staging|prod)"
-    ),
-    region: str = typer.Option(None, "--region", "-r", help="Provider region"),
-    project_id: str = typer.Option(
-        None, "--project-id", help="GCP project / AWS account / DO project"
-    ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed output"),
+    platform: str,
+    name: str = None,
+    env: str = "dev",
+    region: str = None,
+    project_id: str = None,
+    verbose: bool = False,
 ) -> None:
     """Show deployment status and health information."""
     console.print(f"[bold blue]Deployment status for {platform}[/bold blue]")

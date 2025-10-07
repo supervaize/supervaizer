@@ -94,7 +94,7 @@ async def test_service_job_start_with_parameters(
         job_context=context_fixture,
         agent_name=agent_fixture.name,
         name=context_fixture.job_id,
-        agent_parameters=[{"test": "decrypted_string"}],
+        agent_parameters={"test": "decrypted_string"},
     )
     background_tasks.add_task.assert_called_once_with(
         agent_fixture.job_start, mock_job, job_fields, context_fixture, server_fixture

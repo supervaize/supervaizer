@@ -241,7 +241,7 @@ async def test_start_job_endpoint(
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     exception: Exception,
-    expected_error_type: ErrorType,
+    expected_error_type: Optional[ErrorType],
     expected_status: int,
 ) -> None:
     """Test the start_job endpoint with parametrization"""
@@ -250,32 +250,30 @@ async def test_start_job_endpoint(
     # Use the real job context and parameters_fixture
     # Remove MagicMock for job context, job fields, job model, etc.
 
-    # Monkeypatch Job.new to return the real job_fixture
-    monkeypatch.setattr(
-        Job, "new", lambda job_context, agent_name, parameters: job_fixture
-    )
-
-    # Patch Agent.job_start to raise exception or return job_fixture
-    def job_start_patch(self: Agent, *args: Any, **kwargs: Any) -> Job:
+    # Mock the service layer function
+    async def mock_service_job_start(*args, **kwargs):
         if exception:
             raise exception
         return job_fixture
 
-    monkeypatch.setattr(Agent, "job_start", job_start_patch)
+    mocker.patch(
+        "supervaizer.routes.service_job_start",
+        new=mock_service_job_start,
+    )
 
     # Patch Server.decrypt to return parameters_fixture as dict
-    monkeypatch.setattr(
-        Server,
+    mocker.patch(
+        "supervaizer.common.decrypt_value",
         "decrypt",
-        lambda self, encrypted: json.dumps(
-            {k: v.value for k, v in parameters_fixture.definitions.items()}
-        ),
+        lambda self, encrypted: json.dumps({
+            k: v.value for k, v in parameters_fixture.definitions.items()
+        }),
     )
 
     # Set up client with API key
     client = TestClient(server_fixture.app)
     headers: dict[str, Any] = {"X-API-Key": server_fixture.api_key}
-    url = f"/supervaizer/agents/{agent_fixture.name}/jobs"
+    url = f"/supervaizer{agent_fixture.path}/jobs"
 
     # Always make the API request regardless of exception case
     data = {
@@ -294,11 +292,12 @@ async def test_start_job_endpoint(
     response = client.post(url, json=data, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
+    if expected_error_type:
+        response_data = response.json()
+        assert response_data["error_type"] == expected_error_type.value
+
     assert i_tested_something, "No test was performed"
 
 
@@ -368,14 +367,11 @@ async def test_get_agent_jobs_endpoint(
     response = client.get(url, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
+    if not exception:
+        assert len(response.json()) > 0
 
-    # Skip the rest of the assertions since we know we're getting 404s
-    pytest.skip("Skipping rest of assertions since we know we're getting 404s")
     assert i_tested_something, "No test was performed"
 
 
@@ -456,20 +452,17 @@ async def test_get_job_status_for_agent(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL - try different formats
-    url = f"/supervaizer/agents/{agent_fixture.name}/jobs/{job_fixture.id}"
+    url = f"/supervaizer{agent_fixture.path}/jobs/{job_fixture.id}"
 
     # Make the API call
     response = client.get(url, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
-
-    # Skip the rest of the assertions since we know we're getting 404s
-    print(f"NOTE: Got expected 404 for {url} - will fix routing in future PR")
+    if expected_error_type:
+        response_data = response.json()
+        assert response_data["error_type"] == expected_error_type.value
 
     assert i_tested_something, "No test was performed"
 

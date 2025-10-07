@@ -23,6 +23,9 @@ from supervaizer.common import log
 class DeploymentState(BaseModel):
     """Deployment state model."""
 
+    # Versioning
+    version: int = Field(2, description="State file format version")
+
     # Service identification
     service_name: str = Field(..., description="Name of the deployed service")
     platform: str = Field(
@@ -91,16 +94,27 @@ class StateManager:
             with open(self.state_file, "r") as f:
                 data = json.load(f)
 
+            # Handle migration
+            data = self.migrate_state(data)
+
             # Handle datetime deserialization
             if "created_at" in data:
                 data["created_at"] = datetime.fromisoformat(data["created_at"])
             if "updated_at" in data:
                 data["updated_at"] = datetime.fromisoformat(data["updated_at"])
 
-            return DeploymentState(**data)
+            state = DeploymentState(**data)
+            if not self.validate_state(state):
+                return None
+            return state
 
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            log.error(f"Failed to load deployment state: {e}")
+        except ValueError as e:
+            if "Unsupported state version" in str(e):
+                raise  # Re-raise the specific error for unsupported versions
+            log.error(f"Failed to load or validate deployment state: {e}")
+            return None
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            log.error(f"Failed to load or validate deployment state: {e}")
             return None
 
     def save_state(self, state: DeploymentState) -> None:
@@ -174,14 +188,22 @@ class StateManager:
 
     def migrate_state(self, state_data: Dict[str, Any]) -> Dict[str, Any]:
         """Migrate state data from older versions."""
-        # Add migration logic here as the state format evolves
+        version = state_data.get("version", 1)
+        if version > 2:
+            raise ValueError(f"Unsupported state version: {version}")
+
         migrated_data = state_data.copy()
 
-        # Example migration: add new fields with defaults
-        if "api_key_generated" not in migrated_data:
-            migrated_data["api_key_generated"] = False
-        if "rsa_key_generated" not in migrated_data:
-            migrated_data["rsa_key_generated"] = False
+        if version < 2:
+            log.info("Migrating state from v1 to v2")
+            # Example migration: add new fields with defaults
+            if "api_key_generated" not in migrated_data:
+                migrated_data["api_key_generated"] = False
+            if "rsa_key_generated" not in migrated_data:
+                migrated_data["rsa_key_generated"] = False
+            if "provider_data" not in migrated_data:
+                migrated_data["provider_data"] = {}
+            migrated_data["version"] = 2
 
         return migrated_data
 

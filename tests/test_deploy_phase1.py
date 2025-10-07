@@ -8,6 +8,7 @@
 Tests for deployment CLI Phase 1 functionality.
 """
 
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -22,6 +23,10 @@ from supervaizer.deploy.state import (
     StateManager,
     create_deployment_directory,
 )
+from supervaizer.deploy.commands import (
+    plan,
+    up,
+)  # Import plan and up modules to access their console instances
 
 
 class TestDockerManager:
@@ -313,3 +318,402 @@ class TestDeploymentDirectory:
             gitignore_content = gitignore_path.read_text()
             assert ".deployment/" in gitignore_content
             assert "*.pyc" in gitignore_content  # Original content preserved
+
+
+class TestDockerManagerAdvanced:
+    """Test advanced Docker manager functionality."""
+
+    def test_build_image_success(self, mocker: MockerFixture) -> None:
+        """Test successful Docker image building."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_image = mocker.Mock()
+        mock_image.id = "sha256:abc123"
+        mock_client.ping.return_value = True
+        mock_client.images.build.return_value = (mock_image, [])
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        result = manager.build_image(
+            "test:latest", Path("/tmp"), Path("/tmp/Dockerfile")
+        )
+
+        assert result == "sha256:abc123"
+        mock_client.images.build.assert_called_once()
+
+    def test_build_image_failure(self, mocker: MockerFixture) -> None:
+        """Test Docker image building failure."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.build.side_effect = DockerException("Build failed")
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        with pytest.raises(RuntimeError, match="Docker build failed"):
+            manager.build_image("test:latest", Path("/tmp"), Path("/tmp/Dockerfile"))
+
+    def test_tag_image_success(self, mocker: MockerFixture) -> None:
+        """Test successful Docker image tagging."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_image = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.get.return_value = mock_image
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        manager.tag_image("source:latest", "target:v1.0")
+
+        mock_client.images.get.assert_called_once_with("source:latest")
+        mock_image.tag.assert_called_once_with("target:v1.0")
+
+    def test_tag_image_failure(self, mocker: MockerFixture) -> None:
+        """Test Docker image tagging failure."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.get.side_effect = DockerException("Image not found")
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        with pytest.raises(RuntimeError, match="Failed to tag image"):
+            manager.tag_image("source:latest", "target:v1.0")
+
+    def test_push_image_success(self, mocker: MockerFixture) -> None:
+        """Test successful Docker image push."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.push.return_value = [{"status": "Pushed"}]
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        # push_image returns None on success, not True
+        assert manager.push_image("test:latest") is None
+
+    def test_push_image_failure(self, mocker: MockerFixture) -> None:
+        """Test Docker image push failure."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.push.side_effect = DockerException("Push failed")
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        # push_image raises RuntimeError on failure
+        with pytest.raises(RuntimeError, match="Failed to push image"):
+            manager.push_image("test:latest")
+
+    def test_push_image_auth_failure(self, mocker: MockerFixture) -> None:
+        """Test Docker image push with auth failure."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.push.return_value = [{"error": "authentication required"}]
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        # push_image raises RuntimeError on auth failure
+        with pytest.raises(RuntimeError, match="Push failed"):
+            manager.push_image("test:latest")
+
+    def test_get_image_digest_success(self, mocker: MockerFixture) -> None:
+        """Test successful image digest retrieval."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_image = mocker.Mock()
+        mock_image.attrs = {"RepoDigests": ["test@sha256:abc123def456"]}
+        mock_client.ping.return_value = True
+        mock_client.images.get.return_value = mock_image
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        digest = manager.get_image_digest("test:latest")
+
+        # The actual implementation returns the full digest string, not just the hash part
+        assert digest == "test@sha256:abc123def456"
+
+    def test_get_image_digest_no_digest(self, mocker: MockerFixture) -> None:
+        """Test image digest retrieval when no digest exists."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_image = mocker.Mock()
+        mock_image.attrs = {"RepoDigests": []}
+        mock_client.ping.return_value = True
+        mock_client.images.get.return_value = mock_image
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        # This will raise IndexError with current implementation
+        # The implementation was corrected to return None if RepoDigests is empty or missing.
+        digest = manager.get_image_digest("test:latest")
+        assert digest is None
+
+    def test_get_image_digest_failure(self, mocker: MockerFixture) -> None:
+        """Test image digest retrieval failure."""
+        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_client = mocker.Mock()
+        mock_client.ping.return_value = True
+        mock_client.images.get.side_effect = DockerException("Image not found")
+        mock_docker_client.from_env.return_value = mock_client
+
+        manager = DockerManager()
+        digest = manager.get_image_digest("test:latest")
+
+        assert digest is None
+
+
+class TestDeployCommands:
+    """Test deployment command functions."""
+
+    def test_plan_deployment_command(self, mocker: MockerFixture) -> None:
+        """Test plan deployment command."""
+        from supervaizer.deploy.cli import plan
+
+        # Mock console.print to capture output
+        mock_print = mocker.patch("supervaizer.deploy.commands.plan.console.print")
+
+        plan(
+            platform="cloud-run",
+            name="test-service",
+            env="dev",
+            region="us-central1",
+            project_id="test-project",
+            verbose=True,
+        )
+
+        # Verify console output
+        assert mock_print.call_count >= 3
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Planning deployment to cloud-run" in call for call in calls)
+        assert any("Environment: dev" in call for call in calls)
+        assert any("Service name: test-service" in call for call in calls)
+
+    def test_deploy_up_command(self, mocker: MockerFixture) -> None:
+        """Test deploy up command."""
+        from supervaizer.deploy.cli import up
+
+        # Mock console.print to capture output
+        mock_print = mocker.patch("supervaizer.deploy.commands.up.console.print")
+
+        up(
+            platform="aws-app-runner",
+            name="test-service",
+            env="staging",
+            region="us-east-1",
+            project_id="test-account",
+            image="test-registry/test:latest",
+            port=8080,
+            generate_api_key=True,
+            generate_rsa=True,
+            yes=True,
+            no_rollback=False,
+            timeout=600,
+            verbose=True,
+        )
+
+        # Verify console output
+        assert mock_print.call_count >= 4
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Deploying to aws-app-runner" in call for call in calls)
+        assert any("Environment: staging" in call for call in calls)
+        assert any("Port: 8080" in call for call in calls)
+        assert any("Service name: test-service" in call for call in calls)
+
+    def test_deploy_down_command(self, mocker: MockerFixture) -> None:
+        """Test deploy down command."""
+        from supervaizer.deploy.cli import down
+
+        # Mock console.print to capture output
+        mock_print = mocker.patch("supervaizer.deploy.commands.down.console.print")
+
+        down(
+            platform="do-app-platform",
+            name="test-service",
+            env="prod",
+            region="nyc1",
+            project_id="test-project",
+            yes=True,
+            verbose=True,
+        )
+
+        # Verify console output
+        assert mock_print.call_count >= 3
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Destroying service on do-app-platform" in call for call in calls)
+        assert any("Environment: prod" in call for call in calls)
+        assert any("Service name: test-service" in call for call in calls)
+
+    def test_deploy_status_command(self, mocker: MockerFixture) -> None:
+        """Test deploy status command."""
+        from supervaizer.deploy.cli import status
+
+        # Mock console.print to capture output
+        mock_print = mocker.patch("supervaizer.deploy.commands.status.console.print")
+
+        status(
+            platform="cloud-run",
+            name="test-service",
+            env="dev",
+            region="us-central1",
+            project_id="test-project",
+            verbose=True,
+        )
+
+        # Verify console output
+        assert mock_print.call_count >= 3
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Deployment status for cloud-run" in call for call in calls)
+        assert any("Environment: dev" in call for call in calls)
+        assert any("Service name: test-service" in call for call in calls)
+
+    def test_plan_deployment_minimal_args(self, mocker: MockerFixture) -> None:
+        """Test plan deployment with minimal arguments."""
+        # Mock console.print to capture output
+        mock_print = mocker.patch.object(plan.console, "print")
+
+        plan.plan_deployment(platform="cloud-run")
+
+        # Verify console output
+        assert mock_print.call_count >= 2
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Planning deployment to cloud-run" in call for call in calls)
+        assert any("Environment: dev" in call for call in calls)
+
+    def test_deploy_up_minimal_args(self, mocker: MockerFixture) -> None:
+        """Test deploy up with minimal arguments."""
+        # Mock console.print to capture output
+        mock_print = mocker.patch.object(up.console, "print")
+
+        up.deploy_up(platform="aws-app-runner")
+
+        # Verify console output
+        assert mock_print.call_count >= 2
+        calls = [call[0][0] for call in mock_print.call_args_list]
+        assert any("Deploying to aws-app-runner" in call for call in calls)
+        assert any("Environment: dev" in call for call in calls)
+
+
+class TestStateManagerAdvanced:
+    """Test advanced state manager functionality."""
+
+    def test_migrate_state_v1_to_v2(self, mocker: MockerFixture) -> None:
+        """Test state migration from v1 to v2."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            # Create v1 state file
+            v1_state = {
+                "version": 1,
+                "service_name": "test-service",
+                "platform": "cloud-run",
+                "environment": "dev",
+                "region": "us-central1",
+                "image_tag": "test:latest",
+            }
+            manager.state_file.write_text(json.dumps(v1_state))
+
+            # Load and migrate
+            state = manager.load_state()
+            assert state is not None
+            assert state.service_name == "test-service"
+            assert state.platform == "cloud-run"
+            assert state.version == 2  # Should be migrated to v2
+
+    def test_migrate_state_unknown_version(self, mocker: MockerFixture) -> None:
+        """Test state migration with unknown version."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            # Create unknown version state file
+            unknown_state = {
+                "version": 999,
+                "service_name": "test-service",
+                "platform": "cloud-run",
+                "environment": "dev",
+                "region": "us-central1",
+                "image_tag": "test:latest",
+            }
+            manager.state_file.write_text(json.dumps(unknown_state))
+
+            # Should raise error for unknown version
+            with pytest.raises(ValueError, match="Unsupported state version"):
+                manager.load_state()
+
+    def test_validate_state_invalid_platform(self) -> None:
+        """Test state validation with invalid platform."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            invalid_state = DeploymentState(
+                service_name="test-service",
+                platform="invalid-platform",
+                environment="dev",
+                region="us-central1",
+                image_tag="test:latest",
+            )
+
+            assert manager.validate_state(invalid_state) is False
+
+    def test_validate_state_invalid_environment(self) -> None:
+        """Test state validation with invalid environment."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            invalid_state = DeploymentState(
+                service_name="test-service",
+                platform="cloud-run",
+                environment="invalid-env",
+                region="us-central1",
+                image_tag="test:latest",
+            )
+
+            assert manager.validate_state(invalid_state) is False
+
+    def test_validate_state_valid_state(self) -> None:
+        """Test state validation with valid state."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            valid_state = DeploymentState(
+                service_name="test-service",
+                platform="cloud-run",
+                environment="dev",
+                region="us-central1",
+                image_tag="test:latest",
+            )
+
+            assert manager.validate_state(valid_state) is True
+
+    def test_get_service_key_edge_cases(self) -> None:
+        """Test service key generation with edge cases."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            # Test with special characters
+            key1 = manager.get_service_key("test-service-123", "dev")
+            assert key1 == "test-service-123-dev"
+
+            # Test with empty environment
+            key2 = manager.get_service_key("test-service", "")
+            assert key2 == "test-service-"
+
+    def test_state_file_corruption(self) -> None:
+        """Test handling of corrupted state file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            deployment_dir = Path(temp_dir) / ".deployment"
+            manager = StateManager(deployment_dir)
+
+            # Create corrupted JSON file
+            manager.state_file.write_text("{ invalid json }")
+
+            # Should return None for corrupted file
+            state = manager.load_state()
+            assert state is None

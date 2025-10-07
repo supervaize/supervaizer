@@ -20,7 +20,7 @@ from supervaizer.__version__ import VERSION
 from supervaizer.deploy.cli import deploy_app
 
 app = typer.Typer(
-    help=f"Supervaizer Controller CLI v{VERSION} - Documentation @ https://docs.supervaize.com"
+    help=f"Supervaizer Controller CLI v{VERSION} - Documentation @ https://doc.supervaize.com/docs/category/supervaizer-controller"
 )
 console = Console()
 
