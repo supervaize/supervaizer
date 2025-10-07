@@ -96,6 +96,14 @@ class TestDockerManager:
             assert "version: '3.8'" in content
             assert "ports:" in content
             assert "8000:8000" in content
+            # Verify template placeholders are replaced with actual values
+            assert "supervaizer-dev:" in content  # service name
+            assert "SUPERVAIZER_ENVIRONMENT=dev" in content  # environment
+            assert "SUPERVAIZER_API_KEY=test-api-key" in content  # api key
+            assert "SV_RSA_PRIVATE_KEY=test-rsa-key" in content  # rsa key
+            # Verify no template placeholders remain
+            assert "{{" not in content
+            assert "}}" not in content
 
 
 class TestStateManager:

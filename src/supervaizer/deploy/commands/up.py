@@ -109,7 +109,14 @@ def deploy_up(
 
             docker_manager.generate_dockerfile(dockerfile_path)
             docker_manager.generate_dockerignore(dockerignore_path)
-            docker_manager.generate_docker_compose(compose_path)
+            docker_manager.generate_docker_compose(
+                compose_path,
+                port=port,
+                service_name=name,
+                environment=env,
+                api_key=secrets_dict.get("api_key", "test-api-key"),
+                rsa_key=secrets_dict.get("rsa_private_key", "test-rsa-key")
+            )
 
             # Build image
             progress.update(task, description="Building Docker image...")

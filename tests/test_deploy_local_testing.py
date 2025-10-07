@@ -320,7 +320,13 @@ class TestLocalTesting:
         mock_check_docker.assert_called_once()
         mock_docker_instance.generate_dockerfile.assert_called_once()
         mock_docker_instance.generate_dockerignore.assert_called_once()
-        mock_docker_instance.generate_docker_compose.assert_called_once_with(port=8000)
+        mock_docker_instance.generate_docker_compose.assert_called_once_with(
+            port=8000,
+            service_name="test-service-dev",
+            environment="dev",
+            api_key="test-key",
+            rsa_key="test-rsa"
+        )
         mock_docker_instance.build_image.assert_called_once()
         mock_generate_secrets.assert_called_once_with(True, False)
         mock_start_compose.assert_called_once()

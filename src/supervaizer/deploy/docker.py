@@ -72,7 +72,13 @@ class DockerManager:
         log.info(f"Generated .dockerignore at {output_path}")
 
     def generate_docker_compose(
-        self, output_path: Optional[Path] = None, port: int = 8000
+        self, 
+        output_path: Optional[Path] = None, 
+        port: int = 8000,
+        service_name: str = "supervaizer-dev",
+        environment: str = "dev",
+        api_key: str = "test-api-key",
+        rsa_key: str = "test-rsa-key"
     ) -> None:
         """Generate a docker-compose.yml for local testing."""
         if output_path is None:
@@ -85,20 +91,13 @@ class DockerManager:
         template_path = TEMPLATE_DIR / "docker-compose.yml.template"
         compose_content = template_path.read_text()
 
-        # Replace template placeholders
+        # Replace template placeholders with actual values
         compose_content = compose_content.replace("{{PORT}}", str(port))
-        compose_content = compose_content.replace(
-            "{{SERVICE_NAME}}", "{{ env.SERVICE_NAME | default('supervaizer-dev') }}"
-        )
-        compose_content = compose_content.replace(
-            "{{ENVIRONMENT}}", "{{ env.SUPERVAIZER_ENVIRONMENT | default('dev') }}"
-        )
-        compose_content = compose_content.replace(
-            "{{API_KEY}}", "{{ env.SUPERVAIZER_API_KEY | default('test-api-key') }}"
-        )
-        compose_content = compose_content.replace(
-            "{{RSA_KEY}}", "{{ env.SV_RSA_PRIVATE_KEY | default('test-rsa-key') }}"
-        )
+        compose_content = compose_content.replace("{{SERVICE_NAME}}", service_name)
+        compose_content = compose_content.replace("{{ENVIRONMENT}}", environment)
+        compose_content = compose_content.replace("{{API_KEY}}", api_key)
+        compose_content = compose_content.replace("{{RSA_KEY}}", rsa_key)
+        compose_content = compose_content.replace("{{ env.SV_LOG_LEVEL | default('INFO') }}", "INFO")
 
         output_path.write_text(compose_content)
         log.info(f"Generated docker-compose.yml at {output_path}")

@@ -57,18 +57,24 @@ def local_docker(
             raise RuntimeError("Docker not available")
         console.print("[green]✓[/] Docker is available")
 
-        # Step 2: Generate deployment files
-        console.print("\n[bold]Step 2:[/] Generating deployment files...")
+        # Step 2: Generate secrets if needed
+        console.print("\n[bold]Step 2:[/] Setting up secrets...")
+        secrets = _generate_test_secrets(generate_api_key, generate_rsa)
+        console.print("[green]✓[/] Test secrets configured")
+
+        # Step 3: Generate deployment files
+        console.print("\n[bold]Step 3:[/] Generating deployment files...")
         docker_manager = DockerManager()
         docker_manager.generate_dockerfile()
         docker_manager.generate_dockerignore()
-        docker_manager.generate_docker_compose(port=port)
+        docker_manager.generate_docker_compose(
+            port=port,
+            service_name=service_name,
+            environment=env,
+            api_key=secrets.get("api_key", "test-api-key"),
+            rsa_key=secrets.get("rsa_private_key", "test-rsa-key")
+        )
         console.print("[green]✓[/] Deployment files generated")
-
-        # Step 3: Generate secrets if needed
-        console.print("\n[bold]Step 3:[/] Setting up secrets...")
-        secrets = _generate_test_secrets(generate_api_key, generate_rsa)
-        console.print("[green]✓[/] Test secrets configured")
 
         # Step 4: Build Docker image
         console.print("\n[bold]Step 4:[/] Building Docker image...")
