@@ -314,7 +314,7 @@ class TestLocalTesting:
         mock_run_health.return_value = {"health_endpoint": {"success": True}}
 
         # Run test
-        local_docker("test-service", "dev", 8000, True, False, 30, False)
+        local_docker("test-service", "dev", 8000, True, False, 30, False, False)
 
         # Verify calls
         mock_check_docker.assert_called_once()
@@ -325,7 +325,7 @@ class TestLocalTesting:
             service_name="test-service-dev",
             environment="dev",
             api_key="test-key",
-            rsa_key="test-rsa"
+            rsa_key="test-rsa",
         )
         mock_docker_instance.build_image.assert_called_once()
         mock_generate_secrets.assert_called_once_with(True, False)
@@ -343,7 +343,7 @@ class TestLocalTesting:
         mock_check_docker.return_value = False
 
         with pytest.raises(RuntimeError, match="Docker not available"):
-            local_docker("test-service", "dev", 8000, True, False, 30, False)
+            local_docker("test-service", "dev", 8000, True, False, 30, False, False)
 
     def test_test_local_service_timeout(
         self,
@@ -380,6 +380,49 @@ class TestLocalTesting:
         mock_wait_service.return_value = False
 
         with pytest.raises(RuntimeError, match="Service startup timeout"):
-            local_docker("test-service", "dev", 8000, True, False, 30, False)
+            local_docker("test-service", "dev", 8000, True, False, 30, False, False)
 
         mock_cleanup.assert_called_once()
+
+    def test_local_docker_docker_files_only(
+        self,
+        mocker: MockerFixture,
+    ):
+        """Test local docker with docker_files_only=True."""
+        # Setup mocks
+        mock_check_docker = mocker.patch(
+            "supervaizer.deploy.commands.local._check_docker_available"
+        )
+        mock_docker_manager = mocker.patch(
+            "supervaizer.deploy.commands.local.DockerManager"
+        )
+        mock_generate_secrets = mocker.patch(
+            "supervaizer.deploy.commands.local._generate_test_secrets"
+        )
+
+        mock_check_docker.return_value = True
+        mock_docker_instance = mocker.Mock()
+        mock_docker_manager.return_value = mock_docker_instance
+        mock_generate_secrets.return_value = {
+            "api_key": "test-key",
+            "rsa_private_key": "test-rsa",
+        }
+
+        # Run test with docker_files_only=True
+        local_docker("test-service", "dev", 8000, True, False, 30, False, True)
+
+        # Verify calls
+        mock_check_docker.assert_called_once()
+        mock_docker_instance.generate_dockerfile.assert_called_once()
+        mock_docker_instance.generate_dockerignore.assert_called_once()
+        mock_docker_instance.generate_docker_compose.assert_called_once_with(
+            port=8000,
+            service_name="test-service-dev",
+            environment="dev",
+            api_key="test-key",
+            rsa_key="test-rsa",
+        )
+        mock_generate_secrets.assert_called_once_with(True, False)
+
+        # Verify that build_image and other runtime operations are NOT called
+        mock_docker_instance.build_image.assert_not_called()

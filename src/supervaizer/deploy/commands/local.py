@@ -35,9 +35,17 @@ def local_docker(
     generate_rsa: bool,
     timeout: int,
     verbose: bool,
+    docker_files_only: bool = False,
 ) -> None:
     """Test deployment locally using Docker Compose."""
-    console.print(Panel.fit("[bold blue]Local Docker Testing[/]", border_style="blue"))
+    if docker_files_only:
+        console.print(
+            Panel.fit("[bold blue]Generate Docker Files Only[/]", border_style="blue")
+        )
+    else:
+        console.print(
+            Panel.fit("[bold blue]Local Docker Testing[/]", border_style="blue")
+        )
 
     # Determine service name
     if name is None:
@@ -72,9 +80,20 @@ def local_docker(
             service_name=service_name,
             environment=env,
             api_key=secrets.get("api_key", "test-api-key"),
-            rsa_key=secrets.get("rsa_private_key", "test-rsa-key")
+            rsa_key=secrets.get("rsa_private_key", "test-rsa-key"),
         )
         console.print("[green]✓[/] Deployment files generated")
+
+        # If docker_files_only is True, stop here
+        if docker_files_only:
+            console.print("\n[bold green]✓ Docker files generated successfully![/]")
+            console.print("[bold]Generated files:[/]")
+            console.print("  • .deployment/Dockerfile")
+            console.print("  • .deployment/.dockerignore")
+            console.print("  • .deployment/docker-compose.yml")
+            console.print("\n[bold]To start the services:[/]")
+            console.print("[dim]docker-compose -f .deployment/docker-compose.yml up[/]")
+            return
 
         # Step 4: Build Docker image
         console.print("\n[bold]Step 4:[/] Building Docker image...")

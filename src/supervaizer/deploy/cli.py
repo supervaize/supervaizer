@@ -55,6 +55,9 @@ generate_rsa_option = typer.Option(
 yes_option = typer.Option(False, "--yes", "-y", help="Non-interactive mode")
 no_rollback_option = typer.Option(False, "--no-rollback", help="Keep failed revision")
 timeout_option = typer.Option(300, "--timeout", help="Deployment timeout in seconds")
+docker_files_only_option = typer.Option(
+    False, "--docker-files-only", help="Only generate Docker files without running them"
+)
 
 
 def _check_platform_required(platform: str, command_name: str) -> None:
@@ -154,6 +157,16 @@ def local(
     generate_rsa: bool = generate_rsa_option,
     timeout: int = timeout_option,
     verbose: bool = verbose_option,
+    docker_files_only: bool = docker_files_only_option,
 ) -> None:
     """Test deployment locally using Docker Compose."""
-    local_docker(name, env, port, generate_api_key, generate_rsa, timeout, verbose)
+    local_docker(
+        name,
+        env,
+        port,
+        generate_api_key,
+        generate_rsa,
+        timeout,
+        verbose,
+        docker_files_only,
+    )
