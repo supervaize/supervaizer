@@ -36,6 +36,8 @@ def local_docker(
     timeout: int,
     verbose: bool,
     docker_files_only: bool = False,
+    source_dir: str = "src",
+    controller_file: str = "supervaizer_control.py",
 ) -> None:
     """Test deployment locally using Docker Compose."""
     if docker_files_only:
@@ -73,7 +75,9 @@ def local_docker(
         # Step 3: Generate deployment files
         console.print("\n[bold]Step 3:[/] Generating deployment files...")
         docker_manager = DockerManager()
-        docker_manager.generate_dockerfile()
+        docker_manager.generate_dockerfile(
+            source_dir=source_dir, controller_file=controller_file
+        )
         docker_manager.generate_dockerignore()
         docker_manager.generate_docker_compose(
             port=port,

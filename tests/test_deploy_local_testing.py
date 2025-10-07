@@ -314,11 +314,24 @@ class TestLocalTesting:
         mock_run_health.return_value = {"health_endpoint": {"success": True}}
 
         # Run test
-        local_docker("test-service", "dev", 8000, True, False, 30, False, False)
+        local_docker(
+            "test-service",
+            "dev",
+            8000,
+            True,
+            False,
+            30,
+            False,
+            False,
+            "src",
+            "supervaizer_control.py",
+        )
 
         # Verify calls
         mock_check_docker.assert_called_once()
-        mock_docker_instance.generate_dockerfile.assert_called_once()
+        mock_docker_instance.generate_dockerfile.assert_called_once_with(
+            source_dir="src", controller_file="supervaizer_control.py"
+        )
         mock_docker_instance.generate_dockerignore.assert_called_once()
         mock_docker_instance.generate_docker_compose.assert_called_once_with(
             port=8000,
@@ -343,7 +356,18 @@ class TestLocalTesting:
         mock_check_docker.return_value = False
 
         with pytest.raises(RuntimeError, match="Docker not available"):
-            local_docker("test-service", "dev", 8000, True, False, 30, False, False)
+            local_docker(
+                "test-service",
+                "dev",
+                8000,
+                True,
+                False,
+                30,
+                False,
+                False,
+                "src",
+                "supervaizer_control.py",
+            )
 
     def test_test_local_service_timeout(
         self,
@@ -380,7 +404,18 @@ class TestLocalTesting:
         mock_wait_service.return_value = False
 
         with pytest.raises(RuntimeError, match="Service startup timeout"):
-            local_docker("test-service", "dev", 8000, True, False, 30, False, False)
+            local_docker(
+                "test-service",
+                "dev",
+                8000,
+                True,
+                False,
+                30,
+                False,
+                False,
+                "src",
+                "supervaizer_control.py",
+            )
 
         mock_cleanup.assert_called_once()
 
@@ -409,11 +444,24 @@ class TestLocalTesting:
         }
 
         # Run test with docker_files_only=True
-        local_docker("test-service", "dev", 8000, True, False, 30, False, True)
+        local_docker(
+            "test-service",
+            "dev",
+            8000,
+            True,
+            False,
+            30,
+            False,
+            True,
+            "src",
+            "supervaizer_control.py",
+        )
 
         # Verify calls
         mock_check_docker.assert_called_once()
-        mock_docker_instance.generate_dockerfile.assert_called_once()
+        mock_docker_instance.generate_dockerfile.assert_called_once_with(
+            source_dir="src", controller_file="supervaizer_control.py"
+        )
         mock_docker_instance.generate_dockerignore.assert_called_once()
         mock_docker_instance.generate_docker_compose.assert_called_once_with(
             port=8000,

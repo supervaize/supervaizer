@@ -37,7 +37,14 @@ class DockerManager:
             log.error(f"Failed to connect to Docker: {e}")
             raise RuntimeError("Docker is not running or not accessible") from e
 
-    def generate_dockerfile(self, output_path: Optional[Path] = None) -> None:
+    def generate_dockerfile(
+        self,
+        output_path: Optional[Path] = None,
+        python_version: str = "3.12",
+        app_port: int = 8000,
+        source_dir: str = "src",
+        controller_file: str = "supervaizer_control.py",
+    ) -> None:
         """Generate a Dockerfile for Supervaizer deployment."""
         if output_path is None:
             output_path = Path(".deployment/Dockerfile")
@@ -49,9 +56,15 @@ class DockerManager:
         template_path = TEMPLATE_DIR / "Dockerfile.template"
         dockerfile_content = template_path.read_text()
 
-        # Replace template placeholders if any
-        dockerfile_content = dockerfile_content.replace("{{PYTHON_VERSION}}", "3.12")
-        dockerfile_content = dockerfile_content.replace("{{APP_PORT}}", "8000")
+        # Replace template placeholders with actual values
+        dockerfile_content = dockerfile_content.replace(
+            "{{PYTHON_VERSION}}", python_version
+        )
+        dockerfile_content = dockerfile_content.replace("{{APP_PORT}}", str(app_port))
+        dockerfile_content = dockerfile_content.replace("{{SOURCE_DIR}}", source_dir)
+        dockerfile_content = dockerfile_content.replace(
+            "{{CONTROLLER_FILE}}", controller_file
+        )
 
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
@@ -72,13 +85,13 @@ class DockerManager:
         log.info(f"Generated .dockerignore at {output_path}")
 
     def generate_docker_compose(
-        self, 
-        output_path: Optional[Path] = None, 
+        self,
+        output_path: Optional[Path] = None,
         port: int = 8000,
         service_name: str = "supervaizer-dev",
         environment: str = "dev",
         api_key: str = "test-api-key",
-        rsa_key: str = "test-rsa-key"
+        rsa_key: str = "test-rsa-key",
     ) -> None:
         """Generate a docker-compose.yml for local testing."""
         if output_path is None:
@@ -97,7 +110,9 @@ class DockerManager:
         compose_content = compose_content.replace("{{ENVIRONMENT}}", environment)
         compose_content = compose_content.replace("{{API_KEY}}", api_key)
         compose_content = compose_content.replace("{{RSA_KEY}}", rsa_key)
-        compose_content = compose_content.replace("{{ env.SV_LOG_LEVEL | default('INFO') }}", "INFO")
+        compose_content = compose_content.replace(
+            "{{ env.SV_LOG_LEVEL | default('INFO') }}", "INFO"
+        )
 
         output_path.write_text(compose_content)
         log.info(f"Generated docker-compose.yml at {output_path}")

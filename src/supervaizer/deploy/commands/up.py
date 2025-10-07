@@ -115,7 +115,7 @@ def deploy_up(
                 service_name=name,
                 environment=env,
                 api_key=secrets_dict.get("api_key", "test-api-key"),
-                rsa_key=secrets_dict.get("rsa_private_key", "test-rsa-key")
+                rsa_key=secrets_dict.get("rsa_private_key", "test-rsa-key"),
             )
 
             # Build image

@@ -67,6 +67,37 @@ class TestDockerManager:
             assert "FROM python:3.12-slim" in content
             assert "EXPOSE 8000" in content
             assert 'CMD ["python", "-m", "supervaizer.__main__"]' in content
+            # Verify template placeholders are replaced with actual values
+            assert "COPY src/ ./src/" in content  # source directory
+            assert "COPY supervaizer_control.py ./" in content  # controller file
+            # Verify no template placeholders remain
+            assert "{{" not in content
+            assert "}}" not in content
+
+    def test_generate_dockerfile_custom_params(self, mocker: MockerFixture) -> None:
+        """Test Dockerfile generation with custom parameters."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "Dockerfile"
+
+            mocker.patch("supervaizer.deploy.docker.DockerClient")
+            manager = DockerManager()
+            manager.generate_dockerfile(
+                output_path,
+                python_version="3.11",
+                app_port=9000,
+                source_dir=".",
+                controller_file="my_controller.py",
+            )
+
+            assert output_path.exists()
+            content = output_path.read_text()
+            assert "FROM python:3.11-slim" in content
+            assert "EXPOSE 9000" in content
+            assert "COPY ./ ././" in content  # source directory
+            assert "COPY my_controller.py ./" in content  # controller file
+            # Verify no template placeholders remain
+            assert "{{" not in content
+            assert "}}" not in content
 
     def test_generate_dockerignore(self, mocker: MockerFixture) -> None:
         """Test .dockerignore generation."""

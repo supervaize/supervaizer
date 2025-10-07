@@ -15,8 +15,8 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 # Copy application code
-COPY src/ ./src/
-COPY supervaizer_control.py ./
+COPY {{SOURCE_DIR}}/ ./{{SOURCE_DIR}}/
+COPY {{CONTROLLER_FILE}} ./
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash supervaizer && \
@@ -31,4 +31,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:{{APP_PORT}}/.well-known/health || exit 1
 
 # Run the application
-CMD ["python", "-m", "supervaizer.__main__"]
+CMD ["supervaizer",  "start"]

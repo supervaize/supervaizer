@@ -58,6 +58,14 @@ timeout_option = typer.Option(300, "--timeout", help="Deployment timeout in seco
 docker_files_only_option = typer.Option(
     False, "--docker-files-only", help="Only generate Docker files without running them"
 )
+source_dir_option = typer.Option(
+    "src", "--source-dir", help="Source directory path (default: src)"
+)
+controller_file_option = typer.Option(
+    "supervaizer_control.py",
+    "--controller-file",
+    help="Controller file name (default: supervaizer_control.py)",
+)
 
 
 def _check_platform_required(platform: str, command_name: str) -> None:
@@ -158,6 +166,8 @@ def local(
     timeout: int = timeout_option,
     verbose: bool = verbose_option,
     docker_files_only: bool = docker_files_only_option,
+    source_dir: str = source_dir_option,
+    controller_file: str = controller_file_option,
 ) -> None:
     """Test deployment locally using Docker Compose."""
     local_docker(
@@ -169,4 +179,6 @@ def local(
         timeout,
         verbose,
         docker_files_only,
+        source_dir,
+        controller_file,
     )
