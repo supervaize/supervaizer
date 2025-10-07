@@ -32,6 +32,7 @@ supervaizer deploy plan   [OPTIONS]
 supervaizer deploy up     [OPTIONS]
 supervaizer deploy down   [OPTIONS]
 supervaizer deploy status [OPTIONS]
+supervaizer deploy local  [OPTIONS]
 ```
 
 ### Common Options
@@ -59,6 +60,7 @@ supervaizer deploy status [OPTIONS]
 - **up** – Build → Push → Secrets upsert → Service create/update → Set `SUPERVAIZER_PUBLIC_URL` → Verify health → Output.
 - **down** – Destroy service and **tool-owned** secrets; keep images by default.
 - **status** – Print URL, health state, image digest, revision, and key env vars.
+- **local** – Build → Generate secrets → Start Docker Compose → Verify health → Display service info.
 
 ### Idempotency
 
@@ -88,6 +90,65 @@ After provisioning, the CLI **reads the assigned URL** and sets:
 **Health check:** `/.well-known/health` (used for both liveness/readiness in v1).
 
 **Note**: The current implementation provides both A2A (`/.well-known/health`) and ACP (`/agents/health`) health endpoints. The deployment CLI will use `/.well-known/health` as the primary health check endpoint for consistency with A2A protocol standards.
+
+---
+
+## Local Testing Workflow
+
+The `supervaizer deploy local` command provides a complete local testing environment using Docker Compose, enabling developers to test their Supervaizer agents before deploying to cloud platforms.
+
+### Local Command Options
+
+```
+supervaizer deploy local [OPTIONS]
+
+Options:
+--name TEXT                     # service base name; default from folder
+--env [dev|staging|prod]        # default: dev
+--port INTEGER                  # default: 8000
+--generate-api-key              # create secure API key for testing
+--generate-rsa                  # generate RSA private key for testing
+--timeout INTEGER               # seconds to wait for service startup; default: 30
+--verbose                       # show Docker Compose output
+```
+
+### Local Testing Workflow
+
+1. **Docker Availability Check**: Verify Docker is running and accessible.
+2. **Generate Deployment Files**: Create Dockerfile, docker-compose.yml, and .dockerignore.
+3. **Generate Test Secrets**: Create API key and RSA private key for local testing.
+4. **Build Docker Image**: Build the service image with local-test tag.
+5. **Start Services**: Launch Docker Compose with generated secrets and environment variables.
+6. **Wait for Service**: Poll health endpoint until service is ready or timeout.
+7. **Run Health Checks**: Verify all endpoints (health, API docs, optional API health).
+8. **Display Service Info**: Show service URL, API key, and access information.
+
+### Local Testing Features
+
+- **Automatic Secret Generation**: Creates secure test API keys and RSA keys
+- **Health Verification**: Tests `/.well-known/health`, `/docs`, and `/agents/health` endpoints
+- **Service Information Display**: Shows service URL, API documentation links, and masked secrets
+- **Cleanup Instructions**: Provides commands to stop test services
+- **Error Handling**: Automatic cleanup on failure with detailed error reporting
+
+### Local Environment Variables
+
+The local testing sets the following environment variables in Docker Compose:
+
+- `SUPERVAIZER_ENVIRONMENT=dev`
+- `SUPERVAIZER_HOST=0.0.0.0`
+- `SUPERVAIZER_PORT={port}`
+- `SUPERVAIZER_API_KEY={generated-test-key}`
+- `SV_RSA_PRIVATE_KEY={generated-rsa-key}`
+- `SV_LOG_LEVEL=INFO`
+
+### Health Check Endpoints
+
+Local testing verifies:
+
+- **Basic Health**: `GET http://localhost:{port}/.well-known/health`
+- **API Health**: `GET http://localhost:{port}/agents/health` (with API key header)
+- **API Documentation**: `GET http://localhost:{port}/docs`
 
 ---
 
@@ -161,11 +222,12 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 3. **Update**: Changing image/env results in a rolling update with no downtime.
 4. **Rollback**: On failed verify, last healthy revision is restored (unless `--no-rollback`).
 5. **Down**: Destroys service and tool‑owned secrets without orphaning provider resources.
-6. **Health Check**: Service responds to `/.well-known/health` endpoint with 200 status.
-7. **API Key**: Generated API key works for admin interface access.
-8. **Environment**: All required environment variables are properly set.
-9. **Idempotency**: Multiple runs of same command produce identical results.
-10. **Error Handling**: Clear error messages with actionable recovery steps.
+6. **Local**: Builds Docker image, generates test secrets, starts Docker Compose, verifies health endpoints, and displays service information.
+7. **Health Check**: Service responds to `/.well-known/health` endpoint with 200 status.
+8. **API Key**: Generated API key works for admin interface access.
+9. **Environment**: All required environment variables are properly set.
+10. **Idempotency**: Multiple runs of same command produce identical results.
+11. **Error Handling**: Clear error messages with actionable recovery steps.
 
 ---
 
@@ -192,11 +254,12 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 - ✅ **Phase 1: Core Infrastructure** - COMPLETED
 - ✅ **Phase 2: Provider Drivers** - COMPLETED
 - ✅ **Phase 3: CLI Commands** - COMPLETED
+- ✅ **Phase 3.5: Local Testing** - COMPLETED
 - 🔄 **Phase 4: Advanced Features** - PENDING
 - 🔄 **Phase 5: Testing & Documentation** - PENDING
 - 🔄 **Phase 6: Production Readiness** - PENDING
 
-**Current Status**: Core deployment functionality is complete and ready for advanced features and production testing.
+**Current Status**: Core deployment functionality and local testing are complete and ready for advanced features and production testing.
 
 ### Phase 1: Core Infrastructure ✅ **COMPLETED**
 
@@ -324,6 +387,54 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Dependencies**: Phase 2 completion
 
 **Status**: ✅ **COMPLETED** - All CLI commands implemented with comprehensive testing
+
+### Phase 3.5: Local Testing ✅ **COMPLETED**
+
+**Goal**: Implement local Docker testing functionality
+
+**Tasks**:
+
+1. **Local Command Implementation** (`src/supervaizer/deploy/commands/local.py`) ✅
+
+   - ✅ Docker availability checking
+   - ✅ Test secret generation (API keys and RSA keys)
+   - ✅ Docker Compose service management
+   - ✅ Health check verification and reporting
+   - ✅ Service information display
+
+2. **Local Testing Features** ✅
+
+   - ✅ Automatic Docker image building with local-test tag
+   - ✅ Environment variable configuration for local testing
+   - ✅ Comprehensive health endpoint testing
+   - ✅ Service logs display for debugging
+   - ✅ Cleanup instructions and resource management
+
+3. **Local Testing Integration** ✅
+
+   - ✅ Integration with existing Docker management system
+   - ✅ Consistent secret generation across local and cloud deployments
+   - ✅ Health check endpoint validation
+   - ✅ Error handling and cleanup on failure
+
+4. **Local Testing Documentation** ✅
+
+   - ✅ Created comprehensive LOCAL_TESTING.md guide
+   - ✅ Added usage examples and troubleshooting
+   - ✅ Documented environment variables and configuration
+   - ✅ Provided cleanup and debugging instructions
+
+5. **Local Testing Validation** ✅
+
+   - ✅ Unit tests for all local testing functions
+   - ✅ Integration tests with Docker Compose
+   - ✅ Health check endpoint testing
+   - ✅ Secret generation and validation testing
+   - ✅ Error handling and cleanup testing
+
+**Dependencies**: Phase 3 completion
+
+**Status**: ✅ **COMPLETED** - Local testing functionality fully implemented with comprehensive testing and documentation
 
 ### Phase 4: Advanced Features
 
@@ -462,7 +573,8 @@ src/supervaizer/deploy/
     ├── plan.py
     ├── up.py
     ├── down.py
-    └── status.py
+    ├── status.py
+    └── local.py            # Local Docker testing
 ```
 
 ## Future Enhancements

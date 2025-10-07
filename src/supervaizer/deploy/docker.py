@@ -37,26 +37,85 @@ class DockerManager:
             log.error(f"Failed to connect to Docker: {e}")
             raise RuntimeError("Docker is not running or not accessible") from e
 
-    def generate_dockerfile(self, output_path: Path) -> None:
+    def generate_dockerfile(self, output_path: Optional[Path] = None) -> None:
         """Generate a Dockerfile for Supervaizer deployment."""
-        dockerfile_content = (TEMPLATE_DIR / "Dockerfile.template").read_text()
+        if output_path is None:
+            output_path = Path(".deployment/Dockerfile")
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read template and customize it
+        template_path = TEMPLATE_DIR / "Dockerfile.template"
+        dockerfile_content = template_path.read_text()
+
+        # Replace template placeholders if any
+        dockerfile_content = dockerfile_content.replace("{{PYTHON_VERSION}}", "3.12")
+        dockerfile_content = dockerfile_content.replace("{{APP_PORT}}", "8000")
+
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
 
-    def generate_dockerignore(self, output_path: Path) -> None:
+    def generate_dockerignore(self, output_path: Optional[Path] = None) -> None:
         """Generate a .dockerignore file."""
-        dockerignore_content = (TEMPLATE_DIR / "dockerignore.template").read_text()
+        if output_path is None:
+            output_path = Path(".deployment/.dockerignore")
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read template
+        template_path = TEMPLATE_DIR / "dockerignore.template"
+        dockerignore_content = template_path.read_text()
+
         output_path.write_text(dockerignore_content)
         log.info(f"Generated .dockerignore at {output_path}")
 
-    def generate_docker_compose(self, output_path: Path) -> None:
+    def generate_docker_compose(
+        self, output_path: Optional[Path] = None, port: int = 8000
+    ) -> None:
         """Generate a docker-compose.yml for local testing."""
-        compose_content = (TEMPLATE_DIR / "docker-compose.yml.template").read_text()
+        if output_path is None:
+            output_path = Path(".deployment/docker-compose.yml")
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read template and customize it
+        template_path = TEMPLATE_DIR / "docker-compose.yml.template"
+        compose_content = template_path.read_text()
+
+        # Replace template placeholders
+        compose_content = compose_content.replace("{{PORT}}", str(port))
+        compose_content = compose_content.replace(
+            "{{SERVICE_NAME}}", "{{ env.SERVICE_NAME | default('supervaizer-dev') }}"
+        )
+        compose_content = compose_content.replace(
+            "{{ENVIRONMENT}}", "{{ env.SUPERVAIZER_ENVIRONMENT | default('dev') }}"
+        )
+        compose_content = compose_content.replace(
+            "{{API_KEY}}", "{{ env.SUPERVAIZER_API_KEY | default('test-api-key') }}"
+        )
+        compose_content = compose_content.replace(
+            "{{RSA_KEY}}", "{{ env.SV_RSA_PRIVATE_KEY | default('test-rsa-key') }}"
+        )
+
         output_path.write_text(compose_content)
         log.info(f"Generated docker-compose.yml at {output_path}")
 
-    def build_image(self, tag: str, context_path: Path, dockerfile_path: Path) -> str:
+    def build_image(
+        self,
+        tag: str,
+        context_path: Optional[Path] = None,
+        dockerfile_path: Optional[Path] = None,
+        verbose: bool = False,
+    ) -> str:
         """Build Docker image and return the image ID."""
+        if context_path is None:
+            context_path = Path(".")
+        if dockerfile_path is None:
+            dockerfile_path = Path(".deployment/Dockerfile")
+
         try:
             log.info(f"Building Docker image with tag: {tag}")
             image, build_logs = self.client.images.build(
@@ -66,6 +125,11 @@ class DockerManager:
                 rm=True,
                 forcerm=True,
             )
+
+            if verbose:
+                for log_line in build_logs:
+                    if "stream" in log_line:
+                        print(log_line["stream"], end="")
 
             log.info(f"Successfully built image: {image.id}")
             return image.id

@@ -17,6 +17,7 @@ from supervaizer.deploy.commands.plan import plan_deployment
 from supervaizer.deploy.commands.up import deploy_up
 from supervaizer.deploy.commands.down import deploy_down
 from supervaizer.deploy.commands.status import deploy_status
+from supervaizer.deploy.commands.local import local_docker
 
 console = Console()
 
@@ -142,3 +143,17 @@ def status(
     """Show deployment status and health information."""
     _check_platform_required(platform, "status")
     deploy_status(platform, name, env, region, project_id, verbose)
+
+
+@deploy_app.command(no_args_is_help=True)
+def local(
+    name: str = name_option,
+    env: str = env_option,
+    port: int = port_option,
+    generate_api_key: bool = generate_api_key_option,
+    generate_rsa: bool = generate_rsa_option,
+    timeout: int = timeout_option,
+    verbose: bool = verbose_option,
+) -> None:
+    """Test deployment locally using Docker Compose."""
+    local_docker(name, env, port, generate_api_key, generate_rsa, timeout, verbose)

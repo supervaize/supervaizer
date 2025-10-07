@@ -13,11 +13,12 @@ All notable changes to this project will be documented in this file.
 
 ### Unit tests results
 
-| Status     | Count |
-| ---------- | ----- |
-| ✅ Passed  | 384   |
-| 🤔 Skipped | 6     |
-| 🔴 Failed  | 0     |
+| Status     | Count  |
+| ---------- | ------ |
+| ✅ Passed  | 405    |
+| 🤔 Skipped | 6      |
+| 🔴 Failed  | 0      |
+| ⏱️ in      | 49.71s |
 
 ## [0.9.8]
 
