@@ -15,9 +15,9 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 350   |
+| ✅ Passed  | 356   |
 | 🤔 Skipped | 6     |
-| 🔴 Failed  | 4     |
+| 🔴 Failed  | 0     |
 
 ## [0.9.8]
 

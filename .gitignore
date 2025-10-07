@@ -249,3 +249,5 @@ uv.lock
 /data/*
 
 .pypirc
+
+.deployment/
