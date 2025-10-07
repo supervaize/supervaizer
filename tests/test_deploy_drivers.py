@@ -16,7 +16,8 @@ from supervaizer.deploy.drivers.base import (
     BaseDriver,
 )
 from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
-from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver
+from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver, ClientError
+
 from supervaizer.deploy.drivers.do_app_platform import DOAppPlatformDriver
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 
@@ -27,6 +28,7 @@ class TestBaseDriver:
     def test_get_service_key(self, mocker: MockerFixture):
         """Test service key generation."""
         driver = mocker.Mock(spec=BaseDriver)
+        driver.region = "us-east-1"  # Add region to mock
         driver.get_service_key = BaseDriver.get_service_key.__get__(driver)
 
         key = driver.get_service_key("test-service", "dev")
@@ -35,6 +37,7 @@ class TestBaseDriver:
     def test_validate_configuration(self, mocker: MockerFixture):
         """Test configuration validation."""
         driver = mocker.Mock(spec=BaseDriver)
+        driver.region = None  # Set region to None to trigger validation error
         driver.validate_configuration = BaseDriver.validate_configuration.__get__(
             driver
         )
@@ -50,6 +53,11 @@ class TestCloudRunDriver:
     @pytest.fixture
     def driver(self, mocker: MockerFixture):
         """Create Cloud Run driver instance."""
+        # Mock the availability of Google Cloud libraries
+        mocker.patch(
+            "supervaizer.deploy.drivers.cloud_run.GOOGLE_CLOUD_AVAILABLE", True
+        )
+
         mocker.patch("supervaizer.deploy.drivers.cloud_run.run_v2.ServicesClient")
         mocker.patch(
             "supervaizer.deploy.drivers.cloud_run.secretmanager.SecretManagerServiceClient"
@@ -72,8 +80,11 @@ class TestCloudRunDriver:
 
     def test_plan_deployment_new_service(self, driver, mocker: MockerFixture):
         """Test planning deployment for new service."""
+        # Import NotFound from the driver module to ensure the correct exception type is used
+        from supervaizer.deploy.drivers.cloud_run import NotFound
+
         mocker.patch.object(
-            driver.run_client, "get_service", side_effect=Exception("Not found")
+            driver.run_client, "get_service", side_effect=NotFound("Not found")
         )
         plan = driver.plan_deployment(
             service_name="test-service",
@@ -109,13 +120,31 @@ class TestCloudRunDriver:
 
     def test_check_prerequisites(self, driver, mocker: MockerFixture):
         """Test prerequisite checking."""
-        mocker.patch(
-            "subprocess.run",
-            return_value=mocker.Mock(stdout="gcloud version", returncode=0),
-        )
+
+        def mock_gcloud_run(*args, **kwargs):
+            command = args[0]
+            if "version" in command:
+                return mocker.Mock(stdout="Google Cloud SDK 450.0.0", returncode=0)
+            if "auth" in command:
+                return mocker.Mock(stdout="test@example.com", returncode=0)
+            if "config" in command:
+                return mocker.Mock(stdout="test-project", returncode=0)
+            if "services" in command and "run.googleapis.com" in command[-1]:
+                return mocker.Mock(stdout="run.googleapis.com", returncode=0)
+            if "services" in command and "secretmanager.googleapis.com" in command[-1]:
+                return mocker.Mock(stdout="secretmanager.googleapis.com", returncode=0)
+            if (
+                "services" in command
+                and "artifactregistry.googleapis.com" in command[-1]
+            ):
+                return mocker.Mock(
+                    stdout="artifactregistry.googleapis.com", returncode=0
+                )
+            return mocker.Mock(stdout="", returncode=1)
+
+        mocker.patch("subprocess.run", side_effect=mock_gcloud_run)
 
         errors = driver.check_prerequisites()
-        # Should have no errors with mocked successful commands
         assert len(errors) == 0
 
 
@@ -125,9 +154,29 @@ class TestAWSAppRunnerDriver:
     @pytest.fixture
     def driver(self, mocker: MockerFixture):
         """Create AWS App Runner driver instance."""
+        # Mock boto3 clients
+        mock_apprunner = mocker.Mock()
+        mock_ecr = mocker.Mock()
+        mock_secrets = mocker.Mock()
+        mock_sts = mocker.Mock()
+
+        # Mock STS get_caller_identity response
+        mock_sts.get_caller_identity.return_value = {"Account": "123456789012"}
+
+        def mock_client(service_name, **kwargs):
+            if service_name == "apprunner":
+                return mock_apprunner
+            elif service_name == "ecr":
+                return mock_ecr
+            elif service_name == "secretsmanager":
+                return mock_secrets
+            elif service_name == "sts":
+                return mock_sts
+            return mocker.Mock()
+
         mocker.patch(
             "supervaizer.deploy.drivers.aws_app_runner.boto3.client",
-            return_value=mocker.Mock(),
+            side_effect=mock_client,
         )
         return AWSAppRunnerDriver("us-east-1", "test-account")
 
@@ -143,10 +192,20 @@ class TestAWSAppRunnerDriver:
 
     def test_plan_deployment_new_service(self, driver, mocker: MockerFixture):
         """Test planning deployment for new service."""
+        # Mock botocore exceptions
+        error_response = {"Error": {"Code": "ResourceNotFoundException"}}
+        mock_exception = ClientError(error_response, "DescribeService")
+
         mocker.patch.object(
             driver.apprunner_client,
             "describe_service",
-            side_effect=Exception("ResourceNotFoundException"),
+            side_effect=mock_exception,
+        )
+        repo_error_response = {"Error": {"Code": "RepositoryNotFoundException"}}
+        mocker.patch.object(
+            driver.ecr_client,
+            "describe_repositories",
+            side_effect=ClientError(repo_error_response, "DescribeRepositories"),
         )
         plan = driver.plan_deployment(
             service_name="test-service",
@@ -170,6 +229,8 @@ class TestDOAppPlatformDriver:
     @pytest.fixture
     def driver(self):
         """Create DO App Platform driver instance."""
+        # This driver uses subprocess, which is generally available.
+        # No complex mocking needed for initialization.
         return DOAppPlatformDriver("nyc3", "test-project")
 
     def test_init(self, driver):
@@ -216,6 +277,11 @@ class TestDriverFactory:
 
     def test_create_cloud_run_driver(self, mocker: MockerFixture):
         """Test creating Cloud Run driver."""
+        # Mock the availability of Google Cloud libraries
+        mocker.patch(
+            "supervaizer.deploy.drivers.cloud_run.GOOGLE_CLOUD_AVAILABLE", True
+        )
+
         mocker.patch("supervaizer.deploy.drivers.cloud_run.run_v2.ServicesClient")
         mocker.patch(
             "supervaizer.deploy.drivers.cloud_run.secretmanager.SecretManagerServiceClient"
