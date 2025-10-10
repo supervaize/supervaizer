@@ -36,7 +36,7 @@ def local_docker(
     timeout: int,
     verbose: bool,
     docker_files_only: bool = False,
-    source_dir: str = "src",
+    source_dir: str = ".",
     controller_file: str = "supervaizer_control.py",
 ) -> None:
     """Test deployment locally using Docker Compose."""
@@ -51,7 +51,7 @@ def local_docker(
 
     # Determine service name
     if name is None:
-        name = Path.cwd().name.lower().replace("_", "-")
+        name = Path(source_dir).name.lower().replace("_", "-")
 
     service_name = f"{name}-{env}"
 

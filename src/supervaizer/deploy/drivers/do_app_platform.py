@@ -306,7 +306,7 @@ class DOAppPlatformDriver(BaseDriver):
         # Check authentication
         try:
             result = subprocess.run(
-                ["doctl", "account", "get", "--format", "json"],
+                ["doctl", "account", "get", "--output", "json"],
                 capture_output=True,
                 text=True,
                 check=True,

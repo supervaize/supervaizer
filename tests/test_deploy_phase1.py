@@ -21,8 +21,8 @@ from supervaizer.deploy.docker import DockerManager, ensure_docker_running, get_
 from supervaizer.deploy.state import (
     DeploymentState,
     StateManager,
-    create_deployment_directory,
 )
+from supervaizer.deploy.utils import create_deployment_directory
 from supervaizer.deploy.commands import (
     plan,
     up,
@@ -185,11 +185,14 @@ class TestStateManager:
 
             # Create initial state
             state = DeploymentState(
+                version=1,
                 service_name="test-service",
                 platform="cloud-run",
                 environment="dev",
                 region="us-central1",
                 image_tag="test:latest",
+                project_id="p1",
+                image_digest="imgdigest",
             )
 
             # Save state

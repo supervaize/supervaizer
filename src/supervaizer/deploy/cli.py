@@ -11,6 +11,7 @@ This module contains the main CLI commands for the deploy subcommand.
 """
 
 import typer
+from pathlib import Path
 from rich.console import Console
 
 from supervaizer.deploy.commands.plan import plan_deployment
@@ -24,7 +25,7 @@ console = Console()
 # Create the deploy subcommand
 deploy_app = typer.Typer(
     name="deploy",
-    help="Deploy Supervaizer agents to cloud platforms",
+    help="Deploy Supervaizer agents to cloud platforms. Python dependencies must be managed in pyproject.toml file.",
     no_args_is_help=True,
 )
 
@@ -58,14 +59,42 @@ timeout_option = typer.Option(300, "--timeout", help="Deployment timeout in seco
 docker_files_only_option = typer.Option(
     False, "--docker-files-only", help="Only generate Docker files without running them"
 )
-source_dir_option = typer.Option(
-    "src", "--source-dir", help="Source directory path (default: src)"
-)
+
 controller_file_option = typer.Option(
     "supervaizer_control.py",
     "--controller-file",
     help="Controller file name (default: supervaizer_control.py)",
 )
+
+
+def _check_pyproject_toml() -> Path:
+    """Check if pyproject.toml exists in current directory or parent directories."""
+    current_dir = Path.cwd()
+
+    # Check current directory first
+    pyproject_path = current_dir / "pyproject.toml"
+    if pyproject_path.exists():
+        return current_dir
+
+    # Check parent directories up to 3 levels
+    for _ in range(3):
+        current_dir = current_dir.parent
+        pyproject_path = current_dir / "pyproject.toml"
+        if pyproject_path.exists():
+            return current_dir
+
+    # If not found, show error and exit
+    console.print("[bold red]Error:[/] pyproject.toml file not found")
+    console.print(
+        "The supervaizer deploy command must be run from a directory containing pyproject.toml"
+    )
+    console.print("or from a subdirectory of such a directory.")
+    console.print("\n[bold]Current directory:[/] " + str(Path.cwd()))
+    console.print("\n[bold]Please ensure:[/]")
+    console.print("  • You are in the correct project directory")
+    console.print("  • The pyproject.toml file exists in the project root")
+    console.print("  • Python dependencies are properly defined in pyproject.toml")
+    raise typer.Exit(1)
 
 
 def _check_platform_required(platform: str, command_name: str) -> None:
@@ -89,7 +118,8 @@ def plan(
 ) -> None:
     """Plan deployment changes without applying them."""
     _check_platform_required(platform, "plan")
-    plan_deployment(platform, name, env, region, project_id, verbose)
+    source_dir = _check_pyproject_toml()
+    plan_deployment(platform, name, env, region, project_id, verbose, source_dir)
 
 
 @deploy_app.command(no_args_is_help=True)
@@ -110,6 +140,7 @@ def up(
 ) -> None:
     """Deploy or update the service."""
     _check_platform_required(platform, "up")
+    source_dir = _check_pyproject_toml()
     deploy_up(
         platform,
         name,
@@ -124,6 +155,7 @@ def up(
         no_rollback,
         timeout,
         verbose,
+        source_dir,
     )
 
 
@@ -139,7 +171,8 @@ def down(
 ) -> None:
     """Destroy the service and cleanup resources."""
     _check_platform_required(platform, "down")
-    deploy_down(platform, name, env, region, project_id, yes, verbose)
+    source_dir = _check_pyproject_toml()
+    deploy_down(platform, name, env, region, project_id, yes, verbose, source_dir)
 
 
 @deploy_app.command(no_args_is_help=True)
@@ -153,7 +186,8 @@ def status(
 ) -> None:
     """Show deployment status and health information."""
     _check_platform_required(platform, "status")
-    deploy_status(platform, name, env, region, project_id, verbose)
+    source_dir = _check_pyproject_toml()
+    deploy_status(platform, name, env, region, project_id, verbose, source_dir)
 
 
 @deploy_app.command(no_args_is_help=True)
@@ -166,10 +200,10 @@ def local(
     timeout: int = timeout_option,
     verbose: bool = verbose_option,
     docker_files_only: bool = docker_files_only_option,
-    source_dir: str = source_dir_option,
     controller_file: str = controller_file_option,
 ) -> None:
     """Test deployment locally using Docker Compose."""
+    source_dir = _check_pyproject_toml()
     local_docker(
         name,
         env,
@@ -179,6 +213,6 @@ def local(
         timeout,
         verbose,
         docker_files_only,
-        source_dir,
+        str(source_dir),
         controller_file,
     )

@@ -31,6 +31,7 @@ def deploy_down(
     project_id: Optional[str] = None,
     yes: bool = False,
     verbose: bool = False,
+    source_dir: Optional[Path] = None,
 ) -> None:
     """Destroy the service and cleanup resources."""
     # Validate platform
@@ -41,7 +42,7 @@ def deploy_down(
 
     # Set defaults
     if not name:
-        name = Path.cwd().name
+        name = (source_dir or Path.cwd()).name
     if not region:
         region = _get_default_region(platform)
 
@@ -54,7 +55,7 @@ def deploy_down(
 
     try:
         # Check local state
-        deployment_dir = Path.cwd() / ".deployment"
+        deployment_dir = (source_dir or Path.cwd()) / ".deployment"
         state_manager = StateManager(deployment_dir)
         state = state_manager.load_state()
 

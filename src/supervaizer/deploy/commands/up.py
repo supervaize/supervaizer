@@ -21,7 +21,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from supervaizer.common import log
 from supervaizer.deploy.docker import DockerManager, get_git_sha, ensure_docker_running
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.state import StateManager, create_deployment_directory
+from supervaizer.deploy.state import StateManager
+from supervaizer.deploy.utils import create_deployment_directory
 
 console = Console()
 
@@ -40,6 +41,7 @@ def deploy_up(
     no_rollback: bool = False,
     timeout: int = 300,
     verbose: bool = False,
+    source_dir: Optional[Path] = None,
 ) -> None:
     """Deploy or update the service."""
     # Validate platform
@@ -50,7 +52,7 @@ def deploy_up(
 
     # Set defaults
     if not name:
-        name = Path.cwd().name
+        name = (source_dir or Path.cwd()).name
     if not region:
         region = _get_default_region(platform)
 
@@ -71,7 +73,7 @@ def deploy_up(
             return
 
         # Create deployment directory
-        deployment_dir = create_deployment_directory(Path.cwd())
+        deployment_dir = create_deployment_directory(source_dir or Path.cwd())
         state_manager = StateManager(deployment_dir)
 
         # Create driver
@@ -120,7 +122,9 @@ def deploy_up(
 
             # Build image
             progress.update(task, description="Building Docker image...")
-            image_id = docker_manager.build_image(image, Path.cwd(), dockerfile_path)
+            image_id = docker_manager.build_image(
+                image, source_dir or Path.cwd(), dockerfile_path
+            )
 
             # Push image (this would be platform-specific)
             progress.update(task, description="Pushing Docker image...")

@@ -30,6 +30,7 @@ def plan_deployment(
     region: Optional[str] = None,
     project_id: Optional[str] = None,
     verbose: bool = False,
+    source_dir: Optional[Path] = None,
 ) -> None:
     """Plan deployment changes without applying them."""
     # Validate platform
@@ -40,7 +41,7 @@ def plan_deployment(
 
     # Set defaults
     if not name:
-        name = Path.cwd().name
+        name = (source_dir or Path.cwd()).name
     if not region:
         region = _get_default_region(platform)
 

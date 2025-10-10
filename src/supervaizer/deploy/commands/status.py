@@ -30,6 +30,7 @@ def deploy_status(
     region: Optional[str] = None,
     project_id: Optional[str] = None,
     verbose: bool = False,
+    source_dir: Optional[Path] = None,
 ) -> None:
     """Show deployment status and health information."""
     # Validate platform
@@ -40,7 +41,7 @@ def deploy_status(
 
     # Set defaults
     if not name:
-        name = Path.cwd().name
+        name = (source_dir or Path.cwd()).name
     if not region:
         region = _get_default_region(platform)
 
@@ -52,7 +53,7 @@ def deploy_status(
 
     try:
         # Check local state first
-        deployment_dir = Path.cwd() / ".deployment"
+        deployment_dir = (source_dir or Path.cwd()) / ".deployment"
         if deployment_dir.exists():
             state_manager = StateManager(deployment_dir)
             state = state_manager.load_state()

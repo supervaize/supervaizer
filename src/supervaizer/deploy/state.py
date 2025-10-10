@@ -45,10 +45,12 @@ class DeploymentState(BaseModel):
 
     # Timestamps
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="Deployment creation time"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Deployment creation time",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="Last update time"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last update time",
     )
 
     # Status
@@ -206,28 +208,3 @@ class StateManager:
             migrated_data["version"] = 2
 
         return migrated_data
-
-
-def create_deployment_directory(project_root: Path) -> Path:
-    """Create deployment directory and add to .gitignore."""
-    deployment_dir = project_root / ".deployment"
-    deployment_dir.mkdir(exist_ok=True)
-
-    # Create logs subdirectory
-    logs_dir = deployment_dir / "logs"
-    logs_dir.mkdir(exist_ok=True)
-
-    # Add to .gitignore if not already present
-    gitignore_path = project_root / ".gitignore"
-    gitignore_entry = ".deployment/"
-
-    if gitignore_path.exists():
-        gitignore_content = gitignore_path.read_text()
-        if gitignore_entry not in gitignore_content:
-            gitignore_path.write_text(gitignore_content + f"\n{gitignore_entry}\n")
-            log.info(f"Added {gitignore_entry} to .gitignore")
-    else:
-        gitignore_path.write_text(f"{gitignore_entry}\n")
-        log.info(f"Created .gitignore with {gitignore_entry}")
-
-    return deployment_dir
