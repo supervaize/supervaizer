@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -e .
 COPY ./ ./src/
 COPY {{CONTROLLER_FILE}} ./
 
+# Set environment variables
+{{ENV_VARS}}
+
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash supervaizer && \
     chown -R supervaizer:supervaizer /app

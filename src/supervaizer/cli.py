@@ -12,6 +12,7 @@ import sys
 from typing import Any
 from pathlib import Path
 from typing import Optional
+from supervaizer.deploy.cli import deploy_app
 
 import typer
 from rich.console import Console
@@ -22,6 +23,11 @@ app = typer.Typer(
     help=f"Supervaizer Controller CLI v{VERSION} - Documentation @ https://doc.supervaize.com/docs/category/supervaizer-controller"
 )
 console = Console()
+
+# Add deploy subcommand
+app.add_typer(
+    deploy_app, name="deploy", help="Deploy Supervaizer agents to cloud platforms"
+)
 
 
 @app.command()

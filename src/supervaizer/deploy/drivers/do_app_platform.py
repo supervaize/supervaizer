@@ -278,17 +278,7 @@ class DOAppPlatformDriver(BaseDriver):
 
     def verify_health(self, service_url: str, timeout: int = 60) -> bool:
         """Verify service health by checking the health endpoint."""
-        import httpx
-
-        health_url = f"{service_url}/.well-known/health"
-
-        try:
-            with httpx.Client(timeout=timeout) as client:
-                response = client.get(health_url)
-                return response.status_code == 200
-        except Exception as e:
-            log.debug(f"Health check failed: {e}")
-            return False
+        return self.verify_health_enhanced(service_url, timeout=timeout)
 
     def check_prerequisites(self) -> List[str]:
         """Check prerequisites and return list of missing requirements."""

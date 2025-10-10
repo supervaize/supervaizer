@@ -19,6 +19,11 @@ from supervaizer.deploy.commands.up import deploy_up
 from supervaizer.deploy.commands.down import deploy_down
 from supervaizer.deploy.commands.status import deploy_status
 from supervaizer.deploy.commands.local import local_docker
+from supervaizer.deploy.commands.clean import (
+    clean_deployment,
+    clean_docker_artifacts,
+    clean_state_only,
+)
 
 console = Console()
 
@@ -64,6 +69,12 @@ controller_file_option = typer.Option(
     "supervaizer_control.py",
     "--controller-file",
     help="Controller file name (default: supervaizer_control.py)",
+)
+
+# Clean command options
+force_option = typer.Option(False, "--force", "-f", help="Skip confirmation prompts")
+verbose_option_clean = typer.Option(
+    False, "--verbose", "-v", help="Show detailed output"
 )
 
 
@@ -113,6 +124,9 @@ def _show_pyproject_toml_help() -> None:
     )
     console.print(
         "  • [bold]supervaizer deploy plan[/] - Plan deployment changes without applying them"
+    )
+    console.print(
+        "  • [bold]supervaizer deploy clean[/] - Clean up deployment artifacts and generated files"
     )
     console.print(
         "\nUse [bold]supervaizer deploy <command> --help[/] for more information about each command."
@@ -246,3 +260,31 @@ def local(
         str(source_dir),
         controller_file,
     )
+
+
+@deploy_app.command(no_args_is_help=True)
+def clean(
+    force: bool = force_option,
+    verbose: bool = verbose_option_clean,
+    docker_only: bool = typer.Option(
+        False, "--docker-only", help="Clean only Docker artifacts"
+    ),
+    state_only: bool = typer.Option(
+        False, "--state-only", help="Clean only deployment state"
+    ),
+) -> None:
+    """Clean up deployment artifacts and generated files."""
+    source_dir = _check_pyproject_toml()
+
+    if docker_only and state_only:
+        console.print(
+            "[bold red]Error:[/] Cannot use both --docker-only and --state-only"
+        )
+        raise typer.Exit(1)
+
+    if docker_only:
+        clean_docker_artifacts(force=force, verbose=verbose)
+    elif state_only:
+        clean_state_only(force=force, verbose=verbose)
+    else:
+        clean_deployment(force=force, verbose=verbose)

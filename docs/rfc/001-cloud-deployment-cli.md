@@ -33,6 +33,7 @@ supervaizer deploy up     [OPTIONS]
 supervaizer deploy down   [OPTIONS]
 supervaizer deploy status [OPTIONS]
 supervaizer deploy local  [OPTIONS]
+supervaizer deploy clean  [OPTIONS]
 ```
 
 ### Common Options
@@ -61,6 +62,7 @@ supervaizer deploy local  [OPTIONS]
 - **down** – Destroy service and **tool-owned** secrets; keep images by default.
 - **status** – Print URL, health state, image digest, revision, and key env vars.
 - **local** – Build → Generate secrets → Start Docker Compose → Verify health → Display service info.
+- **clean** – Remove deployment artifacts, generated files, and state with confirmation prompts.
 
 ### Idempotency
 
@@ -255,11 +257,11 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 - ✅ **Phase 2: Provider Drivers** - COMPLETED
 - ✅ **Phase 3: CLI Commands** - COMPLETED
 - ✅ **Phase 3.5: Local Testing** - COMPLETED
-- 🔄 **Phase 4: Advanced Features** - PENDING
+- ✅ **Phase 4: Advanced Features** - COMPLETED
 - 🔄 **Phase 5: Testing & Documentation** - PENDING
 - 🔄 **Phase 6: Production Readiness** - PENDING
 
-**Current Status**: Core deployment functionality and local testing are complete and ready for advanced features and production testing.
+**Current Status**: All core deployment functionality, local testing, and advanced features are complete. Ready for comprehensive testing and production readiness.
 
 ### Phase 1: Core Infrastructure ✅ **COMPLETED**
 
@@ -436,7 +438,7 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 
 **Status**: ✅ **COMPLETED** - Local testing functionality fully implemented with comprehensive testing and documentation
 
-### Phase 4: Advanced Features
+### Phase 4: Advanced Features ✅ **COMPLETED**
 
 **Goal**: Add advanced deployment features
 
@@ -445,15 +447,29 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 1. **Secret Management** ✅
 
    - ✅ Environment variables setup in docker
+   - ✅ Centralized environment variable management with `get_docker_env_vars()` function
+   - ✅ Factorized environment variable handling in Dockerfile generation
 
-2. **Health Verification**
+2. **Health Verification** ✅
 
-   - Enhanced health check endpoints
-   - Retry logic with exponential backoff
-   - Detailed health reporting
+   - ✅ Enhanced health check endpoints with retry logic and exponential backoff
+   - ✅ Created comprehensive `health.py` utility module with `HealthVerifier` class
+   - ✅ Implemented `HealthCheckConfig` for configurable health check parameters
+   - ✅ Added support for multiple endpoint verification
+   - ✅ Integrated enhanced health verification into all provider drivers
+   - ✅ Added detailed health reporting with response times and error messages
 
-3. **Clean function**
-   - add a `supervaizer deploy clean` command that deletes the .deployment directory - after user confirmation
+3. **Clean Command** ✅
+   - ✅ Implemented `supervaizer deploy clean` command with user confirmation
+   - ✅ Added support for selective cleanup (Docker artifacts only, state only)
+   - ✅ Created comprehensive cleanup functions with detailed output
+   - ✅ Added force mode to skip confirmation prompts
+   - ✅ Implemented verbose mode for detailed cleanup information
+   - ✅ Added proper error handling and recovery guidance
+
+**Dependencies**: Phase 3.5 completion
+
+**Status**: ✅ **COMPLETED** - All advanced features implemented with comprehensive functionality
 
 ### Phase 5: Testing & Documentation
 

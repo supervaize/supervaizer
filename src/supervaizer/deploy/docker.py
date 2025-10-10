@@ -96,11 +96,15 @@ class DockerManager:
             "{{CONTROLLER_FILE}}", controller_file
         )
 
-        # Replace environment variable placeholders
+        # Replace environment variables placeholder
         env_vars = get_docker_env_vars(app_port)
+        env_lines = []
         for var_name, var_value in env_vars.items():
-            placeholder = f"{{{{{var_name}}}}}"
-            dockerfile_content = dockerfile_content.replace(placeholder, var_value)
+            env_lines.append(f"ENV {var_name}={var_value}")
+        env_vars_section = "\n".join(env_lines)
+        dockerfile_content = dockerfile_content.replace(
+            "{{ENV_VARS}}", env_vars_section
+        )
 
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")

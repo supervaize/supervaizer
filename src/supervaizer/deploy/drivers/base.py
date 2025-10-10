@@ -154,6 +154,29 @@ class BaseDriver(ABC):
         """Verify service health by checking the health endpoint."""
         pass
 
+    def verify_health_enhanced(
+        self,
+        service_url: str,
+        api_key: Optional[str] = None,
+        timeout: int = 60,
+        max_retries: int = 5,
+    ) -> bool:
+        """
+        Enhanced health verification with retry logic and exponential backoff.
+
+        Args:
+            service_url: Base URL of the service
+            api_key: Optional API key for authenticated endpoints
+            timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            True if service is healthy, False otherwise
+        """
+        from supervaizer.deploy.health import verify_service_health
+
+        return verify_service_health(service_url, api_key, timeout, max_retries)
+
     @abstractmethod
     def check_prerequisites(self) -> List[str]:
         """Check prerequisites and return list of missing requirements."""
