@@ -75,7 +75,10 @@ def local_docker(
         # Step 3: Generate deployment files
         console.print("\n[bold]Step 3:[/] Generating deployment files...")
         docker_manager = DockerManager(require_docker=False)
-        docker_manager.generate_dockerfile(controller_file=controller_file)
+        docker_manager.generate_dockerfile(
+            controller_file=controller_file,
+            app_port=port,
+        )
         docker_manager.generate_dockerignore()
         docker_manager.generate_docker_compose(
             port=port,

@@ -442,11 +442,9 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 
 **Tasks**:
 
-1. **Secret Management**
+1. **Secret Management** ✅
 
-   - Secure secret generation and storage
-   - Secret rotation support
-   - Cross-environment secret sharing
+   - ✅ Environment variables setup in docker
 
 2. **Health Verification**
 
@@ -454,12 +452,8 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
    - Retry logic with exponential backoff
    - Detailed health reporting
 
-3. **Rollback Support**
-   - Automatic rollback on health check failure
-   - Manual rollback to previous revisions
-   - Rollback validation and testing
-
-**Dependencies**: Phase 3 completion
+3. **Clean function**
+   - add a `supervaizer deploy clean` command that deletes the .deployment directory - after user confirmation
 
 ### Phase 5: Testing & Documentation
 

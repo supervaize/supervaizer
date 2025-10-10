@@ -109,7 +109,10 @@ def deploy_up(
             dockerignore_path = deployment_dir / ".dockerignore"
             compose_path = deployment_dir / "docker-compose.yml"
 
-            docker_manager.generate_dockerfile(output_path=dockerfile_path)
+            docker_manager.generate_dockerfile(
+                output_path=dockerfile_path,
+                app_port=port,
+            )
             docker_manager.generate_dockerignore(dockerignore_path)
             docker_manager.generate_docker_compose(
                 compose_path,

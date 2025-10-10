@@ -10,6 +10,7 @@ Docker Operations
 This module handles Docker-related operations for deployment.
 """
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,35 @@ from supervaizer.common import log
 console = Console()
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+
+# List of environment variables to include in Dockerfile
+DOCKER_ENV_VARS = [
+    "SUPERVAIZE_API_KEY",
+    "SUPERVAIZE_WORKSPACE_ID",
+    "SUPERVAIZE_API_URL",
+    "SUPERVAIZER_PORT",
+    "SUPERVAIZER_PUBLIC_URL",
+]
+
+
+def get_docker_env_vars(port: int = 8000) -> dict[str, str]:
+    """Get environment variables for Docker deployment.
+
+    Args:
+        port: The application port to use for SUPERVAIZER_PORT
+
+    Returns:
+        Dictionary mapping environment variable names to their values
+    """
+    env_vars = {}
+
+    for var_name in DOCKER_ENV_VARS:
+        if var_name == "SUPERVAIZER_PORT":
+            env_vars[var_name] = str(port)
+        else:
+            env_vars[var_name] = os.getenv(var_name, "")
+
+    return env_vars
 
 
 class DockerManager:
@@ -65,6 +95,12 @@ class DockerManager:
         dockerfile_content = dockerfile_content.replace(
             "{{CONTROLLER_FILE}}", controller_file
         )
+
+        # Replace environment variable placeholders
+        env_vars = get_docker_env_vars(app_port)
+        for var_name, var_value in env_vars.items():
+            placeholder = f"{{{{{var_name}}}}}"
+            dockerfile_content = dockerfile_content.replace(placeholder, var_value)
 
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
