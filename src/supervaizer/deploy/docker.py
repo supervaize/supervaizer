@@ -28,21 +28,22 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 class DockerManager:
     """Manages Docker operations for deployment."""
 
-    def __init__(self) -> None:
+    def __init__(self, require_docker: bool = True) -> None:
         """Initialize Docker manager."""
-        try:
-            self.client = DockerClient.from_env()
-            self.client.ping()  # Test connection
-        except DockerException as e:
-            log.error(f"Failed to connect to Docker: {e}")
-            raise RuntimeError("Docker is not running or not accessible") from e
+        self.client = None
+        if require_docker:
+            try:
+                self.client = DockerClient.from_env()
+                self.client.ping()  # Test connection
+            except DockerException as e:
+                log.error(f"Failed to connect to Docker: {e}")
+                raise RuntimeError("Docker is not running or not accessible") from e
 
     def generate_dockerfile(
         self,
         output_path: Optional[Path] = None,
         python_version: str = "3.12",
         app_port: int = 8000,
-        source_dir: str = "src",
         controller_file: str = "supervaizer_control.py",
     ) -> None:
         """Generate a Dockerfile for Supervaizer deployment."""
@@ -61,7 +62,6 @@ class DockerManager:
             "{{PYTHON_VERSION}}", python_version
         )
         dockerfile_content = dockerfile_content.replace("{{APP_PORT}}", str(app_port))
-        dockerfile_content = dockerfile_content.replace("{{SOURCE_DIR}}", source_dir)
         dockerfile_content = dockerfile_content.replace(
             "{{CONTROLLER_FILE}}", controller_file
         )
@@ -125,6 +125,11 @@ class DockerManager:
         verbose: bool = False,
     ) -> str:
         """Build Docker image and return the image ID."""
+        if self.client is None:
+            raise RuntimeError(
+                "Docker client not available. Initialize DockerManager with require_docker=True"
+            )
+
         if context_path is None:
             context_path = Path(".")
         if dockerfile_path is None:
@@ -154,6 +159,11 @@ class DockerManager:
 
     def tag_image(self, source_tag: str, target_tag: str) -> None:
         """Tag a Docker image."""
+        if self.client is None:
+            raise RuntimeError(
+                "Docker client not available. Initialize DockerManager with require_docker=True"
+            )
+
         try:
             image = self.client.images.get(source_tag)
             image.tag(target_tag)
@@ -164,6 +174,11 @@ class DockerManager:
 
     def push_image(self, tag: str) -> None:
         """Push Docker image to registry."""
+        if self.client is None:
+            raise RuntimeError(
+                "Docker client not available. Initialize DockerManager with require_docker=True"
+            )
+
         try:
             log.info(f"Pushing image: {tag}")
             push_logs = self.client.images.push(tag, stream=True, decode=True)
@@ -183,6 +198,11 @@ class DockerManager:
 
     def get_image_digest(self, tag: str) -> Optional[str]:
         """Get the digest of a Docker image."""
+        if self.client is None:
+            raise RuntimeError(
+                "Docker client not available. Initialize DockerManager with require_docker=True"
+            )
+
         try:
             image = self.client.images.get(tag)
             repo_digests = image.attrs.get("RepoDigests", [])

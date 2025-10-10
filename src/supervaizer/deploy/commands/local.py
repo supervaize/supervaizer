@@ -74,10 +74,8 @@ def local_docker(
 
         # Step 3: Generate deployment files
         console.print("\n[bold]Step 3:[/] Generating deployment files...")
-        docker_manager = DockerManager()
-        docker_manager.generate_dockerfile(
-            source_dir=source_dir, controller_file=controller_file
-        )
+        docker_manager = DockerManager(require_docker=False)
+        docker_manager.generate_dockerfile(controller_file=controller_file)
         docker_manager.generate_dockerignore()
         docker_manager.generate_docker_compose(
             port=port,
@@ -102,7 +100,9 @@ def local_docker(
         # Step 4: Build Docker image
         console.print("\n[bold]Step 4:[/] Building Docker image...")
         image_tag = f"{service_name}:local-test"
-        docker_manager.build_image(image_tag, verbose=verbose)
+        # Create a new DockerManager instance that requires Docker for building
+        build_docker_manager = DockerManager(require_docker=True)
+        build_docker_manager.build_image(image_tag, verbose=verbose)
         console.print(f"[green]✓[/] Image built: {image_tag}")
 
         # Step 5: Start services with Docker Compose

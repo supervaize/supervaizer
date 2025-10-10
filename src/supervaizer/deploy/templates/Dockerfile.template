@@ -15,7 +15,7 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 # Copy application code
-COPY {{SOURCE_DIR}}/ ./{{SOURCE_DIR}}/
+COPY ./ ./src/
 COPY {{CONTROLLER_FILE}} ./
 
 # Create non-root user
