@@ -17,17 +17,11 @@ import typer
 from rich.console import Console
 
 from supervaizer.__version__ import VERSION
-from supervaizer.deploy.cli import deploy_app
 
 app = typer.Typer(
     help=f"Supervaizer Controller CLI v{VERSION} - Documentation @ https://doc.supervaize.com/docs/category/supervaizer-controller"
 )
 console = Console()
-
-# Add deploy subcommand
-app.add_typer(
-    deploy_app, name="deploy", help="Deploy Supervaizer agents to cloud platforms"
-)
 
 
 @app.command()

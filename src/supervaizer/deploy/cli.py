@@ -83,7 +83,13 @@ def _check_pyproject_toml() -> Path:
         if pyproject_path.exists():
             return current_dir
 
-    # If not found, show error and exit
+    # If not found, show help and exit
+    _show_pyproject_toml_help()
+    raise typer.Exit(1)
+
+
+def _show_pyproject_toml_help() -> None:
+    """Show help message when pyproject.toml is not found."""
     console.print("[bold red]Error:[/] pyproject.toml file not found")
     console.print(
         "The supervaizer deploy command must be run from a directory containing pyproject.toml"
@@ -94,7 +100,31 @@ def _check_pyproject_toml() -> Path:
     console.print("  • You are in the correct project directory")
     console.print("  • The pyproject.toml file exists in the project root")
     console.print("  • Python dependencies are properly defined in pyproject.toml")
-    raise typer.Exit(1)
+    console.print("\n[bold]Available deploy commands:[/]")
+    console.print(
+        "  • [bold]supervaizer deploy local[/] - Test deployment locally using Docker Compose"
+    )
+    console.print("  • [bold]supervaizer deploy up[/] - Deploy or update the service")
+    console.print(
+        "  • [bold]supervaizer deploy down[/] - Destroy the service and cleanup resources"
+    )
+    console.print(
+        "  • [bold]supervaizer deploy status[/] - Show deployment status and health information"
+    )
+    console.print(
+        "  • [bold]supervaizer deploy plan[/] - Plan deployment changes without applying them"
+    )
+    console.print(
+        "\nUse [bold]supervaizer deploy <command> --help[/] for more information about each command."
+    )
+
+
+@deploy_app.callback()
+def deploy_callback() -> None:
+    """Deploy Supervaizer agents to cloud platforms."""
+    # This callback is called when no subcommand is provided
+    # The no_args_is_help=True will automatically show help
+    pass
 
 
 def _check_platform_required(platform: str, command_name: str) -> None:
