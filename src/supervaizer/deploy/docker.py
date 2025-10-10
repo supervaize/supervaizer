@@ -55,6 +55,29 @@ def get_docker_env_vars(port: int = 8000) -> dict[str, str]:
     return env_vars
 
 
+def get_docker_build_args(port: int = 8000) -> dict[str, str]:
+    """Get build arguments for Docker deployment.
+
+    Args:
+        port: The application port to use for SUPERVAIZER_PORT
+
+    Returns:
+        Dictionary mapping build argument names to their values
+    """
+    build_args = {}
+
+    for var_name in DOCKER_ENV_VARS:
+        if var_name == "SUPERVAIZER_PORT":
+            build_args[var_name] = str(port)
+        else:
+            # Only include build args for variables that are set
+            value = os.getenv(var_name)
+            if value:
+                build_args[var_name] = value
+
+    return build_args
+
+
 class DockerManager:
     """Manages Docker operations for deployment."""
 
@@ -99,8 +122,9 @@ class DockerManager:
         # Replace environment variables placeholder
         env_vars = get_docker_env_vars(app_port)
         env_lines = []
-        for var_name, var_value in env_vars.items():
-            env_lines.append(f"ENV {var_name}={var_value}")
+        for var_name in env_vars.keys():
+            env_lines.append(f"ARG {var_name}")
+            env_lines.append(f"ENV {var_name}=${{{var_name}}}")
         env_vars_section = "\n".join(env_lines)
         dockerfile_content = dockerfile_content.replace(
             "{{ENV_VARS}}", env_vars_section
@@ -108,6 +132,13 @@ class DockerManager:
 
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
+
+        # Copy debug script to deployment directory
+        debug_script_path = output_path.parent / "debug_env.py"
+        debug_template_path = TEMPLATE_DIR / "debug_env.py"
+        if debug_template_path.exists():
+            debug_script_path.write_text(debug_template_path.read_text())
+            log.info(f"Generated debug script at {debug_script_path}")
 
     def generate_dockerignore(self, output_path: Optional[Path] = None) -> None:
         """Generate a .dockerignore file."""
@@ -144,6 +175,9 @@ class DockerManager:
         template_path = TEMPLATE_DIR / "docker-compose.yml.template"
         compose_content = template_path.read_text()
 
+        # Get environment variables for build args
+        env_vars = get_docker_env_vars(port)
+
         # Replace template placeholders with actual values
         compose_content = compose_content.replace("{{PORT}}", str(port))
         compose_content = compose_content.replace("{{SERVICE_NAME}}", service_name)
@@ -152,6 +186,17 @@ class DockerManager:
         compose_content = compose_content.replace("{{RSA_KEY}}", rsa_key)
         compose_content = compose_content.replace(
             "{{ env.SV_LOG_LEVEL | default('INFO') }}", "INFO"
+        )
+
+        # Replace environment variable placeholders for build args
+        compose_content = compose_content.replace(
+            "{{WORKSPACE_ID}}", env_vars.get("SUPERVAIZE_WORKSPACE_ID", "")
+        )
+        compose_content = compose_content.replace(
+            "{{API_URL}}", env_vars.get("SUPERVAIZE_API_URL", "")
+        )
+        compose_content = compose_content.replace(
+            "{{PUBLIC_URL}}", env_vars.get("SUPERVAIZER_PUBLIC_URL", "")
         )
 
         output_path.write_text(compose_content)
@@ -163,6 +208,7 @@ class DockerManager:
         context_path: Optional[Path] = None,
         dockerfile_path: Optional[Path] = None,
         verbose: bool = False,
+        build_args: Optional[dict] = None,
     ) -> str:
         """Build Docker image and return the image ID."""
         if self.client is None:
@@ -183,6 +229,7 @@ class DockerManager:
                 tag=tag,
                 rm=True,
                 forcerm=True,
+                buildargs=build_args,
             )
 
             if verbose:

@@ -394,3 +394,4 @@ def display_health_results(results: Dict[str, HealthCheckResult]) -> None:
         )
 
     console.print(table)
+

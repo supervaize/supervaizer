@@ -68,20 +68,31 @@ The `supervaizer deploy local` command supports the following options:
 - ✅ Creates RSA keys (if requested)
 - ✅ Sets up environment variables
 
-### 4. Docker Operations
+### 4. Environment Variables
+
+The local testing automatically includes environment variables from your host environment:
+
+- **SUPERVAIZE_API_KEY**: Your Supervaize API key
+- **SUPERVAIZE_WORKSPACE_ID**: Your workspace identifier
+- **SUPERVAIZE_API_URL**: Supervaize API endpoint URL
+- **SUPERVAIZER_PUBLIC_URL**: Public URL for your service
+
+These variables are securely passed as build arguments to the Docker image and are not stored in the image layers.
+
+### 5. Docker Operations
 
 - ✅ Builds Docker image with local tag
 - ✅ Starts services using Docker Compose
 - ✅ Waits for service to be ready
 
-### 5. Health Validation
+### 6. Health Validation
 
 - ✅ Tests `/.well-known/health` endpoint
 - ✅ Validates API health endpoint (with API key)
 - ✅ Checks API documentation availability
 - ✅ Measures response times
 
-### 6. Service Information
+### 7. Service Information
 
 - ✅ Displays service URL and port
 - ✅ Shows API documentation links
@@ -156,11 +167,51 @@ ReDoc: http://localhost:8000/redoc
 
 To stop the test services:
 docker-compose -f .deployment/docker-compose.yml down
+
+To debug environment variables:
+docker-compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
+
+To clean up all deployment files:
+supervaizer deploy clean
 ```
 
 ## Troubleshooting
 
 ### Common Issues
+
+#### Environment Variable Issues
+
+```
+❌ ValidationError: workspace_id, api_key, api_url are None
+```
+
+**Solution**: Check if environment variables are properly set:
+
+1. **Debug environment variables**:
+
+   ```bash
+   docker-compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
+   ```
+
+2. **Set required environment variables**:
+
+   ```bash
+   export SUPERVAIZE_API_KEY="your-api-key"
+   export SUPERVAIZE_WORKSPACE_ID="your-workspace-id"
+   export SUPERVAIZE_API_URL="https://api.supervaize.com"
+   export SUPERVAIZER_PUBLIC_URL="https://your-app.com"
+   ```
+
+3. **Regenerate deployment files**:
+
+   ```bash
+   supervaizer deploy local --docker-files-only
+   ```
+
+4. **Check generated docker-compose.yml**:
+   ```bash
+   cat .deployment/docker-compose.yml
+   ```
 
 #### Docker Not Available
 

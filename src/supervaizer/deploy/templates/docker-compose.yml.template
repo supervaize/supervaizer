@@ -3,6 +3,12 @@ services:
     build:
       context: ..
       dockerfile: .deployment/Dockerfile
+      args:
+        - SUPERVAIZE_API_KEY={{API_KEY}}
+        - SUPERVAIZE_WORKSPACE_ID={{WORKSPACE_ID}}
+        - SUPERVAIZE_API_URL={{API_URL}}
+        - SUPERVAIZER_PORT=8000
+        - SUPERVAIZER_PUBLIC_URL={{PUBLIC_URL}}
     ports:
       - "{{PORT}}:8000"
     environment:
@@ -12,6 +18,10 @@ services:
       - SV_LOG_LEVEL={{ env.SV_LOG_LEVEL | default('INFO') }}
       - SUPERVAIZER_API_KEY={{API_KEY}}
       - SV_RSA_PRIVATE_KEY={{RSA_KEY}}
+      - SUPERVAIZE_API_KEY={{API_KEY}}
+      - SUPERVAIZE_WORKSPACE_ID={{WORKSPACE_ID}}
+      - SUPERVAIZE_API_URL={{API_URL}}
+      - SUPERVAIZER_PUBLIC_URL={{PUBLIC_URL}}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/.well-known/health"]
       interval: 30s

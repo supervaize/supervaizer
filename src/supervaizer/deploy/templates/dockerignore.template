@@ -54,6 +54,7 @@ test_*
 
 # Deployment artifacts
 .deployment/
+!.deployment/debug_env.py
 
 # Logs
 *.log

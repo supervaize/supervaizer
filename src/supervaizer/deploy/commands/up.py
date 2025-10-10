@@ -125,8 +125,14 @@ def deploy_up(
 
             # Build image
             progress.update(task, description="Building Docker image...")
+
+            # Get build arguments for environment variables
+            from supervaizer.deploy.docker import get_docker_build_args
+
+            build_args = get_docker_build_args(port)
+
             image_id = docker_manager.build_image(
-                image, source_dir or Path.cwd(), dockerfile_path
+                image, source_dir or Path.cwd(), dockerfile_path, build_args=build_args
             )
 
             # Push image (this would be platform-specific)

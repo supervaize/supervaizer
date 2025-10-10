@@ -98,6 +98,18 @@ def local_docker(
             console.print("  • .deployment/docker-compose.yml")
             console.print("\n[bold]To start the services:[/]")
             console.print("[dim]docker-compose -f .deployment/docker-compose.yml up[/]")
+            console.print("\n[bold]To debug environment variables:[/]")
+            console.print(
+                f"[dim]docker-compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
+            )
+            console.print(
+                "\n[bold]Note:[/] Environment variables are automatically included from your host environment."
+            )
+            console.print("Make sure to set the following variables if needed:")
+            console.print("  • SUPERVAIZE_API_KEY")
+            console.print("  • SUPERVAIZE_WORKSPACE_ID")
+            console.print("  • SUPERVAIZE_API_URL")
+            console.print("  • SUPERVAIZER_PUBLIC_URL")
             return
 
         # Step 4: Build Docker image
@@ -105,7 +117,15 @@ def local_docker(
         image_tag = f"{service_name}:local-test"
         # Create a new DockerManager instance that requires Docker for building
         build_docker_manager = DockerManager(require_docker=True)
-        build_docker_manager.build_image(image_tag, verbose=verbose)
+
+        # Get build arguments for environment variables
+        from supervaizer.deploy.docker import get_docker_build_args
+
+        build_args = get_docker_build_args(port)
+
+        build_docker_manager.build_image(
+            image_tag, verbose=verbose, build_args=build_args
+        )
         console.print(f"[green]✓[/] Image built: {image_tag}")
 
         # Step 5: Start services with Docker Compose
@@ -145,6 +165,12 @@ def local_docker(
         # Always show cleanup instructions
         console.print("\n[bold]To stop the test services:[/]")
         console.print("[dim]docker-compose -f .deployment/docker-compose.yml down[/]")
+        console.print("\n[bold]To debug environment variables:[/]")
+        console.print(
+            f"[dim]docker-compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
+        )
+        console.print("\n[bold]To clean up all deployment files:[/]")
+        console.print("[dim]supervaizer deploy clean[/]")
 
 
 def _check_docker_available() -> bool:
