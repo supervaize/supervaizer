@@ -1,29 +1,36 @@
 # Supervaizer Deployment Dockerfile
-FROM python:{{PYTHON_VERSION}}-slim
+FROM ghcr.io/astral-sh/uv:python{{PYTHON_VERSION}}-bookworm AS base
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy only files that affect dependency resolution
+COPY pyproject.toml ./
+# Sync dependencies (uv sync will resolve and install dependencies)
+RUN uv --version &&python --version
+RUN uv sync --no-dev --no-install-project
+# COPY {{CONTROLLER_FILE}} ./
 
 
-# Copy application code
-COPY {{CONTROLLER_FILE}}./ ./
-RUN pip install --no-cache-dir -e .
 
+# Copy entrypoint script
+COPY .deployment/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-COPY .deployment/debug_env.py ./debug_env.py
+# Now bring in the rest of the source (maximizes cache hits for deps)
+COPY . .
 
+# COPY .deployment/debug_env.py ./debug_env.py
 # Set environment variables
 {{ENV_VARS}}
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash supervaizer && \
-    chown -R supervaizer:supervaizer /app
+    chown -R supervaizer:supervaizer /app && \
+    chown supervaizer:supervaizer /entrypoint.sh
 USER supervaizer
 
 # Expose port
@@ -33,5 +40,6 @@ EXPOSE {{APP_PORT}}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:{{APP_PORT}}/.well-known/health || exit 1
 
-# Run the application
-CMD ["supervaizer", "start"]
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+

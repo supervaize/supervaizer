@@ -41,7 +41,13 @@ platform_option = typer.Option(
     "-p",
     help="Target platform (cloud-run|aws-app-runner|do-app-platform)",
 )
-name_option = typer.Option(None, "--name", "-n", help="Service name")
+name_option = typer.Option(
+    ...,
+    "--name",
+    "-n",
+    help="Service name. Required for local command.",
+    prompt="Service name (e.g. my-service)",
+)
 env_option = typer.Option("dev", "--env", "-e", help="Environment (dev|staging|prod)")
 region_option = typer.Option(None, "--region", "-r", help="Provider region")
 project_id_option = typer.Option(
@@ -234,7 +240,7 @@ def status(
     deploy_status(platform, name, env, region, project_id, verbose, source_dir)
 
 
-@deploy_app.command(no_args_is_help=True)
+@deploy_app.command()
 def local(
     name: str = name_option,
     env: str = env_option,
@@ -246,7 +252,7 @@ def local(
     docker_files_only: bool = docker_files_only_option,
     controller_file: str = controller_file_option,
 ) -> None:
-    """Test deployment locally using Docker Compose."""
+    """Test deployment locally using Docker Compose. Requires --name."""
     source_dir = _check_pyproject_toml()
     local_docker(
         name,
@@ -262,7 +268,7 @@ def local(
     )
 
 
-@deploy_app.command(no_args_is_help=True)
+@deploy_app.command()
 def clean(
     force: bool = force_option,
     verbose: bool = verbose_option_clean,

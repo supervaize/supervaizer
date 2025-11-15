@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 -🏹 Start implementation of [RFC001 - cloud-deployment-cli](docs/rfc/001-cloud-deployment-cli.md)
 -🛣️ Updated pyproject.toml dependency versions
+-🏹 `version_check` Check latest version of supervaizer
 
 ### Unit tests results
 

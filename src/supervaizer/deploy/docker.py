@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from docker import DockerClient
-from docker.errors import DockerException
+from docker.errors import APIError, BuildError, DockerException
 from rich.console import Console
 
 from supervaizer.common import log
@@ -133,6 +133,15 @@ class DockerManager:
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
 
+        # Copy entrypoint script to deployment directory
+        entrypoint_script_path = output_path.parent / "entrypoint.sh"
+        entrypoint_template_path = TEMPLATE_DIR / "entrypoint.sh"
+        if entrypoint_template_path.exists():
+            entrypoint_script_path.write_text(entrypoint_template_path.read_text())
+            # Make it executable
+            entrypoint_script_path.chmod(0o755)
+            log.info(f"Generated entrypoint script at {entrypoint_script_path}")
+
         # Copy debug script to deployment directory
         debug_script_path = output_path.parent / "debug_env.py"
         debug_template_path = TEMPLATE_DIR / "debug_env.py"
@@ -223,23 +232,64 @@ class DockerManager:
 
         try:
             log.info(f"Building Docker image with tag: {tag}")
-            image, build_logs = self.client.images.build(
-                path=str(context_path),
-                dockerfile=str(dockerfile_path),
-                tag=tag,
-                rm=True,
-                forcerm=True,
-                buildargs=build_args,
-            )
 
-            if verbose:
-                for log_line in build_logs:
-                    if "stream" in log_line:
-                        print(log_line["stream"], end="")
+            # Use low-level API to get logs even when build fails
+            # Access the low-level API through the existing client
+            build_kwargs = {
+                "path": str(context_path),
+                "dockerfile": str(dockerfile_path),
+                "tag": tag,
+                "rm": True,
+                "forcerm": True,
+                "buildargs": build_args or {},
+                "decode": True,
+            }
 
-            log.info(f"Successfully built image: {image.id}")
-            return image.id
+            response = [line for line in self.client.api.build(**build_kwargs)]
 
+            if not response:
+                raise RuntimeError("Failed to get a response from docker client")
+
+            # Process and display logs (always show output, especially errors)
+            image_id = None
+            last_error = None
+            for result in response:
+                if isinstance(result, dict):
+                    # Check for errors first
+                    if "error" in result or "errorDetail" in result:
+                        error_msg = result.get("error") or result.get(
+                            "errorDetail", {}
+                        ).get("message", "Unknown error")
+                        last_error = error_msg
+
+                    for key, value in result.items():
+                        if isinstance(value, str):
+                            # Always print string values (logs, errors, etc.)
+                            print(value, end="", flush=True)
+                        elif key == "aux" and isinstance(value, dict):
+                            # Extract image ID from aux data
+                            image_id = value.get("ID")
+
+            # If we found an error, raise it
+            if last_error:
+                raise RuntimeError(f"Docker build failed: {last_error}")
+
+            # If we didn't get image ID from aux, try to get it from the tag
+            if image_id is None:
+                try:
+                    image = self.client.images.get(tag)
+                    image_id = image.id
+                except DockerException:
+                    raise RuntimeError(
+                        "Docker build completed but no image was returned"
+                    )
+
+            log.info(f"Successfully built image: {image_id}")
+            return image_id
+
+        except (BuildError, APIError) as e:
+            log.error(f"Failed to build Docker image: {e}")
+            raise RuntimeError(f"Docker build failed: {e}") from e
         except DockerException as e:
             log.error(f"Failed to build Docker image: {e}")
             raise RuntimeError(f"Docker build failed: {e}") from e

@@ -28,7 +28,7 @@ console = Console()
 
 
 def local_docker(
-    name: Optional[str],
+    name: str,
     env: str,
     port: int,
     generate_api_key: bool,
@@ -130,7 +130,9 @@ def local_docker(
 
         # Step 5: Start services with Docker Compose
         console.print("\n[bold]Step 5:[/] Starting services...")
-        _start_docker_compose(service_name, port, secrets, verbose)
+        _start_docker_compose(
+            service_name=service_name, port=port, secrets=secrets, verbose=verbose
+        )
         console.print("[green]✓[/] Services started")
 
         # Step 6: Wait for service to be ready
@@ -219,7 +221,7 @@ def _generate_test_secrets(generate_api_key: bool, generate_rsa: bool) -> dict:
 
 
 def _start_docker_compose(
-    service_name: str, port: int, secrets: dict, verbose: bool
+    service_name: str, port: int, secrets: dict, verbose: bool = False
 ) -> None:
     """Start services using Docker Compose."""
     compose_file = Path(".deployment/docker-compose.yml")
@@ -241,13 +243,22 @@ def _start_docker_compose(
     })
 
     cmd = ["docker-compose", "-f", str(compose_file), "up", "-d"]
-    if verbose:
-        cmd.append("--verbose")
 
-    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if verbose:
+        # When verbose, capture output to display it
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        # Display the captured output
+        if result.stdout:
+            console.print(result.stdout)
+        if result.stderr:
+            console.print(f"[yellow]Stderr:[/] {result.stderr}")
+    else:
+        # When not verbose, capture output silently
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
 
     if result.returncode != 0:
-        raise RuntimeError(f"Failed to start Docker Compose: {result.stderr}")
+        error_msg = result.stderr if result.stderr else "Unknown error"
+        raise RuntimeError(f"Failed to start Docker Compose: {error_msg}")
 
 
 def _wait_for_service(url: str, timeout: int) -> bool:
@@ -378,13 +389,15 @@ def _show_service_logs(service_name: str) -> None:
     """Show service logs for debugging."""
     console.print("\n[bold]Service Logs:[/]")
     try:
+        # Try docker-compose logs first
         result = subprocess.run(
             [
                 "docker-compose",
                 "-f",
                 ".deployment/docker-compose.yml",
                 "logs",
-                "--tail=50",
+                "--tail=100",
+                service_name,
             ],
             capture_output=True,
             text=True,
@@ -392,7 +405,41 @@ def _show_service_logs(service_name: str) -> None:
         if result.stdout:
             console.print(result.stdout)
         if result.stderr:
-            console.print(f"[red]Errors:[/] {result.stderr}")
+            console.print(f"[yellow]Stderr:[/] {result.stderr}")
+
+        # Also try direct docker logs as fallback
+        if not result.stdout:
+            console.print("\n[bold]Trying direct docker logs:[/]")
+            docker_logs = subprocess.run(
+                [
+                    "docker",
+                    "logs",
+                    f"deployment-{service_name}-1",
+                    "--tail=100",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if docker_logs.stdout:
+                console.print(docker_logs.stdout)
+            if docker_logs.stderr:
+                console.print(f"[yellow]Stderr:[/] {docker_logs.stderr}")
+
+        # Also try to get container status
+        console.print("\n[bold]Container Status:[/]")
+        status_result = subprocess.run(
+            [
+                "docker-compose",
+                "-f",
+                ".deployment/docker-compose.yml",
+                "ps",
+                "-a",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if status_result.stdout:
+            console.print(status_result.stdout)
     except Exception as e:
         console.print(f"[red]Failed to get logs:[/] {e}")
 
