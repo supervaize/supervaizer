@@ -8,7 +8,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
@@ -242,8 +242,8 @@ class AbstractJob(SvBaseModel):
     responses: list["JobResponse"] = []
     finished_at: datetime | None = None
     created_at: datetime | None = None
-    agent_parameters: List[dict[str, Any]] | None = None
-    case_ids: List[str] = []  # Foreign key relationship to cases
+    agent_parameters: list[dict[str, Any]] | None = None
+    case_ids: list[str] = []  # Foreign key relationship to cases
 
 
 class Job(AbstractJob):
@@ -344,7 +344,7 @@ class Job(AbstractJob):
         cls,
         job_context: "JobContext",
         agent_name: str,
-        agent_parameters: Optional[List[dict[str, Any]]] = None,
+        agent_parameters: Optional[list[dict[str, Any]]] = None,
         name: Optional[str] = None,
     ) -> "Job":
         """Create a new job
@@ -352,7 +352,7 @@ class Job(AbstractJob):
         Args:
             job_context (JobContext): The context of the job
             agent_name (str): The name of the agent
-            agent_parameters (dict[str, Any] | None): Optional parameters for the job
+            agent_parameters (list[dict[str, Any]] | None): Optional parameters for the job
             name (str | None): Optional name for the job, defaults to mission name if not provided
 
         Returns:
@@ -361,6 +361,19 @@ class Job(AbstractJob):
         job_id = job_context.job_id or str(uuid.uuid4())
         # Use provided name or fallback to mission name from context
         job_name = name or job_context.mission_name
+
+        # Ensure agent_parameters is a list of dicts, not nested incorrectly
+        if agent_parameters is not None:
+            # If it's a list but the first element is also a list, unwrap it
+            if isinstance(agent_parameters, list) and len(agent_parameters) > 0:
+                if isinstance(agent_parameters[0], list):
+                    # Unwrap nested list: [[{...}, {...}]] -> [{...}, {...}]
+                    agent_parameters = agent_parameters[0]
+            # Ensure all elements are dicts
+            if not all(isinstance(p, dict) for p in agent_parameters):
+                raise ValueError(
+                    f"agent_parameters must be a list of dictionaries, got: {type(agent_parameters)}"
+                )
 
         job = cls(
             id=job_id,
