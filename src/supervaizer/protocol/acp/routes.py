@@ -68,7 +68,7 @@ def create_routes(server: "Server") -> APIRouter:
     @handle_route_errors()
     async def get_acp_health() -> Dict[str, Any]:
         """Get health information for the server and all agents."""
-        log.info("[ACP] GET /agents/health [Health status]")
+        # log.info("[ACP] GET /agents/health [Health status]")
         return create_health_data(server.agents)
 
     return router
