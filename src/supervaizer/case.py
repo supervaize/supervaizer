@@ -99,12 +99,16 @@ class CaseNodeUpdate(SvBaseModel):
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case node update"""
+        # Serialize payload to convert type objects to strings for JSON serialization
+        serialized_payload = (
+            self.serialize_value(self.payload) if self.payload else None
+        )
         return {
             "index": self.index,
             "name": self.name,
             "error": self.error,
             "cost": self.cost,
-            "payload": self.payload,
+            "payload": serialized_payload,
             "is_final": self.is_final,
         }
 
@@ -137,12 +141,29 @@ class CaseNode(SvBaseModel):
         """Make it callable directly."""
         return self.factory(*args, **kwargs)
 
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case node"""
+        return {
+            "name": self.name,
+            "type": self.type.value,
+            "description": self.description,
+            "can_be_confirmed": self.can_be_confirmed,
+        }
+
 
 class CaseNodes(SvBaseModel):
     nodes: List[CaseNode] = []
 
     def get(self, name: str) -> CaseNode | None:
         return next((node for node in self.nodes if node.name == name), None)
+
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case nodes"""
+        return {
+            "nodes": [node.registration_info for node in self.nodes],
+        }
 
 
 class CaseAbstractModel(SvBaseModel):

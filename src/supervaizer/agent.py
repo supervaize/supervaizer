@@ -425,6 +425,7 @@ class AgentMethod(AgentMethodAbstract):
             "params": self.params,
             "fields": self.fields_definitions,
             "description": self.description,
+            "nodes": self.nodes.registration_info if self.nodes else None,
         }
 
 
