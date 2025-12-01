@@ -215,11 +215,28 @@ class Case(CaseAbstractModel):
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
-    def receive_human_input(self, **kwargs: Any) -> None:
+    def receive_human_input(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
         # Transition from AWAITING to IN_PROGRESS
         from supervaizer.storage import PersistentEntityLifecycle
 
         PersistentEntityLifecycle.handle_event(self, EntityEvents.INPUT_RECEIVED)
+
+
+        updateCaseNode.index = len(self.updates) + 1
+        self.update(updateCaseNode)
+        # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
+        # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE
+
+        log.debug(
+            f"[Receive human input] CaseRef {self.case_ref} with update {updateCaseNode} & kwargs {kwargs}"
+        )
+        # execute the human_answer method
+        # agent.methods.human_answer(self, updateCaseNode, **kwargs)
+
+        # We need to make sure that the job and case id are correctly received along the human input. 
+        
+        
+
 
     def close(
         self,

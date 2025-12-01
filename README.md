@@ -17,6 +17,7 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
     - [3. Scaffold the controller](#3-scaffold-the-controller)
     - [(Optional) 4. Configure your Supervaize account \& environment](#optional-4-configure-your-supervaize-account--environment)
     - [5. Start the server 🚀](#5-start-the-server-)
+    - [6. Optional parameters](#6-optional-parameters)
     - [What's next?](#whats-next)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
@@ -109,6 +110,16 @@ Once the server is running, you'll have:
 - **API docs**: `http://127.0.0.1:8000/docs` (Swagger) and `/redoc`
 - **A2A discovery**: `/.well-known/agents.json`
 - **ACP discovery**: `/agents`
+
+### 6. Optional parameters
+
+Configure retry behavior for HTTP requests to the Supervaize API:
+
+- **`SUPERVAIZE_HTTP_MAX_RETRIES`**: Number of retry attempts for failed HTTP requests (default: `2`). The client will automatically retry requests that fail with status codes 429, 500, 502, 503, or 504.
+
+```bash
+export SUPERVAIZE_MAX_HTTP_RETRIES=3  # Will attempt up to 4 times total (1 original + 3 retries)
+```
 
 ### What's next?
 

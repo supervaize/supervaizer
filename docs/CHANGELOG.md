@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 -🛣️ Updated pyproject.toml dependency versions
 -🏹 `version_check` Check latest version of supervaizer
 
+- AgentMethodsAbstract:  job_stop & job_status : optional. Added "human_answer".
+
 ### Unit tests results
 
 | Status     | Count  |

@@ -264,6 +264,9 @@ def create_default_routes(server: "Server") -> APIRouter:
         # Transition the case from AWAITING to IN_PROGRESS
         case.receive_human_input()
 
+        # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
+        # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE
+
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
         )
@@ -703,7 +706,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         agent: Agent = Depends(get_agent),
     ) -> AgentResponse:
         log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
-        result = agent.job_stop(params.get("job_context", {}))
+        # Pass job_context as 'context' parameter to match agent method expectations
+        job_context = params.get("job_context", {})
+        result = agent.job_stop({"context": job_context})
         res_info = result.registration_info if result else {}
         return AgentResponse(
             name=agent.name,

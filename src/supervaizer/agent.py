@@ -440,8 +440,9 @@ class AgentCustomMethodParams(AgentMethodParams):
 
 class AgentMethodsAbstract(BaseModel):
     job_start: AgentMethod
-    job_stop: AgentMethod
-    job_status: AgentMethod
+    job_stop: AgentMethod | None = None
+    job_status: AgentMethod | None = None
+    human_answer: AgentMethod | None = None
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
 
@@ -476,8 +477,9 @@ class AgentMethods(AgentMethodsAbstract):
     def registration_info(self) -> Dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
-            "job_stop": self.job_stop.registration_info,
-            "job_status": self.job_status.registration_info,
+            "job_stop": self.job_stop.registration_info if self.job_stop else None,
+            "job_status": self.job_status.registration_info if self.job_status else None,
+            "human_answer": self.human_answer.registration_info if self.human_answer else None,
             "chat": self.chat.registration_info if self.chat else None,
             "custom": {
                 name: method.registration_info
