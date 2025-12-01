@@ -28,6 +28,7 @@ from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
+from supervaizer.case import CaseNodes
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -209,6 +210,11 @@ class AgentMethodAbstract(BaseModel):
             "description": "Start the collection of new competitor summary",
         },
     }
+
+    nodes: CaseNodes | None = Field(
+        default=None,
+        description="The definition of the Case Nodes (=steps) for this method",
+    )
 
 
 class AgentMethod(AgentMethodAbstract):
@@ -478,8 +484,12 @@ class AgentMethods(AgentMethodsAbstract):
         return {
             "job_start": self.job_start.registration_info,
             "job_stop": self.job_stop.registration_info if self.job_stop else None,
-            "job_status": self.job_status.registration_info if self.job_status else None,
-            "human_answer": self.human_answer.registration_info if self.human_answer else None,
+            "job_status": self.job_status.registration_info
+            if self.job_status
+            else None,
+            "human_answer": self.human_answer.registration_info
+            if self.human_answer
+            else None,
             "chat": self.chat.registration_info if self.chat else None,
             "custom": {
                 name: method.registration_info

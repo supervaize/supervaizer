@@ -13,7 +13,7 @@ from pydantic import Field
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
 from supervaizer.telemetry import Telemetry
-from rich import inspect
+
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
     from supervaizer.case import Case, CaseNodeUpdate
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from supervaizer.job import Job
     from supervaizer.server import Server
 from supervaizer.common import log
+
 
 class AccountAbstract(SvBaseModel):
     """
@@ -271,8 +272,6 @@ class Account(AccountAbstract):
         log.debug(f"[send_update_case] CaseRef {case} with update {update}")
         log.debug(f"[send_update_case] {type(case)}")
         log.debug(f"[send_update_case] {type(update)}")
-        inspect(case)
-        inspect(update)
         from supervaizer.event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)

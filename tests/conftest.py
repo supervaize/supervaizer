@@ -21,7 +21,10 @@ from supervaizer import (
     AgentMethod,
     AgentMethods,
     Case,
+    CaseNode,
+    CaseNodeType,
     CaseNodeUpdate,
+    CaseNodes,
     EntityStatus,
     Event,
     EventType,
@@ -194,6 +197,149 @@ def case_node_update_fixture() -> Annotated[CaseNodeUpdate, "fixture"]:
         payload={"test": "value"},
         is_final=True,
         cost=10.0,
+    )
+
+
+@pytest.fixture
+def case_node_confirm_call() -> Annotated[CaseNode, "fixture"]:
+    """Fixture based on step0 from call_agent.py example."""
+    return CaseNode(
+        name="confirm_call",
+        type=CaseNodeType.VALIDATION,
+        factory=lambda phone_number: CaseNodeUpdate(
+            name=f"Confirm call {phone_number}",
+            cost=0.0,
+            is_final=False,
+            payload={
+                "supervaizer_form": {
+                    "question": f"Do you really want to place a call to {phone_number}",
+                    "answer": {
+                        "fields": [
+                            {
+                                "name": "Place the call",
+                                "description": "Place the call",
+                                "type": bool,
+                                "field_type": "BooleanField",
+                                "required": False,
+                            },
+                            {
+                                "name": "Skip",
+                                "description": "Skip this call and mark as failed",
+                                "type": bool,
+                                "field_type": "BooleanField",
+                                "required": False,
+                            },
+                        ],
+                    },
+                }
+            },
+        ),
+        description="Confirm call before placing it",
+    )
+
+
+@pytest.fixture
+def case_node_start_call() -> Annotated[CaseNode, "fixture"]:
+    """Fixture based on step_start_call from call_agent.py example."""
+    return CaseNode(
+        name="start_call",
+        type=CaseNodeType.TRIGGER,
+        can_be_confirmed=True,
+        factory=lambda attempt, call_id: CaseNodeUpdate(
+            name=f"📞 Starting Outgoing Call (Try #{attempt})",
+            cost=0.0,
+            is_final=False,
+            payload={
+                "attempt": attempt,
+                "call_id": call_id,
+            },
+        ),
+        description="Start the call",
+    )
+
+
+@pytest.fixture
+def case_node_update_call_status() -> Annotated[CaseNode, "fixture"]:
+    """Fixture based on step_update_call_status from call_agent.py example."""
+    return CaseNode(
+        name="update_call_status",
+        type=CaseNodeType.INFO,
+        factory=lambda attempt, call_status: CaseNodeUpdate(
+            name=f"📞 Call Status (Try #{attempt})",
+            cost=0.0,
+            payload={
+                "call_status": call_status,
+            },
+            is_final=False,
+        ),
+        description="Update call status",
+    )
+
+
+@pytest.fixture
+def case_node_update_call_completed() -> Annotated[CaseNode, "fixture"]:
+    """Fixture based on step_update_call_completed from call_agent.py example."""
+    return CaseNode(
+        name="update_call_completed",
+        type=CaseNodeType.DELIVERY,
+        factory=lambda call,
+        call_status,
+        duration_seconds,
+        extracted_values,
+        metadata: CaseNodeUpdate(
+            name="✅ Call Completed Successfully",
+            cost=getattr(call, "cost", 0.0),
+            payload={
+                "call_id": getattr(call, "call_id", None),
+                "call_status": call_status,
+                "duration_seconds": duration_seconds,
+                "extracted_values": extracted_values,
+                "metadata": metadata,
+            },
+            is_final=False,
+        ),
+        description="Call completed successfully",
+    )
+
+
+@pytest.fixture
+def case_node_update_call_failed() -> Annotated[CaseNode, "fixture"]:
+    """Fixture based on step_update_call_failed from call_agent.py example."""
+    return CaseNode(
+        name="update_call_failed",
+        type=CaseNodeType.ERROR,
+        factory=lambda call, attempt, error: CaseNodeUpdate(
+            name=f"❌ Call Failed (Try #{attempt})",
+            cost=getattr(call, "cost", 0.0),
+            error=str(error),
+            payload={
+                "status": "failed",
+                "attempt": attempt,
+                "error": str(error),
+            },
+            is_final=False,
+        ),
+        description="Call failed",
+    )
+
+
+@pytest.fixture
+def case_nodes_all_steps(
+    case_node_confirm_call: CaseNode,
+    case_node_start_call: CaseNode,
+    case_node_update_call_status: CaseNode,
+    case_node_update_call_completed: CaseNode,
+    case_node_update_call_failed: CaseNode,
+) -> Annotated[CaseNodes, "fixture"]:
+    """Fixture based on all_steps_start_method from call_agent.py example."""
+    return CaseNodes(
+        nodes=[
+            case_node_confirm_call,
+            case_node_start_call,
+            case_node_update_call_status,
+            case_node_update_call_completed,
+            case_node_update_call_failed,
+        ]
     )
 
 

@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
 from pydantic import ConfigDict
-from typing_extensions import deprecated
-
+from typing import Callable
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
@@ -55,7 +54,6 @@ class CaseNodeUpdate(SvBaseModel):
             payload (Dict[str, Any]): Additional data for the update - when a question is requested to the user, the payload is the question
             is_final (bool): Whether this is the final update. Default to False
             index (int): Index of the node to update. This is set by Case.update()
-
             error (Optional[str]): Error message if any. Default to None
 
         When payload contains a question (supervaizer_form):
@@ -111,37 +109,40 @@ class CaseNodeUpdate(SvBaseModel):
         }
 
 
-class CaseNoteType(Enum):
+class CaseNodeType(Enum):
     """
-    CaseNoteType is an enum that represents the type of a case note.
+    CaseNodeType is an enum that represents the type of a case note.
     """
 
     CHAT = "chat"
     TRIGGER = "trigger"
     NOTIFICATION = "notification"
-    VALIDATION = "validation"
-    DELIVERY = "delivery"
+    STATUS_UPDATE = "status_update"
+    INTERMEDIARY_DELIVERY = "intermediary_delivery"
+    HITL = "human_in_the_loop"
+    DELIVERABLE = "deliverable"
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
 
 
-@deprecated("Not used")
 class CaseNode(SvBaseModel):
     name: str
-    description: str
-    type: CaseNoteType
+    type: CaseNodeType
+    factory: Callable[..., CaseNodeUpdate]
+    description: str | None = None
+    can_be_confirmed: bool = False  # Whether the user can decide that this node needs to be confirmed. This must be set in the job definition.
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    def __call__(self, *args: Any, **kwargs: Any) -> CaseNodeUpdate:
+        """Make it callable directly."""
+        return self.factory(*args, **kwargs)
 
-    @property
-    def registration_info(self) -> Dict[str, Any]:
-        """Returns registration info for the case node"""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.type.value,
-        }
+
+class CaseNodes(SvBaseModel):
+    nodes: List[CaseNode] = []
+
+    def get(self, name: str) -> CaseNode | None:
+        return next((node for node in self.nodes if node.name == name), None)
 
 
 class CaseAbstractModel(SvBaseModel):
@@ -215,7 +216,11 @@ class Case(CaseAbstractModel):
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
-    def receive_human_input(self, **kwargs: Any) -> None:
+    def receive_human_input(
+        self, updateCaseNode: CaseNodeUpdate, **kwargs: Any
+    ) -> None:
+        # Add the update to the case (this handles index, send_update_case, and persistence)
+        self.update(updateCaseNode)
         # Transition from AWAITING to IN_PROGRESS
         from supervaizer.storage import PersistentEntityLifecycle
 
