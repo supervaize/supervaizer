@@ -64,12 +64,11 @@ class TestDockerManager:
 
             assert output_path.exists()
             content = output_path.read_text()
-            assert "FROM python:3.12-slim" in content
+            assert "FROM ghcr.io/astral-sh/uv:python3.12-bookworm" in content
             assert "EXPOSE 8000" in content
-            assert 'CMD ["supervaizer", "start"]' in content
+            assert 'ENTRYPOINT ["/entrypoint.sh"]' in content
             # Verify template placeholders are replaced with actual values
-            assert "COPY src/ ./src/" in content  # source directory
-            assert "COPY supervaizer_control.py ./" in content  # controller file
+            assert "COPY . ." in content  # source directory
             # Verify no template placeholders remain
             assert "{{" not in content
             assert "}}" not in content
@@ -85,15 +84,14 @@ class TestDockerManager:
                 output_path,
                 python_version="3.11",
                 app_port=9000,
-                source_dir=".",
                 controller_file="my_controller.py",
             )
 
             assert output_path.exists()
             content = output_path.read_text()
-            assert "FROM python:3.11-slim" in content
+            assert "FROM ghcr.io/astral-sh/uv:python3.11-bookworm" in content
             assert "EXPOSE 9000" in content
-            assert "COPY ./ ././" in content  # source directory
+            # assert "COPY ./ ././" in content  # source directory - Removed as source_dir is not supported
             assert "COPY my_controller.py ./" in content  # controller file
             # Verify no template placeholders remain
             assert "{{" not in content
@@ -368,10 +366,14 @@ class TestDockerManagerAdvanced:
         """Test successful Docker image building."""
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
-        mock_image = mocker.Mock()
-        mock_image.id = "sha256:abc123"
         mock_client.ping.return_value = True
-        mock_client.images.build.return_value = (mock_image, [])
+        
+        # Mock the low-level API build method
+        mock_client.api.build.return_value = [
+            {"stream": "Step 1/5 : FROM python:3.12-slim"},
+            {"aux": {"ID": "sha256:abc123def456"}}
+        ]
+        
         mock_docker_client.from_env.return_value = mock_client
 
         manager = DockerManager()
@@ -379,15 +381,21 @@ class TestDockerManagerAdvanced:
             "test:latest", Path("/tmp"), Path("/tmp/Dockerfile")
         )
 
-        assert result == "sha256:abc123"
-        mock_client.images.build.assert_called_once()
+        assert result == "sha256:abc123def456"
+        mock_client.api.build.assert_called_once()
 
     def test_build_image_failure(self, mocker: MockerFixture) -> None:
         """Test Docker image building failure."""
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
-        mock_client.images.build.side_effect = DockerException("Build failed")
+        
+        # Mock the low-level API build method to return an error
+        mock_client.api.build.return_value = [
+            {"stream": "Step 1/5 : FROM python:3.12-slim"},
+            {"error": "Build failed"}
+        ]
+        
         mock_docker_client.from_env.return_value = mock_client
 
         manager = DockerManager()

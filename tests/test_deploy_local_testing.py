@@ -239,17 +239,19 @@ class TestLocalTesting:
 
         _show_service_logs("test-service")
 
-        mock_run.assert_called_once_with(
-            [
-                "docker-compose",
-                "-f",
-                ".deployment/docker-compose.yml",
-                "logs",
-                "--tail=50",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        # The function calls subprocess.run multiple times (logs, docker logs, ps)
+        # Check that at least the first call (docker-compose logs) was made
+        assert mock_run.call_count >= 1
+        # Verify the first call is for docker-compose logs
+        first_call = mock_run.call_args_list[0]
+        assert first_call[0][0] == [
+            "docker-compose",
+            "-f",
+            ".deployment/docker-compose.yml",
+            "logs",
+            "--tail=100",
+            "test-service",
+        ]
 
     def test_cleanup_test_resources(self, mocker: MockerFixture):
         """Test test resources cleanup."""
@@ -330,7 +332,8 @@ class TestLocalTesting:
         # Verify calls
         mock_check_docker.assert_called_once()
         mock_docker_instance.generate_dockerfile.assert_called_once_with(
-            source_dir="src", controller_file="supervaizer_control.py"
+            controller_file="supervaizer_control.py",
+            app_port=8000,
         )
         mock_docker_instance.generate_dockerignore.assert_called_once()
         mock_docker_instance.generate_docker_compose.assert_called_once_with(
@@ -460,7 +463,8 @@ class TestLocalTesting:
         # Verify calls
         mock_check_docker.assert_called_once()
         mock_docker_instance.generate_dockerfile.assert_called_once_with(
-            source_dir="src", controller_file="supervaizer_control.py"
+            controller_file="supervaizer_control.py",
+            app_port=8000,
         )
         mock_docker_instance.generate_dockerignore.assert_called_once()
         mock_docker_instance.generate_docker_compose.assert_called_once_with(

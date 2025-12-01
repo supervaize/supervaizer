@@ -259,10 +259,10 @@ def create_default_routes(server: "Server") -> APIRouter:
         )
 
         # Update the case with the answer
-        case.update(update)
+        # case.update(update) - Redundant, receive_human_input calls update()
 
         # Transition the case from AWAITING to IN_PROGRESS
-        case.receive_human_input()
+        case.receive_human_input(update)
 
         # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
         # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE

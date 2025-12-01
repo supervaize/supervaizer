@@ -28,6 +28,27 @@ class SvBaseModel(BaseModel):
     Base model for all Supervaize models.
     """
 
+    @staticmethod
+    def serialize_value(value: Any) -> Any:
+        """Recursively serialize values, converting type objects and datetimes to strings."""
+        from datetime import datetime
+
+        if isinstance(value, type):
+            # Convert type objects to their string name
+            return value.__name__
+        elif isinstance(value, datetime):
+            # Convert datetime to ISO format string
+            return value.isoformat()
+        elif isinstance(value, dict):
+            # Recursively process dictionaries
+            return {k: SvBaseModel.serialize_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            # Recursively process lists and tuples
+            return [SvBaseModel.serialize_value(item) for item in value]
+        else:
+            # Return value as-is for other types
+            return value
+
     @property
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -37,30 +58,10 @@ class SvBaseModel(BaseModel):
         to their string representation.
         Tested in tests/test_common.test_sv_base_model_json_conversion
         """
-        from datetime import datetime
-
-        def serialize_value(value: Any) -> Any:
-            """Recursively serialize values, converting type objects and datetimes to strings."""
-            if isinstance(value, type):
-                # Convert type objects to their string name
-                return value.__name__
-            elif isinstance(value, datetime):
-                # Convert datetime to ISO format string
-                return value.isoformat()
-            elif isinstance(value, dict):
-                # Recursively process dictionaries
-                return {k: serialize_value(v) for k, v in value.items()}
-            elif isinstance(value, (list, tuple)):
-                # Recursively process lists and tuples
-                return [serialize_value(item) for item in value]
-            else:
-                # Return value as-is for other types
-                return value
-
         # Use mode="python" to avoid Pydantic's JSON serialization errors with type objects
         # Then post-process to handle type objects and datetimes
         data = self.model_dump(mode="python")
-        return serialize_value(data)
+        return self.serialize_value(data)
 
     @property
     def to_json(self) -> str:
