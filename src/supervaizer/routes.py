@@ -466,6 +466,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             log.info(f"📤 Agent {agent.name}: No parameter setup defined → {result}")
             return result
 
+        if body_params is None:
+            body_params = {}
+
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
         agent_parameters: Dict[str, Any] = {}
@@ -562,6 +565,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             f"📥 POST /validate-method-fields [Validate method fields] {agent.name}"
         )
 
+        if body_params is None:
+            body_params = {}
+
         method_name = body_params.get("method_name", "job_start")
         job_fields = body_params.get("job_fields", {})
 
@@ -646,8 +652,15 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
 
-        sv_context: JobContext = JobContext(**body_params["job_context"])
-        job_fields = body_params["job_fields"]
+        if body_params is None:
+            body_params = {}
+
+        job_context_data = body_params.get("job_context")
+        if job_context_data is None:
+            raise ValueError("job_context is required")
+
+        sv_context: JobContext = JobContext(**job_context_data)
+        job_fields = body_params.get("job_fields", {})
 
         # Get job encrypted parameters if available
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
@@ -870,6 +883,9 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )
             log.info(f"body_params: {body_params}")
+
+            if body_params is None:
+                raise ValueError("body_params cannot be None")
 
             sv_context: JobContext = body_params.job_context
             job_fields = body_params.job_fields.to_dict()

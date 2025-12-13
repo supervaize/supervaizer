@@ -126,6 +126,8 @@ class CaseNodeType(Enum):
     INTERMEDIARY_DELIVERY = "intermediary_delivery"
     HITL = "human_in_the_loop"
     DELIVERABLE = "deliverable"
+    VALIDATION = "validation"
+    DELIVERY = "delivery"
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"

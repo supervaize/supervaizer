@@ -6,22 +6,36 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## TODO
+
+- Remove ACP, update A2A
+- Finish Deploy
+- Fix receive_human_input
+
 ### Added
 
+- Create "Agent instructions for Supervaize". This is an html page that is served by the fastapi
+
+- Fix error in API Doc
+
 -🏹 Start implementation of [RFC001 - cloud-deployment-cli](docs/rfc/001-cloud-deployment-cli.md)
+
 -🛣️ Updated pyproject.toml dependency versions
+
 -🏹 `version_check` Check latest version of supervaizer
 
-- AgentMethodsAbstract:  job_stop & job_status : optional. Added "human_answer".
+- `receive_human_input`
+
+- CaseNode - CaseNodes , new feature for can_be_confirmed (TB Implemented)
 
 ### Unit tests results
 
 | Status     | Count  |
 | ---------- | ------ |
-| ✅ Passed  | 407    |
+| ✅ Passed  | 420    |
 | 🤔 Skipped | 6      |
 | 🔴 Failed  | 0      |
-| ⏱️ in      | 49.13s |
+| ⏱️ in      | 53.51s |
 
 ## [0.9.8]
 

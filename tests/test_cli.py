@@ -112,6 +112,9 @@ class TestCLIInstall:
             patch("os.path.exists", return_value=True),
             patch("supervaizer.cli.Path") as mock_path_class,
             patch("shutil.copy") as mock_copy,
+            patch(
+                "supervaizer.cli._create_instructions_file"
+            ) as mock_create_instructions,
         ):
             # Create proper mock chain
             mock_examples_dir = Mock()
@@ -125,6 +128,10 @@ class TestCLIInstall:
             mock_file_path.parent = mock_parent1
             mock_parent1.__truediv__ = Mock(return_value=mock_examples_dir)
             mock_examples_dir.__truediv__ = Mock(return_value=mock_example_file)
+
+            # Mock the instructions file creation
+            mock_instructions_path = Mock()
+            mock_create_instructions.return_value = mock_instructions_path
 
             result = runner.invoke(app, ["scaffold", "--force"])
 
@@ -242,7 +249,7 @@ class TestCLIApp:
         result = runner.invoke(app, ["scaffold", "--help"])
 
         assert result.exit_code == 0
-        assert "Create a draft supervaizer_control.py script" in str(result.stdout)
+        assert "Scaffold commands for creating project files" in str(result.stdout)
 
 
 @patch("supervaizer.cli.app")
