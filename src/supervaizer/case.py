@@ -10,7 +10,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 from typing import Callable
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
@@ -135,7 +136,9 @@ class CaseNode(SvBaseModel):
 
     name: str
     type: CaseNodeType
-    factory: Callable[..., CaseNodeUpdate]
+    factory: SkipJsonSchema[Callable[..., CaseNodeUpdate]] = Field(
+        exclude=True, repr=False
+    )  # Exclude from JSON schema generation and representation
     description: str | None = None
     can_be_confirmed: bool = False  # Whether the user can decide that this node needs to be confirmed. This must be set in the job definition.
 
