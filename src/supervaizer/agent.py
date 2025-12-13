@@ -588,6 +588,14 @@ class AgentAbstract(SvBaseModel):
         default=60 * 60,
         description="Maximum execution time in seconds, defaults to 1 hour",
     )
+    supervaize_instructions_template_path: Optional[str] = Field(
+        default=None,
+        description="Optional path to a custom template file for supervaize_instructions.html page",
+    )
+    instructions_path: str = Field(
+        default="supervaize_instructions.html",
+        description="Path where the supervaize instructions page is served (relative to agent path)",
+    )
 
     model_config = {
         "reference_group": "Core",
@@ -703,6 +711,7 @@ class Agent(AgentAbstract):
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
             "server_encrypted_parameters": self.server_encrypted_parameters,
             "max_execution_time": self.max_execution_time,
+            "instructions_path": self.instructions_path,
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:

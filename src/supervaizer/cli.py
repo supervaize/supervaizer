@@ -17,6 +17,7 @@ from supervaizer.deploy.cli import deploy_app
 
 import typer
 from rich.console import Console
+from rich.prompt import Confirm
 
 from supervaizer.__version__ import VERSION
 from supervaizer.utils.version_check import check_is_latest_version
@@ -97,6 +98,10 @@ app.add_typer(
     deploy_app, name="deploy", help="Deploy Supervaizer agents to cloud platforms"
 )
 
+# Create scaffold subcommand group
+scaffold_app = typer.Typer(help="Scaffold commands for creating project files")
+app.add_typer(scaffold_app, name="scaffold", invoke_without_command=True)
+
 
 @app.command()
 def start(
@@ -172,8 +177,45 @@ def start(
     process.wait()
 
 
-@app.command()
+def _create_instructions_file(
+    output_dir: Path, force: bool = False, silent: bool = False
+) -> Path:
+    """Create supervaize_instructions.html file in the given directory.
+
+    Args:
+        output_dir: Directory where to create the instructions file
+        force: If True, overwrite existing file
+        silent: If True, don't show warnings if file already exists (just skip)
+    """
+    instructions_path = output_dir / "supervaize_instructions.html"
+
+    # Check if file already exists
+    if instructions_path.exists() and not force:
+        if not silent:
+            console.print(
+                f"[bold yellow]Warning:[/] {instructions_path} already exists"
+            )
+            console.print(
+                "Use [bold]--force[/] to overwrite it, or run [bold]supervaizer refresh-instructions[/]"
+            )
+        return instructions_path
+
+    # Get the path to the admin templates directory
+    admin_templates_dir = Path(__file__).parent / "admin" / "templates"
+    template_file = admin_templates_dir / "supervaize_instructions.html"
+
+    if not template_file.exists():
+        console.print("[bold red]Error:[/] Template file not found")
+        sys.exit(1)
+
+    # Copy the template file
+    shutil.copy(template_file, instructions_path)
+    return instructions_path
+
+
+@scaffold_app.callback(invoke_without_command=True)
 def scaffold(
+    ctx: typer.Context,
     output_path: str = typer.Option(
         os.environ.get("SUPERVAIZER_OUTPUT_PATH", "supervaizer_control.py"),
         help="Path to save the script",
@@ -183,7 +225,10 @@ def scaffold(
         help="Overwrite existing file",
     ),
 ) -> None:
-    """Create a draft supervaizer_control.py script."""
+    """Create a draft supervaizer_control.py script and supervaize_instructions.html."""
+    # Only run if no subcommand was invoked
+    if ctx.invoked_subcommand is not None:
+        return
     # Check if file already exists
     if os.path.exists(output_path) and not force:
         console.print(f"[bold red]Error:[/] {output_path} already exists")
@@ -203,17 +248,138 @@ def scaffold(
     console.print(
         f"[bold green]Success:[/] Created an example file at [bold blue]{output_path}[/]"
     )
+
+    # Create instructions file in the same directory (silently if it already exists)
+    output_dir = Path(output_path).parent
+    instructions_path = output_dir / "supervaize_instructions.html"
+    instructions_existed = instructions_path.exists()
+    _create_instructions_file(output_dir, force=force, silent=True)
+    # Only show success message if we actually created the file (didn't exist before or force was used)
+    if not instructions_existed or force:
+        console.print(
+            f"[bold green]Success:[/] Created instructions template at [bold blue]{instructions_path}[/]"
+        )
+
     console.print(
         "1. Copy this file to [bold]supervaizer_control.py[/] and edit it to configure your agent(s)"
     )
     console.print(
-        "2. (Optional) Get your API from [bold]supervaizer.com and setup your environment variables"
+        "2. Customize [bold]supervaize_instructions.html[/] to match your agent's documentation"
     )
     console.print(
-        "3. Run [bold]supervaizer start[/] to start the supervaizer controller"
+        "3. (Optional) Get your API from [bold]supervaizer.com and setup your environment variables"
     )
-    console.print("4. Open [bold]http://localhost:8000/docs[/] to explore the API")
+    console.print(
+        "4. Run [bold]supervaizer start[/] to start the supervaizer controller"
+    )
+    console.print("5. Open [bold]http://localhost:8000/docs[/] to explore the API")
     sys.exit(0)
+
+
+@scaffold_app.command(name="instructions")
+def scaffold_instructions(
+    control_file: Optional[str] = typer.Option(
+        None,
+        help="Path to supervaizer_control.py (default: auto-detect)",
+    ),
+    output_path: Optional[str] = typer.Option(
+        None,
+        help="Path to save supervaize_instructions.html (default: same directory as control file)",
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Overwrite existing file",
+    ),
+) -> None:
+    """Create supervaize_instructions.html file."""
+    # Determine control file path
+    if control_file is None:
+        control_file = (
+            os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
+        )
+
+    control_path = Path(control_file)
+
+    # Determine output directory
+    if output_path is None:
+        output_dir = control_path.parent
+        instructions_path = output_dir / "supervaize_instructions.html"
+    else:
+        instructions_path = Path(output_path)
+        output_dir = instructions_path.parent
+
+    # Check if control file exists (informational)
+    if not control_path.exists():
+        console.print(f"[bold yellow]Warning:[/] Control file {control_file} not found")
+        console.print("Creating instructions file anyway...")
+
+    # Create instructions file
+    _create_instructions_file(output_dir, force=force)
+    console.print(
+        f"[bold green]Success:[/] Created instructions template at [bold blue]{instructions_path}[/]"
+    )
+    console.print(
+        "Customize this file to match your agent's documentation and instructions."
+    )
+
+
+@scaffold_app.command(name="refresh-instructions")
+def refresh_instructions(
+    control_file: Optional[str] = typer.Option(
+        None,
+        help="Path to supervaizer_control.py (default: auto-detect)",
+    ),
+    output_path: Optional[str] = typer.Option(
+        None,
+        help="Path to supervaize_instructions.html (default: same directory as control file)",
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Skip confirmation prompt",
+    ),
+) -> None:
+    """Refresh/update supervaize_instructions.html file."""
+    # Determine control file path
+    if control_file is None:
+        control_file = (
+            os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
+        )
+
+    control_path = Path(control_file)
+
+    # Determine output path
+    if output_path is None:
+        output_dir = control_path.parent
+        instructions_path = output_dir / "supervaize_instructions.html"
+    else:
+        instructions_path = Path(output_path)
+
+    # Check if instructions file exists
+    if instructions_path.exists():
+        if not force:
+            console.print(
+                f"[bold yellow]Warning:[/] {instructions_path} already exists"
+            )
+            if not Confirm.ask(
+                "Delete existing file and create a fresh template?",
+                default=False,
+            ):
+                console.print("[bold]Cancelled.[/]")
+                sys.exit(0)
+
+        # Delete existing file
+        instructions_path.unlink()
+        console.print(f"[bold]Deleted[/] existing {instructions_path}")
+
+    # Create new instructions file
+    output_dir = instructions_path.parent
+    _create_instructions_file(output_dir, force=True)
+    console.print(
+        f"[bold green]Success:[/] Created fresh instructions template at [bold blue]{instructions_path}[/]"
+    )
+    console.print(
+        "Customize this file to match your agent's documentation and instructions."
+    )
 
 
 if __name__ == "__main__":

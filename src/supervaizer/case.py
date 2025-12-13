@@ -131,6 +131,8 @@ class CaseNodeType(Enum):
 
 
 class CaseNode(SvBaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     name: str
     type: CaseNodeType
     factory: Callable[..., CaseNodeUpdate]

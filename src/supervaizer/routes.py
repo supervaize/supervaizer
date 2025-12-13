@@ -6,6 +6,7 @@
 
 import traceback
 from functools import wraps
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,11 +27,12 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
     Security,
     status as http_status,
 )
-from fastapi.responses import JSONResponse
-from rich import inspect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.templating import Jinja2Templates
 
 from supervaizer.agent import (
     Agent,
@@ -50,8 +52,6 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 T = TypeVar("T")
-
-insp = inspect
 
 
 class CaseUpdateRequest(SvBaseModel):
@@ -386,6 +386,54 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
+    @router.get(
+        f"/{agent.instructions_path}",
+        summary=f"Get supervaize instructions page for agent {agent.name}",
+        description="HTML page displaying agent registration information and instructions",
+        response_class=HTMLResponse,
+        tags=tags,
+    )
+    @handle_route_errors()
+    async def supervaize_instructions(
+        request: Request, agent: Agent = Depends(get_agent)
+    ) -> Response:
+        """Serve the supervaize instructions HTML page for this agent."""
+        log.info(
+            f"📥  GET /{agent.instructions_path} [Supervaize Instructions] for agent{agent.name}"
+        )
+
+        registration_info = agent.registration_info
+
+        # Convert instructions_path string to Path object
+        instructions_path = Path(agent.instructions_path)
+
+        # Check if file exists - if not, return empty HTML
+        if not instructions_path.exists() or not instructions_path.is_file():
+            return HTMLResponse(content="", status_code=200)
+
+        # Serve the file (check if it's a Jinja2 template or static HTML)
+        with open(instructions_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            # Simple check: if it contains Jinja2 syntax, render as template
+            if "{{" in content or "{%" in content:
+                # Render as Jinja2 template
+                custom_templates = Jinja2Templates(
+                    directory=str(instructions_path.parent)
+                )
+                return custom_templates.TemplateResponse(
+                    instructions_path.name,
+                    {
+                        "request": request,
+                        "registration_info": registration_info,
+                    },
+                )
+            else:
+                # Serve as static HTML file
+                return FileResponse(
+                    str(instructions_path),
+                    media_type="text/html",
+                )
+
     @router.post(
         "/validate-agent-parameters",
         summary=f"Validate agent parameters for agent: {agent.name}",
@@ -428,8 +476,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             )
 
             try:
-                from supervaizer.common import decrypt_value
                 import json
+
+                from supervaizer.common import decrypt_value
 
                 agent_parameters_str = decrypt_value(
                     encrypted_agent_parameters, server.private_key
