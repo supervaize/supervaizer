@@ -4,9 +4,42 @@ All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Feature Branch Status
+
+### ✅ Merged to Develop
+
+- **feature/deploy** - Cloud deployment CLI with GCP, AWS, and DigitalOcean support
+  - Status: Fully merged and tested (420 tests passing)
+  - Includes: Deployment commands, Docker workflow, secret management, health verification
+  - See "Cloud Deployment CLI" section below for details
+
+### 🚧 Ready for Review (Not Yet Merged)
+
+- **feature/a2a-protocol-update** - ACP protocol removal and A2A unification
+  - Status: ✅ Complete, all tests passing (415 tests)
+  - Commits: 3 commits ready for merge
+  - Changes: Removed ACP protocol implementation, updated all documentation, unified to A2A-only
+  - Breaking: `acp_endpoints` parameter removed from Server class
+  - See "Protocol Unification" section below for details
+
+### 🔨 Work in Progress (Not Ready for Merge)
+
+- **feature/data-persistance** - Enhanced data persistence and job handling
+  - Status: 10 commits, needs review and testing
+  - Changes: Job response handling, entity repository, admin interface improvements, case nodes removal
+  - Note: May have conflicts with develop branch
+
+- **feature/smartinstall** - Smart installer with dependency management
+  - Status: 10 commits, work in progress
+  - Changes: LangSmith tracing, improved error handling, dependency checks, CLI integration
+  - New dependencies: langchain-deepseek, httpx, packaging
+  - Note: Requires testing and documentation updates
+
 ## TODO
 
-- Finish Deploy
+- Merge feature/a2a-protocol-update to develop
+- Review and test feature/data-persistance
+- Complete feature/smartinstall implementation
 - Fix receive_human_input
 
 ## Unreleased
