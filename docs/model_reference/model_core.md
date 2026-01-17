@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.9.8
+**Version:** 0.10.0
 
 ### `account.Account`
 
@@ -125,6 +125,8 @@ _No additional fields beyond parent class._
 | `server_agent_onboarding_status` | `str` | `None` | Onboarding status - Do not set this manually |
 | `server_encrypted_parameters` | `str` | `None` | Encrypted parameters from server - Do not set this manually |
 | `max_execution_time` | `int` | 3600 | Maximum execution time in seconds, defaults to 1 hour |
+| `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
+| `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
 
 ### `agent.AgentMethod`
 
@@ -181,6 +183,7 @@ Attributes:
 | `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
 | `description` | `str` | `None` | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
+| `nodes` | `CaseNodes` | `None` | The definition of the Case Nodes (=steps) for this method |
 
 #### Example
 
@@ -395,7 +398,6 @@ public_url: full url (including scheme and port) to use for outbound connections
 | `reload` | `bool` | **required** | Whether to enable auto-reload |
 | `supervisor_account` | `Account` | `None` | Account of the supervisor - can be created at supervaize.com |
 | `a2a_endpoints` | `bool` | True | Whether to enable A2A endpoints |
-| `acp_endpoints` | `bool` | True | Whether to enable ACP endpoints |
 | `private_key` | `RSAPrivateKey` | **required** | RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user |
 | `public_key` | `RSAPublicKey` | **required** | RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user |
 | `public_url` | `str` | `None` | Public including scheme and port to use for inbound connections |
@@ -428,11 +430,10 @@ public_url: full url (including scheme and port) to use for outbound connections
   "mac_addr": "00-11-22-33-44-55",
   "debug": false,
   "reload": false,
-  "a2a_endpoints": true,
-  "acp_endpoints": true
+  "a2a_endpoints": true
 }
 
 ```
 
 
-*Uploaded on 2025-08-12 14:19:38*
+*Uploaded on 2026-01-17 16:08:02*

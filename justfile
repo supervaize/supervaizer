@@ -110,3 +110,26 @@ ready-to-go:
     just generate_documentation
     git add . && git commit -m "chore: update documentation"
     just tag_version
+
+# Merge develop to main - after just tag_version
+merge-to-main:
+    @echo "Switching to main branch..."
+    git checkout main
+    @echo "Pulling latest main..."
+    git pull origin main
+    @echo "Merging develop into main..."
+    git merge develop --no-ff -m "chore: merge develop to main"
+    @echo "✅ Merged develop to main"
+
+# Push main branch to remote
+push-main:
+    @echo "Pushing main branch to remote..."
+    git push origin main
+    @echo "✅ Main branch pushed to remote"
+
+# Complete release: merge develop to main, push main and tags
+release:
+    just merge-to-main
+    just push-main
+    just push_tags
+    @echo "✅ Release complete! Main branch and tags pushed to remote"

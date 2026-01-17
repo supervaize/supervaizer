@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.9.8\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 0.10.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -458,6 +458,30 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/supervaize_instructions.html": {
+      "get": {
+        "tags": [
+          "Supervision",
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get supervaize instructions page for agent competitor_summary",
+        "description": "HTML page displaying agent registration information and instructions",
+        "operationId": "supervaize_instructions_supervaizer_agents_competitor_summary_supervaize_instructions_html_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/supervaizer/agents/competitor-summary/validate-agent-parameters": {
@@ -1274,81 +1298,6 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Agent Card Legacy  Well Known Agents Competitor Summary Agent Json Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/agents": {
-      "get": {
-        "tags": [
-          "Protocol ACP"
-        ],
-        "summary": "ACP Agents Discovery",
-        "description": "Returns a list of all agents according to ACP protocol specification",
-        "operationId": "get_acp_agents_agents_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response Get Acp Agents Agents Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/agents/competitor-summary": {
-      "get": {
-        "tags": [
-          "Protocol ACP"
-        ],
-        "summary": "ACP Agent Detail for competitor_summary",
-        "description": "Returns details for agent competitor_summary according to ACP protocol specification",
-        "operationId": "get_agent_detail_agents_competitor_summary_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Agent Detail Agents Competitor Summary Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/agents/health": {
-      "get": {
-        "tags": [
-          "Protocol ACP"
-        ],
-        "summary": "ACP Health Status",
-        "description": "Returns health information about the server and agents",
-        "operationId": "get_acp_health_agents_health_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Acp Health Agents Health Get"
                 }
               }
             }
@@ -2563,6 +2512,17 @@
             "title": "Is Async",
             "description": "Whether the method is asynchronous",
             "default": false
+          },
+          "nodes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseNodes"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The definition of the Case Nodes (=steps) for this method"
           }
         },
         "type": "object",
@@ -2711,10 +2671,34 @@
             "$ref": "#/components/schemas/AgentMethod"
           },
           "job_stop": {
-            "$ref": "#/components/schemas/AgentMethod"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "job_status": {
-            "$ref": "#/components/schemas/AgentMethod"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "human_answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "chat": {
             "anyOf": [
@@ -2743,9 +2727,7 @@
         },
         "type": "object",
         "required": [
-          "job_start",
-          "job_stop",
-          "job_status"
+          "job_start"
         ],
         "title": "AgentMethods"
       },
@@ -2938,6 +2920,72 @@
         "type": "object",
         "title": "Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post"
       },
+      "CaseNode": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/CaseNodeType"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "can_be_confirmed": {
+            "type": "boolean",
+            "title": "Can Be Confirmed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "CaseNode"
+      },
+      "CaseNodeType": {
+        "type": "string",
+        "enum": [
+          "chat",
+          "trigger",
+          "notification",
+          "status_update",
+          "intermediary_delivery",
+          "human_in_the_loop",
+          "deliverable",
+          "validation",
+          "delivery",
+          "error",
+          "warning",
+          "info"
+        ],
+        "title": "CaseNodeType",
+        "description": "CaseNodeType is an enum that represents the type of a case note."
+      },
+      "CaseNodes": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/CaseNode"
+            },
+            "type": "array",
+            "title": "Nodes",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "CaseNodes"
+      },
       "CaseUpdateRequest": {
         "properties": {
           "answer": {
@@ -3002,7 +3050,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2025-08-12T14:19:39.099352"
+            "default": "2026-01-17T16:08:03.229490"
           },
           "status_code": {
             "type": "integer",
