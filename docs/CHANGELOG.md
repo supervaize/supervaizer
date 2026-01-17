@@ -4,10 +4,42 @@ All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Feature Branch Status
+
+### ✅ Merged to Develop
+
+- **feature/deploy** - Cloud deployment CLI with GCP, AWS, and DigitalOcean support
+  - Status: Fully merged and tested (420 tests passing)
+  - Includes: Deployment commands, Docker workflow, secret management, health verification
+  - See "Cloud Deployment CLI" section below for details
+
+### 🚧 Ready for Review (Not Yet Merged)
+
+- **feature/a2a-protocol-update** - ACP protocol removal and A2A unification
+  - Status: ✅ Complete, all tests passing (415 tests)
+  - Commits: 3 commits ready for merge
+  - Changes: Removed ACP protocol implementation, updated all documentation, unified to A2A-only
+  - Breaking: `acp_endpoints` parameter removed from Server class
+  - See "Protocol Unification" section below for details
+
+### 🔨 Work in Progress (Not Ready for Merge)
+
+- **feature/data-persistance** - Enhanced data persistence and job handling
+  - Status: 10 commits, needs review and testing
+  - Changes: Job response handling, entity repository, admin interface improvements, case nodes removal
+  - Note: May have conflicts with develop branch
+
+- **feature/smartinstall** - Smart installer with dependency management
+  - Status: 10 commits, work in progress
+  - Changes: LangSmith tracing, improved error handling, dependency checks, CLI integration
+  - New dependencies: langchain-deepseek, httpx, packaging
+  - Note: Requires testing and documentation updates
+
 ## TODO
 
-- Remove ACP, update A2A
-- Finish Deploy
+- Merge feature/a2a-protocol-update to develop
+- Review and test feature/data-persistance
+- Complete feature/smartinstall implementation
 - Fix receive_human_input
 
 ## Unreleased
@@ -52,6 +84,16 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **🔄 Protocol Unification** - Removed ACP protocol in favor of unified A2A protocol
+
+  - Removed `src/supervaizer/protocol/acp/` directory and all ACP-specific code
+  - Removed `acp_endpoints` parameter from Server class
+  - Removed ACP route registration and test files
+  - Updated all documentation to reflect A2A-only support
+  - The A2A protocol has evolved to incorporate features from multiple agent communication standards, including the former ACP
+  - All A2A protocol links updated to [https://a2a-protocol.org/](https://a2a-protocol.org/)
+  - **Breaking Change**: `acp_endpoints` parameter no longer accepted in Server initialization
+
 - **📦 Dependency Optimization** - Cloud SDKs moved to optional dependencies
 
   - Base package size significantly reduced
@@ -66,27 +108,30 @@ All notable changes to this project will be documented in this file.
   - Added comprehensive deployment documentation
   - Updated model reference documentation
   - Improved README with deployment examples
+  - Updated PROTOCOLS.md to focus on unified A2A protocol
+  - Added Protocol Evolution section explaining ACP merger
 
 ### Fixed
 
 - API documentation errors corrected
 - Improved type hints for `agent_parameters` and `case_ids` in job.py
-- Health logging optimized in A2A and ACP routes
+- Health logging optimized in A2A routes
 
 ### Unit Tests Results
 
 | Status     | Count  |
 | ---------- | ------ |
-| ✅ Passed  | 420    |
+| ✅ Passed  | 415    |
 | 🤔 Skipped | 6      |
 | 🔴 Failed  | 0      |
-| ⏱️ in      | 82.63s |
+| ⏱️ in      | 50.56s |
 
 ### Migration Notes
 
+- **ACP Protocol Removal**: If your code uses `acp_endpoints=True` parameter, remove it from Server initialization. The A2A protocol now provides unified agent communication.
 - If you need deployment features, install with: `pip install supervaizer[deploy]`
 - For development, install with: `pip install supervaizer[dev,deploy]`
-- No breaking changes to existing APIs or functionality
+- No other breaking changes to existing APIs or functionality
 
 ## [0.9.8]
 

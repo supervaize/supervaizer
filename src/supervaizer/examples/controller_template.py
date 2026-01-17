@@ -185,7 +185,6 @@ account: Account = Account(
 sv_server: Server = Server(
     agents=[agent],
     a2a_endpoints=True,  # Enable A2A endpoints
-    acp_endpoints=True,  # Enable ACP endpoints
     supervisor_account=account,  # Account of the supervisor from Supervaize
 )
 

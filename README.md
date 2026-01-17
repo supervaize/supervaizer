@@ -2,11 +2,10 @@
 
 [Operate AI Agents with confidence]
 
-A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://google.github.io/A2A/#/) and [Agent Communication Protocol (ACP)](https://github.com/i-am-bee/ACP) support.
+A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://a2a-protocol.org/) protocol support.
 
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
-[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://google.github.io/A2A/)
-[![ACP Protocol](https://img.shields.io/badge/ACP-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
+[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-orange.svg)](https://a2a-protocol.org/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
 > **⚠️ Beta Disclaimer**: SUPERVAIZER is currently in beta mode. Not everything works as expected yet. Please report any issues you encounter.
@@ -39,11 +38,11 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
 
 ## Description
 
-SUPERVAIZER is a toolkit built for the age of AI interoperability. At its core, it implements Google's Agent-to-Agent (A2A) protocol and IBM's Agent Communication Protocol (ACP), enabling seamless discovery and interaction between agents across different systems and platforms.
+SUPERVAIZER is a toolkit built for the age of AI interoperability. At its core, it implements the Agent-to-Agent (A2A) protocol, enabling seamless discovery and interaction between agents across different systems and platforms.
 
-With comprehensive support for the A2A/ACP protocols, specification, SUPERVAIZER allows you to:
+With comprehensive support for the A2A protocol specification, SUPERVAIZER allows you to:
 
-- Enhance the capabilities of your agents, making them automatically discoverable by other A2A/ACP compatible systems
+- Enhance the capabilities of your agents, making them automatically discoverable by other A2A compatible systems
 - Expose standardized agent capabilities through agent cards
 - Monitor agent health and status through dedicated endpoints
 - Connect your agents to the growing ecosystem of A2A-compatible tools
@@ -131,7 +130,7 @@ export SUPERVAIZE_MAX_HTTP_RETRIES=3  # Will attempt up to 4 times total (1 orig
 ### What's next?
 
 - Add more **custom methods** (`chat`, `custom`) to extend control
-- Turn on **A2A / ACP** discovery for interoperability
+- Turn on **A2A** discovery for interoperability
 - Hook your controller into Supervaize to **monitor, audit, and operate** the agent
 
 For detailed instructions on customizing your controller, see the [Controller Setup Guide](https://doc.supervaize.com/docs/supervaizer-controller/controller-setup)
@@ -142,15 +141,13 @@ For detailed instructions on customizing your controller, see the [Controller Se
 - **Job Control**: Create, track, and manage jobs
 - **Event Handling**: Process and respond to system events
 - **🚀 Cloud Deployment**: Automated deployment to GCP Cloud Run, AWS App Runner, and DigitalOcean App Platform
-- Protocol support
-  - **A2A Protocol **: Integration with Google's Agent-to-Agent protocol for interoperability
-  - **ACP Protocol **: Integration with IBM/BeeAI's Agent Communication Protocol for standardized agent discovery and interaction
+- **A2A Protocol Support**: Full integration with the Agent-to-Agent protocol for standardized agent discovery and interaction
 - **Server Communication**: Interact with SUPERVAIZE servers (see [supervaize.com](https://www.supervaize.com) for more info)
 - **Web Admin Interface**: Easy to use web-based admin dashboard for managing jobs, cases, and system monitoring
 
 ## Protocol Support
 
-SUPERVAIZER provides comprehensive support for multiple agent communication protocols. See [Protocol Documentation](docs/PROTOCOLS.md) for complete details.
+SUPERVAIZER provides comprehensive support for the A2A agent communication protocol. See [Protocol Documentation](docs/PROTOCOLS.md) for complete details.
 
 ## Cloud Deployment
 

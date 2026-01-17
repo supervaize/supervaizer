@@ -405,7 +405,6 @@ def server_fixture(
         debug=True,
         agent_timeout=10,
         private_key=private_key,
-        acp_endpoints=True,
         a2a_endpoints=True,
         supervisor_account=account_fixture,
         agents=[agent_fixture],
