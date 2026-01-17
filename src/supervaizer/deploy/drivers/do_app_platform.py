@@ -171,7 +171,9 @@ class DOAppPlatformDriver(BaseDriver):
 
             # Verify health
             health_status = (
-                "healthy" if self.verify_health(service_url) else "unhealthy"
+                "healthy"
+                if service_url and self.verify_health(service_url)
+                else "unhealthy"
             )
 
             deployment_time = time.time() - start_time
@@ -387,7 +389,7 @@ class DOAppPlatformDriver(BaseDriver):
         spec_path = Path(".deployment") / "do-app-spec.yaml"
         spec_path.parent.mkdir(exist_ok=True)
 
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         with open(spec_path, "w") as f:
             yaml.dump(app_spec, f, default_flow_style=False)
@@ -406,7 +408,7 @@ class DOAppPlatformDriver(BaseDriver):
                     ["doctl", "apps", "get", app_name], capture_output=True, check=True
                 )
                 # App exists, update it
-                result = subprocess.run(
+                subprocess.run(
                     ["doctl", "apps", "update", app_name, "--spec", str(spec_path)],
                     capture_output=True,
                     text=True,
@@ -415,7 +417,7 @@ class DOAppPlatformDriver(BaseDriver):
                 log.info(f"Updated App Platform app: {app_name}")
             except subprocess.CalledProcessError:
                 # App doesn't exist, create it
-                result = subprocess.run(
+                subprocess.run(
                     ["doctl", "apps", "create", "--spec", str(spec_path)],
                     capture_output=True,
                     text=True,

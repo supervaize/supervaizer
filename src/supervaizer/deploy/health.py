@@ -13,7 +13,7 @@ exponential backoff, and detailed health reporting for deployment verification.
 
 import asyncio
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -46,7 +46,7 @@ class HealthCheckResult:
     endpoint: Optional[str] = None
     timestamp: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp == 0.0:
             self.timestamp = time.time()
 
@@ -61,9 +61,9 @@ class HealthCheckConfig:
     max_delay: float = 30.0
     backoff_multiplier: float = 2.0
     success_threshold: int = 1  # Number of successful checks required
-    endpoints: List[str] = None
+    endpoints: Optional[List[str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.endpoints is None:
             self.endpoints = ["/.well-known/health"]
 
@@ -107,6 +107,9 @@ class HealthVerifier:
 
             try:
                 # Check all configured endpoints
+                if not config.endpoints:
+                    last_error = "No endpoints configured"
+                    continue
                 all_healthy = True
                 for endpoint in config.endpoints:
                     endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
@@ -129,7 +132,7 @@ class HealthVerifier:
                             status=HealthStatus.HEALTHY,
                             response_time=response_time,
                             status_code=200,
-                            endpoint=config.endpoints[0],
+                            endpoint=config.endpoints[0] if config.endpoints else None,
                         )
                 else:
                     last_error = last_error or "One or more endpoints failed"
@@ -200,6 +203,9 @@ class HealthVerifier:
 
                 try:
                     # Check all configured endpoints
+                    if not config.endpoints:
+                        last_error = "No endpoints configured"
+                        continue
                     all_healthy = True
                     for endpoint in config.endpoints:
                         endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
@@ -221,7 +227,9 @@ class HealthVerifier:
                                 status=HealthStatus.HEALTHY,
                                 response_time=response_time,
                                 status_code=200,
-                                endpoint=config.endpoints[0],
+                                endpoint=config.endpoints[0]
+                                if config.endpoints
+                                else None,
                             )
                     else:
                         last_error = last_error or "One or more endpoints failed"
@@ -294,7 +302,7 @@ class HealthVerifier:
 
     def get_health_summary(
         self, results: Dict[str, HealthCheckResult]
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Generate a summary of health check results.
 

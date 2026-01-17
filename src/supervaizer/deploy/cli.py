@@ -280,7 +280,7 @@ def clean(
     ),
 ) -> None:
     """Clean up deployment artifacts and generated files."""
-    source_dir = _check_pyproject_toml()
+    _check_pyproject_toml()
 
     if docker_only and state_only:
         console.print(

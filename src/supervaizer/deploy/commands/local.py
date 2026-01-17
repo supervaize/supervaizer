@@ -272,7 +272,7 @@ def _wait_for_service(url: str, timeout: int) -> bool:
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task("Waiting for service...", total=None)
+        progress.add_task("Waiting for service...", total=None)
 
         while time.time() - start_time < timeout:
             try:

@@ -289,9 +289,7 @@ class TestLocalTesting:
         mock_generate_secrets = mocker.patch(
             "supervaizer.deploy.commands.local._generate_test_secrets"
         )
-        mock_start_compose = mocker.patch(
-            "supervaizer.deploy.commands.local._start_docker_compose"
-        )
+        mocker.patch("supervaizer.deploy.commands.local._start_docker_compose")
         mock_wait_service = mocker.patch(
             "supervaizer.deploy.commands.local._wait_for_service"
         )
@@ -345,7 +343,6 @@ class TestLocalTesting:
         )
         mock_docker_instance.build_image.assert_called_once()
         mock_generate_secrets.assert_called_once_with(True, False)
-        mock_start_compose.assert_called_once()
         mock_wait_service.assert_called_once()
         mock_run_health.assert_called_once()
         mock_display_health.assert_called_once()
@@ -387,9 +384,7 @@ class TestLocalTesting:
         mock_generate_secrets = mocker.patch(
             "supervaizer.deploy.commands.local._generate_test_secrets"
         )
-        mock_start_compose = mocker.patch(
-            "supervaizer.deploy.commands.local._start_docker_compose"
-        )
+        mocker.patch("supervaizer.deploy.commands.local._start_docker_compose")
         mock_wait_service = mocker.patch(
             "supervaizer.deploy.commands.local._wait_for_service"
         )

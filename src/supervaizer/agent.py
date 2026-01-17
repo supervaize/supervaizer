@@ -910,13 +910,13 @@ class Agent(AgentAbstract):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
-        if not self.methods:
+        if not self.methods or not self.methods.job_stop:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
-        if not self.methods:
+        if not self.methods or not self.methods.job_status:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_status.method
         return self._execute(method, params)

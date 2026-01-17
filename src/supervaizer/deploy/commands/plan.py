@@ -19,6 +19,7 @@ from rich.table import Table
 from supervaizer.common import log
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 from supervaizer.deploy.docker import get_git_sha
+from supervaizer.deploy.drivers.base import DeploymentPlan
 
 console = Console()
 
@@ -119,7 +120,7 @@ def _get_default_secrets(service_name: str, environment: str) -> dict[str, str]:
     }
 
 
-def _display_plan(plan) -> None:
+def _display_plan(plan: DeploymentPlan) -> None:
     """Display deployment plan."""
     console.print(
         f"\n[bold]Deployment Plan for {plan.service_name}-{plan.environment}[/bold]"

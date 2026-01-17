@@ -18,7 +18,8 @@ from rich.table import Table
 
 from supervaizer.common import log
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.state import StateManager
+from supervaizer.deploy.drivers.base import DeploymentResult
+from supervaizer.deploy.state import DeploymentState, StateManager
 
 console = Console()
 
@@ -99,7 +100,7 @@ def _get_default_region(platform: str) -> str:
     return defaults.get(platform, "us-central1")
 
 
-def _display_state(state) -> None:
+def _display_state(state: DeploymentState) -> None:
     """Display deployment state."""
     table = Table(title="Deployment State")
     table.add_column("Property", style="cyan")
@@ -129,7 +130,7 @@ def _display_state(state) -> None:
     console.print(table)
 
 
-def _display_service_status(result) -> None:
+def _display_service_status(result: DeploymentResult) -> None:
     """Display service status."""
     table = Table(title="Service Status")
     table.add_column("Property", style="cyan")

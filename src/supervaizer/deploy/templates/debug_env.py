@@ -11,7 +11,7 @@ import os
 import sys
 
 
-def debug_environment_variables():
+def debug_environment_variables() -> None:
     """Print all environment variables for debugging."""
     print("=== Environment Variables Debug ===")
     print(f"Python version: {sys.version}")

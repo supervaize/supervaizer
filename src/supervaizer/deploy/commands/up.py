@@ -21,6 +21,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from supervaizer.common import log
 from supervaizer.deploy.docker import DockerManager, get_git_sha, ensure_docker_running
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
+from supervaizer.deploy.drivers.base import DeploymentResult
 from supervaizer.deploy.state import StateManager
 from supervaizer.deploy.utils import create_deployment_directory
 
@@ -131,7 +132,7 @@ def deploy_up(
 
             build_args = get_docker_build_args(port)
 
-            image_id = docker_manager.build_image(
+            docker_manager.build_image(
                 image, source_dir or Path.cwd(), dockerfile_path, build_args=build_args
             )
 
@@ -258,7 +259,7 @@ def _get_default_env_vars(environment: str) -> dict[str, str]:
     }
 
 
-def _display_deployment_result(result) -> None:
+def _display_deployment_result(result: DeploymentResult) -> None:
     """Display deployment result."""
     console.print("\n[bold green]Deployment successful![/bold green]")
 

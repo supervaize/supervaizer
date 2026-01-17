@@ -10,7 +10,7 @@ import httpx
 try:
     from packaging import version
 except ImportError:
-    version = None  # type: ignore[assignment, misc]
+    version = None
 
 from supervaizer import __version__
 

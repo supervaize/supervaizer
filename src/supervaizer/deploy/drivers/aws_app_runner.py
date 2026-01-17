@@ -12,7 +12,7 @@ This module implements deployment to AWS App Runner.
 
 import subprocess
 import time
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -29,25 +29,31 @@ from supervaizer.deploy.drivers.base import (
 console = Console()
 
 # Conditional imports for AWS libraries
-try:
+if TYPE_CHECKING:
     import boto3
     from botocore.exceptions import ClientError, NoCredentialsError
 
     AWS_AVAILABLE = True
-except ImportError:
-    AWS_AVAILABLE = False
+else:
+    try:
+        import boto3
+        from botocore.exceptions import ClientError, NoCredentialsError
 
-    # Create dummy classes for type hints when not available
-    class ClientError(Exception):
-        pass
+        AWS_AVAILABLE = True
+    except ImportError:
+        AWS_AVAILABLE = False
 
-    class NoCredentialsError(Exception):
-        pass
-
-    class boto3:
-        @staticmethod
-        def client(*args, **kwargs):
+        # Create dummy classes for type hints when not available
+        class ClientError(Exception):
             pass
+
+        class NoCredentialsError(Exception):
+            pass
+
+        class boto3:
+            @staticmethod
+            def client(*args: Any, **kwargs: Any) -> Any:
+                pass
 
 
 class AWSAppRunnerDriver(BaseDriver):
@@ -231,7 +237,9 @@ class AWSAppRunnerDriver(BaseDriver):
 
             # Verify health
             health_status = (
-                "healthy" if self.verify_health(service_url) else "unhealthy"
+                "healthy"
+                if service_url and self.verify_health(service_url)
+                else "unhealthy"
             )
 
             deployment_time = time.time() - start_time
@@ -371,19 +379,6 @@ class AWSAppRunnerDriver(BaseDriver):
             errors.append("AWS credentials not found")
         except Exception as e:
             errors.append(f"AWS credentials check failed: {e}")
-
-        # Check required permissions
-        required_permissions = [
-            "apprunner:CreateService",
-            "apprunner:UpdateService",
-            "apprunner:DeleteService",
-            "ecr:CreateRepository",
-            "ecr:DeleteRepository",
-            "secretsmanager:CreateSecret",
-            "secretsmanager:UpdateSecret",
-            "iam:CreateRole",
-            "iam:AttachRolePolicy",
-        ]
 
         # This is a simplified check - in practice you'd want to test actual permissions
         try:

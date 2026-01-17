@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 
-def main():
+def main() -> None:
     """Run local Docker tests."""
     print("🐳 Supervaizer Local Docker Testing")
     print("=" * 50)
@@ -62,7 +62,7 @@ def main():
         ]
 
         print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)
 
         print("\n✅ Local test completed successfully!")
         print("\n📋 Next steps:")

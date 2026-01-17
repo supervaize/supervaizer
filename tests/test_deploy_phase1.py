@@ -210,7 +210,7 @@ class TestStateManager:
             manager = StateManager(deployment_dir)
 
             # Create initial state
-            state = manager.update_state(
+            manager.update_state(
                 service_name="test-service",
                 platform="cloud-run",
                 environment="dev",
@@ -351,7 +351,7 @@ class TestDeploymentDirectory:
             gitignore_path = project_root / ".gitignore"
             gitignore_path.write_text("*.pyc\n__pycache__/\n")
 
-            deployment_dir = create_deployment_directory(project_root)
+            create_deployment_directory(project_root)
 
             # Check that .deployment/ was added
             gitignore_content = gitignore_path.read_text()

@@ -12,7 +12,7 @@ This module implements deployment to Google Cloud Platform Cloud Run.
 
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -29,31 +29,39 @@ from supervaizer.deploy.drivers.base import (
 console = Console()
 
 # Conditional imports for Google Cloud libraries
-try:
+if TYPE_CHECKING:
     from google.cloud import artifactregistry_v1
     from google.cloud import run_v2
     from google.cloud import secretmanager
     from google.cloud.exceptions import NotFound
 
     GOOGLE_CLOUD_AVAILABLE = True
-except ImportError:
-    GOOGLE_CLOUD_AVAILABLE = False
+else:
+    try:
+        from google.cloud import artifactregistry_v1
+        from google.cloud import run_v2
+        from google.cloud import secretmanager
+        from google.cloud.exceptions import NotFound
 
-    # Create dummy classes for type hints when not available
-    class NotFound(Exception):
-        pass
+        GOOGLE_CLOUD_AVAILABLE = True
+    except ImportError:
+        GOOGLE_CLOUD_AVAILABLE = False
 
-    class artifactregistry_v1:
-        class ArtifactRegistryClient:
+        # Create dummy classes for type hints when not available
+        class NotFound(Exception):
             pass
 
-    class run_v2:
-        class ServicesClient:
-            pass
+        class artifactregistry_v1:
+            class ArtifactRegistryClient:
+                pass
 
-    class secretmanager:
-        class SecretManagerServiceClient:
-            pass
+        class run_v2:
+            class ServicesClient:
+                pass
+
+        class secretmanager:
+            class SecretManagerServiceClient:
+                pass
 
 
 class CloudRunDriver(BaseDriver):
@@ -212,7 +220,9 @@ class CloudRunDriver(BaseDriver):
 
             # Verify health
             health_status = (
-                "healthy" if self.verify_health(service_url) else "unhealthy"
+                "healthy"
+                if service_url and self.verify_health(service_url)
+                else "unhealthy"
             )
 
             deployment_time = time.time() - start_time
@@ -394,7 +404,7 @@ class CloudRunDriver(BaseDriver):
 
                 # Update existing secret
                 parent = f"projects/{self.project_id}"
-                secret_version = self.secret_client.add_secret_version(
+                self.secret_client.add_secret_version(
                     request={
                         "parent": secret_path,
                         "payload": {"data": secret_value.encode("utf-8")},
