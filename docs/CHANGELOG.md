@@ -4,13 +4,18 @@ All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## TODO
 
-## [0.9.9] - 2025-01-17
+- Remove ACP, update A2A
+- Finish Deploy
+- Fix receive_human_input
+
+## Unreleased
 
 ### Added
 
 - **🚀 Cloud Deployment CLI** - Complete automated deployment system for Supervaizer agents
+
   - Full implementation of [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md)
   - Support for three major cloud platforms:
     - **Google Cloud Run** with Artifact Registry and Secret Manager
@@ -31,10 +36,12 @@ All notable changes to this project will be documented in this file.
   - See [Local Testing Documentation](docs/LOCAL_TESTING.md) for details
 
 - **Agent Instructions Template** - New HTML page served by FastAPI for Supervaize integration instructions
+
   - Accessible at `/admin/supervaize-instructions`
   - Provides step-by-step setup guide for agents
 
 - **Version Check Utility** - Automatic check for latest Supervaizer version
+
   - Helps users stay up-to-date with latest features and fixes
   - Located in `supervaizer.utils.version_check`
 
@@ -46,6 +53,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **📦 Dependency Optimization** - Cloud SDKs moved to optional dependencies
+
   - Base package size significantly reduced
   - Cloud deployment dependencies now optional: `pip install supervaizer[deploy]`
   - Optional `deploy` group includes: boto3, docker, google-cloud-artifact-registry, google-cloud-run, google-cloud-secret-manager, psutil
