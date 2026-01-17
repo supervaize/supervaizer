@@ -8,23 +8,16 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "boto3>=1.34.0",
     "cryptography>=46.0.2",
     "demjson3>=3.0.6",
     "deprecated>=1.2.18",
-    "docker>=7.0.0",
     "fastapi>=0.118.0",
-    "google-cloud-artifact-registry>=1.8.0",
-    "google-cloud-run>=0.10.0",
-    "google-cloud-secret-manager>=2.18.0",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
     "orjson>=3.11.3",
     "packaging>=24.0",
-    "psutil>=7.1.0",
     "pydantic>=2.12.0",
-    "pymongo>=4.15.2",
     "python-slugify>=8.0.4",
     "pyyaml>=6.0.3",
     "rich>=14.1.0",
@@ -54,6 +47,14 @@ Documentation = "https://doc.supervaize.com"
 supervaizer = "supervaizer.cli:app"
 
 [project.optional-dependencies]
+deploy = [
+    "boto3>=1.34.0",
+    "docker>=7.0.0",
+    "google-cloud-artifact-registry>=1.8.0",
+    "google-cloud-run>=0.10.0",
+    "google-cloud-secret-manager>=2.18.0",
+    "psutil>=7.1.0",
+]
 dev = [
     "hatch>=1.14.2",
     "jsonschema>=4.25.1",
