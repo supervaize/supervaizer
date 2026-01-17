@@ -48,7 +48,7 @@ def create_routes(server: "Server") -> APIRouter:
     @handle_route_errors()
     async def get_health() -> Dict[str, Any]:
         """Get health information for the server and all agents."""
-        log.debug("[A2A] GET /.well-known/health [Health status]")
+        # log.debug("[A2A] GET /.well-known/health [Health status]")
         return create_health_data(server.agents)
 
     # Create explicit routes for each agent in the versioned format

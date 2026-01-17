@@ -63,7 +63,7 @@ class Parameter(ParameterAbstract):
         """
         Override the to_dict method to handle the value field.
         """
-        data = self.model_dump(mode="json")
+        data = super().to_dict
         if self.is_secret:
             data["value"] = "********"
         return data
@@ -186,6 +186,18 @@ class ParametersSetup(SvBaseModel):
         """
         errors = []
         invalid_parameters = {}
+
+        # Ensure parameters is a dictionary
+        if not isinstance(parameters, dict):
+            error_msg = (
+                f"Parameters must be a dictionary, got {type(parameters).__name__}"
+            )
+            errors.append(error_msg)
+            return {
+                "valid": False,
+                "errors": errors,
+                "invalid_parameters": {"parameters": error_msg},
+            }
 
         # First check for missing required parameters
         for param_name, param_def in self.definitions.items():

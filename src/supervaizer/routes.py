@@ -6,6 +6,7 @@
 
 import traceback
 from functools import wraps
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,11 +27,12 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
     Security,
     status as http_status,
 )
-from fastapi.responses import JSONResponse
-from rich import inspect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.templating import Jinja2Templates
 
 from supervaizer.agent import (
     Agent,
@@ -50,8 +52,6 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 T = TypeVar("T")
-
-insp = inspect
 
 
 class CaseUpdateRequest(SvBaseModel):
@@ -259,10 +259,13 @@ def create_default_routes(server: "Server") -> APIRouter:
         )
 
         # Update the case with the answer
-        case.update(update)
+        # case.update(update) - Redundant, receive_human_input calls update()
 
         # Transition the case from AWAITING to IN_PROGRESS
-        case.receive_human_input()
+        case.receive_human_input(update)
+
+        # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
+        # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE
 
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
@@ -383,6 +386,54 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
+    @router.get(
+        f"/{agent.instructions_path}",
+        summary=f"Get supervaize instructions page for agent {agent.name}",
+        description="HTML page displaying agent registration information and instructions",
+        response_class=HTMLResponse,
+        tags=tags,
+    )
+    @handle_route_errors()
+    async def supervaize_instructions(
+        request: Request, agent: Agent = Depends(get_agent)
+    ) -> Response:
+        """Serve the supervaize instructions HTML page for this agent."""
+        log.info(
+            f"📥  GET /{agent.instructions_path} [Supervaize Instructions] for agent{agent.name}"
+        )
+
+        registration_info = agent.registration_info
+
+        # Convert instructions_path string to Path object
+        instructions_path = Path(agent.instructions_path)
+
+        # Check if file exists - if not, return empty HTML
+        if not instructions_path.exists() or not instructions_path.is_file():
+            return HTMLResponse(content="", status_code=200)
+
+        # Serve the file (check if it's a Jinja2 template or static HTML)
+        with open(instructions_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            # Simple check: if it contains Jinja2 syntax, render as template
+            if "{{" in content or "{%" in content:
+                # Render as Jinja2 template
+                custom_templates = Jinja2Templates(
+                    directory=str(instructions_path.parent)
+                )
+                return custom_templates.TemplateResponse(
+                    instructions_path.name,
+                    {
+                        "request": request,
+                        "registration_info": registration_info,
+                    },
+                )
+            else:
+                # Serve as static HTML file
+                return FileResponse(
+                    str(instructions_path),
+                    media_type="text/html",
+                )
+
     @router.post(
         "/validate-agent-parameters",
         summary=f"Validate agent parameters for agent: {agent.name}",
@@ -406,21 +457,31 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
 
         if not agent.parameters_setup:
-            return {
+            result = {
                 "valid": True,
                 "message": "Agent has no parameter setup defined",
                 "errors": [],
                 "invalid_parameters": {},
             }
+            log.info(f"📤 Agent {agent.name}: No parameter setup defined → {result}")
+            return result
+
+        if body_params is None:
+            body_params = {}
 
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
-        # Decrypt agent parameters if provided
         agent_parameters: Dict[str, Any] = {}
         if encrypted_agent_parameters:
+            # Basic debug trace
+            log.info(
+                f"📥 Received encrypted_agent_parameters, length: {len(encrypted_agent_parameters)}"
+            )
+
             try:
-                from supervaizer.common import decrypt_value
                 import json
+
+                from supervaizer.common import decrypt_value
 
                 agent_parameters_str = decrypt_value(
                     encrypted_agent_parameters, server.private_key
@@ -428,8 +489,30 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 agent_parameters = (
                     json.loads(agent_parameters_str) if agent_parameters_str else {}
                 )
+
+                # Debug: Log the parsed data type and structure
+                log.info(f"🔍 Parsed agent_parameters type: {type(agent_parameters)}")
+                if isinstance(agent_parameters, list):
+                    log.info(
+                        f"🔍 Converting list to dict with {len(agent_parameters)} items"
+                    )
+                    # Convert list to dict if needed (common when frontend sends array)
+                    agent_parameters = {
+                        f"param_{i}": param for i, param in enumerate(agent_parameters)
+                    }
+                elif isinstance(agent_parameters, dict):
+                    log.info(
+                        f"🔍 Agent parameters keys: {list(agent_parameters.keys())}"
+                    )
+                else:
+                    log.warning(
+                        f"🔍 Unexpected type: {type(agent_parameters)}, converting to empty dict"
+                    )
+                    agent_parameters = {}
+
             except Exception as e:
-                return {
+                log.error(f"❌ Decryption failed: {type(e).__name__}: {str(e)}")
+                result = {
                     "valid": False,
                     "message": f"Failed to decrypt agent parameters: {str(e)}",
                     "errors": [f"Decryption failed: {str(e)}"],
@@ -437,11 +520,18 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                         "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
                     },
                 }
+                log.info(f"📤 Agent {agent.name}: Decryption failed → {result}")
+                return result
+
+        # Log the incoming request details
+        log.info(
+            f"🔍 Agent {agent.name}: Incoming request - encrypted_params: {bool(encrypted_agent_parameters)}, parsed_params: {agent_parameters}"
+        )
 
         # Validate agent parameters
         validation_result = agent.parameters_setup.validate_parameters(agent_parameters)
 
-        return {
+        result = {
             "valid": validation_result["valid"],
             "message": "Agent parameters validated successfully"
             if validation_result["valid"]
@@ -449,6 +539,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             "errors": validation_result["errors"],
             "invalid_parameters": validation_result["invalid_parameters"],
         }
+
+        log.info(f"📤 Agent {agent.name}: Validation result → {result}")
+        return result
 
     @router.post(
         "/validate-method-fields",
@@ -472,39 +565,58 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             f"📥 POST /validate-method-fields [Validate method fields] {agent.name}"
         )
 
+        if body_params is None:
+            body_params = {}
+
         method_name = body_params.get("method_name", "job_start")
         job_fields = body_params.get("job_fields", {})
 
+        # Log the incoming request details
+        log.info(
+            f"🔍 Agent {agent.name}: Incoming request - method: {method_name}, fields: {job_fields}"
+        )
+
         # Get the method to validate against
         if not agent.methods:
-            return {
+            result = {
                 "valid": False,
                 "message": "Agent has no methods defined",
                 "errors": ["Agent has no methods defined"],
                 "invalid_fields": {},
             }
+            log.info(f"📤 Agent {agent.name}: No methods defined → {result}")
+            return result
 
         if method_name == "job_start":
             method = agent.methods.job_start
         elif agent.methods.custom and method_name in agent.methods.custom:
             method = agent.methods.custom[method_name]
         else:
-            return {
+            result = {
                 "valid": False,
                 "message": f"Method '{method_name}' not found",
                 "errors": [f"Method '{method_name}' not found"],
                 "invalid_fields": {},
             }
+            log.info(
+                f"📤 Agent {agent.name}: Method '{method_name}' not found → {result}"
+            )
+            return result
 
         # Validate method fields
         validation_result = method.validate_method_fields(job_fields)
 
-        return {
+        result = {
             "valid": validation_result["valid"],
             "message": validation_result["message"],
             "errors": validation_result["errors"],
             "invalid_fields": validation_result["invalid_fields"],
         }
+
+        log.info(
+            f"📤 Agent {agent.name}: Method '{method_name}' validation result → {result}"
+        )
+        return result
 
     if not agent.methods:
         raise ValueError(f"Agent {agent.name} has no methods defined")
@@ -540,8 +652,15 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
 
-        sv_context: JobContext = JobContext(**body_params["job_context"])
-        job_fields = body_params["job_fields"]
+        if body_params is None:
+            body_params = {}
+
+        job_context_data = body_params.get("job_context")
+        if job_context_data is None:
+            raise ValueError("job_context is required")
+
+        sv_context: JobContext = JobContext(**job_context_data)
+        job_fields = body_params.get("job_fields", {})
 
         # Get job encrypted parameters if available
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
@@ -649,7 +768,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         agent: Agent = Depends(get_agent),
     ) -> AgentResponse:
         log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
-        result = agent.job_stop(params.get("job_context", {}))
+        # Pass job_context as 'context' parameter to match agent method expectations
+        job_context = params.get("job_context", {})
+        result = agent.job_stop({"context": job_context})
         res_info = result.registration_info if result else {}
         return AgentResponse(
             name=agent.name,
@@ -762,6 +883,9 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )
             log.info(f"body_params: {body_params}")
+
+            if body_params is None:
+                raise ValueError("body_params cannot be None")
 
             sv_context: JobContext = body_params.job_context
             job_fields = body_params.job_fields.to_dict()

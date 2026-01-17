@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervaize Instructions - {{ registration_info.name }}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .json-key {
+            color: #0369a1;
+            font-weight: 600;
+        }
+        .json-string {
+            color: #059669;
+        }
+        .json-number {
+            color: #dc2626;
+        }
+        .json-boolean {
+            color: #7c3aed;
+        }
+        .json-null {
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ registration_info.name }}</h1>
+            {% if registration_info.description %}
+            <p class="text-lg text-gray-600">{{ registration_info.description }}</p>
+            {% endif %}
+            {% if registration_info.version %}
+            <p class="text-sm text-gray-500 mt-2">Version: {{ registration_info.version }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Basic Information -->
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Agent Information</h2>
+            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {% if registration_info.id %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">ID</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.id }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.api_path %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">API Path</dt>
+                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ registration_info.api_path }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.author %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Author</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.author }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.developer %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Developer</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.developer }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.maintainer %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Maintainer</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.maintainer }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.editor %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Editor</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.editor }}</dd>
+                </div>
+                {% endif %}
+                {% if registration_info.max_execution_time %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Max Execution Time</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ registration_info.max_execution_time }} seconds</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        <!-- Tags -->
+        {% if registration_info.tags %}
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Tags</h2>
+            <div class="flex flex-wrap gap-2">
+                {% for tag in registration_info.tags %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {{ tag }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Methods -->
+        {% if registration_info.methods %}
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Available Methods</h2>
+            <div class="space-y-4">
+                {% if registration_info.methods.job_start %}
+                <div class="border-l-4 border-green-500 pl-4">
+                    <h3 class="font-medium text-gray-900">Job Start</h3>
+                    {% if registration_info.methods.job_start.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ registration_info.methods.job_start.description }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if registration_info.methods.job_stop %}
+                <div class="border-l-4 border-red-500 pl-4">
+                    <h3 class="font-medium text-gray-900">Job Stop</h3>
+                    {% if registration_info.methods.job_stop.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ registration_info.methods.job_stop.description }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if registration_info.methods.job_status %}
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <h3 class="font-medium text-gray-900">Job Status</h3>
+                    {% if registration_info.methods.job_status.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ registration_info.methods.job_status.description }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if registration_info.methods.chat %}
+                <div class="border-l-4 border-purple-500 pl-4">
+                    <h3 class="font-medium text-gray-900">Chat</h3>
+                    {% if registration_info.methods.chat.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ registration_info.methods.chat.description }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if registration_info.methods.custom %}
+                {% for method_name, method_info in registration_info.methods.custom.items() %}
+                <div class="border-l-4 border-yellow-500 pl-4">
+                    <h3 class="font-medium text-gray-900">{{ method_name }}</h3>
+                    {% if method_info.description %}
+                    <p class="text-sm text-gray-600 mt-1">{{ method_info.description }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        <!-- Parameters Setup -->
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Parameters</h2>
+            {% if registration_info.parameters_setup %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for param in registration_info.parameters_setup %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ param.name }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ param.description or "-" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if param.is_secret %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Secret</span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Standard</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if param.is_required %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Required</span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Optional</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No parameters configured.</p>
+            {% endif %}
+        </div>
+
+        <!-- Custom instructions -->
+        <div class="bg-white shadow rounded-lg mb-6 p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Setup instructions</h2>
+            <div class="overflow-x-auto">
+                TBD
+            </div>
+        </div>
+    </div>
+</body>
+</html>

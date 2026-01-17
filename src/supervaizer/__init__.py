@@ -14,7 +14,14 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentMethods,
 )
-from supervaizer.case import Case, CaseNodeUpdate, CaseNoteType, Cases
+from supervaizer.case import (
+    Case,
+    CaseNodeUpdate,
+    CaseNodeType,
+    Cases,
+    CaseNode,
+    CaseNodes,
+)
 from supervaizer.common import ApiError, ApiResult, ApiSuccess
 from supervaizer.event import (
     AgentRegisterEvent,
@@ -51,8 +58,10 @@ __all__ = [
     "ApiSuccess",
     "Case",
     "CaseNodeUpdate",
-    "CaseNoteType",
+    "CaseNodeType",
     "Cases",
+    "CaseNode",
+    "CaseNodes",
     "CaseStartEvent",
     "CaseUpdateEvent",
     "create_error_response",

@@ -141,27 +141,38 @@ async def test_get_all_jobs_endpoint(
     agent_fixture: Agent,
     job_fixture: Job,
     mocker: Any,
+    monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     exception: Optional[Exception],
     status_filter: Optional[EntityStatus],
     expected_error_type: Optional[ErrorType],
     expected_status: Optional[int],
 ) -> None:
-    """Test the get_agent_jobs endpoint with parametrization"""
-    i_tested_something = False
+    """Test the GET /supervaizer/jobs endpoint for listing all jobs."""
+    if not exception:
+        monkeypatch.undo()
 
-    # Only test the success cases for now - they're the most important
     if exception:
-        # Skip the exception tests - they're too tricky to set up
-        pytest.skip("Skipping exception test cases for now")
-
-    # For non-exception cases, mock the Jobs registry
-    mock_jobs = mocker.patch("supervaizer.routes.Jobs")
-    mock_jobs_instance = mocker.MagicMock()
-    mock_jobs.return_value = mock_jobs_instance
-
-    # Return a dictionary with the actual job_fixture object
-    mock_jobs_instance.get_agent_jobs.return_value = {job_fixture.id: job_fixture}
+        # Mock Jobs() to raise an exception when its attribute is accessed
+        mock_jobs_class = mocker.patch("supervaizer.routes.Jobs")
+        mock_jobs_instance = mocker.MagicMock()
+        # Use a property to raise the exception on access
+        type(mock_jobs_instance).jobs_by_agent = mocker.PropertyMock(
+            side_effect=exception
+        )
+        mock_jobs_class.return_value = mock_jobs_instance
+    else:
+        # For non-exception cases, mock the Jobs registry to return jobs
+        mock_jobs = mocker.patch("supervaizer.routes.Jobs")
+        mock_jobs_instance = mocker.MagicMock()
+        mock_jobs.return_value = mock_jobs_instance
+        # If filtering, update the job's status to match
+        if status_filter:
+            job_fixture.status = status_filter
+        # The endpoint iterates over jobs_by_agent, so we mock that attribute
+        mock_jobs_instance.jobs_by_agent = {
+            agent_fixture.name: {job_fixture.id: job_fixture}
+        }
 
     # Add API key headers
     client = TestClient(server_fixture.app)
@@ -174,20 +185,21 @@ async def test_get_all_jobs_endpoint(
 
     # Make the API call for all test cases
     response = client.get(url, headers=headers)
-    i_tested_something = True
 
     # Assert expected status code
     assert response.status_code == expected_status
 
-    # For success case, do additional verifications
-    if not exception and response.status_code == 200:
+    if not exception:
+        # For success cases, check the response body and unauthorized access
+        response_data = response.json()
+        assert agent_fixture.name in response_data
+        assert len(response_data[agent_fixture.name]) > 0
+        assert response_data[agent_fixture.name][0]["job_id"] == job_fixture.id
+
         # Verify unauthorized access
         unauth_response = client.get(url)
-        i_tested_something = True
         assert unauth_response.status_code == 403
         assert "Not authenticated" in unauth_response.json()["detail"]
-
-    assert i_tested_something, "No test was performed"
 
 
 def test_utils_routes(server_fixture: Server) -> None:
@@ -211,27 +223,35 @@ def test_utils_routes(server_fixture: Server) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "exception,expected_error_type,expected_status",
-    [
-        (None, None, status.HTTP_202_ACCEPTED),  # Success case
+    "exception,expected_error_type,expected_status,use_no_response_validation",
+    [  # The use_no_response_validation parameter is a dummy to trigger the fixture
+        (None, None, status.HTTP_202_ACCEPTED, False),
         (
             ValueError("Job already exists"),
             ErrorType.JOB_ALREADY_EXISTS,
             status.HTTP_409_CONFLICT,
+            True,
         ),
         (
             ValueError("Other error"),
             ErrorType.INVALID_REQUEST,
             status.HTTP_400_BAD_REQUEST,
+            True,
         ),
         (
             Exception("General error"),
             ErrorType.INTERNAL_ERROR,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
+            True,
         ),
     ],
+    ids=[
+        "success",
+        "exception1-job_already_exists",
+        "exception2-invalid_request",
+        "exception3-internal_error",
+    ],
 )
-@pytest.mark.current
 async def test_start_job_endpoint(
     server_fixture: Server,
     agent_fixture: Agent,
@@ -240,32 +260,35 @@ async def test_start_job_endpoint(
     parameters_fixture: ParametersSetup,
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
+    mocker: Any,
     exception: Exception,
-    expected_error_type: ErrorType,
+    expected_error_type: Optional[ErrorType],
     expected_status: int,
+    use_no_response_validation: bool,
 ) -> None:
     """Test the start_job endpoint with parametrization"""
     i_tested_something = False
 
+    if not use_no_response_validation:
+        monkeypatch.undo()
+
     # Use the real job context and parameters_fixture
     # Remove MagicMock for job context, job fields, job model, etc.
 
-    # Monkeypatch Job.new to return the real job_fixture
-    monkeypatch.setattr(
-        Job, "new", lambda job_context, agent_name, parameters: job_fixture
-    )
-
-    # Patch Agent.job_start to raise exception or return job_fixture
-    def job_start_patch(self: Agent, *args: Any, **kwargs: Any) -> Job:
+    # Mock the service layer function
+    async def mock_service_job_start(*args, **kwargs):
         if exception:
             raise exception
         return job_fixture
 
-    monkeypatch.setattr(Agent, "job_start", job_start_patch)
+    mocker.patch(
+        "supervaizer.routes.service_job_start",
+        new=mock_service_job_start,
+    )
 
     # Patch Server.decrypt to return parameters_fixture as dict
-    monkeypatch.setattr(
-        Server,
+    mocker.patch(
+        "supervaizer.common.decrypt_value",
         "decrypt",
         lambda self, encrypted: json.dumps(
             {k: v.value for k, v in parameters_fixture.definitions.items()}
@@ -275,7 +298,7 @@ async def test_start_job_endpoint(
     # Set up client with API key
     client = TestClient(server_fixture.app)
     headers: dict[str, Any] = {"X-API-Key": server_fixture.api_key}
-    url = f"/supervaizer/agents/{agent_fixture.name}/jobs"
+    url = f"/supervaizer{agent_fixture.path}/jobs"
 
     # Always make the API request regardless of exception case
     data = {
@@ -294,11 +317,12 @@ async def test_start_job_endpoint(
     response = client.post(url, json=data, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
+    if expected_error_type:
+        response_data = response.json()
+        assert response_data["error_type"] == expected_error_type.value
+
     assert i_tested_something, "No test was performed"
 
 
@@ -327,6 +351,7 @@ async def test_get_agent_jobs_endpoint(
     agent_fixture: Agent,
     job_fixture: Job,
     mocker: Any,
+    monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     exception: Optional[Exception],
     status_filter: Optional[EntityStatus],
@@ -335,6 +360,9 @@ async def test_get_agent_jobs_endpoint(
 ) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     i_tested_something = False
+
+    if not exception:
+        monkeypatch.undo()
 
     # Create mock jobs
     mock_jobs = mocker.patch("supervaizer.routes.Jobs")
@@ -345,14 +373,24 @@ async def test_get_agent_jobs_endpoint(
     if exception:
         # Mock the Jobs registry to raise the exception
         mock_jobs_instance.get_agent_jobs.side_effect = exception
+    elif status_filter:
+        job_fixture.status = status_filter
+        jobs_list = [job_fixture]
+        mock_jobs_instance.get_agent_jobs.return_value = {j.id: j for j in jobs_list}
     else:
-        mock_jobs_instance.get_agent_jobs.return_value = {job_fixture.id: job_fixture}
+        # The endpoint iterates over the values of the returned dict.
+        # Let's make the mock return a list directly to be clearer.
+        jobs_list = [job_fixture]
+        mock_jobs_instance.get_agent_jobs.return_value = {j.id: j for j in jobs_list}
 
     # Mock error response for exceptions
     if exception:
         mock_error = mocker.patch("supervaizer.routes.create_error_response")
+        error_content = {"detail": str(exception)}
+        if expected_error_type:
+            error_content["error_type"] = expected_error_type.value
         mock_error.return_value = JSONResponse(
-            status_code=expected_status, content={"detail": str(exception)}
+            status_code=expected_status, content=error_content
         )
 
     # Add API key headers and prepare client
@@ -360,7 +398,7 @@ async def test_get_agent_jobs_endpoint(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL and add status filter if provided
-    url = f"/supervaizer/agents/{agent_fixture.name}/jobs"
+    url = f"/supervaizer/agents/{agent_fixture.slug}/jobs"
     if status_filter:
         url += f"?status={status_filter.value}"
 
@@ -368,14 +406,11 @@ async def test_get_agent_jobs_endpoint(
     response = client.get(url, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
+    if not exception:
+        assert len(response.json()) > 0
 
-    # Skip the rest of the assertions since we know we're getting 404s
-    pytest.skip("Skipping rest of assertions since we know we're getting 404s")
     assert i_tested_something, "No test was performed"
 
 
@@ -407,12 +442,12 @@ async def test_get_agent_jobs_endpoint(
         ),
     ],
 )
-@pytest.mark.current
 async def test_get_job_status_for_agent(
     server_fixture: Server,
     agent_fixture: Agent,
     job_fixture: Job,
     mocker: Any,
+    monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     job_exists: bool,
     exception: Optional[Exception],
@@ -422,6 +457,9 @@ async def test_get_job_status_for_agent(
 ) -> None:
     """Test the get_job_status endpoint for a specific agent with parametrization"""
     i_tested_something = False
+
+    if not exception and job_exists:
+        monkeypatch.undo()
 
     # Simple mocking approach using existing fixtures
     mock_jobs = mocker.patch("supervaizer.routes.Jobs")
@@ -440,15 +478,21 @@ async def test_get_job_status_for_agent(
     if exception or not job_exists:
         mock_error = mocker.patch("supervaizer.routes.create_error_response")
         if exception:
+            error_content = {"detail": str(exception)}
+            if expected_error_type:
+                error_content["error_type"] = expected_error_type.value
             mock_error.return_value = JSONResponse(
-                status_code=expected_status, content={"detail": str(exception)}
+                status_code=expected_status, content=error_content
             )
         else:
+            error_content = {
+                "detail": f"Job with ID {job_fixture.id} not found for agent {agent_fixture.name}"
+            }
+            if expected_error_type:
+                error_content["error_type"] = expected_error_type.value
+
             mock_error.return_value = JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={
-                    "detail": f"Job with ID {job_fixture.id} not found for agent {agent_fixture.name}"
-                },
+                status_code=expected_status, content=error_content
             )
 
     # Set up client and add API key headers
@@ -456,20 +500,18 @@ async def test_get_job_status_for_agent(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL - try different formats
-    url = f"/supervaizer/agents/{agent_fixture.name}/jobs/{job_fixture.id}"
+    url = f"/supervaizer{agent_fixture.path}/jobs/{job_fixture.id}"
 
     # Make the API call
     response = client.get(url, headers=headers)
     i_tested_something = True
 
-    # TEMPORARY: Set the expected status code to 404 until we fix the routing
-    expected_actual_status = 404  # We know all routes return 404 for now
+    assert response.status_code == expected_status
 
-    # Assert temporary expected status code
-    assert response.status_code == expected_actual_status
-
-    # Skip the rest of the assertions since we know we're getting 404s
-    print(f"NOTE: Got expected 404 for {url} - will fix routing in future PR")
+    if expected_error_type:
+        response_data = response.json()
+        assert "detail" in response_data
+        assert response_data["error_type"] == expected_error_type.value
 
     assert i_tested_something, "No test was performed"
 
@@ -483,45 +525,6 @@ def test_error_response() -> None:
     )
     assert isinstance(error, JSONResponse)
     assert error.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-
-def get_correct_route_paths(server_fixture: Server, agent_fixture: Agent) -> dict:
-    """Helper function to analyze available routes and return correct paths for tests."""
-    route_paths = {}
-
-    # Find the jobs endpoint path
-    for route in server_fixture.app.routes:
-        route_path = route.path
-        route_methods = route.methods
-
-        # Jobs listing endpoints (all jobs)
-        if "/jobs" in route_path and "{" not in route_path and "GET" in route_methods:
-            if not route_path.startswith("/supervaizer/agents"):
-                route_paths["all_jobs_path"] = route_path
-
-        # Agent-specific jobs endpoints
-        if "/agents/" in route_path and "/jobs" in route_path:
-            if "{job_id}" in route_path:
-                # Job detail endpoint
-                route_paths["agent_job_detail_template"] = route_path.replace(
-                    "{agent_name}", agent_fixture.name
-                )
-                route_paths["agent_job_detail"] = route_path.replace(
-                    "{agent_name}", agent_fixture.name
-                ).replace("{job_id}", "test-job-id")
-            elif "{agent_name}" in route_path and "POST" in route_methods:
-                # Job creation endpoint
-                route_paths["agent_jobs_create"] = route_path.replace(
-                    "{agent_name}", agent_fixture.name
-                )
-            elif "{agent_name}" in route_path and "GET" in route_methods:
-                # Jobs listing for agent
-                route_paths["agent_jobs_list"] = route_path.replace(
-                    "{agent_name}", agent_fixture.name
-                )
-
-    print("Detected route paths:", route_paths)
-    return route_paths
 
 
 def test_server_registration_info(server_fixture: Server) -> None:
@@ -541,7 +544,7 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert "docs" in registration_info
     assert "agents" in registration_info
     assert "url" in registration_info
-    print(registration_info)
+
     # Check values match the fixture
     assert registration_info.pop("public_key").startswith("-----BEGIN PUBLIC KEY")
     assert len(registration_info.pop("agents")) == 1

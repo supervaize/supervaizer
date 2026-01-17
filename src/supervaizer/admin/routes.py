@@ -27,7 +27,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from supervaizer.__version__ import API_VERSION
+from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.common import log
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import (
@@ -257,10 +257,11 @@ def create_admin_routes() -> APIRouter:
             stats = get_dashboard_stats(storage)
 
             return templates.TemplateResponse(
+                request,
                 "dashboard.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "stats": stats,
                     "system_status": "Online",
                     "db_name": "TinyDB",
@@ -276,10 +277,11 @@ def create_admin_routes() -> APIRouter:
     async def admin_jobs_page(request: Request) -> Response:
         """Jobs management page."""
         return templates.TemplateResponse(
+            request,
             "jobs_list.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
@@ -288,10 +290,11 @@ def create_admin_routes() -> APIRouter:
     async def admin_cases_page(request: Request) -> Response:
         """Cases management page."""
         return templates.TemplateResponse(
+            request,
             "cases_list.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
@@ -305,10 +308,11 @@ def create_admin_routes() -> APIRouter:
             server_config = get_server_configuration(storage)
 
             return templates.TemplateResponse(
+                request,
                 "server.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "server_status": server_status,
                     "server_config": server_config,
                     "api_key": os.getenv("SUPERVAIZER_API_KEY"),
@@ -331,10 +335,11 @@ def create_admin_routes() -> APIRouter:
                 )
 
             return templates.TemplateResponse(
+                request,
                 "agents.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "agents": server_info.agents,
                     "api_key": os.getenv("SUPERVAIZER_API_KEY"),
                 },
@@ -349,10 +354,11 @@ def create_admin_routes() -> APIRouter:
     async def admin_job_start_test_page(request: Request) -> Response:
         """Job start form test page."""
         return templates.TemplateResponse(
+            request,
             "job_start_test.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
@@ -378,7 +384,9 @@ def create_admin_routes() -> APIRouter:
         console_token = generate_console_token()
 
         return templates.TemplateResponse(
-            "console.html", {"request": request, "console_token": console_token}
+            request,
+            "console.html",
+            {"request": request, "console_token": console_token},
         )
 
     # API Routes
@@ -394,6 +402,7 @@ def create_admin_routes() -> APIRouter:
             server_status = get_server_status()
 
             return templates.TemplateResponse(
+                request,
                 "server_status_cards.html",
                 {
                     "request": request,
@@ -466,6 +475,7 @@ def create_admin_routes() -> APIRouter:
                 pass
 
             return templates.TemplateResponse(
+                request,
                 "agents_grid.html",
                 {
                     "request": request,
@@ -503,6 +513,7 @@ def create_admin_routes() -> APIRouter:
                 raise HTTPException(status_code=404, detail="Agent not found")
 
             return templates.TemplateResponse(
+                request,
                 "agent_detail.html",
                 {
                     "request": request,
@@ -586,6 +597,7 @@ def create_admin_routes() -> APIRouter:
                 jobs.append(job)
 
             return templates.TemplateResponse(
+                request,
                 "jobs_table.html",
                 {
                     "request": request,
@@ -614,6 +626,7 @@ def create_admin_routes() -> APIRouter:
             cases_data = storage.get_cases_for_job(job_id)
 
             return templates.TemplateResponse(
+                request,
                 "job_detail.html",
                 {
                     "request": request,
@@ -704,6 +717,7 @@ def create_admin_routes() -> APIRouter:
                 cases.append(case)
 
             return templates.TemplateResponse(
+                request,
                 "cases_table.html",
                 {
                     "request": request,
@@ -734,6 +748,7 @@ def create_admin_routes() -> APIRouter:
                 job_data = storage.get_object_by_id("Job", case_data["job_id"])
 
             return templates.TemplateResponse(
+                request,
                 "case_detail.html",
                 {
                     "request": request,
@@ -885,6 +900,7 @@ def create_admin_routes() -> APIRouter:
             activities = activities[:10]  # Top 10 recent activities
 
             return templates.TemplateResponse(
+                request,
                 "recent_activity.html",
                 {
                     "request": request,

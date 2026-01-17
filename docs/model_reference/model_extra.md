@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 0.9.8
+**Version:** 0.10.0
 
 ### `common.SvBaseModel`
 
@@ -66,8 +66,9 @@ A base class for creating Pydantic models.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `job_start` | `AgentMethod` | **required** |  |
-| `job_stop` | `AgentMethod` | **required** |  |
-| `job_status` | `AgentMethod` | **required** |  |
+| `job_stop` | `AgentMethod` | `None` |  |
+| `job_status` | `AgentMethod` | `None` |  |
+| `human_answer` | `AgentMethod` | `None` |  |
 | `chat` | `AgentMethod` | `None` |  |
 | `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` |  |
 
@@ -93,6 +94,16 @@ Response model for agent endpoints - values provided by Agent.registration_info
 | `server_agent_status` | `str` | `None` |  |
 | `server_agent_onboarding_status` | `str` | `None` |  |
 | `server_encrypted_parameters` | `str` | `None` |  |
+
+### `case.CaseNodes`
+
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `nodes` | `List[case.CaseNode]` | [] |  |
 
 ### `job.Job`
 
@@ -186,8 +197,10 @@ _No additional fields beyond parent class._
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | **required** |  |
-| `description` | `str` | **required** |  |
-| `type` | `<enum 'CaseNoteType'>` | **required** |  |
+| `type` | `<enum 'CaseNodeType'>` | **required** |  |
+| `factory` | `Callable[..., case.CaseNodeUpdate]` | **required** |  |
+| `description` | `str` | `None` |  |
+| `can_be_confirmed` | `bool` | False |  |
 
 ### `case.CaseNodeUpdate`
 
@@ -209,6 +222,110 @@ Returns:
 | `payload` | `typing.Dict[str, typing.Any]` | `None` |  |
 | `is_final` | `bool` | False |  |
 | `error` | `str` | `None` |  |
+
+### `deploy.drivers.base.DeploymentPlan`
+
+Deployment plan containing all actions to be taken.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `platform` | `str` | **required** |  |
+| `service_name` | `str` | **required** |  |
+| `environment` | `str` | **required** |  |
+| `region` | `str` | **required** |  |
+| `project_id` | `str` | `None` |  |
+| `actions` | `List[deploy.drivers.base.ResourceAction]` | [] |  |
+| `total_cost_estimate` | `str` | `None` |  |
+| `estimated_duration` | `str` | `None` |  |
+| `current_image` | `str` | `None` |  |
+| `current_url` | `str` | `None` |  |
+| `current_status` | `str` | `None` |  |
+| `target_image` | `str` | **required** |  |
+| `target_port` | `int` | 8000 |  |
+| `target_env_vars` | `Dict[str, str]` | {} |  |
+| `target_secrets` | `Dict[str, str]` | {} |  |
+
+### `deploy.drivers.base.DeploymentResult`
+
+Result of a deployment operation.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `success` | `bool` | **required** |  |
+| `service_url` | `str` | `None` |  |
+| `service_id` | `str` | `None` |  |
+| `revision` | `str` | `None` |  |
+| `image_digest` | `str` | `None` |  |
+| `status` | `str` | 'unknown' |  |
+| `health_status` | `str` | 'unknown' |  |
+| `deployment_time` | `float` | `None` |  |
+| `error_message` | `str` | `None` |  |
+| `error_details` | `typing.Dict[str, typing.Any]` | `None` |  |
+
+### `deploy.state.DeploymentState`
+
+Deployment state model.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `version` | `int` | 2 | State file format version |
+| `service_name` | `str` | **required** | Name of the deployed service |
+| `platform` | `str` | **required** | Target platform (cloud-run|aws-app-runner|do-app-platform) |
+| `environment` | `str` | **required** | Environment (dev|staging|prod) |
+| `region` | `str` | **required** | Provider region |
+| `project_id` | `str` | `None` | GCP project / AWS account / DO project |
+| `image_tag` | `str` | **required** | Docker image tag |
+| `image_digest` | `str` | `None` | Docker image digest |
+| `service_url` | `str` | `None` | Public service URL |
+| `revision` | `str` | `None` | Service revision/version |
+| `created_at` | `datetime` | — | Deployment creation time |
+| `updated_at` | `datetime` | — | Last update time |
+| `status` | `str` | 'unknown' | Deployment status |
+| `health_status` | `str` | 'unknown' | Health check status |
+| `port` | `int` | 8000 | Application port |
+| `api_key_generated` | `bool` | False | Whether API key was generated |
+| `rsa_key_generated` | `bool` | False | Whether RSA key was generated |
+| `provider_data` | `Dict[str, Any]` | — | Platform-specific data |
+
+### `deploy.drivers.base.ResourceAction`
+
+Represents an action to be taken on a resource.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `resource_type` | `<enum 'ResourceType'>` | **required** |  |
+| `action_type` | `<enum 'ActionType'>` | **required** |  |
+| `resource_name` | `str` | **required** |  |
+| `description` | `str` | **required** |  |
+| `cost_estimate` | `str` | `None` |  |
+| `metadata` | `typing.Dict[str, typing.Any]` | `None` |  |
+
+### `deploy.health.HealthCheckConfig`
+
+Configuration for health check operations.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `timeout` | `int` | 60 |  |
+| `max_retries` | `int` | 5 |  |
+| `base_delay` | `float` | 1.0 |  |
+| `max_delay` | `float` | 30.0 |  |
+| `backoff_multiplier` | `float` | 2.0 |  |
+| `success_threshold` | `int` | 1 |  |
+| `endpoints` | `typing.List[str]` | `None` |  |
+
+### `deploy.health.HealthCheckResult`
+
+Result of a health check operation.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `status` | `<enum 'HealthStatus'>` | **required** |  |
+| `response_time` | `float` | **required** |  |
+| `status_code` | `int` | `None` |  |
+| `error_message` | `str` | `None` |  |
+| `endpoint` | `str` | `None` |  |
+| `timestamp` | `float` | 0.0 |  |
 
 ### `event.AbstractEvent`
 
@@ -296,8 +413,8 @@ _No additional fields beyond parent class._
 | `responses` | `list[job.JobResponse]` | [] |  |
 | `finished_at` | `datetime` | `None` |  |
 | `created_at` | `datetime` | `None` |  |
-| `agent_parameters` | `typing.List[dict[str, typing.Any]]` | `None` |  |
-| `case_ids` | `List[str]` | [] |  |
+| `agent_parameters` | `list[dict[str, typing.Any]]` | `None` |  |
+| `case_ids` | `list[str]` | [] |  |
 
 ### `job.JobInstructions`
 
@@ -336,7 +453,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2025, 8, 12, 14, 19, 38, 649854) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 1, 17, 16, 8, 2, 181168) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.ServerInfo`
@@ -368,4 +485,4 @@ A base class for creating Pydantic models.
 | `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Uploaded on 2025-08-12 14:19:38*
+*Uploaded on 2026-01-17 16:08:02*

@@ -28,6 +28,7 @@ from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
+from supervaizer.case import CaseNodes
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -209,6 +210,11 @@ class AgentMethodAbstract(BaseModel):
             "description": "Start the collection of new competitor summary",
         },
     }
+
+    nodes: CaseNodes | None = Field(
+        default=None,
+        description="The definition of the Case Nodes (=steps) for this method",
+    )
 
 
 class AgentMethod(AgentMethodAbstract):
@@ -419,6 +425,7 @@ class AgentMethod(AgentMethodAbstract):
             "params": self.params,
             "fields": self.fields_definitions,
             "description": self.description,
+            "nodes": self.nodes.registration_info if self.nodes else None,
         }
 
 
@@ -440,8 +447,9 @@ class AgentCustomMethodParams(AgentMethodParams):
 
 class AgentMethodsAbstract(BaseModel):
     job_start: AgentMethod
-    job_stop: AgentMethod
-    job_status: AgentMethod
+    job_stop: AgentMethod | None = None
+    job_status: AgentMethod | None = None
+    human_answer: AgentMethod | None = None
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
 
@@ -476,8 +484,13 @@ class AgentMethods(AgentMethodsAbstract):
     def registration_info(self) -> Dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
-            "job_stop": self.job_stop.registration_info,
-            "job_status": self.job_status.registration_info,
+            "job_stop": self.job_stop.registration_info if self.job_stop else None,
+            "job_status": self.job_status.registration_info
+            if self.job_status
+            else None,
+            "human_answer": self.human_answer.registration_info
+            if self.human_answer
+            else None,
             "chat": self.chat.registration_info if self.chat else None,
             "custom": {
                 name: method.registration_info
@@ -574,6 +587,14 @@ class AgentAbstract(SvBaseModel):
     max_execution_time: int = Field(
         default=60 * 60,
         description="Maximum execution time in seconds, defaults to 1 hour",
+    )
+    supervaize_instructions_template_path: Optional[str] = Field(
+        default=None,
+        description="Optional path to a custom template file for supervaize_instructions.html page",
+    )
+    instructions_path: str = Field(
+        default="supervaize_instructions.html",
+        description="Path where the supervaize instructions page is served (relative to agent path)",
     )
 
     model_config = {
@@ -690,6 +711,7 @@ class Agent(AgentAbstract):
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
             "server_encrypted_parameters": self.server_encrypted_parameters,
             "max_execution_time": self.max_execution_time,
+            "instructions_path": self.instructions_path,
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
@@ -888,13 +910,13 @@ class Agent(AgentAbstract):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
-        if not self.methods:
+        if not self.methods or not self.methods.job_stop:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
-        if not self.methods:
+        if not self.methods or not self.methods.job_status:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_status.method
         return self._execute(method, params)

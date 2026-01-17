@@ -173,6 +173,7 @@ agent: Agent = Agent(
         custom={"custom1": custom_method, "custom2": custom_method2},
     ),
     parameters_setup=agent_parameters,
+    instructions_path="supervaize_instructions.html",  # Path where instructions page is served
 )
 
 # For export purposes, use dummy values if environment variables are not set
@@ -186,7 +187,6 @@ account: Account = Account(
 sv_server: Server = Server(
     agents=[agent],
     a2a_endpoints=True,  # Enable A2A endpoints
-    acp_endpoints=True,  # Enable ACP endpoints
     supervisor_account=account,  # Account of the supervisor from Supervaize
 )
 

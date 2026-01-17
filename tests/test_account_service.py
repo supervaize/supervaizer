@@ -23,9 +23,11 @@ def test_send_event_success(
     server_fixture: Server,
     mocker: MockerFixture,
 ) -> None:
-    mock_post = mocker.patch("httpx.post")
+    # Patch the method on the client instance used in account_service
+    mock_post = mocker.patch("supervaizer.account_service._httpx_client.post")
     mock_post.return_value.status_code = 200
     mock_post.return_value.text = str(WAKEUP_EVENT_RESPONSE)
+    mock_post.return_value.raise_for_status = mocker.Mock()
 
     result = send_event(
         account=account_fixture, sender=server_fixture, event=event_fixture
@@ -47,14 +49,20 @@ def test_send_event_auth_error(
     server_fixture: Server,
     mocker: MockerFixture,
 ) -> None:
-    mock_post = mocker.patch("httpx.post")
-    mock_post.return_value.status_code = 403
-    mock_post.return_value.text = str(AUTH_ERROR_RESPONSE)
-    mock_post.side_effect = HTTPStatusError(
-        "403 Client Error: Forbidden for url: https://api.example.com",
-        request=None,
-        response=None,
+    mock_post = mocker.patch("supervaizer.account_service._httpx_client.post")
+
+    # Create a mock response that raises HTTPStatusError when raise_for_status is called
+    mock_response = mocker.Mock()
+    mock_response.status_code = 403
+    mock_response.text = str(AUTH_ERROR_RESPONSE)
+
+    error = HTTPStatusError(
+        "403 Client Error: Forbidden for url",
+        request=mocker.Mock(),
+        response=mock_response,
     )
+    mock_response.raise_for_status.side_effect = error
+    mock_post.return_value = mock_response
 
     with pytest.raises(HTTPStatusError, match="403 Client Error: Forbidden for url"):
         send_event(account=account_fixture, sender=server_fixture, event=event_fixture)
@@ -66,8 +74,7 @@ def test_send_event_url_error(
     server_fixture: Server,
     mocker: MockerFixture,
 ) -> None:
-    mock_post = mocker.patch("httpx.post")
-    mock_post.return_value.status_code = ""
+    mock_post = mocker.patch("supervaizer.account_service._httpx_client.post")
     mock_post.side_effect = ConnectError("HTTPSConnectionPool(host='...")
 
     with pytest.raises(ConnectError, match="HTTPSConnectionPool"):

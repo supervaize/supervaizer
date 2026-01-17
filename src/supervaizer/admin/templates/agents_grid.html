@@ -33,7 +33,7 @@
                             </div>
                             {% endif %}
                             <div class="ml-3">
-                                <h3 class="text-lg font-medium text-gray-900">{{ agent.name }}</h3>
+                                <h3 class="text-lg font-medium text-gray-900">{{ agent.name }} </h3>
                                 <p class="text-sm text-gray-500 capitalize">{{ agent.type or "conversational" }}</p>
                             </div>
                         </div>
@@ -56,10 +56,12 @@
                         </div>
                     </div>
                     <div class="mt-6 flex space-x-3">
-                        <button onclick="showAgentDetails('{{ agent.slug }}')" class="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        {% set agent_slug = agent.slug if agent.slug else (agent.api_path.replace('/agents/', '').rstrip('/') if agent.api_path and agent.api_path.startswith('/agents/') else '') %}
+                        {% set instructions_path = agent.instructions_path if agent.instructions_path else 'supervaize_instructions.html' %}
+                        <button onclick="showAgentInstructions('{{ agent_slug }}', '{{ instructions_path }}')" class="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             View
                         </button>
-                        <button onclick="editAgent('{{ agent.slug }}')" class="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <button onclick="showAgentDetails('{{ agent_slug }}')" class="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             Configure
                         </button>
                     </div>

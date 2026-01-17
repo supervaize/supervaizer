@@ -7,7 +7,6 @@
 import json
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from rich import inspect
 
 from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
@@ -44,7 +43,7 @@ async def service_job_start(
     Returns:
         The created job
     """
-    agent_parameters: dict[str, Any] | None = None
+    agent_parameters = None
     # If agent has parameters_setup defined, validate parameters
     if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
@@ -54,14 +53,16 @@ async def service_job_start(
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
 
-        inspect(agent)
-        log.debug(f"[Decrypted parameters] : parameters = {agent_parameters}")
+        # inspect(agent)
+        log.debug(
+            f"[service_job_start Decrypted parameters] : parameters = {agent_parameters}"
+        )
 
     # Create and prepare the job
     new_saas_job = Job.new(
         job_context=sv_context,
         agent_name=agent.name,
-        agent_parameters=[agent_parameters] if agent_parameters else None,
+        agent_parameters=agent_parameters,
         name=sv_context.job_id,
     )
 

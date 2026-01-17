@@ -9,6 +9,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import logging
+import os
 from typing import TYPE_CHECKING, Union
 
 import httpx
@@ -18,6 +19,11 @@ from supervaizer.common import ApiError, ApiResult, ApiSuccess, log
 logger = logging.getLogger("httpx")
 # Enable httpx debug logging (optional - uncomment for transport-level debugging)
 logger.setLevel(logging.DEBUG)
+
+_httpx_transport = httpx.HTTPTransport(
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+)
+_httpx_client = httpx.Client(transport=_httpx_transport)
 
 if TYPE_CHECKING:
     from supervaizer.account import Account
@@ -60,7 +66,7 @@ def send_event(
     curl_cmd = f"curl -X 'GET' '{account.url_event}'  {curl_headers}"
 
     try:
-        response = httpx.post(account.url_event, headers=headers, json=payload)
+        response = _httpx_client.post(account.url_event, headers=headers, json=payload)
 
         # Log response details before raising for status
 

@@ -38,7 +38,6 @@ from supervaizer.common import (
 )
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a import create_routes as create_a2a_routes
-from supervaizer.protocol.acp import create_routes as create_acp_routes
 from supervaizer.routes import (
     create_agents_routes,
     create_default_routes,
@@ -82,6 +81,9 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
                         "name": agent.name,
                         "description": agent.description,
                         "version": agent.version,
+                        "api_path": agent.path,
+                        "slug": agent.slug,
+                        "instructions_path": agent.instructions_path,
                     }
                 )
 
@@ -166,9 +168,6 @@ class ServerAbstract(SvBaseModel):
     a2a_endpoints: bool = Field(
         default=True, description="Whether to enable A2A endpoints"
     )
-    acp_endpoints: bool = Field(
-        default=True, description="Whether to enable ACP endpoints"
-    )
     private_key: RSAPrivateKey = Field(
         description="RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user"
     )
@@ -206,7 +205,6 @@ class ServerAbstract(SvBaseModel):
                     "debug": False,
                     "reload": False,
                     "a2a_endpoints": True,
-                    "acp_endpoints": True,
                 },
             ]
         },
@@ -237,7 +235,6 @@ class Server(ServerAbstract):
         agents: List[Agent],
         supervisor_account: Optional[Account] = None,
         a2a_endpoints: bool = True,
-        acp_endpoints: bool = True,
         admin_interface: bool = True,
         scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
@@ -259,7 +256,6 @@ class Server(ServerAbstract):
             agents: List of agents to register with the server
             supervisor_account: Account of the supervisor
             a2a_endpoints: Whether to enable A2A endpoints
-            acp_endpoints: Whether to enable ACP endpoints
             admin_interface: Whether to enable admin interface
             scheme: URL scheme (http or https)
             environment: Environment name (e.g., dev, staging, prod)
@@ -350,7 +346,6 @@ class Server(ServerAbstract):
             reload=reload,
             supervisor_account=supervisor_account,
             a2a_endpoints=a2a_endpoints,
-            acp_endpoints=acp_endpoints,
             private_key=private_key,
             public_key=public_key,
             public_url=public_url,
@@ -371,9 +366,6 @@ class Server(ServerAbstract):
         if self.a2a_endpoints:
             log.info("[Server launch] 📢 Deploy A2A routes  ")
             self.app.include_router(create_a2a_routes(self))
-        if self.acp_endpoints:
-            log.info("[Server launch] 📢 Deploy ACP routes")
-            self.app.include_router(create_acp_routes(self))
 
         # Deploy admin routes if API key is available
         if self.api_key and admin_interface:
@@ -519,6 +511,8 @@ class Server(ServerAbstract):
             server_registration_result: ApiResult = (
                 self.supervisor_account.register_server(server=self)
             )
+            # log.debug(f"[Server launch] Server registration result: {server_registration_result}")
+            # inspect(server_registration_result)
             assert isinstance(
                 server_registration_result, ApiSuccess
             )  # If ApiError, exception should have been raised before
