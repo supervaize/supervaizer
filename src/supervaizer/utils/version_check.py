@@ -54,4 +54,3 @@ async def check_is_latest_version() -> tuple[bool, str | None]:
         # Fallback to simple string comparison if packaging is not available
         is_latest = current_version >= latest_version
     return is_latest, latest_version
-

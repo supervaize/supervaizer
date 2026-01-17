@@ -367,13 +367,13 @@ class TestDockerManagerAdvanced:
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
-        
+
         # Mock the low-level API build method
         mock_client.api.build.return_value = [
             {"stream": "Step 1/5 : FROM python:3.12-slim"},
-            {"aux": {"ID": "sha256:abc123def456"}}
+            {"aux": {"ID": "sha256:abc123def456"}},
         ]
-        
+
         mock_docker_client.from_env.return_value = mock_client
 
         manager = DockerManager()
@@ -389,13 +389,13 @@ class TestDockerManagerAdvanced:
         mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
-        
+
         # Mock the low-level API build method to return an error
         mock_client.api.build.return_value = [
             {"stream": "Step 1/5 : FROM python:3.12-slim"},
-            {"error": "Build failed"}
+            {"error": "Build failed"},
         ]
-        
+
         mock_docker_client.from_env.return_value = mock_client
 
         manager = DockerManager()

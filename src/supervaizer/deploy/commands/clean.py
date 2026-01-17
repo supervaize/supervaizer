@@ -292,4 +292,3 @@ def clean_state_only(
         console.print("[bold red]Error:[/] Failed to clean deployment state")
         console.print(f"Details: {e}")
         raise RuntimeError(f"Failed to clean deployment state: {e}") from e
-

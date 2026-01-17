@@ -50,12 +50,12 @@ def test_send_event_auth_error(
     mocker: MockerFixture,
 ) -> None:
     mock_post = mocker.patch("supervaizer.account_service._httpx_client.post")
-    
+
     # Create a mock response that raises HTTPStatusError when raise_for_status is called
     mock_response = mocker.Mock()
     mock_response.status_code = 403
     mock_response.text = str(AUTH_ERROR_RESPONSE)
-    
+
     error = HTTPStatusError(
         "403 Client Error: Forbidden for url",
         request=mocker.Mock(),

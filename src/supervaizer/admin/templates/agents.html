@@ -127,10 +127,10 @@
 </div>
 
 <!-- Instructions Modal -->
-<div id="instructions-modal" 
-     class="fixed inset-0 z-50" 
-     x-data="{ open: false, agentSlug: '', instructionsPath: 'supervaize_instructions.html' }" 
-     x-show="open" 
+<div id="instructions-modal"
+     class="fixed inset-0 z-50"
+     x-data="{ open: false, agentSlug: '', instructionsPath: 'supervaize_instructions.html' }"
+     x-show="open"
      x-cloak
      @open-instructions.window="agentSlug = $event.detail.slug; instructionsPath = $event.detail.instructionsPath || 'supervaize_instructions.html'; open = true">
     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -190,21 +190,21 @@
 
     window.showAgentInstructions = function(agentSlug, instructionsPath) {
         console.log('showAgentInstructions called with slug:', agentSlug, 'path:', instructionsPath);
-        
+
         if (!agentSlug || agentSlug.trim() === '') {
             console.error('Agent slug is missing or empty');
             return;
         }
-        
+
         // Default instructions path if not provided
         instructionsPath = instructionsPath || 'supervaize_instructions.html';
-        
+
         const modal = document.getElementById('instructions-modal');
         if (!modal) {
             console.error('Instructions modal not found');
             return;
         }
-        
+
         // Dispatch Alpine.js event to open modal (Alpine will handle iframe src reactively)
         const event = new CustomEvent('open-instructions', {
             detail: { slug: agentSlug, instructionsPath: instructionsPath },
@@ -212,7 +212,7 @@
         });
         modal.dispatchEvent(event);
         console.log('Dispatched open-instructions event with slug:', agentSlug, 'path:', instructionsPath);
-        
+
         // Also try direct Alpine.js access as fallback
         if (modal._x_dataStack && modal._x_dataStack[0]) {
             const alpineData = modal._x_dataStack[0];

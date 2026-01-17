@@ -14,4 +14,3 @@ __all__ = [
     "check_is_latest_version",
     "get_latest_version",
 ]
-

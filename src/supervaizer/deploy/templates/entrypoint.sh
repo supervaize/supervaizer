@@ -18,4 +18,3 @@ fi
 
 # Run supervaizer start
 exec uv run supervaizer start
-
