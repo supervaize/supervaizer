@@ -9,6 +9,8 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
 [![ACP Protocol](https://img.shields.io/badge/ACP-Protocol-purple.svg)](https://github.com/i-am-bee/ACP)
 [![Test Coverage](https://img.shields.io/badge/Coverage-81%25-brightgreen.svg)](https://github.com/supervaize/supervaizer)
 
+> **⚠️ Beta Disclaimer**: SUPERVAIZER is currently in beta mode. Not everything works as expected yet. Please report any issues you encounter.
+
 - [SUPERVAIZER](#supervaizer)
   - [Description](#description)
   - [Quick Start](#quick-start)
@@ -22,14 +24,14 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
   - [Features](#features)
   - [Protocol Support](#protocol-support)
   - [Cloud Deployment](#cloud-deployment)
-    - [Quick Start](#quick-start-2)
+    - [Quick Start](#quick-start-1)
     - [Deployment Commands](#deployment-commands)
     - [Features](#features-1)
     - [Documentation](#documentation)
   - [Using the CLI](#using-the-cli)
   - [API Documentation \& User Interfaces](#api-documentation--user-interfaces)
     - [Admin Interface (`/admin`)](#admin-interface-admin)
-      - [Quick Start](#quick-start-3)
+      - [Quick Start](#quick-start-2)
 - [Calculating costs](#calculating-costs)
   - [Documentation](#documentation-1)
   - [Contributing](#contributing)
