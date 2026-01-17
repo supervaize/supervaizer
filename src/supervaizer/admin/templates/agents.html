@@ -126,6 +126,43 @@
     </div>
 </div>
 
+<!-- Instructions Modal -->
+<div id="instructions-modal" 
+     class="fixed inset-0 z-50" 
+     x-data="{ open: false, agentSlug: '', instructionsPath: 'supervaize_instructions.html' }" 
+     x-show="open" 
+     x-cloak
+     @open-instructions.window="agentSlug = $event.detail.slug; instructionsPath = $event.detail.instructionsPath || 'supervaize_instructions.html'; open = true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="open = false"></div>
+
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Supervaize Instructions</h3>
+                    <button
+                        @click="open = false"
+                        class="bg-white rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                        <span class="sr-only">Close</span>
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-4" style="height: 80vh; overflow-y: auto;">
+                    <iframe
+                        id="instructions-iframe"
+                        x-bind:src="agentSlug && instructionsPath ? `/supervaizer/agents/${agentSlug}/${instructionsPath}` : ''"
+                        class="w-full h-full border-0"
+                        style="min-height: 600px;"
+                    ></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Handle agent modal
     document.body.addEventListener('htmx:afterRequest', function(e) {
@@ -149,6 +186,43 @@
     window.showAgentDetails = function(agentSlug) {
         console.log('Showing agent details for slug:', agentSlug);
         htmx.ajax('GET', `/admin/api/agents/${encodeURIComponent(agentSlug)}`, {target: '#agent-modal-content'});
+    };
+
+    window.showAgentInstructions = function(agentSlug, instructionsPath) {
+        console.log('showAgentInstructions called with slug:', agentSlug, 'path:', instructionsPath);
+        
+        if (!agentSlug || agentSlug.trim() === '') {
+            console.error('Agent slug is missing or empty');
+            return;
+        }
+        
+        // Default instructions path if not provided
+        instructionsPath = instructionsPath || 'supervaize_instructions.html';
+        
+        const modal = document.getElementById('instructions-modal');
+        if (!modal) {
+            console.error('Instructions modal not found');
+            return;
+        }
+        
+        // Dispatch Alpine.js event to open modal (Alpine will handle iframe src reactively)
+        const event = new CustomEvent('open-instructions', {
+            detail: { slug: agentSlug, instructionsPath: instructionsPath },
+            bubbles: true
+        });
+        modal.dispatchEvent(event);
+        console.log('Dispatched open-instructions event with slug:', agentSlug, 'path:', instructionsPath);
+        
+        // Also try direct Alpine.js access as fallback
+        if (modal._x_dataStack && modal._x_dataStack[0]) {
+            const alpineData = modal._x_dataStack[0];
+            alpineData.agentSlug = agentSlug;
+            alpineData.instructionsPath = instructionsPath;
+            alpineData.open = true;
+            console.log('Modal opened via direct Alpine.js access');
+        } else {
+            console.warn('Alpine.js data not available, modal may not open');
+        }
     };
 
     window.editAgent = function(agentId) {

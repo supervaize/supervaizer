@@ -81,6 +81,9 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
                     "name": agent.name,
                     "description": agent.description,
                     "version": agent.version,
+                    "api_path": agent.path,
+                    "slug": agent.slug,
+                    "instructions_path": agent.instructions_path,
                 })
 
         # Create server info

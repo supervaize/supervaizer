@@ -28,19 +28,44 @@ class SvBaseModel(BaseModel):
     Base model for all Supervaize models.
     """
 
+    @staticmethod
+    def serialize_value(value: Any) -> Any:
+        """Recursively serialize values, converting type objects and datetimes to strings."""
+        from datetime import datetime
+
+        if isinstance(value, type):
+            # Convert type objects to their string name
+            return value.__name__
+        elif isinstance(value, datetime):
+            # Convert datetime to ISO format string
+            return value.isoformat()
+        elif isinstance(value, dict):
+            # Recursively process dictionaries
+            return {k: SvBaseModel.serialize_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            # Recursively process lists and tuples
+            return [SvBaseModel.serialize_value(item) for item in value]
+        else:
+            # Return value as-is for other types
+            return value
+
     @property
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the model to a dictionary.
 
-        Note: Using mode="json" to handle datetime serialization.
+        Note: Handles datetime serialization and type objects by converting them
+        to their string representation.
         Tested in tests/test_common.test_sv_base_model_json_conversion
         """
-        return self.model_dump(mode="json")
+        # Use mode="python" to avoid Pydantic's JSON serialization errors with type objects
+        # Then post-process to handle type objects and datetimes
+        data = self.model_dump(mode="python")
+        return self.serialize_value(data)
 
     @property
     def to_json(self) -> str:
-        return self.model_dump_json()
+        return json.dumps(self.to_dict)
 
 
 class ApiResult:

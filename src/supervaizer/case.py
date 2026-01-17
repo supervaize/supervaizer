@@ -10,9 +10,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
-from pydantic import ConfigDict
-from typing_extensions import deprecated
-
+from pydantic import ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
+from typing import Callable
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
@@ -55,7 +55,6 @@ class CaseNodeUpdate(SvBaseModel):
             payload (Dict[str, Any]): Additional data for the update - when a question is requested to the user, the payload is the question
             is_final (bool): Whether this is the final update. Default to False
             index (int): Index of the node to update. This is set by Case.update()
-
             error (Optional[str]): Error message if any. Default to None
 
         When payload contains a question (supervaizer_form):
@@ -101,24 +100,32 @@ class CaseNodeUpdate(SvBaseModel):
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case node update"""
+        # Serialize payload to convert type objects to strings for JSON serialization
+        serialized_payload = (
+            self.serialize_value(self.payload) if self.payload else None
+        )
         return {
             "index": self.index,
             "name": self.name,
             "error": self.error,
             "cost": self.cost,
-            "payload": self.payload,
+            "payload": serialized_payload,
             "is_final": self.is_final,
         }
 
 
-class CaseNoteType(Enum):
+class CaseNodeType(Enum):
     """
-    CaseNoteType is an enum that represents the type of a case note.
+    CaseNodeType is an enum that represents the type of a case note.
     """
 
     CHAT = "chat"
     TRIGGER = "trigger"
     NOTIFICATION = "notification"
+    STATUS_UPDATE = "status_update"
+    INTERMEDIARY_DELIVERY = "intermediary_delivery"
+    HITL = "human_in_the_loop"
+    DELIVERABLE = "deliverable"
     VALIDATION = "validation"
     DELIVERY = "delivery"
     ERROR = "error"
@@ -126,22 +133,43 @@ class CaseNoteType(Enum):
     INFO = "info"
 
 
-@deprecated("Not used")
 class CaseNode(SvBaseModel):
-    name: str
-    description: str
-    type: CaseNoteType
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    class Config:
-        arbitrary_types_allowed = True
+    name: str
+    type: CaseNodeType
+    factory: SkipJsonSchema[Callable[..., CaseNodeUpdate]] = Field(
+        exclude=True, repr=False
+    )  # Exclude from JSON schema generation and representation
+    description: str | None = None
+    can_be_confirmed: bool = False  # Whether the user can decide that this node needs to be confirmed. This must be set in the job definition.
+
+    def __call__(self, *args: Any, **kwargs: Any) -> CaseNodeUpdate:
+        """Make it callable directly."""
+        return self.factory(*args, **kwargs)
 
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case node"""
         return {
             "name": self.name,
-            "description": self.description,
             "type": self.type.value,
+            "description": self.description,
+            "can_be_confirmed": self.can_be_confirmed,
+        }
+
+
+class CaseNodes(SvBaseModel):
+    nodes: List[CaseNode] = []
+
+    def get(self, name: str) -> CaseNode | None:
+        return next((node for node in self.nodes if node.name == name), None)
+
+    @property
+    def registration_info(self) -> Dict[str, Any]:
+        """Returns registration info for the case nodes"""
+        return {
+            "nodes": [node.registration_info for node in self.nodes],
         }
 
 
@@ -216,7 +244,11 @@ class Case(CaseAbstractModel):
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
-    def receive_human_input(self, **kwargs: Any) -> None:
+    def receive_human_input(
+        self, updateCaseNode: CaseNodeUpdate, **kwargs: Any
+    ) -> None:
+        # Add the update to the case (this handles index, send_update_case, and persistence)
+        self.update(updateCaseNode)
         # Transition from AWAITING to IN_PROGRESS
         from supervaizer.storage import PersistentEntityLifecycle
 

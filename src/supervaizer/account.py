@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from supervaizer.event import Event
     from supervaizer.job import Job
     from supervaizer.server import Server
+from supervaizer.common import log
 
 
 class AccountAbstract(SvBaseModel):
@@ -268,6 +269,9 @@ class Account(AccountAbstract):
 
     def send_update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
         # Import here to avoid circular imports
+        log.debug(f"[send_update_case] CaseRef {case} with update {update}")
+        log.debug(f"[send_update_case] {type(case)}")
+        log.debug(f"[send_update_case] {type(update)}")
         from supervaizer.event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)

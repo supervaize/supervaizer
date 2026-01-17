@@ -276,3 +276,63 @@ def test_sv_base_model_json_conversion() -> None:
     # Test to_json also handles the datetime correctly
     json_data = json.loads(model.to_json)
     assert json_data["timestamp"] == "2024-01-01T12:00:00"
+
+
+def test_sv_base_model_with_type_objects() -> None:
+    """Test SvBaseModel with type objects in nested structures"""
+
+    class ModelWithTypeObjects(SvBaseModel):
+        name: str = Field(default="test")
+        payload: Optional[Dict[str, Any]] = Field(default=None)
+
+    # Create a model with nested type objects (similar to CaseNodeUpdate)
+    model = ModelWithTypeObjects(
+        name="test_form",
+        payload={
+            "supervaizer_form": {
+                "question": "Do you want to proceed?",
+                "answer": {
+                    "fields": [
+                        {
+                            "name": "Confirm",
+                            "description": "Confirm action",
+                            "type": bool,  # This is a type object
+                            "field_type": "BooleanField",
+                            "required": False,
+                        },
+                        {
+                            "name": "Count",
+                            "description": "Number of items",
+                            "type": int,  # This is a type object
+                            "field_type": "IntegerField",
+                            "required": True,
+                        },
+                    ]
+                },
+            }
+        },
+    )
+
+    # Test to_dict converts type objects to their string names
+    dict_data = model.to_dict
+    assert dict_data["name"] == "test_form"
+    assert "supervaizer_form" in dict_data["payload"]
+
+    # Verify type objects are converted to strings
+    fields = dict_data["payload"]["supervaizer_form"]["answer"]["fields"]
+    assert fields[0]["type"] == "bool"  # Not <class 'bool'>
+    assert fields[1]["type"] == "int"  # Not <class 'int'>
+    assert isinstance(fields[0]["type"], str)
+    assert isinstance(fields[1]["type"], str)
+
+    # Verify the rest of the data is intact
+    assert fields[0]["name"] == "Confirm"
+    assert fields[0]["field_type"] == "BooleanField"
+    assert fields[1]["required"] is True
+
+    # Test that to_json also works correctly
+    json_str = model.to_json
+    json_data = json.loads(json_str)
+    json_fields = json_data["payload"]["supervaizer_form"]["answer"]["fields"]
+    assert json_fields[0]["type"] == "bool"
+    assert json_fields[1]["type"] == "int"

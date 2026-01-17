@@ -1,0 +1,37 @@
+services:
+  {{SERVICE_NAME}}:
+    build:
+      context: ..
+      dockerfile: .deployment/Dockerfile
+      args:
+        - SUPERVAIZE_API_KEY={{API_KEY}}
+        - SUPERVAIZE_WORKSPACE_ID={{WORKSPACE_ID}}
+        - SUPERVAIZE_API_URL={{API_URL}}
+        - SUPERVAIZER_PORT=8000
+        - SUPERVAIZER_PUBLIC_URL={{PUBLIC_URL}}
+    ports:
+      - "{{PORT}}:8000"
+    environment:
+      - SUPERVAIZER_ENVIRONMENT={{ENVIRONMENT}}
+      - SUPERVAIZER_HOST=0.0.0.0
+      - SUPERVAIZER_PORT=8000
+      - SV_LOG_LEVEL={{ env.SV_LOG_LEVEL | default('INFO') }}
+      - SUPERVAIZER_API_KEY={{API_KEY}}
+      - SV_RSA_PRIVATE_KEY={{RSA_KEY}}
+      - SUPERVAIZE_API_KEY={{API_KEY}}
+      - SUPERVAIZE_WORKSPACE_ID={{WORKSPACE_ID}}
+      - SUPERVAIZE_API_URL={{API_URL}}
+      - SUPERVAIZER_PUBLIC_URL={{PUBLIC_URL}}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/.well-known/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - supervaizer-network
+
+networks:
+  supervaizer-network:
+    driver: bridge

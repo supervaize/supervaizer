@@ -17,15 +17,21 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
     - [3. Scaffold the controller](#3-scaffold-the-controller)
     - [(Optional) 4. Configure your Supervaize account \& environment](#optional-4-configure-your-supervaize-account--environment)
     - [5. Start the server 🚀](#5-start-the-server-)
+    - [6. Optional parameters](#6-optional-parameters)
     - [What's next?](#whats-next)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
+  - [Cloud Deployment](#cloud-deployment)
+    - [Quick Start](#quick-start-2)
+    - [Deployment Commands](#deployment-commands)
+    - [Features](#features-1)
+    - [Documentation](#documentation)
   - [Using the CLI](#using-the-cli)
   - [API Documentation \& User Interfaces](#api-documentation--user-interfaces)
     - [Admin Interface (`/admin`)](#admin-interface-admin)
-      - [Quick Start](#quick-start-1)
+      - [Quick Start](#quick-start-3)
 - [Calculating costs](#calculating-costs)
-  - [Documentation](#documentation)
+  - [Documentation](#documentation-1)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -110,6 +116,16 @@ Once the server is running, you'll have:
 - **A2A discovery**: `/.well-known/agents.json`
 - **ACP discovery**: `/agents`
 
+### 6. Optional parameters
+
+Configure retry behavior for HTTP requests to the Supervaize API:
+
+- **`SUPERVAIZE_HTTP_MAX_RETRIES`**: Number of retry attempts for failed HTTP requests (default: `2`). The client will automatically retry requests that fail with status codes 429, 500, 502, 503, or 504.
+
+```bash
+export SUPERVAIZE_MAX_HTTP_RETRIES=3  # Will attempt up to 4 times total (1 original + 3 retries)
+```
+
 ### What's next?
 
 - Add more **custom methods** (`chat`, `custom`) to extend control
@@ -123,6 +139,7 @@ For detailed instructions on customizing your controller, see the [Controller Se
 - **Agent Management**: Register, update, and control agents
 - **Job Control**: Create, track, and manage jobs
 - **Event Handling**: Process and respond to system events
+- **🚀 Cloud Deployment**: Automated deployment to GCP Cloud Run, AWS App Runner, and DigitalOcean App Platform
 - Protocol support
   - **A2A Protocol **: Integration with Google's Agent-to-Agent protocol for interoperability
   - **ACP Protocol **: Integration with IBM/BeeAI's Agent Communication Protocol for standardized agent discovery and interaction
@@ -132,6 +149,51 @@ For detailed instructions on customizing your controller, see the [Controller Se
 ## Protocol Support
 
 SUPERVAIZER provides comprehensive support for multiple agent communication protocols. See [Protocol Documentation](docs/PROTOCOLS.md) for complete details.
+
+## Cloud Deployment
+
+SUPERVAIZER includes a powerful deployment CLI that automates the entire process of deploying your agents to production cloud platforms.
+
+### Quick Start
+
+```bash
+# Install with deployment dependencies
+pip install supervaizer[deploy]
+
+# Test locally with Docker
+supervaizer deploy local --generate-api-key --generate-rsa
+
+# Deploy to Google Cloud Run
+supervaizer deploy up --platform cloud-run --region us-central1
+
+# Deploy to AWS App Runner
+supervaizer deploy up --platform aws-app-runner --region us-east-1
+
+# Deploy to DigitalOcean App Platform
+supervaizer deploy up --platform do-app-platform --region nyc
+```
+
+### Deployment Commands
+
+- **`supervaizer deploy plan`** - Preview deployment actions before applying
+- **`supervaizer deploy up`** - Deploy to cloud platform with automated build, push, and verification
+- **`supervaizer deploy down`** - Tear down deployment and clean up resources
+- **`supervaizer deploy status`** - Check deployment status and health
+- **`supervaizer deploy local`** - Local Docker testing with docker-compose
+- **`supervaizer deploy clean`** - Clean up deployment artifacts and state
+
+### Features
+
+- ✅ **Automated Docker Workflow**: Build → Push → Deploy → Verify
+- ✅ **Secret Management**: Secure handling of API keys and RSA keys
+- ✅ **Health Verification**: Automatic health checks at `/.well-known/health`
+- ✅ **Idempotent Deployments**: Safe create/update operations with rollback on failure
+- ✅ **Local Testing**: Full Docker Compose environment for pre-deployment testing
+
+### Documentation
+
+- [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md) - Complete specification
+- [Local Testing Guide](docs/LOCAL_TESTING.md) - Docker testing documentation
 
 ## Using the CLI
 

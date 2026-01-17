@@ -63,7 +63,7 @@ class Parameter(ParameterAbstract):
         """
         Override the to_dict method to handle the value field.
         """
-        data = self.model_dump(mode="json")
+        data = super().to_dict
         if self.is_secret:
             data["value"] = "********"
         return data

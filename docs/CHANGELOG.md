@@ -4,6 +4,82 @@ All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+## [0.9.9] - 2025-01-17
+
+### Added
+
+- **🚀 Cloud Deployment CLI** - Complete automated deployment system for Supervaizer agents
+  - Full implementation of [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md)
+  - Support for three major cloud platforms:
+    - **Google Cloud Run** with Artifact Registry and Secret Manager
+    - **AWS App Runner** with ECR and Secrets Manager
+    - **DigitalOcean App Platform**
+  - New deployment commands:
+    - `supervaizer deploy plan` - Preview deployment actions before applying
+    - `supervaizer deploy up` - Deploy to cloud platform with automated build, push, and verification
+    - `supervaizer deploy down` - Tear down deployment and clean up resources
+    - `supervaizer deploy status` - Check deployment status and health
+    - `supervaizer deploy local` - Local Docker testing with docker-compose
+    - `supervaizer deploy clean` - Clean up deployment artifacts and state
+  - **Automated Docker Workflow**: Build → Push → Deploy → Verify
+  - **Secret Management**: Secure handling of API keys and RSA keys via cloud provider secret stores
+  - **Health Verification**: Automatic health checks at `/.well-known/health` endpoint
+  - **Idempotent Deployments**: Safe create/update operations with rollback on failure
+  - **Local Testing**: Full Docker Compose environment for pre-deployment testing
+  - See [Local Testing Documentation](docs/LOCAL_TESTING.md) for details
+
+- **Agent Instructions Template** - New HTML page served by FastAPI for Supervaize integration instructions
+  - Accessible at `/admin/supervaize-instructions`
+  - Provides step-by-step setup guide for agents
+
+- **Version Check Utility** - Automatic check for latest Supervaizer version
+  - Helps users stay up-to-date with latest features and fixes
+  - Located in `supervaizer.utils.version_check`
+
+- **Enhanced Admin Interface**
+  - New agents listing page with grid view
+  - Improved agent detail views
+  - Better navigation and UI consistency
+
+### Changed
+
+- **📦 Dependency Optimization** - Cloud SDKs moved to optional dependencies
+  - Base package size significantly reduced
+  - Cloud deployment dependencies now optional: `pip install supervaizer[deploy]`
+  - Optional `deploy` group includes: boto3, docker, google-cloud-artifact-registry, google-cloud-run, google-cloud-secret-manager, psutil
+  - Removed unused `pymongo` dependency
+  - Updated dependency versions for better compatibility
+
+- **Improved Error Handling** - Enhanced API error responses with better context
+
+- **Documentation Updates**
+  - Added comprehensive deployment documentation
+  - Updated model reference documentation
+  - Improved README with deployment examples
+
+### Fixed
+
+- API documentation errors corrected
+- Improved type hints for `agent_parameters` and `case_ids` in job.py
+- Health logging optimized in A2A and ACP routes
+
+### Unit Tests Results
+
+| Status     | Count  |
+| ---------- | ------ |
+| ✅ Passed  | 420    |
+| 🤔 Skipped | 6      |
+| 🔴 Failed  | 0      |
+| ⏱️ in      | 82.63s |
+
+### Migration Notes
+
+- If you need deployment features, install with: `pip install supervaizer[deploy]`
+- For development, install with: `pip install supervaizer[dev,deploy]`
+- No breaking changes to existing APIs or functionality
+
 ## [0.9.8]
 
 ### Added
