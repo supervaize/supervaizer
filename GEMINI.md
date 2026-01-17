@@ -1,4 +1,4 @@
-This is a Python project that provides a toolkit for building, managing, and connecting AI agents. It uses FastAPI for the web server, Typer for the command-line interface, and Pydantic for data validation. The project supports the Agent-to-Agent (A2A) and Agent Communication Protocol (ACP) for interoperability between AI agents.
+This is a Python project that provides a toolkit for building, managing, and connecting AI agents. It uses FastAPI for the web server, Typer for the command-line interface, and Pydantic for data validation. The project supports the Agent-to-Agent (A2A) protocol for interoperability between AI agents.
 
 ### Building and Running
 
@@ -56,7 +56,7 @@ just test-no-cov
 
 ### Project Overview
 
-The Supervaizer project is a toolkit for building and managing AI agents. It provides a framework for defining agents, their methods, and their parameters. The project also includes a web server that exposes a REST API for interacting with the agents. The API supports the A2A and ACP protocols for interoperability with other AI agent systems.
+The Supervaizer project is a toolkit for building and managing AI agents. It provides a framework for defining agents, their methods, and their parameters. The project also includes a web server that exposes a REST API for interacting with the agents. The API supports the A2A protocol for interoperability with other AI agent systems.
 
 The project is built on top of several popular Python libraries, including:
 
