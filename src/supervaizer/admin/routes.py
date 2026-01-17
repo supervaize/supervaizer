@@ -27,7 +27,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from supervaizer.__version__ import API_VERSION
+from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.common import log
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import (
@@ -261,7 +261,7 @@ def create_admin_routes() -> APIRouter:
                 "dashboard.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "stats": stats,
                     "system_status": "Online",
                     "db_name": "TinyDB",
@@ -281,7 +281,7 @@ def create_admin_routes() -> APIRouter:
             "jobs_list.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
@@ -294,7 +294,7 @@ def create_admin_routes() -> APIRouter:
             "cases_list.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
@@ -312,7 +312,7 @@ def create_admin_routes() -> APIRouter:
                 "server.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "server_status": server_status,
                     "server_config": server_config,
                     "api_key": os.getenv("SUPERVAIZER_API_KEY"),
@@ -339,7 +339,7 @@ def create_admin_routes() -> APIRouter:
                 "agents.html",
                 {
                     "request": request,
-                    "api_version": API_VERSION,
+                    "api_version": VERSION,
                     "agents": server_info.agents,
                     "api_key": os.getenv("SUPERVAIZER_API_KEY"),
                 },
@@ -358,7 +358,7 @@ def create_admin_routes() -> APIRouter:
             "job_start_test.html",
             {
                 "request": request,
-                "api_version": API_VERSION,
+                "api_version": VERSION,
                 "api_key": os.getenv("SUPERVAIZER_API_KEY"),
             },
         )
