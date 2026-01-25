@@ -17,12 +17,12 @@ import pytest
 from docker.errors import DockerException
 from pytest_mock import MockerFixture
 
-from supervaizer.deploy.docker import DockerManager, ensure_docker_running, get_git_sha
+from supervaizer.deploy.docker import DockerManager, ensure_docker_running
 from supervaizer.deploy.state import (
     DeploymentState,
     StateManager,
 )
-from supervaizer.deploy.utils import create_deployment_directory
+from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
 from supervaizer.deploy.commands import (
     plan,
     up,

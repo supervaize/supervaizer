@@ -18,7 +18,7 @@ from rich.table import Table
 
 from supervaizer.common import log
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.docker import get_git_sha
+from supervaizer.deploy.utils import get_git_sha
 from supervaizer.deploy.drivers.base import DeploymentPlan
 
 console = Console()

@@ -15,8 +15,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from docker import DockerClient
-from docker.errors import APIError, BuildError, DockerException
 from rich.console import Console
 
 from supervaizer.common import log
@@ -85,6 +83,14 @@ class DockerManager:
         """Initialize Docker manager."""
         self.client = None
         if require_docker:
+            try:
+                from docker import DockerClient
+                from docker.errors import DockerException
+            except ImportError:
+                raise RuntimeError(
+                    "Docker package not installed. Install with: pip install supervaizer[deploy]"
+                ) from None
+
             try:
                 self.client = DockerClient.from_env()
                 self.client.ping()  # Test connection
@@ -220,6 +226,8 @@ class DockerManager:
         build_args: Optional[dict] = None,
     ) -> str:
         """Build Docker image and return the image ID."""
+        from docker.errors import APIError, BuildError, DockerException
+
         if self.client is None:
             raise RuntimeError(
                 "Docker client not available. Initialize DockerManager with require_docker=True"
@@ -296,6 +304,8 @@ class DockerManager:
 
     def tag_image(self, source_tag: str, target_tag: str) -> None:
         """Tag a Docker image."""
+        from docker.errors import DockerException
+
         if self.client is None:
             raise RuntimeError(
                 "Docker client not available. Initialize DockerManager with require_docker=True"
@@ -311,6 +321,8 @@ class DockerManager:
 
     def push_image(self, tag: str) -> None:
         """Push Docker image to registry."""
+        from docker.errors import DockerException
+
         if self.client is None:
             raise RuntimeError(
                 "Docker client not available. Initialize DockerManager with require_docker=True"
@@ -335,6 +347,8 @@ class DockerManager:
 
     def get_image_digest(self, tag: str) -> Optional[str]:
         """Get the digest of a Docker image."""
+        from docker.errors import DockerException
+
         if self.client is None:
             raise RuntimeError(
                 "Docker client not available. Initialize DockerManager with require_docker=True"
@@ -352,19 +366,13 @@ class DockerManager:
 def ensure_docker_running() -> bool:
     """Check if Docker is running and accessible."""
     try:
+        from docker import DockerClient
+        from docker.errors import DockerException
+
         client = DockerClient.from_env()
         client.ping()
         return True
+    except ImportError:
+        return False
     except DockerException:
         return False
-
-
-def get_git_sha() -> str:
-    """Get the current git SHA for tagging."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        )
-        return result.stdout.strip()[:8]  # Use short SHA
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "latest"

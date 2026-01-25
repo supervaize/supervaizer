@@ -10,8 +10,8 @@ Deployment State Management
 This module handles deployment state persistence and management.
 """
 
+import subprocess
 from pathlib import Path
-
 
 from supervaizer.common import log
 
@@ -39,3 +39,14 @@ def create_deployment_directory(project_root: Path) -> Path:
         log.info(f"Created .gitignore with {gitignore_entry}")
 
     return deployment_dir
+
+
+def get_git_sha() -> str:
+    """Get the current git SHA for tagging."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()[:8]  # Use short SHA
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "latest"

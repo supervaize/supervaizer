@@ -19,11 +19,11 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from supervaizer.common import log
-from supervaizer.deploy.docker import DockerManager, get_git_sha, ensure_docker_running
+from supervaizer.deploy.docker import DockerManager, ensure_docker_running
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 from supervaizer.deploy.drivers.base import DeploymentResult
 from supervaizer.deploy.state import StateManager
-from supervaizer.deploy.utils import create_deployment_directory
+from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
 
 console = Console()
 

@@ -17,6 +17,7 @@ dependencies = [
     "loguru>=0.7.3",
     "orjson>=3.11.3",
     "packaging>=24.0",
+    "psutil>=7.1.0",
     "pydantic>=2.12.0",
     "python-slugify>=8.0.4",
     "pyyaml>=6.0.3",
@@ -53,7 +54,6 @@ deploy = [
     "google-cloud-artifact-registry>=1.8.0",
     "google-cloud-run>=0.10.0",
     "google-cloud-secret-manager>=2.18.0",
-    "psutil>=7.1.0",
 ]
 dev = [
     "hatch>=1.14.2",
