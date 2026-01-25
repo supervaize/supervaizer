@@ -6,13 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ## TODO
 
-- Version bump : rebuild documentation after version bump in CI-CD
+- Fix CI### Changed
+  - Version bump : rebuild documentation after version bump in CI-CD
+  - Update Released / Package / Tag
 - Review and test feature/data-persistance
 - Complete feature/smartinstall implementation
 - Fix receive_human_input
 - Test and fix deploy
 
 ## Unreleased
+
+## [0.10.4]
+
+- Relax some dependencies requirements
 
 ## [0.10.2]
 
