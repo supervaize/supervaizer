@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## TODO
 
+- Version bump : rebuild documentation after version bump in CI-CD
 - Review and test feature/data-persistance
 - Complete feature/smartinstall implementation
 - Fix receive_human_input
@@ -13,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-## [0.10.1]
+## [0.10.2]
 
 ### Changed
 

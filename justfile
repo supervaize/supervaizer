@@ -54,7 +54,7 @@ build:
 
 # Reusable recipe to bump version
 _bump_version bump_type:
-    hatch version {{bump_type}} 
+    @echo "VERSION BUMP IN CICD - not running: hatch version {{bump_type}} "
     hatch build
 
 # Increase 0.0.1
