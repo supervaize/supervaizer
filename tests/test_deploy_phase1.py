@@ -34,7 +34,7 @@ class TestDockerManager:
 
     def test_docker_manager_init(self, mocker: MockerFixture) -> None:
         """Test Docker manager initialization."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_docker_client.from_env.return_value = mock_client
@@ -45,7 +45,7 @@ class TestDockerManager:
 
     def test_docker_manager_init_failure(self, mocker: MockerFixture) -> None:
         """Test Docker manager initialization failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.side_effect = DockerException("Docker not running")
         mock_docker_client.from_env.return_value = mock_client
@@ -58,7 +58,7 @@ class TestDockerManager:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "Dockerfile"
 
-            mocker.patch("supervaizer.deploy.docker.DockerClient")
+            mocker.patch("docker.DockerClient")
             manager = DockerManager()
             manager.generate_dockerfile(output_path)
 
@@ -78,7 +78,7 @@ class TestDockerManager:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "Dockerfile"
 
-            mocker.patch("supervaizer.deploy.docker.DockerClient")
+            mocker.patch("docker.DockerClient")
             manager = DockerManager()
             manager.generate_dockerfile(
                 output_path,
@@ -102,7 +102,7 @@ class TestDockerManager:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / ".dockerignore"
 
-            mocker.patch("supervaizer.deploy.docker.DockerClient")
+            mocker.patch("docker.DockerClient")
             manager = DockerManager()
             manager.generate_dockerignore(output_path)
 
@@ -116,7 +116,7 @@ class TestDockerManager:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "docker-compose.yml"
 
-            mocker.patch("supervaizer.deploy.docker.DockerClient")
+            mocker.patch("docker.DockerClient")
             manager = DockerManager()
             manager.generate_docker_compose(output_path)
 
@@ -289,7 +289,7 @@ class TestUtilityFunctions:
 
     def test_ensure_docker_running(self, mocker: MockerFixture) -> None:
         """Test Docker running check."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_docker_client.from_env.return_value = mock_client
@@ -298,7 +298,7 @@ class TestUtilityFunctions:
 
     def test_ensure_docker_not_running(self, mocker: MockerFixture) -> None:
         """Test Docker not running check."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.side_effect = DockerException("Docker not running")
         mock_docker_client.from_env.return_value = mock_client
@@ -364,7 +364,7 @@ class TestDockerManagerAdvanced:
 
     def test_build_image_success(self, mocker: MockerFixture) -> None:
         """Test successful Docker image building."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
 
@@ -386,7 +386,7 @@ class TestDockerManagerAdvanced:
 
     def test_build_image_failure(self, mocker: MockerFixture) -> None:
         """Test Docker image building failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
 
@@ -404,7 +404,7 @@ class TestDockerManagerAdvanced:
 
     def test_tag_image_success(self, mocker: MockerFixture) -> None:
         """Test successful Docker image tagging."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_image = mocker.Mock()
         mock_client.ping.return_value = True
@@ -419,7 +419,7 @@ class TestDockerManagerAdvanced:
 
     def test_tag_image_failure(self, mocker: MockerFixture) -> None:
         """Test Docker image tagging failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_client.images.get.side_effect = DockerException("Image not found")
@@ -431,7 +431,7 @@ class TestDockerManagerAdvanced:
 
     def test_push_image_success(self, mocker: MockerFixture) -> None:
         """Test successful Docker image push."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_client.images.push.return_value = [{"status": "Pushed"}]
@@ -443,7 +443,7 @@ class TestDockerManagerAdvanced:
 
     def test_push_image_failure(self, mocker: MockerFixture) -> None:
         """Test Docker image push failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_client.images.push.side_effect = DockerException("Push failed")
@@ -456,7 +456,7 @@ class TestDockerManagerAdvanced:
 
     def test_push_image_auth_failure(self, mocker: MockerFixture) -> None:
         """Test Docker image push with auth failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_client.images.push.return_value = [{"error": "authentication required"}]
@@ -469,7 +469,7 @@ class TestDockerManagerAdvanced:
 
     def test_get_image_digest_success(self, mocker: MockerFixture) -> None:
         """Test successful image digest retrieval."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_image = mocker.Mock()
         mock_image.attrs = {"RepoDigests": ["test@sha256:abc123def456"]}
@@ -485,7 +485,7 @@ class TestDockerManagerAdvanced:
 
     def test_get_image_digest_no_digest(self, mocker: MockerFixture) -> None:
         """Test image digest retrieval when no digest exists."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_image = mocker.Mock()
         mock_image.attrs = {"RepoDigests": []}
@@ -501,7 +501,7 @@ class TestDockerManagerAdvanced:
 
     def test_get_image_digest_failure(self, mocker: MockerFixture) -> None:
         """Test image digest retrieval failure."""
-        mock_docker_client = mocker.patch("supervaizer.deploy.docker.DockerClient")
+        mock_docker_client = mocker.patch("docker.DockerClient")
         mock_client = mocker.Mock()
         mock_client.ping.return_value = True
         mock_client.images.get.side_effect = DockerException("Image not found")

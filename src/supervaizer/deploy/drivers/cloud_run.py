@@ -451,17 +451,15 @@ class CloudRunDriver(BaseDriver):
         # Build secret references
         secret_refs = []
         for secret_name in secrets.keys():
-            secret_refs.append(
-                {
-                    "name": secret_name,
-                    "value_source": {
-                        "secret_key_ref": {
-                            "secret": f"projects/{self.project_id}/secrets/{secret_name}",
-                            "version": "latest",
-                        }
-                    },
-                }
-            )
+            secret_refs.append({
+                "name": secret_name,
+                "value_source": {
+                    "secret_key_ref": {
+                        "secret": f"projects/{self.project_id}/secrets/{secret_name}",
+                        "version": "latest",
+                    }
+                },
+            })
 
         # Service configuration
         service_config = {
@@ -532,12 +530,10 @@ class CloudRunDriver(BaseDriver):
                     env_vars.append(env_var)
 
             # Add the public URL
-            env_vars.append(
-                {
-                    "name": "SUPERVAIZER_PUBLIC_URL",
-                    "value": public_url,
-                }
-            )
+            env_vars.append({
+                "name": "SUPERVAIZER_PUBLIC_URL",
+                "value": public_url,
+            })
 
             # Update service
             service.template.containers[0].env = env_vars

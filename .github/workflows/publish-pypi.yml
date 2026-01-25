@@ -14,14 +14,66 @@ jobs:
       url: https://pypi.org/p/supervaizer
     permissions:
       id-token: write # required for trusted publishing if using PyPI's OIDC
+      contents: write # required for committing version bump
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install bump-my-version
+        run: |
+          uv tool install bump-my-version
+
+      - name: Determine version bump type
+        id: version-bump-type
+        run: |
+          # Get the commit message of the latest commit
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Check if commit contains [MAJOR] or [MINOR]
+          VERSION_BUMP=patch
+
+          # Determine the bump type based on commit message
+          if [[ "$COMMIT_MSG" == *"[MAJOR]"* ]]; then
+            VERSION_BUMP=major
+          elif [[ "$COMMIT_MSG" == *"[MINOR]"* ]]; then
+            VERSION_BUMP=minor
+          fi
+
+          echo "Determined version bump type: $VERSION_BUMP"
+          echo "VERSION_BUMP=$VERSION_BUMP" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        id: bump-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUMPVERSION_CONFIG_FILE: pyproject.toml
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          # Detect current version from __version__.py (authoritative for search)
+          OLD_VERSION=$(grep '^VERSION =' src/supervaizer/__version__.py | cut -d '"' -f2)
+          export OLD_VERSION
+          # Expose for downstream steps
+          echo "OLD_VERSION=${OLD_VERSION}" >> $GITHUB_OUTPUT
+          bump-my-version bump ${{ steps.version-bump-type.outputs.VERSION_BUMP }} \
+            --config-file pyproject.toml \
+            --verbose
+          git push --follow-tags
+          # Store the new version
+          echo "NEW_VERSION=$(grep '^VERSION =' src/supervaizer/__version__.py | cut -d '"' -f2)" >> $GITHUB_OUTPUT
 
       - name: Install Hatch
         run: pip install hatch

@@ -106,7 +106,7 @@ def test_get_job_status_endpoint(
 
     # Test unauthorized access (missing API key)
     response = client.get("/supervaizer/jobs/test-job-id")
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
 
     # Test job not found case with valid API key
@@ -198,7 +198,7 @@ async def test_get_all_jobs_endpoint(
 
         # Verify unauthorized access
         unauth_response = client.get(url)
-        assert unauth_response.status_code == 403
+        assert unauth_response.status_code == 401
         assert "Not authenticated" in unauth_response.json()["detail"]
 
 

@@ -872,28 +872,24 @@ def create_admin_routes() -> APIRouter:
             # Combine and sort by created_at
             activities = []
             for job in recent_jobs:
-                activities.append(
-                    {
-                        "type": "job",
-                        "id": job.get("id"),
-                        "name": job.get("name"),
-                        "status": job.get("status"),
-                        "created_at": job.get("created_at"),
-                        "agent_name": job.get("agent_name"),
-                    }
-                )
+                activities.append({
+                    "type": "job",
+                    "id": job.get("id"),
+                    "name": job.get("name"),
+                    "status": job.get("status"),
+                    "created_at": job.get("created_at"),
+                    "agent_name": job.get("agent_name"),
+                })
 
             for case in recent_cases:
-                activities.append(
-                    {
-                        "type": "case",
-                        "id": case.get("id"),
-                        "name": case.get("name"),
-                        "status": case.get("status"),
-                        "created_at": case.get("created_at"),
-                        "job_id": case.get("job_id"),
-                    }
-                )
+                activities.append({
+                    "type": "case",
+                    "id": case.get("id"),
+                    "name": case.get("name"),
+                    "status": case.get("status"),
+                    "created_at": case.get("created_at"),
+                    "job_id": case.get("job_id"),
+                })
 
             # Sort by created_at descending
             activities.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
@@ -1150,23 +1146,23 @@ def get_dashboard_stats(storage: StorageManager) -> AdminStats:
 
         # Calculate job stats
         job_total = len(all_jobs)
-        job_running = len(
-            [j for j in all_jobs if j.get("status") in ["in_progress", "awaiting"]]
-        )
+        job_running = len([
+            j for j in all_jobs if j.get("status") in ["in_progress", "awaiting"]
+        ])
         job_completed = len([j for j in all_jobs if j.get("status") == "completed"])
-        job_failed = len(
-            [j for j in all_jobs if j.get("status") in ["failed", "cancelled"]]
-        )
+        job_failed = len([
+            j for j in all_jobs if j.get("status") in ["failed", "cancelled"]
+        ])
 
         # Calculate case stats
         case_total = len(all_cases)
-        case_running = len(
-            [c for c in all_cases if c.get("status") in ["in_progress", "awaiting"]]
-        )
+        case_running = len([
+            c for c in all_cases if c.get("status") in ["in_progress", "awaiting"]
+        ])
         case_completed = len([c for c in all_cases if c.get("status") == "completed"])
-        case_failed = len(
-            [c for c in all_cases if c.get("status") in ["failed", "cancelled"]]
-        )
+        case_failed = len([
+            c for c in all_cases if c.get("status") in ["failed", "cancelled"]
+        ])
 
         # TinyDB collections count (tables)
         collections_count = len(storage._db.tables())

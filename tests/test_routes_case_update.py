@@ -169,5 +169,5 @@ def test_update_case_unauthorized(
         json=request_data,
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
