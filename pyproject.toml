@@ -8,25 +8,25 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "cryptography>=46.0.2",
+    "cryptography>=46.0.3",
     "demjson3>=3.0.6",
-    "deprecated>=1.2.18",
-    "fastapi>=0.118.0",
+    "deprecated>=1.3.1",
+    "fastapi>=0.128.0",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "orjson>=3.11.3",
-    "packaging>=24.0",
-    "psutil>=7.1.0",
-    "pydantic>=2.12.0",
+    "orjson>=3.11.5",
+    "packaging>=26.0",
+    "psutil>=7.2.1",
+    "pydantic>=2.12.5",
     "python-slugify>=8.0.4",
     "pyyaml>=6.0.3",
-    "rich>=14.1.0",
+    "rich>=14.3.1",
     "shortuuid>=1.0.13",
-    "sse-starlette>=3.0.2",
+    "sse-starlette>=3.2.0",
     "tinydb>=4.8.1",
-    "typer>=0.19.2",
-    "uvicorn>=0.36.0",
+    "typer>=0.21.1",
+    "uvicorn>=0.40.0",
 ]
 license = "MPL-2.0"
 classifiers = [
@@ -35,6 +35,7 @@ classifiers = [
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 keywords = ["AI", "controller", "workflow", "supervaize", "agent", "agentic"]
 dynamic = ["version"]

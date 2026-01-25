@@ -15,6 +15,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **🐍 Python 3.13 Support** - Added Python 3.13 compatibility
+  - Updated package classifiers to include Python 3.13
+  - Build process now uses Python 3.13 for wheel generation
+  - CI test matrix includes Python 3.13
+  - Wheels built with Python 3.13 are compatible with both Python 3.12 and 3.13
+
 ## [0.10.0]
 
 ### Added
