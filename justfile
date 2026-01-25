@@ -54,9 +54,8 @@ build:
 
 # Reusable recipe to bump version
 _bump_version bump_type:
-    @echo "Bumping version IS DONE IN CI/CD"
-    @echo "not running: hatch version {{bump_type}} "
-    @echo "not running: hatch build"
+    hatch version {{bump_type}} 
+    hatch build
 
 # Increase 0.0.1
 build_fix:

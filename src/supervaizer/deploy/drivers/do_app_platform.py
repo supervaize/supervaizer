@@ -346,11 +346,13 @@ class DOAppPlatformDriver(BaseDriver):
         # Build secret references
         secret_refs = []
         for secret_name in secrets.keys():
-            secret_refs.append({
-                "key": secret_name,
-                "scope": "RUN_TIME",
-                "type": "SECRET",
-            })
+            secret_refs.append(
+                {
+                    "key": secret_name,
+                    "scope": "RUN_TIME",
+                    "type": "SECRET",
+                }
+            )
 
         # App spec
         app_spec = {
