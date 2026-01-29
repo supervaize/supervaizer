@@ -19,6 +19,7 @@ from tinydb import Query, TinyDB
 from tinydb.storages import MemoryStorage
 
 from supervaizer.common import log, singleton
+from supervaizer.lifecycle import WorkflowEntity
 
 
 class _MemoryStorage(MemoryStorage):
@@ -33,7 +34,6 @@ if TYPE_CHECKING:
     from supervaizer.job import Job
     from supervaizer.lifecycle import EntityEvents, EntityStatus
 
-from supervaizer.lifecycle import WorkflowEntity
 
 T = TypeVar("T", bound=WorkflowEntity)
 
