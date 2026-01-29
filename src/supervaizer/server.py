@@ -379,9 +379,9 @@ class Server(ServerAbstract):
             # Save server info to storage for admin interface
             save_server_info_to_storage(self)
 
-        # Home page (template in deploy/templates)
+        # Home page (template in admin/templates)
         _home_templates = Jinja2Templates(
-            directory=str(Path(__file__).parent / "deploy" / "templates")
+            directory=str(Path(__file__).parent / "admin" / "templates")
         )
 
         @self.app.get("/", response_class=HTMLResponse)

@@ -34,28 +34,26 @@ DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
 PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
 
 # Define the parameters and secrets expected by the agent
-agent_parameters: ParametersSetup | None = ParametersSetup.from_list(
-    [
-        Parameter(
-            name="OPEN_API_KEY",
-            description="OpenAPI Key",
-            is_environment=True,
-            is_secret=True,
-        ),
-        Parameter(
-            name="SERPER_API",
-            description="Server API key updated",
-            is_environment=True,
-            is_secret=True,
-        ),
-        Parameter(
-            name="COMPETITOR_SUMMARY_URL",
-            description="Competitor Summary URL",
-            is_environment=True,
-            is_secret=False,
-        ),
-    ]
-)
+agent_parameters: ParametersSetup | None = ParametersSetup.from_list([
+    Parameter(
+        name="OPEN_API_KEY",
+        description="OpenAPI Key",
+        is_environment=True,
+        is_secret=True,
+    ),
+    Parameter(
+        name="SERPER_API",
+        description="Server API key updated",
+        is_environment=True,
+        is_secret=True,
+    ),
+    Parameter(
+        name="COMPETITOR_SUMMARY_URL",
+        description="Competitor Summary URL",
+        is_environment=True,
+        is_secret=False,
+    ),
+])
 
 # Define the method used to start a job
 job_start_method: AgentMethod = AgentMethod(
@@ -180,7 +178,7 @@ agent: Agent = Agent(
 account: Account = Account(
     workspace_id=os.getenv("SUPERVAIZE_WORKSPACE_ID") or "dummy_workspace_id",
     api_key=os.getenv("SUPERVAIZE_API_KEY") or "dummy_api_key",
-    api_url=os.getenv("SUPERVAIZE_API_URL") or "https://api.supervaize.com",
+    api_url=os.getenv("SUPERVAIZE_API_URL") or "https://app.supervaize.com",
 )
 
 # Define the supervaizer server capabilities
