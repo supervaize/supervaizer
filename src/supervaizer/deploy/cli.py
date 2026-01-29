@@ -167,6 +167,15 @@ def plan(
     verbose: bool = verbose_option,
 ) -> None:
     """Plan deployment changes without applying them."""
+    # Check if deploy extras are installed (e.g., docker, cloud SDKs)
+    try:
+        import docker
+    except ImportError:
+        console.print(
+            "[bold red]Error:[/] 'deploy' extra requirements are not installed. "
+            "Install them with: [bold]pip install supervaizer[deploy][/]"
+        )
+        raise typer.Exit(1)
     _check_platform_required(platform, "plan")
     source_dir = _check_pyproject_toml()
     plan_deployment(platform, name, env, region, project_id, verbose, source_dir)
