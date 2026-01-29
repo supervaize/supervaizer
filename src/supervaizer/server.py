@@ -10,6 +10,7 @@ import sys
 import time
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar
 from urllib.parse import urlunparse
 
@@ -19,8 +20,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator, Field
 from rich import inspect
 
@@ -76,16 +78,14 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append(
-                    {
-                        "name": agent.name,
-                        "description": agent.description,
-                        "version": agent.version,
-                        "api_path": agent.path,
-                        "slug": agent.slug,
-                        "instructions_path": agent.instructions_path,
-                    }
-                )
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                    "api_path": agent.path,
+                    "slug": agent.slug,
+                    "instructions_path": agent.instructions_path,
+                })
 
         # Create server info
         server_info = ServerInfo(
@@ -376,6 +376,25 @@ class Server(ServerAbstract):
 
             # Save server info to storage for admin interface
             save_server_info_to_storage(self)
+
+        # Home page (template in deploy/templates)
+        _home_templates = Jinja2Templates(
+            directory=str(Path(__file__).parent / "deploy" / "templates")
+        )
+
+        @self.app.get("/", response_class=HTMLResponse)
+        async def home_page(request: Request) -> HTMLResponse:
+            base = self.public_url or f"{self.scheme}://{self.host}:{self.port}"
+            return _home_templates.TemplateResponse(
+                "index.html",
+                {
+                    "request": request,
+                    "base": base,
+                    "version": VERSION,
+                    "api_version": API_VERSION,
+                    "show_admin": bool(self.api_key and admin_interface),
+                },
+            )
 
         # Load running entities from storage into memory
         try:
