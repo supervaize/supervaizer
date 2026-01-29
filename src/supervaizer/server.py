@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator, Field
@@ -377,6 +377,13 @@ class Server(ServerAbstract):
             # Save server info to storage for admin interface
             save_server_info_to_storage(self)
 
+        # Favicon (served at root so /docs, /redoc, etc. pick it up)
+        _favicon_path = Path(__file__).parent / "admin" / "static" / "favicon.ico"
+
+        @self.app.get("/favicon.ico", include_in_schema=False)
+        async def favicon() -> FileResponse:
+            return FileResponse(_favicon_path, media_type="image/x-icon")
+
         # Home page (template in admin/templates)
         _home_templates = Jinja2Templates(
             directory=str(Path(__file__).parent / "admin" / "templates")
@@ -487,7 +494,9 @@ class Server(ServerAbstract):
             "agents": [agent.registration_info for agent in self.agents],
         }
 
-    def launch(self, log_level: Optional[str] = "INFO") -> None:
+    def launch(
+        self, log_level: Optional[str] = "INFO", start_uvicorn: bool = False
+    ) -> None:
         if log_level:
             log.remove()
             log.add(
@@ -546,15 +555,16 @@ class Server(ServerAbstract):
                 if updated_agent:
                     log.info(f"[Server launch] Updated agent {updated_agent.name}")
 
-        import uvicorn
+        if start_uvicorn:
+            import uvicorn
 
-        uvicorn.run(
-            self.app,
-            host=self.host,
-            port=self.port,
-            reload=self.reload,
-            log_level=log_level,
-        )
+            uvicorn.run(
+                self.app,
+                host=self.host,
+                port=self.port,
+                reload=self.reload,
+                log_level=log_level,
+            )
 
     def instructions(self) -> None:
         server_url = f"http://{self.host}:{self.port}"
