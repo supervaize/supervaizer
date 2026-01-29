@@ -78,16 +78,14 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append(
-                    {
-                        "name": agent.name,
-                        "description": agent.description,
-                        "version": agent.version,
-                        "api_path": agent.path,
-                        "slug": agent.slug,
-                        "instructions_path": agent.instructions_path,
-                    }
-                )
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                    "api_path": agent.path,
+                    "slug": agent.slug,
+                    "instructions_path": agent.instructions_path,
+                })
 
         # Create server info
         server_info = ServerInfo(
@@ -386,6 +384,9 @@ class Server(ServerAbstract):
 
         @self.app.get("/", response_class=HTMLResponse)
         async def home_page(request: Request) -> HTMLResponse:
+            root_index = Path.cwd() / "index.html"
+            if root_index.is_file():
+                return HTMLResponse(content=root_index.read_text(encoding="utf-8"))
             base = self.public_url or f"{self.scheme}://{self.host}:{self.port}"
             return _home_templates.TemplateResponse(
                 "index.html",
