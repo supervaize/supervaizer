@@ -62,7 +62,7 @@ class AccountAbstract(SvBaseModel):
                 {
                     "workspace_id": "ws_1234567890abcdef",
                     "api_key": "sk_1234567890abcdef",
-                    "api_url": "https://api.supervaize.com",
+                    "api_url": "https://app.supervaize.com",
                 }
             ]
         },

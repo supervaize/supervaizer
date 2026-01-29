@@ -35,11 +35,14 @@
                             OpenAPI
                         </a>
                     </li>
-                    <li> BASE: {{ base }} 
+                    <li><strong>BASE:</strong> {{ base }} 
+                        <br>
+                        <strong>PUBLIC_URL:</strong> {{ public_url }}
+                        <br>
+                        <strong>FULL_URL:</strong> {{ full_url }}
+                        <br>
                     </li>
-                    <li>
-                        TO REPLACE THIS FILE, create an index.html at the root of the project and it will be served as the home page.
-                    </li>
+               
                     {% if show_admin %}
                     <li>
                         <a href="{{ base }}/admin" class="text-blue-600 hover:text-blue-800 font-medium">
@@ -49,6 +52,10 @@
                     {% endif %}
                 </ul>
             </div>
+        </div>
+<hr>
+        <div class="mt-8">
+                TO REPLACE THIS FILE, create an index.html at the root of the project and it will be served as the home page.
         </div>
     </main>
 </body>

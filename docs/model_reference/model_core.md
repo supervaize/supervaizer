@@ -25,31 +25,27 @@ The API URL is provided by Supervaize.com and is the URL of the Supervaize SaaS 
 The account provides methods for registering servers and agents, sending events,
 and communicating with the Supervaize platform.
 
-
-
 Attributes:
-    workspace_id (str): The workspace ID provided by Supervaize.com
-    api_key (str): The API key provided by Supervaize.com for authentication
-    api_url (str): The URL of the Supervaize SaaS API provided by Supervaize.com
+workspace_id (str): The workspace ID provided by Supervaize.com
+api_key (str): The API key provided by Supervaize.com for authentication
+api_url (str): The URL of the Supervaize SaaS API provided by Supervaize.com
 
 #### Model Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `workspace_id` | `str` | **required** | The workspace ID provided by Supervaize.com |
-| `api_key` | `str` | **required** | The API key provided by Supervaize.com for authentication |
-| `api_url` | `str` | **required** | The URL of the Supervaize SaaS API provided by Supervaize.com |
+| Field          | Type  | Default      | Description                                                   |
+| -------------- | ----- | ------------ | ------------------------------------------------------------- |
+| `workspace_id` | `str` | **required** | The workspace ID provided by Supervaize.com                   |
+| `api_key`      | `str` | **required** | The API key provided by Supervaize.com for authentication     |
+| `api_url`      | `str` | **required** | The URL of the Supervaize SaaS API provided by Supervaize.com |
 
 #### Example
 
 ```json
-
 {
   "workspace_id": "ws_1234567890abcdef",
   "api_key": "sk_1234567890abcdef",
-  "api_url": "https://api.supervaize.com"
+  "api_url": "https://app.supervaize.com"
 }
-
 ```
 
 ### `agent.Agent`
@@ -102,31 +98,33 @@ _No additional fields beyond parent class._
             is_secret=True,
         ),
     ]),
+
 )
-        ```
+
+````
 
 #### Model Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | Display name of the agent |
-| `id` | `str` | **required** | Unique ID generated from name |
-| `author` | `str` | `None` | Author of the agent |
-| `developer` | `str` | `None` | Developer of the controller integration |
-| `maintainer` | `str` | `None` | Maintainer of the integration |
-| `editor` | `str` | `None` | Editor (usually a company) |
-| `version` | `str` | '' | Version string |
-| `description` | `str` | '' | Description of what the agent does |
-| `tags` | `list[str]` | `None` | Tags for categorizing the agent |
-| `methods` | `AgentMethods` | `None` | Methods supported by this agent |
-| `parameters_setup` | `ParametersSetup` | `None` | Parameter configuration |
-| `server_agent_id` | `str` | `None` | ID assigned by server - Do not set this manually |
-| `server_agent_status` | `str` | `None` | Current status on server - Do not set this manually |
-| `server_agent_onboarding_status` | `str` | `None` | Onboarding status - Do not set this manually |
-| `server_encrypted_parameters` | `str` | `None` | Encrypted parameters from server - Do not set this manually |
-| `max_execution_time` | `int` | 3600 | Maximum execution time in seconds, defaults to 1 hour |
-| `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
-| `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
+| Field                                   | Type              | Default                        | Description                                                                    |
+| --------------------------------------- | ----------------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| `name`                                  | `str`             | **required**                   | Display name of the agent                                                      |
+| `id`                                    | `str`             | **required**                   | Unique ID generated from name                                                  |
+| `author`                                | `str`             | `None`                         | Author of the agent                                                            |
+| `developer`                             | `str`             | `None`                         | Developer of the controller integration                                        |
+| `maintainer`                            | `str`             | `None`                         | Maintainer of the integration                                                  |
+| `editor`                                | `str`             | `None`                         | Editor (usually a company)                                                     |
+| `version`                               | `str`             | ''                             | Version string                                                                 |
+| `description`                           | `str`             | ''                             | Description of what the agent does                                             |
+| `tags`                                  | `list[str]`       | `None`                         | Tags for categorizing the agent                                                |
+| `methods`                               | `AgentMethods`    | `None`                         | Methods supported by this agent                                                |
+| `parameters_setup`                      | `ParametersSetup` | `None`                         | Parameter configuration                                                        |
+| `server_agent_id`                       | `str`             | `None`                         | ID assigned by server - Do not set this manually                               |
+| `server_agent_status`                   | `str`             | `None`                         | Current status on server - Do not set this manually                            |
+| `server_agent_onboarding_status`        | `str`             | `None`                         | Onboarding status - Do not set this manually                                   |
+| `server_encrypted_parameters`           | `str`             | `None`                         | Encrypted parameters from server - Do not set this manually                    |
+| `max_execution_time`                    | `int`             | 3600                           | Maximum execution time in seconds, defaults to 1 hour                          |
+| `supervaize_instructions_template_path` | `str`             | `None`                         | Optional path to a custom template file for supervaize_instructions.html page  |
+| `instructions_path`                     | `str`             | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
 
 ### `agent.AgentMethod`
 
@@ -139,12 +137,11 @@ _No additional fields beyond parent class._
 Represents a method that can be called on an agent.
 
 Attributes:
-    name: Display name of the method
-    method: Name of the actual method in the project's codebase that will be called with the provided parameters
-    params: see below
-    fields: see below
-    description: Optional description of what the method does
-
+name: Display name of the method
+method: Name of the actual method in the project's codebase that will be called with the provided parameters
+params: see below
+fields: see below
+description: Optional description of what the method does
 
 1. params : Dictionary format
    A simple key-value dictionary of parameters what will be passed to the
@@ -157,8 +154,7 @@ Attributes:
   "timeout": 60,
   "max_retries": 3
 }
-```
-
+````
 
 2. fields : Form fields format
    These are the values that will be requested from the user in the Supervaize UI
@@ -175,20 +171,19 @@ Attributes:
    - widget: UI widget to use (e.g. RadioSelect, TextInput)
    - required: Whether field is required
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the method |
-| `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `typing.Dict[str, typing.Any]` | `None` | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
-| `description` | `str` | `None` | Optional description of what the method does |
-| `is_async` | `bool` | False | Whether the method is asynchronous |
-| `nodes` | `CaseNodes` | `None` | The definition of the Case Nodes (=steps) for this method |
+| Field         | Type                                              | Default      | Description                                                                                          |
+| ------------- | ------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| `name`        | `str`                                             | **required** | The name of the method                                                                               |
+| `method`      | `str`                                             | **required** | The name of the method in the project's codebase that will be called with the provided parameters    |
+| `params`      | `typing.Dict[str, typing.Any]`                    | `None`       | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs  |
+| `fields`      | `typing.List[supervaizer.agent.AgentMethodField]` | `None`       | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
+| `description` | `str`                                             | `None`       | Optional description of what the method does                                                         |
+| `is_async`    | `bool`                                            | False        | Whether the method is asynchronous                                                                   |
+| `nodes`       | `CaseNodes`                                       | `None`       | The definition of the Case Nodes (=steps) for this method                                            |
 
 #### Example
 
 ```json
-
 {
   "name": "start",
   "method": "example_agent.example_synchronous_job_start",
@@ -206,7 +201,6 @@ Attributes:
   ],
   "description": "Start the collection of new competitor summary"
 }
-
 ```
 
 ### `agent.AgentMethodField`
@@ -217,11 +211,9 @@ Fields are used to define user input parameters that will be collected through
 the UI and passed as kwargs to the AgentMethod.method. They follow Django forms
 field definitions for consistency.
 
-
 - [Django Widgets](https://docs.djangoproject.com/en/5.2/ref/forms/widgets/)
 
-
-** field_type  - available field types ** [Django Field classes](https://docs.djangoproject.com/en/5.2/ref/forms/fields/#built-in-field-classes)
+** field_type - available field types ** [Django Field classes](https://docs.djangoproject.com/en/5.2/ref/forms/fields/#built-in-field-classes)
 
     - `CharField` - Text input
     - `IntegerField` - Number input
@@ -230,51 +222,39 @@ field definitions for consistency.
     - `MultipleChoiceField` - Multi-select
     - `JSONField` - JSON data input
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the field - displayed in the UI |
-| `type` | `Any` | **required** | Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str] |
-| `field_type` | `<enum 'FieldTypeEnum'>` | `CharField` | Field type for persistence |
-| `description` | `str` | `None` | Description of the field - displayed in the UI |
-| `choices` | `list[tuple[str, str]]` \| `list[str]` | `None` | For choice fields, list of [value, label] pairs |
-| `default` | `Any` | `None` | Default value for the field - displayed in the UI |
-| `widget` | `str` | `None` | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
-| `required` | `bool` | False | Whether field is required for form submission |
+| Field         | Type                                   | Default      | Description                                                                                                   |
+| ------------- | -------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `name`        | `str`                                  | **required** | The name of the field - displayed in the UI                                                                   |
+| `type`        | `Any`                                  | **required** | Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str] |
+| `field_type`  | `<enum 'FieldTypeEnum'>`               | `CharField`  | Field type for persistence                                                                                    |
+| `description` | `str`                                  | `None`       | Description of the field - displayed in the UI                                                                |
+| `choices`     | `list[tuple[str, str]]` \| `list[str]` | `None`       | For choice fields, list of [value, label] pairs                                                               |
+| `default`     | `Any`                                  | `None`       | Default value for the field - displayed in the UI                                                             |
+| `widget`      | `str`                                  | `None`       | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name                                      |
+| `required`    | `bool`                                 | False        | Whether field is required for form submission                                                                 |
 
 #### Examples
 
 **Example 1:**
 
 ```json
-
 {
   "name": "color",
   "type": "list[str]",
   "field_type": "MultipleChoiceField",
   "choices": [
-    [
-      "B",
-      "Blue"
-    ],
-    [
-      "R",
-      "Red"
-    ],
-    [
-      "G",
-      "Green"
-    ]
+    ["B", "Blue"],
+    ["R", "Red"],
+    ["G", "Green"]
   ],
   "widget": "RadioSelect",
   "required": true
 }
-
 ```
 
 **Example 2:**
 
 ```json
-
 {
   "name": "age",
   "type": "int",
@@ -282,7 +262,6 @@ field definitions for consistency.
   "widget": "NumberInput",
   "required": false
 }
-
 ```
 
 ### `parameter.ParametersSetup`
@@ -296,6 +275,7 @@ It contains a dictionary of parameters, where the key is the parameter name
 and the value is the parameter object.
 
 Example:
+
 ```python
 ParametersSetup.from_list([
     Parameter(name="parameter1", value="value1"),
@@ -305,8 +285,8 @@ ParametersSetup.from_list([
 
 #### Model Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
+| Field         | Type                             | Default      | Description                                                                                            |
+| ------------- | -------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `definitions` | `Dict[str, parameter.Parameter]` | **required** | A dictionary of Parameters, where the key is the parameter name and the value is the parameter object. |
 
 ### `parameter.Parameter`
@@ -327,19 +307,18 @@ model to manage parameter definitions and values.
 
 #### Model Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `name` | `str` | **required** | The name of the parameter, as used in the agent code |
-| `description` | `str` | `None` | The description of the parameter, used in the Supervaize UI |
-| `is_environment` | `bool` | False | Whether the parameter is set as an environment variable |
-| `value` | `str` | `None` | The value of the parameter - provided by the Supervaize platform |
-| `is_secret` | `bool` | False | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
-| `is_required` | `bool` | False | Whether the parameter is required, used in the Supervaize UI |
+| Field            | Type   | Default      | Description                                                                   |
+| ---------------- | ------ | ------------ | ----------------------------------------------------------------------------- |
+| `name`           | `str`  | **required** | The name of the parameter, as used in the agent code                          |
+| `description`    | `str`  | `None`       | The description of the parameter, used in the Supervaize UI                   |
+| `is_environment` | `bool` | False        | Whether the parameter is set as an environment variable                       |
+| `value`          | `str`  | `None`       | The value of the parameter - provided by the Supervaize platform              |
+| `is_secret`      | `bool` | False        | Whether the parameter is a secret - hidden from the user in the Supervaize UI |
+| `is_required`    | `bool` | False        | Whether the parameter is required, used in the Supervaize UI                  |
 
 #### Example
 
 ```json
-
 {
   "name": "OPEN_API_KEY",
   "description": "OpenAPI Key",
@@ -347,7 +326,6 @@ model to manage parameter definitions and values.
   "is_secret": true,
   "is_required": true
 }
-
 ```
 
 ### `server.Server`
@@ -374,54 +352,49 @@ and supports encryption/decryption of parameters using RSA keys.
 Note that when the supervisor ccount is set, the A2A protocol is automatically activated to provide HEALTH CHECK endpoints.
 
 public_url: full url (including scheme and port) to use for outbound connections and registration.
-            This is especially important in Docker environments where the binding
-            address (0.0.0.0) can't be used for outbound connections. Set to
-            'host.docker.internal' for Docker or the appropriate service name
-            in container environments.
-            Examples:
-            - In Docker, set to 'http://host.docker.internal' to reach the host machine
-            - In Kubernetes, might be set to the service name or external DNS
-            If not provided, falls back to using the listening host.
+This is especially important in Docker environments where the binding
+address (0.0.0.0) can't be used for outbound connections. Set to
+'host.docker.internal' for Docker or the appropriate service name
+in container environments.
+Examples: - In Docker, set to 'http://host.docker.internal' to reach the host machine - In Kubernetes, might be set to the service name or external DNS
+If not provided, falls back to using the listening host.
 
 #### Model Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `scheme` | `str` | **required** | URL scheme (http or https) |
-| `host` | `str` | **required** | Host to bind the server to (e.g., 0.0.0.0 for all interfaces) |
-| `port` | `int` | **required** | Port to bind the server to |
-| `environment` | `str` | **required** | Environment name (e.g., dev, staging, prod) |
-| `mac_addr` | `str` | **required** | MAC address to use for server identification |
-| `debug` | `bool` | **required** | Whether to enable debug mode |
-| `agents` | `List[agent.Agent]` | **required** | List of agents to register with the server |
-| `app` | `FastAPI` | **required** | FastAPI application instance |
-| `reload` | `bool` | **required** | Whether to enable auto-reload |
-| `supervisor_account` | `Account` | `None` | Account of the supervisor - can be created at supervaize.com |
-| `a2a_endpoints` | `bool` | True | Whether to enable A2A endpoints |
-| `private_key` | `RSAPrivateKey` | **required** | RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user |
-| `public_key` | `RSAPublicKey` | **required** | RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user |
-| `public_url` | `str` | `None` | Public including scheme and port to use for inbound connections |
-| `api_key` | `str` | `None` | Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated |
-| `api_key_header` | `APIKeyHeader` | `None` | API key header for authentication |
+| Field                | Type                | Default      | Description                                                                                                   |
+| -------------------- | ------------------- | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `scheme`             | `str`               | **required** | URL scheme (http or https)                                                                                    |
+| `host`               | `str`               | **required** | Host to bind the server to (e.g., 0.0.0.0 for all interfaces)                                                 |
+| `port`               | `int`               | **required** | Port to bind the server to                                                                                    |
+| `environment`        | `str`               | **required** | Environment name (e.g., dev, staging, prod)                                                                   |
+| `mac_addr`           | `str`               | **required** | MAC address to use for server identification                                                                  |
+| `debug`              | `bool`              | **required** | Whether to enable debug mode                                                                                  |
+| `agents`             | `List[agent.Agent]` | **required** | List of agents to register with the server                                                                    |
+| `app`                | `FastAPI`           | **required** | FastAPI application instance                                                                                  |
+| `reload`             | `bool`              | **required** | Whether to enable auto-reload                                                                                 |
+| `supervisor_account` | `Account`           | `None`       | Account of the supervisor - can be created at supervaize.com                                                  |
+| `a2a_endpoints`      | `bool`              | True         | Whether to enable A2A endpoints                                                                               |
+| `private_key`        | `RSAPrivateKey`     | **required** | RSA private key for secret parameters encryption - Used in server-to-agent communication - Not needed by user |
+| `public_key`         | `RSAPublicKey`      | **required** | RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user  |
+| `public_url`         | `str`               | `None`       | Public including scheme and port to use for inbound connections                                               |
+| `api_key`            | `str`               | `None`       | Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated       |
+| `api_key_header`     | `APIKeyHeader`      | `None`       | API key header for authentication                                                                             |
 
 #### Examples
 
 **Example 1:**
 
 ```json
-
 {
   "agents": "[agent]",
   "a2a_enabled": true,
   "supervisor_account": null
 }
-
 ```
 
 **Example 2:**
 
 ```json
-
 {
   "scheme": "http",
   "host": "0.0.0.0",
@@ -432,8 +405,6 @@ public_url: full url (including scheme and port) to use for outbound connections
   "reload": false,
   "a2a_endpoints": true
 }
-
 ```
 
-
-*Uploaded on 2026-01-25 14:28:59*
+_Uploaded on 2026-01-25 14:28:59_

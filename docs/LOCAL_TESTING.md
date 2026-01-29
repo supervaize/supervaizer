@@ -198,7 +198,7 @@ supervaizer deploy clean
    ```bash
    export SUPERVAIZE_API_KEY="your-api-key"
    export SUPERVAIZE_WORKSPACE_ID="your-workspace-id"
-   export SUPERVAIZE_API_URL="https://api.supervaize.com"
+   export SUPERVAIZE_API_URL="https://app.supervaize.com"
    export SUPERVAIZER_PUBLIC_URL="https://your-app.com"
    ```
 

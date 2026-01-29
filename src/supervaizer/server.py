@@ -89,8 +89,8 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
 
         # Create server info
         server_info = ServerInfo(
-            host=getattr(server_instance, "host", "0.0.0.0"),
-            port=getattr(server_instance, "port", 8000),
+            host=getattr(server_instance, "host", "N/A"),
+            port=getattr(server_instance, "port", "N/A"),
             api_version=API_VERSION,
             environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
             agents=agents,
@@ -236,10 +236,10 @@ class Server(ServerAbstract):
         supervisor_account: Optional[Account] = None,
         a2a_endpoints: bool = True,
         admin_interface: bool = True,
-        scheme: str = "http",
+        scheme: str = os.getenv("SUPERVAIZER_SCHEME", "https"),
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
-        port: int = int(os.getenv("SUPERVAIZER_PORT", 8000)),
+        port: int = int(os.getenv("SUPERVAIZER_PORT", 443)),
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",
@@ -393,6 +393,8 @@ class Server(ServerAbstract):
                 {
                     "request": request,
                     "base": base,
+                    "public_url": self.public_url,
+                    "full_url": f"{self.scheme}://{self.host}:{self.port}",
                     "version": VERSION,
                     "api_version": API_VERSION,
                     "show_admin": bool(self.api_key and admin_interface),
