@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 import threading
 import time
 from pathlib import Path
@@ -18,6 +12,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+import supervaizer.storage as storage_module
 from supervaizer.account import Account
 from supervaizer.case import Case, Cases
 from supervaizer.job import Job, JobContext, Jobs
@@ -29,6 +24,77 @@ from supervaizer.storage import (
     create_case_repository,
     create_job_repository,
 )
+
+
+def _clear_storage_singleton() -> None:
+    """Clear StorageManager singleton so next StorageManager() gets a fresh instance."""
+    storage_get_instance = storage_module.StorageManager
+    if (
+        hasattr(storage_get_instance, "__closure__")
+        and storage_get_instance.__closure__
+    ):
+        for cell in storage_get_instance.__closure__:
+            if hasattr(cell.cell_contents, "clear"):
+                cell.cell_contents.clear()
+
+
+class TestPersistenceOptional:
+    """Test optional persistence (default off for Vercel/serverless)."""
+
+    def test_default_uses_in_memory_storage(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With no env set, StorageManager() uses in-memory storage (no file)."""
+        monkeypatch.setattr(storage_module, "PERSISTENCE_ENABLED", False)
+        _clear_storage_singleton()
+
+        storage = StorageManager()
+
+        assert storage.db_path == Path(":memory:")
+        assert type(storage._db.storage).__name__ == "_MemoryStorage"
+        # CRUD still works
+        storage.save_object("Test", {"id": "x", "name": "y"})
+        assert storage.get_object_by_id("Test", "x") == {"id": "x", "name": "y"}
+
+    def test_persistence_enabled_uses_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """With SUPERVAIZER_PERSISTENCE=true, StorageManager() uses file storage."""
+        monkeypatch.setattr(storage_module, "PERSISTENCE_ENABLED", True)
+        monkeypatch.setattr(storage_module, "DATA_STORAGE_PATH", str(tmp_path / "data"))
+        _clear_storage_singleton()
+
+        storage = StorageManager()
+
+        assert storage.db_path == tmp_path / "data" / "entities.json"
+        assert storage.db_path.exists()
+        storage.save_object("Test", {"id": "f", "name": "file"})
+        assert storage.get_object_by_id("Test", "f") == {"id": "f", "name": "file"}
+
+    def test_explicit_db_path_uses_file_when_persistence_disabled(
+        self, monkeypatch: pytest.MonkeyPatch, temp_db_path: str
+    ) -> None:
+        """Explicit db_path=... always uses file storage, regardless of env."""
+        monkeypatch.setattr(storage_module, "PERSISTENCE_ENABLED", False)
+        _clear_storage_singleton()
+
+        storage = StorageManager(db_path=temp_db_path)
+
+        assert Path(temp_db_path).exists()
+        storage.save_object("Test", {"id": "e", "name": "explicit"})
+        assert storage.get_object_by_id("Test", "e") == {"id": "e", "name": "explicit"}
+
+    def test_db_path_memory_uses_in_memory(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Explicit db_path=':memory:' uses in-memory storage."""
+        monkeypatch.setattr(storage_module, "PERSISTENCE_ENABLED", True)
+        _clear_storage_singleton()
+
+        storage = StorageManager(db_path=":memory:")
+
+        assert storage.db_path == Path(":memory:")
+        assert type(storage._db.storage).__name__ == "_MemoryStorage"
 
 
 class TestStorageManager:

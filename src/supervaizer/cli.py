@@ -95,7 +95,9 @@ def main_callback(
 
 # Add deploy subcommand
 app.add_typer(
-    deploy_app, name="deploy", help="Deploy Supervaizer agents to cloud platforms"
+    deploy_app,
+    name="deploy",
+    help="Deploy Supervaizer agents to cloud platforms (requires deploy extras: pip install supervaizer[deploy])",
 )
 
 # Create scaffold subcommand group
@@ -131,6 +133,12 @@ def start(
     environment: str = typer.Option(
         os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"), help="Environment name"
     ),
+    persist: bool = typer.Option(
+        (os.environ.get("SUPERVAIZER_PERSISTENCE") or "false").lower()
+        in ("true", "1", "yes"),
+        "--persist/--no-persist",
+        help="Persist data to file (default: off; set for self-hosted, off for Vercel/serverless)",
+    ),
     script_path: Optional[str] = typer.Argument(
         None,
         help="Path to the supervaizer_control.py script",
@@ -152,6 +160,7 @@ def start(
     os.environ["SUPERVAIZER_HOST"] = host
     os.environ["SUPERVAIZER_PORT"] = str(port)
     os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
+    os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
     os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
     os.environ["SUPERVAIZER_DEBUG"] = str(debug)
     os.environ["SUPERVAIZER_RELOAD"] = str(reload)

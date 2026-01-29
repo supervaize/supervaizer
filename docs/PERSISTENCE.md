@@ -248,6 +248,15 @@ for job_data in all_jobs:
 
 ## Configuration
 
+### Persistence Default (Off)
+
+Data persistence is **off by default** so the server works on Vercel and other serverless platforms where the filesystem is ephemeral.
+
+- **Default**: In-memory only (no file). Data is lost on restart.
+- **To enable file persistence**: Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`), or run `supervaizer start --persist`.
+
+When persistence is enabled, the storage path is `DATA_STORAGE_PATH/entities.json` (default `./data/entities.json`).
+
 ### Environment-Based Setup
 
 ```python
@@ -256,19 +265,20 @@ from supervaizer.storage import StorageManager
 
 # Environment-based configuration
 def create_storage():
-    env = os.getenv("SUPERVAIZER_ENV", "production")
-
-    if env == "test":
-        return StorageManager(db_path="./test_data/entities.json")
-    elif env == "development":
-        return StorageManager(db_path="./dev_data/entities.json")
-    else:
-        return StorageManager(db_path="./data/entities.json")
+    if os.getenv("SUPERVAIZER_PERSISTENCE", "false").lower() in ("true", "1", "yes"):
+        env = os.getenv("SUPERVAIZER_ENV", "production")
+        if env == "test":
+            return StorageManager(db_path="./test_data/entities.json")
+        elif env == "development":
+            return StorageManager(db_path="./dev_data/entities.json")
+        else:
+            return StorageManager(db_path="./data/entities.json")
+    return StorageManager()  # in-memory (default)
 ```
 
 ### Storage Path Configuration
 
-The default storage path is `./data/entities.json`, but can be customized:
+When persistence is enabled, the default storage path is `./data/entities.json`. It can be customized via `DATA_STORAGE_PATH`:
 
 ```python
 # Custom path

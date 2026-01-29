@@ -16,6 +16,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Optional data persistence (default off)** – Data is no longer persisted to file by default, so the server runs correctly on Vercel and other serverless platforms where the filesystem is ephemeral.
+  - Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`) to enable file persistence.
+  - CLI: `supervaizer start --persist` enables persistence for that run.
+  - Explicit `StorageManager(db_path=...)` in code still uses file storage (e.g. tests).
+  - See [PERSISTENCE.md](PERSISTENCE.md) for configuration.
+
+### Unit Tests Results
+
+| Status     | Count  |
+| ---------- | ------ |
+| ✅ Passed  | 419    |
+| 🤔 Skipped | 6      |
+| 🔴 Failed  | 0      |
+| ⏱️ in      | 55.28s |
+
 ## [0.10.4]
 
 - Relax some dependencies requirements

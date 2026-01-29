@@ -16,18 +16,36 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar
 
 from tinydb import Query, TinyDB
+from tinydb.storages import MemoryStorage
 
 from supervaizer.common import log, singleton
-from supervaizer.lifecycle import WorkflowEntity
+
+
+class _MemoryStorage(MemoryStorage):
+    """MemoryStorage that accepts TinyDB's sort_keys/indent kwargs (ignored)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args)
+
 
 if TYPE_CHECKING:
     from supervaizer.case import Case
     from supervaizer.job import Job
     from supervaizer.lifecycle import EntityEvents, EntityStatus
 
+from supervaizer.lifecycle import WorkflowEntity
+
 T = TypeVar("T", bound=WorkflowEntity)
 
 DATA_STORAGE_PATH = os.getenv("DATA_STORAGE_PATH", "./data")
+
+# When False (default), use in-memory storage only (e.g. Vercel, serverless).
+# Set SUPERVAIZER_PERSISTENCE=true to persist to file.
+PERSISTENCE_ENABLED = os.getenv("SUPERVAIZER_PERSISTENCE", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 
 @singleton
@@ -37,28 +55,36 @@ class StorageManager:
 
     Stores entities in separate tables by type, with foreign key relationships
     represented as ID references (Job.case_ids, Case.job_id).
+
+    When SUPERVAIZER_PERSISTENCE is false (default), uses in-memory storage only.
     """
 
-    def __init__(self, db_path: str = f"{DATA_STORAGE_PATH}/entities.json"):
+    def __init__(self, db_path: Optional[str] = None):
         """
         Initialize the storage manager.
 
         Args:
-            db_path: Path to the TinyDB JSON file
+            db_path: Path to the TinyDB JSON file, or None to use env-based
+                     persistence (file if SUPERVAIZER_PERSISTENCE=true, else memory).
         """
-        self.db_path: Path = Path(db_path)
         self._lock = threading.Lock()
-
-        # Ensure data directory exists
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-
-        # Initialize TinyDB without caching middleware for immediate persistence
-        # Note: Thread safety is handled by our own threading lock
-        self._db = TinyDB(
-            db_path,
-            sort_keys=True,
-            indent=2,
+        # Explicit file path (e.g. tests) uses file; else file only if persistence enabled
+        use_file = (db_path is not None and db_path != ":memory:") or (
+            db_path is None and PERSISTENCE_ENABLED
         )
+        if use_file:
+            path = (
+                db_path
+                if (db_path and db_path != ":memory:")
+                else f"{DATA_STORAGE_PATH}/entities.json"
+            )
+            self.db_path = Path(path)
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            self._db = TinyDB(path, sort_keys=True, indent=2)
+        else:
+            # In-memory only (default for Vercel/serverless)
+            self.db_path = Path(":memory:")
+            self._db = TinyDB(storage=_MemoryStorage, sort_keys=True, indent=2)
 
         # log.debug(
         #    f"[StorageManager] 🗃️ Local DB initialized at {self.db_path.absolute()}"
