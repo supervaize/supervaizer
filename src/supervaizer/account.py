@@ -8,7 +8,7 @@
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 
 import httpx
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
@@ -54,6 +54,14 @@ class AccountAbstract(SvBaseModel):
     api_url: str = Field(
         description="The URL of the Supervaize SaaS API provided by Supervaize.com"
     )
+
+    @field_validator("workspace_id", "api_key", "api_url", mode="before")
+    @classmethod
+    def strip_whitespace(cls, v: Any) -> Any:
+        """Strip leading/trailing whitespace (e.g. newlines from env vars)."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
     model_config = {
         "reference_group": "Core",
@@ -121,7 +129,7 @@ class Account(AccountAbstract):
         """URL for the Supervaize Control API.
         Tested in tests/test_account.py
         """
-        return f"{self.api_url_w_v1}/ctrl-events/"
+        return f"{self.api_url_w_v1}/ctrl-events/".strip()
 
     def get_url(self, pattern_name: str, **kwargs: Any) -> str:
         """Generate a URL using the predefined patterns.

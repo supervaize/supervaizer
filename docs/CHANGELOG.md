@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## TODO
 
-- Fix CI### Changed
+- Fix CICD
   - Version bump : rebuild documentation after version bump in CI-CD
   - Update Released / Package / Tag
 - Review and test feature/data-persistance
@@ -16,9 +16,15 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.10.11
+
 ### Added
 
 - **Optional data persistence (default off)** – Data is no longer persisted to file by default, so the server runs correctly on Vercel and other serverless platforms where the filesystem is ephemeral.
+
+### Changed
+
+- **Controller unreachable** – When the Supervaize controller server is not available (connection refused or timeout), event send now fails gracefully with a short, clear error message instead of dumping the full payload and traceback. Logs: `Supervaize controller is not available at {url}. Connection refused or timed out. Is the controller server running?` and the event type/exception.
   - Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`) to enable file persistence.
   - CLI: `supervaizer start --persist` enables persistence for that run.
   - Explicit `StorageManager(db_path=...)` in code still uses file storage (e.g. tests).

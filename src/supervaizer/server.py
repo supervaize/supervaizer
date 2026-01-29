@@ -46,7 +46,11 @@ from supervaizer.routes import (
     create_utils_routes,
     get_server,
 )
-from supervaizer.storage import StorageManager, load_running_entities_on_startup
+from supervaizer.storage import (
+    PERSISTENCE_ENABLED,
+    StorageManager,
+    load_running_entities_on_startup,
+)
 
 insp = inspect
 
@@ -70,7 +74,9 @@ class ServerInfo(BaseModel):
 
 
 def save_server_info_to_storage(server_instance: "Server") -> None:
-    """Save server information to storage."""
+    """Save server information to storage (only when persistence is enabled)."""
+    if not PERSISTENCE_ENABLED:
+        return
     try:
         storage = StorageManager()
 

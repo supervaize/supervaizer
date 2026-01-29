@@ -59,14 +59,17 @@ def send_event(
 
     headers = account.api_headers
     payload = event.payload
+    url_event = (
+        account.url_event.strip()
+    )  # defensive: env vars often have trailing newline
 
     # Generate curl equivalent for debugging
 
     curl_headers = " ".join([f'-H "{k}: {v}"' for k, v in headers.items()])
-    curl_cmd = f"curl -X 'GET' '{account.url_event}'  {curl_headers}"
+    curl_cmd = f"curl -X 'GET' '{url_event}'  {curl_headers}"
 
     try:
-        response = _httpx_client.post(account.url_event, headers=headers, json=payload)
+        response = _httpx_client.post(url_event, headers=headers, json=payload)
 
         # Log response details before raising for status
 
@@ -76,6 +79,13 @@ def send_event(
         )
 
         log.success(result.log_message)
+    except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+        log.error(
+            f"Supervaize controller is not available at {url_event}. "
+            "Connection refused or timed out. Is the controller server running?"
+        )
+        log.error(f"❌ Error sending event {event.type.name}: {e!s}")
+        raise e
     except httpx.HTTPError as e:
         # Enhanced error logging
         log.error("[Send event] HTTP Error occurred")
@@ -83,7 +93,7 @@ def send_event(
 
         error_result = ApiError(
             message=f"Error sending event {event.type.name}",
-            url=account.url_event,
+            url=url_event,
             payload=event.payload,
             exception=e,
         )
