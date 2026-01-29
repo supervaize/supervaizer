@@ -10,6 +10,7 @@ Deployment CLI Commands
 This module contains the main CLI commands for the deploy subcommand.
 """
 
+import importlib.util
 import typer
 from pathlib import Path
 from rich.console import Console
@@ -168,9 +169,7 @@ def plan(
 ) -> None:
     """Plan deployment changes without applying them."""
     # Check if deploy extras are installed (e.g., docker, cloud SDKs)
-    try:
-        import docker
-    except ImportError:
+    if importlib.util.find_spec("docker") is None:
         console.print(
             "[bold red]Error:[/] 'deploy' extra requirements are not installed. "
             "Install them with: [bold]pip install supervaizer[deploy][/]"
