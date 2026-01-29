@@ -17,11 +17,11 @@ dev-install:
 
 # Run pre-commit hooks manually
 precommit:
-    pre-commit run --all-files --verbose
+    uv run pre-commit run --all-files --verbose
 
 # Run pre-commit autoupdate (when pre-commit-config.yaml is updated)
 precommit-autoupdate:
-    pre-commit autoupdate
+    uv run pre-commit autoupdate
 
 # Run tests with coverage
 test-cov *args:
@@ -38,7 +38,7 @@ test-failed:
 
 # Run mypy type checking
 mypy:
-    pre-commit run mypy --all-files
+    uv run pre-commit run mypy --all-files
 
 # Sync dependencies (from pyproject.toml)
 env_sync:
@@ -79,7 +79,7 @@ install-hooks:
     # First unset any existing hooksPath
     @git config --unset-all core.hooksPath || true
     # Install pre-commit hooks
-    @pre-commit install
+    @uv run pre-commit install
     # Set up our custom hooks
     @git config core.hooksPath .githooks
     # Git hooks installed
