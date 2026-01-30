@@ -13,6 +13,7 @@ from supervaizer.agent import (
     AgentMethod,
     AgentMethodParams,
     AgentMethods,
+    AgentMethodField,
 )
 from supervaizer.case import (
     Case,
