@@ -78,7 +78,7 @@ class AgentMethodField(BaseModel):
     type: Any = Field(
         description="Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]"
     )
-    field_type: FieldTypeEnum = Field(
+    field_type: FieldTypeEnum | str = Field(
         default=FieldTypeEnum.CHAR, description="Field type for persistence"
     )
     description: str | None = Field(
@@ -185,6 +185,7 @@ class AgentMethodAbstract(BaseModel):
         default=None,
         description="A list of field specifications for generating forms/UI, following the django.forms.fields definition",
     )
+
     description: str | None = Field(
         default=None, description="Optional description of what the method does"
     )
