@@ -12,7 +12,15 @@
             </h2>
             <p class="mt-1 text-sm text-gray-500">Monitor server health and configuration</p>
         </div>
-        <div class="mt-4 flex md:mt-0">
+        <div class="mt-4 flex md:mt-0 gap-2">
+            <button
+                id="register-supervisor-btn"
+                type="button"
+                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+                <span id="register-indicator" class="htmx-indicator -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Register with supervisor
+            </button>
             <button
                 hx-get="/admin/api/server/status"
                 hx-target="#server-status-container"
@@ -26,6 +34,7 @@
                 Refresh
             </button>
         </div>
+        <div id="register-result" class="mt-2 text-sm hidden" role="alert"></div>
     </div>
 
     <!-- Server Status Cards -->
@@ -91,15 +100,52 @@
 </div>
 
 <script>
-    // Auto-refresh server status every 30 seconds
     document.addEventListener('DOMContentLoaded', function() {
-        // Set up auto-refresh interval
+        // Auto-refresh server status every 30 seconds
         setInterval(function() {
             const refreshButton = document.querySelector('[hx-get="/admin/api/server/status"]');
             if (refreshButton) {
                 htmx.trigger(refreshButton, 'click');
             }
-        }, 30000); // Refresh every 30 seconds
+        }, 30000);
+
+        // Register with supervisor button
+        const registerBtn = document.getElementById('register-supervisor-btn');
+        const registerIndicator = document.getElementById('register-indicator');
+        const registerResult = document.getElementById('register-result');
+        if (registerBtn) {
+            registerBtn.addEventListener('click', async function() {
+                const params = new URLSearchParams(window.location.search);
+                const key = params.get('key');
+                const url = key ? '/admin/api/server/register?key=' + encodeURIComponent(key) : '/admin/api/server/register';
+                registerResult.classList.add('hidden');
+                registerIndicator.classList.remove('htmx-indicator');
+                registerBtn.disabled = true;
+                try {
+                    const res = await fetch(url, { method: 'POST' });
+                    const data = await res.json().catch(function() { return {}; });
+                    registerResult.classList.remove('hidden');
+                    if (res.ok && data.success) {
+                        registerResult.className = 'mt-2 text-sm text-green-700';
+                        registerResult.textContent = data.message || 'Registered successfully.';
+                    } else {
+                        registerResult.className = 'mt-2 text-sm text-red-700';
+                        if (res.status === 403) {
+                            registerResult.textContent = 'Authentication required. Open this page with ?key=...';
+                        } else {
+                            registerResult.textContent = (data.detail && typeof data.detail === 'object' && data.detail.message) ? data.detail.message : (data.message || 'Registration failed.');
+                        }
+                    }
+                } catch (e) {
+                    registerResult.classList.remove('hidden');
+                    registerResult.className = 'mt-2 text-sm text-red-700';
+                    registerResult.textContent = 'Request failed: ' + (e.message || String(e));
+                } finally {
+                    registerIndicator.classList.add('htmx-indicator');
+                    registerBtn.disabled = false;
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

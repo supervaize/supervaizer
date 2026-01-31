@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter, HTTPException, Query, Request, Security
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -411,6 +411,55 @@ def create_admin_routes() -> APIRouter:
             )
         except Exception as e:
             log.error(f"Get server status API error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.post("/api/server/register")
+    async def register_server_with_supervisor(
+        request: Request,
+        _: bool = Depends(verify_admin_access),
+    ) -> JSONResponse:
+        """Trigger SERVER_REGISTER to the supervaizer supervisor."""
+        try:
+            from supervaizer.common import ApiSuccess
+            from supervaizer.routes import get_server
+
+            get_current = request.app.dependency_overrides.get(get_server)
+            if get_current is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Server instance not available (admin not running with live server)",
+                )
+            try:
+                server = await get_current()
+            except (NotImplementedError, TypeError):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Server instance not available (admin not running with live server)",
+                )
+            if not getattr(server, "supervisor_account", None):
+                raise HTTPException(
+                    status_code=503,
+                    detail="No supervisor account configured",
+                )
+            result = server.supervisor_account.register_server(server=server)
+            if isinstance(result, ApiSuccess):
+                return JSONResponse(
+                    status_code=200,
+                    content={"success": True, "message": result.message, "detail": result.detail},
+                )
+            # ApiError
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "success": False,
+                    "message": result.message,
+                    "detail": getattr(result, "detail", None),
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            log.error(f"Server register API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/api/agents")
