@@ -31,6 +31,13 @@
         .htmx-request { opacity: 0.5; }
         .htmx-request.htmx-swapping { opacity: 1; }
     </style>
+    <script>
+        // Persist admin API key from URL so it survives navigation (e.g. Register with supervisor)
+        (function() {
+            var m = /[?&]key=([^&]+)/.exec(window.location.search);
+            if (m) try { sessionStorage.setItem('admin_api_key', decodeURIComponent(m[1])); } catch (e) {}
+        })();
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->

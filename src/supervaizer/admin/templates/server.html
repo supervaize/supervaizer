@@ -116,7 +116,7 @@
         if (registerBtn) {
             registerBtn.addEventListener('click', async function() {
                 const params = new URLSearchParams(window.location.search);
-                const key = params.get('key');
+                const key = params.get('key') || (function() { try { return sessionStorage.getItem('admin_api_key'); } catch (e) { return null; } })();
                 const url = key ? '/admin/api/server/register?key=' + encodeURIComponent(key) : '/admin/api/server/register';
                 registerResult.classList.add('hidden');
                 registerIndicator.classList.remove('htmx-indicator');
