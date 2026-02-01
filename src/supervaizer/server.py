@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator, Field
@@ -46,17 +46,23 @@ from supervaizer.routes import (
     create_utils_routes,
     get_server,
 )
-from supervaizer.storage import (
-    PERSISTENCE_ENABLED,
-    StorageManager,
-    load_running_entities_on_startup,
-)
+from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 insp = inspect
 
 T = TypeVar("T")
 
 # Additional imports for server persistence
+
+
+def _get_or_create_server_id() -> str:
+    """Use SUPERVAIZER_SERVER_ID from env if set; else create uuid and set env."""
+    existing = os.getenv("SUPERVAIZER_SERVER_ID")
+    if existing:
+        return existing
+    new_id = str(uuid.uuid4())
+    os.environ["SUPERVAIZER_SERVER_ID"] = new_id
+    return new_id
 
 
 class ServerInfo(BaseModel):
@@ -74,9 +80,7 @@ class ServerInfo(BaseModel):
 
 
 def save_server_info_to_storage(server_instance: "Server") -> None:
-    """Save server information to storage (only when persistence is enabled)."""
-    if not PERSISTENCE_ENABLED:
-        return
+    """Save server information to storage."""
     try:
         storage = StorageManager()
 
@@ -154,6 +158,10 @@ class ServerAbstract(SvBaseModel):
     """
 
     supervaizer_VERSION: ClassVar[str] = VERSION
+    server_id: str = Field(
+        default_factory=_get_or_create_server_id,
+        description="Unique server id (SUPERVAIZER_SERVER_ID env or persisted uuid)",
+    )
     scheme: str = Field(description="URL scheme (http or https)")
     host: str = Field(
         description="Host to bind the server to (e.g., 0.0.0.0 for all interfaces)"
@@ -242,10 +250,10 @@ class Server(ServerAbstract):
         supervisor_account: Optional[Account] = None,
         a2a_endpoints: bool = True,
         admin_interface: bool = True,
-        scheme: str = os.getenv("SUPERVAIZER_SCHEME", "https"),
+        scheme: str = "http",
         environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
         host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
-        port: int = int(os.getenv("SUPERVAIZER_PORT", 443)),
+        port: int = int(os.getenv("SUPERVAIZER_PORT", 8000)),
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",
@@ -360,6 +368,8 @@ class Server(ServerAbstract):
             **kwargs,
         )
 
+        log.info(f"[Server launch] Server ID: {self.server_id}")
+
         # Create routes
         if self.supervisor_account:
             log.info(
@@ -383,13 +393,6 @@ class Server(ServerAbstract):
             # Save server info to storage for admin interface
             save_server_info_to_storage(self)
 
-        # Favicon (served at root so /docs, /redoc, etc. pick it up)
-        _favicon_path = Path(__file__).parent / "admin" / "static" / "favicon.ico"
-
-        @self.app.get("/favicon.ico", include_in_schema=False)
-        async def favicon() -> FileResponse:
-            return FileResponse(_favicon_path, media_type="image/x-icon")
-
         # Home page (template in admin/templates)
         _home_templates = Jinja2Templates(
             directory=str(Path(__file__).parent / "admin" / "templates")
@@ -397,20 +400,16 @@ class Server(ServerAbstract):
 
         @self.app.get("/", response_class=HTMLResponse)
         async def home_page(request: Request) -> HTMLResponse:
-            root_index = Path.cwd() / "index.html"
-            if root_index.is_file():
-                return HTMLResponse(content=root_index.read_text(encoding="utf-8"))
             base = self.public_url or f"{self.scheme}://{self.host}:{self.port}"
             return _home_templates.TemplateResponse(
                 "index.html",
                 {
                     "request": request,
                     "base": base,
-                    "public_url": self.public_url,
-                    "full_url": f"{self.scheme}://{self.host}:{self.port}",
                     "version": VERSION,
                     "api_version": API_VERSION,
                     "show_admin": bool(self.api_key and admin_interface),
+                    "server_id": self.server_id,
                 },
             )
 
@@ -481,6 +480,7 @@ class Server(ServerAbstract):
         """Get registration info for the server."""
         assert self.public_key is not None, "Public key not initialized"
         return {
+            "server_id": self.server_id,
             "url": self.public_url,
             "uri": self.uri,
             "api_version": API_VERSION,
@@ -500,9 +500,7 @@ class Server(ServerAbstract):
             "agents": [agent.registration_info for agent in self.agents],
         }
 
-    def launch(
-        self, log_level: Optional[str] = "INFO", start_uvicorn: bool = False
-    ) -> None:
+    def launch(self, log_level: Optional[str] = "INFO") -> None:
         if log_level:
             log.remove()
             log.add(
@@ -561,16 +559,15 @@ class Server(ServerAbstract):
                 if updated_agent:
                     log.info(f"[Server launch] Updated agent {updated_agent.name}")
 
-        if start_uvicorn:
-            import uvicorn
+        import uvicorn
 
-            uvicorn.run(
-                self.app,
-                host=self.host,
-                port=self.port,
-                reload=self.reload,
-                log_level=log_level,
-            )
+        uvicorn.run(
+            self.app,
+            host=self.host,
+            port=self.port,
+            reload=self.reload,
+            log_level=log_level,
+        )
 
     def instructions(self) -> None:
         server_url = f"http://{self.host}:{self.port}"

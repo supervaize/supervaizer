@@ -199,7 +199,13 @@ class Account(AccountAbstract):
         from supervaizer.event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        return self.send_event(sender=server, event=event)
+        result = self.send_event(sender=server, event=event)
+        if isinstance(result, ApiSuccess):
+            log.success(result.message)
+            # TODO: Update server with the server ID from the response. store this ID in env variable.
+        else:
+            log.error(result.message)
+        return result
 
     def _create_api_result(
         self,
