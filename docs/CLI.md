@@ -83,6 +83,7 @@ supervaizer deploy local --verbose
 ```
 
 **Options:**
+
 - `--name TEXT` - Service name (default: current directory name)
 - `--env [dev|staging|prod]` - Environment (default: dev)
 - `--port INTEGER` - Local port to expose (default: 8000)
@@ -107,6 +108,7 @@ supervaizer deploy plan --platform do-app-platform --region nyc
 ```
 
 **Options:**
+
 - `--platform [cloud-run|aws-app-runner|do-app-platform]` - Cloud platform (required)
 - `--name TEXT` - Service name (default: current directory name)
 - `--env [dev|staging|prod]` - Environment (default: dev)
@@ -137,6 +139,7 @@ supervaizer deploy up --platform cloud-run --region us-central1 --yes
 ```
 
 **Options:**
+
 - `--platform [cloud-run|aws-app-runner|do-app-platform]` - Cloud platform (required)
 - `--name TEXT` - Service name (default: current directory name)
 - `--env [dev|staging|prod]` - Environment (default: dev)
@@ -168,6 +171,7 @@ supervaizer deploy down --platform cloud-run --yes
 ```
 
 **Options:**
+
 - `--platform [cloud-run|aws-app-runner|do-app-platform]` - Cloud platform (required)
 - `--name TEXT` - Service name (default: current directory name)
 - `--env [dev|staging|prod]` - Environment (default: dev)
@@ -191,6 +195,7 @@ supervaizer deploy status --platform cloud-run --verbose
 ```
 
 **Options:**
+
 - `--platform [cloud-run|aws-app-runner|do-app-platform]` - Cloud platform (required)
 - `--name TEXT` - Service name (default: current directory name)
 - `--env [dev|staging|prod]` - Environment (default: dev)
@@ -210,12 +215,14 @@ supervaizer deploy clean --verbose
 ```
 
 **Options:**
+
 - `--yes` - Non-interactive mode (skip confirmations)
 - `--verbose` - Show detailed output
 
 ### Deployment Documentation
 
 For detailed deployment documentation, see:
+
 - [RFC-001: Cloud Deployment CLI](rfc/001-cloud-deployment-cli.md) - Complete specification
 - [Local Testing Guide](LOCAL_TESTING.md) - Docker testing documentation
 
@@ -228,8 +235,8 @@ All CLI options can also be configured through environment variables:
 | Environment Variable      | Description                      | Default Value                |
 | ------------------------- | -------------------------------- | ---------------------------- |
 | SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to scheme+host+port |
-| SUPERVAIZER_HOST          | Host to bind the server to      | 0.0.0.0                      |
-| SUPERVAIZER_PORT          | Port to bind the server to      | 8000                         |
+| SUPERVAIZER_HOST          | Host to bind the server to       | 0.0.0.0                      |
+| SUPERVAIZER_PORT          | Port to bind the server to       | 8000                         |
 | SUPERVAIZER_ENVIRONMENT   | Environment name                 | dev                          |
 | SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)    | INFO                         |
 | SUPERVAIZER_DEBUG         | Enable debug mode (true/false)   | false                        |
@@ -242,14 +249,14 @@ All CLI options can also be configured through environment variables:
 
 These environment variables are used during cloud deployment:
 
-| Environment Variable           | Description                                    | Default Value |
-| ------------------------------ | ---------------------------------------------- | ------------- |
-| SUPERVAIZER_API_KEY            | API key for authentication                     | -             |
-| SV_RSA_PRIVATE_KEY             | RSA private key (inline value)                 | -             |
-| SV_RSA_PRIVATE_KEY_PATH        | Path to RSA private key PEM file               | -             |
-| SV_LOG_LEVEL                   | Log level for deployed service                 | INFO          |
-| SUPERVAIZE_API_KEY             | Supervaize platform API key                    | -             |
-| SUPERVAIZE_WORKSPACE_ID        | Supervaize workspace identifier                | -             |
-| SUPERVAIZE_API_URL             | Supervaize API endpoint URL                    | -             |
+| Environment Variable    | Description                      | Default Value |
+| ----------------------- | -------------------------------- | ------------- |
+| SUPERVAIZER_API_KEY     | API key for authentication       | -             |
+| SV_RSA_PRIVATE_KEY      | RSA private key (inline value)   | -             |
+| SV_RSA_PRIVATE_KEY_PATH | Path to RSA private key PEM file | -             |
+| SV_LOG_LEVEL            | Log level for deployed service   | INFO          |
+| SUPERVAIZE_API_KEY      | Supervaize platform API key      | -             |
+| SUPERVAIZE_WORKSPACE_ID | Supervaize workspace identifier  | -             |
+| SUPERVAIZE_API_URL      | Supervaize API endpoint URL      | -             |
 
 **Note:** Deployment secrets (API keys, RSA keys) are securely stored in cloud provider secret stores and not exposed in environment variables or logs.

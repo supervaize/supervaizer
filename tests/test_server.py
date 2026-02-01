@@ -5,6 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import json
+import os
 from typing import Any, Optional
 
 import pytest
@@ -290,9 +291,9 @@ async def test_start_job_endpoint(
     mocker.patch(
         "supervaizer.common.decrypt_value",
         "decrypt",
-        lambda self, encrypted: json.dumps(
-            {k: v.value for k, v in parameters_fixture.definitions.items()}
-        ),
+        lambda self, encrypted: json.dumps({
+            k: v.value for k, v in parameters_fixture.definitions.items()
+        }),
     )
 
     # Set up client with API key
@@ -544,6 +545,7 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert "docs" in registration_info
     assert "agents" in registration_info
     assert "url" in registration_info
+    assert "server_id" in registration_info
 
     # Check values match the fixture
     assert registration_info.pop("public_key").startswith("-----BEGIN PUBLIC KEY")
@@ -558,6 +560,9 @@ def test_server_registration_info(server_fixture: Server) -> None:
         "redoc": f"{url}/redoc",
         "openapi": f"{url}/openapi.json",
     }
+    # Remove server_id from registration_info
+    server_id = registration_info.pop("server_id")
+    assert server_id == os.getenv("SUPERVAIZER_SERVER_ID")
     assert registration_info == {
         "uri": "server:E2-AC-ED-22-BF-B2",
         "api_version": "v1",

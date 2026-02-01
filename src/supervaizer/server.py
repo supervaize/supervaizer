@@ -99,6 +99,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
 
         # Create server info
         server_info = ServerInfo(
+            id=getattr(server_instance, "server_id", "N/A"),
             host=getattr(server_instance, "host", "N/A"),
             port=getattr(server_instance, "port", "N/A"),
             api_version=API_VERSION,

@@ -267,6 +267,7 @@ def create_admin_routes() -> APIRouter:
                     "db_name": "TinyDB",
                     "data_storage_path": str(storage.db_path.absolute()),
                     "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                    "server_id": os.getenv("SUPERVAIZER_SERVER_ID"),
                 },
             )
         except Exception as e:
