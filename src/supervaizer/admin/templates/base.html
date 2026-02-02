@@ -35,11 +35,14 @@
         // Persist admin API key from URL so it survives navigation (e.g. Register with supervisor)
         (function() {
             var m = /[?&]key=([^&]+)/.exec(window.location.search);
-            if (m) try { sessionStorage.setItem('admin_api_key', decodeURIComponent(m[1])); } catch (e) {}
+            if (m) try {
+                var k = decodeURIComponent(m[1]);
+                if (k !== 'None' && k !== 'undefined') sessionStorage.setItem('admin_api_key', k);
+            } catch (e) {}
         })();
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen" data-admin-key="{{ (api_key or '')|e }}">
     <!-- Navigation -->
     {% include "navigation.html" %}
 

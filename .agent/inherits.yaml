@@ -1,0 +1,19 @@
+org_root: /Volumes/SSDext1TB/Documents/GitRepo/SUPERVAIZE
+skills:
+  universal:
+    - git
+    - test
+  languages:
+    javascript:
+      - nodejs
+      - react
+    python:
+      - fastapi
+      - pytest
+      - python
+      - uv
+personas:
+  - backend-developer
+  - frontend-developer
+target_agents:
+  - cursor

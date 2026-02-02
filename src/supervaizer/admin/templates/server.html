@@ -109,20 +109,17 @@
             }
         }, 30000);
 
-        // Register with supervisor button
+        // Register with supervisor button — no API key; backend sends SERVER_REGISTER to SUPERVAIZE_API_URL
         const registerBtn = document.getElementById('register-supervisor-btn');
         const registerIndicator = document.getElementById('register-indicator');
         const registerResult = document.getElementById('register-result');
         if (registerBtn) {
             registerBtn.addEventListener('click', async function() {
-                const params = new URLSearchParams(window.location.search);
-                const key = params.get('key') || (function() { try { return sessionStorage.getItem('admin_api_key'); } catch (e) { return null; } })();
-                const url = key ? '/admin/api/server/register?key=' + encodeURIComponent(key) : '/admin/api/server/register';
                 registerResult.classList.add('hidden');
                 registerIndicator.classList.remove('htmx-indicator');
                 registerBtn.disabled = true;
                 try {
-                    const res = await fetch(url, { method: 'POST' });
+                    const res = await fetch('/admin/api/server/register', { method: 'POST' });
                     const data = await res.json().catch(function() { return {}; });
                     registerResult.classList.remove('hidden');
                     if (res.ok && data.success) {
@@ -130,11 +127,7 @@
                         registerResult.textContent = data.message || 'Registered successfully.';
                     } else {
                         registerResult.className = 'mt-2 text-sm text-red-700';
-                        if (res.status === 403) {
-                            registerResult.textContent = 'Authentication required. Open this page with ?key=...';
-                        } else {
-                            registerResult.textContent = (data.detail && typeof data.detail === 'object' && data.detail.message) ? data.detail.message : (data.message || 'Registration failed.');
-                        }
+                        registerResult.textContent = (data.detail && typeof data.detail === 'object' && data.detail.message) ? data.detail.message : (data.message || data.detail || 'Registration failed.');
                     }
                 } catch (e) {
                     registerResult.classList.remove('hidden');

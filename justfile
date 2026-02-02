@@ -29,12 +29,16 @@ test-cov *args:
 
 
 # Run tests without coverage
+test *args:
+    uv run pytest --no-cov {{args}}
+
+# Run tests without coverage
 test-no-cov *args:
-    pytest --no-cov {{args}}
+    uv run pytest --no-cov {{args}}
 
 # Run only previously failed tests
 test-failed:
-    pytest --lf --no-cov
+    uv run pytest --lf --no-cov
 
 # Run mypy type checking
 mypy:

@@ -131,6 +131,32 @@ def get_server_info_from_storage() -> Optional[ServerInfo]:
     return None
 
 
+def get_server_info_from_live(server_instance: "Server") -> ServerInfo:
+    """Build ServerInfo from a live Server instance (for when storage has no ServerInfo, e.g. no persistence)."""
+    agents = []
+    if hasattr(server_instance, "agents") and server_instance.agents:
+        for agent in server_instance.agents:
+            agents.append({
+                "name": agent.name,
+                "description": agent.description,
+                "version": agent.version,
+                "api_path": agent.path,
+                "slug": agent.slug,
+                "instructions_path": agent.instructions_path,
+            })
+    start_time = getattr(server_instance, "_start_time", time.time())
+    return ServerInfo(
+        host=getattr(server_instance, "host", "N/A"),
+        port=getattr(server_instance, "port", 0),
+        api_version=API_VERSION,
+        environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
+        agents=agents,
+        start_time=start_time,
+        created_at=datetime.now().isoformat(),
+        updated_at=datetime.now().isoformat(),
+    )
+
+
 class ServerAbstract(SvBaseModel):
     """
     API Server for the Supervaize Controller.
@@ -427,6 +453,10 @@ class Server(ServerAbstract):
 
         # Update the dependency
         self.app.dependency_overrides[get_server] = get_current_server
+
+        # Expose live server for admin when storage has no ServerInfo (e.g. no persistence)
+        self._start_time = time.time()
+        self.app.state.server = self
 
         if api_key:
             log.info("[Server launch] API Key authentication enabled")

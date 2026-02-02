@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
+from fastapi import APIRouter, HTTPException, Query, Request, Security
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
@@ -168,12 +168,26 @@ def format_uptime(seconds: int) -> str:
         return f"{minutes}m"
 
 
-def get_server_status() -> ServerStatus:
-    """Get current server status and metrics."""
-    # Get server info from storage - required, no fallback
-    from supervaizer.server import get_server_info_from_storage
+def _get_server_info(request: Optional[Request]) -> Optional[Any]:
+    """Get server info from storage, or from live server (app.state.server) when no persistence."""
+    from supervaizer.server import (
+        get_server_info_from_live,
+        get_server_info_from_storage,
+    )
 
     server_info = get_server_info_from_storage()
+    if server_info is not None:
+        return server_info
+    if request is not None:
+        live = getattr(request.app.state, "server", None)
+        if live is not None:
+            return get_server_info_from_live(live)
+    return None
+
+
+def get_server_status(request: Optional[Request] = None) -> ServerStatus:
+    """Get current server status and metrics."""
+    server_info = _get_server_info(request)
     if not server_info:
         raise HTTPException(
             status_code=503,
@@ -217,12 +231,11 @@ def get_server_status() -> ServerStatus:
     )
 
 
-def get_server_configuration(storage: StorageManager) -> ServerConfiguration:
+def get_server_configuration(
+    storage: StorageManager, request: Optional[Request] = None
+) -> ServerConfiguration:
     """Get server configuration details."""
-    # Get server info from storage - required, no fallback
-    from supervaizer.server import get_server_info_from_storage
-
-    server_info = get_server_info_from_storage()
+    server_info = _get_server_info(request)
     if not server_info:
         raise HTTPException(
             status_code=503,
@@ -304,9 +317,9 @@ def create_admin_routes() -> APIRouter:
     async def admin_server_page(request: Request) -> Response:
         """Server status and configuration page."""
         try:
-            # Get initial server data
-            server_status = get_server_status()
-            server_config = get_server_configuration(storage)
+            # Get initial server data (from storage or live when no persistence)
+            server_status = get_server_status(request)
+            server_config = get_server_configuration(storage, request)
 
             return templates.TemplateResponse(
                 request,
@@ -327,9 +340,7 @@ def create_admin_routes() -> APIRouter:
     async def admin_agents_page(request: Request) -> Response:
         """Agents management page."""
         try:
-            from supervaizer.server import get_server_info_from_storage
-
-            server_info = get_server_info_from_storage()
+            server_info = _get_server_info(request)
             if not server_info:
                 raise HTTPException(
                     status_code=503, detail="Server information not available"
@@ -400,7 +411,7 @@ def create_admin_routes() -> APIRouter:
     async def get_server_status_api(request: Request) -> Response:
         """Get current server status for HTMX refresh."""
         try:
-            server_status = get_server_status()
+            server_status = get_server_status(request)
 
             return templates.TemplateResponse(
                 request,
@@ -415,24 +426,22 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/api/server/register")
-    async def register_server_with_supervisor(
-        request: Request,
-        _: bool = Depends(verify_admin_access),
-    ) -> JSONResponse:
-        """Trigger SERVER_REGISTER to the supervaizer supervisor."""
+    async def register_server_with_supervisor(request: Request) -> JSONResponse:
+        """Trigger SERVER_REGISTER to the supervaizer supervisor (no frontend API key; backend sends to SUPERVAIZE_API_URL)."""
         try:
             from supervaizer.common import ApiSuccess
             from supervaizer.routes import get_server
 
-            get_current = request.app.dependency_overrides.get(get_server)
-            if get_current is None:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Server instance not available (admin not running with live server)",
-                )
-            try:
-                server = await get_current()
-            except (NotImplementedError, TypeError):
+            # Prefer app.state.server (set at launch), else dependency override
+            server = getattr(request.app.state, "server", None)
+            if server is None:
+                get_current = request.app.dependency_overrides.get(get_server)
+                if get_current is not None:
+                    try:
+                        server = await get_current()
+                    except (NotImplementedError, TypeError):
+                        pass
+            if server is None:
                 raise HTTPException(
                     status_code=503,
                     detail="Server instance not available (admin not running with live server)",
@@ -477,9 +486,7 @@ def create_admin_routes() -> APIRouter:
     ) -> Response:
         """Get agents with filtering for HTMX refresh."""
         try:
-            from supervaizer.server import get_server_info_from_storage
-
-            server_info = get_server_info_from_storage()
+            server_info = _get_server_info(request)
             if not server_info:
                 raise HTTPException(
                     status_code=503, detail="Server information not available"
@@ -548,9 +555,7 @@ def create_admin_routes() -> APIRouter:
     ) -> Response:
         """Get detailed agent information."""
         try:
-            from supervaizer.server import get_server_info_from_storage
-
-            server_info = get_server_info_from_storage()
+            server_info = _get_server_info(request)
             if not server_info:
                 raise HTTPException(
                     status_code=503, detail="Server information not available"
