@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: publish-pypi-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -71,6 +75,8 @@ jobs:
           bump-my-version bump ${{ steps.version-bump-type.outputs.VERSION_BUMP }} \
             --config-file pyproject.toml \
             --verbose
+          git fetch origin main
+          git rebase origin/main
           git push --follow-tags
           # Store the new version
           echo "NEW_VERSION=$(grep '^VERSION =' src/supervaizer/__version__.py | cut -d '"' -f2)" >> $GITHUB_OUTPUT
