@@ -16,6 +16,28 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.10.19
+
+### Added
+
+- **Server: optional local index.html** – If a local `index.html` exists, the server serves it for the home page response.
+
+### Changed
+
+- **Dependencies** – Bumped `boto3`/`botocore` to 1.42.41 (lock file). Updated `ruff` to 0.15.0 and pre-commit config.
+- **Admin index** – Simplified displayed information in the admin index template.
+- **CI** – PyPI publish workflow: added concurrency settings to cancel in-progress runs.
+
+## v0.10.18
+
+### Added
+
+- **SUPERVAIZER_PRIVATE_KEY** – `_get_or_create_private_key` reads key from env or generates and sets it. Admin dashboard shows a development-only warning (not for production exposure).
+
+### Changed
+
+- **Refactor** – Code formatting and trailing whitespace cleanup (admin routes, server, examples, tests, templates).
+
 ## v0.10.17
 
 ### Added

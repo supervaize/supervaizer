@@ -30,7 +30,7 @@ jobs:
           version: "latest"
       - name: Install dependencies
         run: |
-          uv sync --extra dev
+          uv sync --extra dev --extra deploy
       - name: Lint with ruff
         run: |
           # Run ruff linting with same args as pre-commit, excluding tools/ and tests/ directories
