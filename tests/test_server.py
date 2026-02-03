@@ -291,9 +291,9 @@ async def test_start_job_endpoint(
     mocker.patch(
         "supervaizer.common.decrypt_value",
         "decrypt",
-        lambda self, encrypted: json.dumps({
-            k: v.value for k, v in parameters_fixture.definitions.items()
-        }),
+        lambda self, encrypted: json.dumps(
+            {k: v.value for k, v in parameters_fixture.definitions.items()}
+        ),
     )
 
     # Set up client with API key

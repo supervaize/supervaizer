@@ -61,4 +61,3 @@ uv remove package-name --script script.py
 # Reinstall all script dependencies from lock file
 uv sync --script script.py
 ```
-    
