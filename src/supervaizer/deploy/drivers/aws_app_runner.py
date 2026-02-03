@@ -455,12 +455,10 @@ class AWSAppRunnerDriver(BaseDriver):
         # Build secret references
         secret_refs = []
         for secret_name in secrets.keys():
-            secret_refs.append(
-                {
-                    "Name": secret_name,
-                    "ValueFrom": f"arn:aws:secretsmanager:{self.region}:{account_id}:secret:{secret_name}",
-                }
-            )
+            secret_refs.append({
+                "Name": secret_name,
+                "ValueFrom": f"arn:aws:secretsmanager:{self.region}:{account_id}:secret:{secret_name}",
+            })
 
         # Service configuration
         service_config = {
@@ -560,12 +558,10 @@ class AWSAppRunnerDriver(BaseDriver):
             ]
 
             # Add the public URL
-            env_vars.append(
-                {
-                    "Name": "SUPERVAIZER_PUBLIC_URL",
-                    "Value": public_url,
-                }
-            )
+            env_vars.append({
+                "Name": "SUPERVAIZER_PUBLIC_URL",
+                "Value": public_url,
+            })
 
             # Update service
             self.apprunner_client.update_service(

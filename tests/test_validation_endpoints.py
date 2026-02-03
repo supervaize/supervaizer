@@ -37,13 +37,11 @@ def mock_server():
 def test_agent():
     """Create a test agent with validation methods."""
     # Create parameters setup
-    parameters_setup = ParametersSetup.from_list(
-        [
-            Parameter(name="API_KEY", value="test_key", is_required=True),
-            Parameter(name="MAX_RETRIES", value="3", is_required=False),
-            Parameter(name="TIMEOUT", value="30", is_required=True),
-        ]
-    )
+    parameters_setup = ParametersSetup.from_list([
+        Parameter(name="API_KEY", value="test_key", is_required=True),
+        Parameter(name="MAX_RETRIES", value="3", is_required=False),
+        Parameter(name="TIMEOUT", value="30", is_required=True),
+    ])
 
     # Create method with fields
     job_start_method = AgentMethod(

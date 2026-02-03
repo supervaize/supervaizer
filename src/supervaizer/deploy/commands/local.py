@@ -231,18 +231,16 @@ def _start_docker_compose(
 
     # Set environment variables for Docker Compose
     env = os.environ.copy()
-    env.update(
-        {
-            "SERVICE_NAME": service_name,
-            "SERVICE_PORT": str(port),
-            "SUPERVAIZER_API_KEY": secrets["api_key"],
-            "SV_RSA_PRIVATE_KEY": secrets["rsa_private_key"],
-            "SUPERVAIZER_ENVIRONMENT": "dev",
-            "SUPERVAIZER_HOST": "0.0.0.0",
-            "SUPERVAIZER_PORT": str(port),
-            "SV_LOG_LEVEL": "INFO",
-        }
-    )
+    env.update({
+        "SERVICE_NAME": service_name,
+        "SERVICE_PORT": str(port),
+        "SUPERVAIZER_API_KEY": secrets["api_key"],
+        "SV_RSA_PRIVATE_KEY": secrets["rsa_private_key"],
+        "SUPERVAIZER_ENVIRONMENT": "dev",
+        "SUPERVAIZER_HOST": "0.0.0.0",
+        "SUPERVAIZER_PORT": str(port),
+        "SV_LOG_LEVEL": "INFO",
+    })
 
     cmd = ["docker-compose", "-f", str(compose_file), "up", "-d"]
 

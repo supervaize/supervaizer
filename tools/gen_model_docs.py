@@ -139,7 +139,8 @@ def format_json_in_doc(doc: str) -> str:
                     except json.JSONDecodeError:
                         # Common Python->JSON fixes
                         fixed = (
-                            json_content_stripped.replace(" True", " true")
+                            json_content_stripped
+                            .replace(" True", " true")
                             .replace(": True", ": true")
                             .replace(" False", " false")
                             .replace(": False", ": false")

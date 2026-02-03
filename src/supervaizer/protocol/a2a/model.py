@@ -56,51 +56,42 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
     tools = []
 
     # Add basic job tools
-    tools.append(
-        {
-            "name": "job_start",
-            "description": (
-                agent.methods.job_start.description if agent.methods else None
-            )
-            or f"Start a job with {agent.name}",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "job_fields": {"type": "object"},
-                    "job_context": {"type": "object"},
-                },
+    tools.append({
+        "name": "job_start",
+        "description": (agent.methods.job_start.description if agent.methods else None)
+        or f"Start a job with {agent.name}",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "job_fields": {"type": "object"},
+                "job_context": {"type": "object"},
             },
-        }
-    )
+        },
+    })
 
-    tools.append(
-        {
-            "name": "job_status",
-            "description": "Check the status of a job",
-            "input_schema": {
-                "type": "object",
-                "properties": {"job_id": {"type": "string"}},
-            },
-        }
-    )
+    tools.append({
+        "name": "job_status",
+        "description": "Check the status of a job",
+        "input_schema": {
+            "type": "object",
+            "properties": {"job_id": {"type": "string"}},
+        },
+    })
 
     # Add custom tools if available
     if agent.methods and agent.methods.custom:
         for name, method in agent.methods.custom.items():
-            tools.append(
-                {
-                    "name": name,
-                    "description": method.description
-                    or f"Execute {name} custom method",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "method_name": {"type": "string", "const": name},
-                            "params": {"type": "object"},
-                        },
+            tools.append({
+                "name": name,
+                "description": method.description or f"Execute {name} custom method",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "method_name": {"type": "string", "const": name},
+                        "params": {"type": "object"},
                     },
-                }
-            )
+                },
+            })
 
     # Build authentication object
     authentication = {
