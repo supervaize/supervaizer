@@ -258,9 +258,9 @@ class TestEntityTransitions:
         ]
 
         # Sort to ensure order-independent comparison
-        assert sorted([state.value for state in terminal_states]) == sorted(
-            [state.value for state in expected_terminal]
-        )
+        assert sorted([state.value for state in terminal_states]) == sorted([
+            state.value for state in expected_terminal
+        ])
 
         # Verify that these are indeed terminal states
         for state in terminal_states:

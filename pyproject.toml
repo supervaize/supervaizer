@@ -69,6 +69,7 @@ dev = [
     "respx>=0.22.0",
     "ruff>=0.15.0",
     "types-deprecated>=1.3.1",
+    "types-PyYAML>=6.0.0",
     "types-python-slugify>=8.0.2.20240310",
 
 ]
@@ -107,6 +108,10 @@ path = "src/supervaizer/__version__.py"
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-wrap-aliases = true
+
+[tool.ruff.format]
+# Match Cursor style: keep opening brace on same line as call, e.g. append({ ... })
+preview = true
 
 [tool.commitizen]
 name = "cz_gitmoji"

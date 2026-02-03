@@ -11,7 +11,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, TypeVar
+from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
 from urllib.parse import urlunparse
 
 from cryptography.hazmat.backends import default_backend
@@ -58,7 +58,7 @@ T = TypeVar("T")
 def _get_or_create_server_id() -> str:
     """Use SUPERVAIZER_SERVER_ID from env if set; else create uuid and set env."""
     existing = os.getenv("SUPERVAIZER_SERVER_ID")
-    if existing:
+    if existing and len(existing) > 5:
         return existing
     new_id = str(uuid.uuid4())
     os.environ["SUPERVAIZER_SERVER_ID"] = new_id
@@ -68,13 +68,14 @@ def _get_or_create_server_id() -> str:
 def _get_or_create_private_key() -> RSAPrivateKey:
     """Use SUPERVAIZER_PRIVATE_KEY from env if set; else create key and set env."""
     pem = os.getenv("SUPERVAIZER_PRIVATE_KEY")
-    if pem:
+    if pem and len(pem) > 5:
         try:
-            return serialization.load_pem_private_key(
+            key = serialization.load_pem_private_key(
                 pem.encode("utf-8"),
                 password=None,
                 backend=default_backend(),
             )
+            return cast(RSAPrivateKey, key)
         except Exception as e:
             log.warning(
                 f"[Server] Invalid SUPERVAIZER_PRIVATE_KEY, generating new key: {e}"
@@ -117,16 +118,14 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         agents = []
         if hasattr(server_instance, "agents") and server_instance.agents:
             for agent in server_instance.agents:
-                agents.append(
-                    {
-                        "name": agent.name,
-                        "description": agent.description,
-                        "version": agent.version,
-                        "api_path": agent.path,
-                        "slug": agent.slug,
-                        "instructions_path": agent.instructions_path,
-                    }
-                )
+                agents.append({
+                    "name": agent.name,
+                    "description": agent.description,
+                    "version": agent.version,
+                    "api_path": agent.path,
+                    "slug": agent.slug,
+                    "instructions_path": agent.instructions_path,
+                })
 
         # Create server info
         server_info = ServerInfo(
@@ -167,16 +166,14 @@ def get_server_info_from_live(server_instance: "Server") -> ServerInfo:
     agents = []
     if hasattr(server_instance, "agents") and server_instance.agents:
         for agent in server_instance.agents:
-            agents.append(
-                {
-                    "name": agent.name,
-                    "description": agent.description,
-                    "version": agent.version,
-                    "api_path": agent.path,
-                    "slug": agent.slug,
-                    "instructions_path": agent.instructions_path,
-                }
-            )
+            agents.append({
+                "name": agent.name,
+                "description": agent.description,
+                "version": agent.version,
+                "api_path": agent.path,
+                "slug": agent.slug,
+                "instructions_path": agent.instructions_path,
+            })
     start_time = getattr(server_instance, "_start_time", time.time())
     return ServerInfo(
         host=getattr(server_instance, "host", "N/A"),
