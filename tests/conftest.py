@@ -282,21 +282,19 @@ def case_node_update_call_completed() -> Annotated[CaseNode, "fixture"]:
     return CaseNode(
         name="update_call_completed",
         type=CaseNodeType.DELIVERY,
-        factory=lambda call,
-        call_status,
-        duration_seconds,
-        extracted_values,
-        metadata: CaseNodeUpdate(
-            name="✅ Call Completed Successfully",
-            cost=getattr(call, "cost", 0.0),
-            payload={
-                "call_id": getattr(call, "call_id", None),
-                "call_status": call_status,
-                "duration_seconds": duration_seconds,
-                "extracted_values": extracted_values,
-                "metadata": metadata,
-            },
-            is_final=False,
+        factory=lambda call, call_status, duration_seconds, extracted_values, metadata: (
+            CaseNodeUpdate(
+                name="✅ Call Completed Successfully",
+                cost=getattr(call, "cost", 0.0),
+                payload={
+                    "call_id": getattr(call, "call_id", None),
+                    "call_status": call_status,
+                    "duration_seconds": duration_seconds,
+                    "extracted_values": extracted_values,
+                    "metadata": metadata,
+                },
+                is_final=False,
+            )
         ),
         description="Call completed successfully",
     )

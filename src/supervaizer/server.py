@@ -23,7 +23,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, Field, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
@@ -456,6 +456,9 @@ class Server(ServerAbstract):
 
         @self.app.get("/", response_class=HTMLResponse)
         async def home_page(request: Request) -> HTMLResponse:
+            root_index = Path.cwd() / "index.html"
+            if root_index.is_file():
+                return HTMLResponse(content=root_index.read_text(encoding="utf-8"))
             base = self.public_url or f"{self.scheme}://{self.host}:{self.port}"
             return _home_templates.TemplateResponse(
                 "index.html",

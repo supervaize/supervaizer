@@ -320,11 +320,13 @@ class TestAdminDataFunctions:
         ]
 
         storage_manager.get_objects = Mock(
-            side_effect=lambda obj_type: mock_jobs
-            if obj_type == "Job"
-            else mock_cases
-            if obj_type == "Case"
-            else []
+            side_effect=lambda obj_type: (
+                mock_jobs
+                if obj_type == "Job"
+                else mock_cases
+                if obj_type == "Case"
+                else []
+            )
         )
 
         # Mock TinyDB tables
