@@ -121,7 +121,7 @@ mypy_path = "src"
 disallow_any_expr = false
 
 [tool.bumpversion]
-current_version = "0.10.18"
+current_version = "0.10.19"
 commit = true
 tag = true
 tag_name = "v{new_version}"
