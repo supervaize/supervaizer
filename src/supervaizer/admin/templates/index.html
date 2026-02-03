@@ -18,6 +18,11 @@
             </p>
             <p class="mt-1 text-xs text-gray-400 font-mono">Server ID: {{ server_id }}</p>
 
+            <div class="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                <p class="font-semibold">⚠️ Do not use in production with network access enabled.</p>
+                <p class="mt-1 text-sm">This interface is for development and local use only. Exposing it over the network in production may allow unauthorized access.</p>
+            </div>
+
             <div class="mt-8">
                 <h2 class="text-lg font-medium text-gray-900 mb-4">Links</h2>
                 <ul class="space-y-2">

@@ -65,6 +65,35 @@ def _get_or_create_server_id() -> str:
     return new_id
 
 
+def _get_or_create_private_key() -> RSAPrivateKey:
+    """Use SUPERVAIZER_PRIVATE_KEY from env if set; else create key and set env."""
+    pem = os.getenv("SUPERVAIZER_PRIVATE_KEY")
+    if pem:
+        try:
+            return serialization.load_pem_private_key(
+                pem.encode("utf-8"),
+                password=None,
+                backend=default_backend(),
+            )
+        except Exception as e:
+            log.warning(
+                f"[Server] Invalid SUPERVAIZER_PRIVATE_KEY, generating new key: {e}"
+            )
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
+    pem_bytes = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    os.environ["SUPERVAIZER_PRIVATE_KEY"] = pem_bytes.decode("utf-8")
+    log.info("[Server] Generated new RSA private key and set SUPERVAIZER_PRIVATE_KEY")
+    return private_key
+
+
 class ServerInfo(BaseModel):
     """Complete server information for storage."""
 
@@ -317,11 +346,7 @@ class Server(ServerAbstract):
             )
 
         if private_key is None:
-            private_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=2048,
-                backend=default_backend(),
-            )
+            private_key = _get_or_create_private_key()
 
         public_key = private_key.public_key()
 

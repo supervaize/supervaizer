@@ -16,7 +16,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.10.17
+
 ### Added
+
+- **SUPERVAIZER_PRIVATE_KEY** from env if set; else create key and set env.
 
 - **Admin: live server and data when no persistence** – When there is no persistent storage (e.g. Vercel, serverless), the admin dashboard and agents page no longer fail. Server status, server config, and agents use the live server instance (`app.state.server`) when storage has no ServerInfo. Dashboard stats, jobs list, cases list, and recent activity use live Jobs/Cases registries when storage is in-memory and empty.
 
