@@ -350,7 +350,17 @@ class Server(ServerAbstract):
             private_key = _get_or_create_private_key()
 
         public_key = private_key.public_key()
-
+        log.info(f"[Server launch] Public key: {public_key}")
+        log.info(
+            f"[Server launch] Public key - decode:  {
+                str(
+                    public_key.public_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                    ).decode('utf-8')
+                )
+            },"
+        )
         # Create root app to handle version prefix
         docs_url = "/docs"  # Swagger UI
         redoc_url = "/redoc"  # ReDoc
