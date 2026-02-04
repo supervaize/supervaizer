@@ -253,6 +253,7 @@ for job_data in all_jobs:
 Data persistence is **off by default** so the server works on Vercel and other serverless platforms where the filesystem is ephemeral.
 
 - **Default**: In-memory only (no file). Data is lost on restart.
+- **Vercel / serverless:** Set `SUPERVAIZER_PRIVATE_KEY` (RSA PEM string) and `SUPERVAIZER_SERVER_ID` (stable UUID) in the platform's environment variables. The app only reads these; it cannot persist them. Without them, each instance generates a new key and server ID on cold start.
 - **To enable file persistence**: Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`), or run `supervaizer start --persist`.
 
 When persistence is enabled, the storage path is `DATA_STORAGE_PATH/entities.json` (default `./data/entities.json`).

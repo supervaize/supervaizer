@@ -232,18 +232,22 @@ All CLI options can also be configured through environment variables:
 
 ### Server Configuration
 
-| Environment Variable      | Description                      | Default Value                |
-| ------------------------- | -------------------------------- | ---------------------------- |
-| SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to scheme+host+port |
-| SUPERVAIZER_HOST          | Host to bind the server to       | 0.0.0.0                      |
-| SUPERVAIZER_PORT          | Port to bind the server to       | 8000                         |
-| SUPERVAIZER_ENVIRONMENT   | Environment name                 | dev                          |
-| SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)    | INFO                         |
-| SUPERVAIZER_DEBUG         | Enable debug mode (true/false)   | false                        |
-| SUPERVAIZER_RELOAD        | Enable auto-reload (true/false)  | false                        |
-| SUPERVAIZER_SCRIPT_PATH   | Path to configuration script     | -                            |
-| SUPERVAIZER_OUTPUT_PATH   | Path for install command output  | supervaizer_control.py       |
-| SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file    | false                        |
+| Environment Variable      | Description                      | Default Value                 |
+| ------------------------- | -------------------------------- | ----------------------------- |
+| SUPERVAIZER_PUBLIC_URL    | Url used for inbound connections | defaults to scheme+host+port  |
+| SUPERVAIZER_HOST          | Host to bind the server to       | 0.0.0.0                       |
+| SUPERVAIZER_PORT          | Port to bind the server to       | 8000                          |
+| SUPERVAIZER_ENVIRONMENT   | Environment name                 | dev                           |
+| SUPERVAIZER_LOG_LEVEL     | Log level (DEBUG, INFO, etc.)    | INFO                          |
+| SUPERVAIZER_DEBUG         | Enable debug mode (true/false)   | false                         |
+| SUPERVAIZER_RELOAD        | Enable auto-reload (true/false)  | false                         |
+| SUPERVAIZER_SCRIPT_PATH   | Path to configuration script     | -                             |
+| SUPERVAIZER_OUTPUT_PATH   | Path for install command output  | supervaizer_control.py        |
+| SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file    | false                         |
+| SUPERVAIZER_PRIVATE_KEY   | RSA private key (PEM string)     | generated at runtime if unset |
+| SUPERVAIZER_SERVER_ID     | Stable server instance ID (UUID) | generated at runtime if unset |
+
+**Serverless (e.g. Vercel):** On serverless platforms, each instance may be a new process. Set `SUPERVAIZER_PRIVATE_KEY` and `SUPERVAIZER_SERVER_ID` in the platform's environment variables so the same key and ID are used across instances. Otherwise every cold start generates a new key and server ID.
 
 ### Deployment Configuration
 
