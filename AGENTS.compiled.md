@@ -140,23 +140,33 @@ Reference specific personas when requesting work:
 
 ## 2. Coding practice
 
-- Before making up code, always look in the best practices for the existing best of breed method to address the problem.
-- Always prefer simple solutions.
-- Be explicit about the solution you will implement.
-- Only make changes that are requested or you are confident are well understood and related to the change being requested.
-- When fixing a bug, exhaust all options in the existing implementation before introducing a new pattern; if you do, remove the old implementation.
-- After a first draft of coding, always go back for possible factorizations and simplifications.
-- Follow the organization's style guide for the language/framework being used
-- Write unit tests first for business logic
-- Avoid duplication - check codebase for similar functionality first
-- Keep files at reasonable length; refactor when they exceed 200-300 lines
-- Avoid one-off scripts in source files
-- When using a library, get the latest documentation (e.g. via context7 MCP)
-- Do not add mock data to production functions; only in tests or test-only utilities
-- Consider what other areas of the codebase might be affected by changes
-- Keep lists in alphabetical order where it helps (e.g. pyproject.toml dependencies, `__all__`)
-- Do not implement fallback methods unless explicitly requested
-- Start with Documentation folder for implementation examples when the project has one
+Core operating principles
+• Prefer simple, boring solutions over clever ones.
+• Be explicit about what you will implement before writing code.
+• Only make changes that are requested, or that are clearly necessary and tightly related.
+• Assume every extra line is a liability.
+
+Best-practice requirement
+• Before writing new code, check the best-of-breed/standard approach for this problem in the ecosystem/framework.
+• When using a library, use latest official docs (do not guess APIs).
+• Follow the organization’s style guide for the language/framework.
+
+Minimal diff discipline (mandatory)
+• Produce the smallest possible diff that correctly solves the problem.
+• Do not reformat, reorder, or rename unrelated code.
+• Avoid whitespace-only changes.
+• Avoid editing imports unless required.
+• Prefer local edits over refactors unless refactor is explicitly requested.
+• If refactor is unavoidable, remove the replaced implementation (no parallel patterns left behind).
+• If both solutions are correct, choose the one touching fewer lines/files.
+• Never mix functional change with tooling/formatting/dependency updates. If needed, split into separate commits.
+
+Working in existing code
+• Exhaust options in the existing implementation before introducing a new pattern.
+• Avoid duplication: search the codebase for similar functionality first.
+• Keep files at reasonable length; refactor when they exceed ~200–300 lines (only when requested or necessary).
+• Avoid one-off scripts inside production source files.
+• Keep alphabetical ordering where it improves predictability (e.g., dependencies lists, **all**).
 
 ## 3. Tools
 
@@ -540,7 +550,7 @@ uv remove package-name --script script.py
 # Reinstall all script dependencies from lock file
 uv sync --script script.py
 ```
-
+    
 
 ---
 

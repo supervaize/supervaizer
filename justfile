@@ -96,6 +96,10 @@ unicorn:
 tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
 
+# Generate RSA private key (PEM) for SUPERVAIZER_PRIVATE_KEY (e.g. Vercel env)
+generate-private-key:
+    uv run python -c "from cryptography.hazmat.primitives.asymmetric import rsa; from cryptography.hazmat.primitives import serialization; from cryptography.hazmat.backends import default_backend; k = rsa.generate_private_key(65537, 2048, default_backend()); print(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode())"
+
 # Check git history for secret leaks
 trufflehog_scan_git_history:
     trufflehog git file://. --results=verified,unknown --fail
