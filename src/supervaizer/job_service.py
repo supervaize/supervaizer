@@ -54,9 +54,9 @@ async def service_job_start(
         )
 
         # inspect(agent)
-        log.debug(
-            f"[service_job_start Decrypted parameters] : parameters = {agent_parameters}"
-        )
+        # log.debug(
+        #    f"[service_job_start Decrypted parameters] : parameters = {agent_parameters}"
+        # )
 
     # Create and prepare the job
     new_saas_job = Job.new(
