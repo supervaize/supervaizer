@@ -138,9 +138,9 @@ class CaseNode(SvBaseModel):
 
     name: str
     type: CaseNodeType
-    factory: SkipJsonSchema[Callable[..., CaseNodeUpdate]] = Field(
-        exclude=True, repr=False
-    )  # Exclude from JSON schema generation and representation
+    factory: SkipJsonSchema[Optional[Callable[..., CaseNodeUpdate]]] = Field(
+        default=None, exclude=True, repr=False
+    )  # Exclude from JSON schema; optional so registration_info round-trips via AgentResponse
     description: str | None = None
     can_be_confirmed: bool = False  # Whether the user can decide that this node needs to be confirmed. This must be set in the job definition.
 
