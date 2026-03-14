@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +18,28 @@ from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# Module-level log buffer — avoids race conditions with SSE consumer
+_workbench_log_buffer: list[dict[str, str]] = []
+_WORKBENCH_LOG_BUFFER_MAX = 500
+_patch_applied = False
+
+
+def _apply_log_patch() -> None:
+    global _patch_applied
+    if _patch_applied:
+        return
+    from supervaizer.admin import routes as _admin_routes
+    _original_add_log = _admin_routes.add_log_to_queue
+
+    def _patched_add_log(timestamp: str, level: str, message: str) -> None:
+        _original_add_log(timestamp, level, message)
+        _workbench_log_buffer.append({"timestamp": timestamp, "level": level, "message": message})
+        if len(_workbench_log_buffer) > _WORKBENCH_LOG_BUFFER_MAX:
+            del _workbench_log_buffer[:len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX]
+
+    _admin_routes.add_log_to_queue = _patched_add_log
+    _patch_applied = True
 
 
 def get_agent_by_slug(request: Request, slug: str) -> Agent:
@@ -62,6 +83,8 @@ class WorkbenchAnswerRequest(BaseModel):
 
 def create_workbench_routes() -> APIRouter:
     """Create workbench sub-router."""
+    _apply_log_patch()
+
     router = APIRouter(tags=["workbench"])
 
     @router.get("/agents/{slug}/workbench", response_class=HTMLResponse)
@@ -191,7 +214,7 @@ def create_workbench_routes() -> APIRouter:
                     job_id=job.id,
                     status=EntityStatus.FAILED,
                     message=f"Job failed: {str(e)}",
-                    error=e,  # Pass exception object — __init__ extracts message + traceback
+                    error=e,
                 ))
 
         asyncio.create_task(run_job())
@@ -210,6 +233,9 @@ def create_workbench_routes() -> APIRouter:
         from supervaizer.job import Jobs
         jobs_registry = Jobs()
         job = jobs_registry.get_job(job_id, agent_name=agent.name)
+
+        if job and job.agent_name != agent.name:
+            job = None  # Don't leak cross-agent data
 
         if not job:
             return HTMLResponse("<div class='text-gray-500 text-sm'>Job not found</div>")
@@ -254,9 +280,10 @@ def create_workbench_routes() -> APIRouter:
             raise HTTPException(status_code=400, detail="Agent has no job_stop method")
 
         try:
-            result = agent._execute(
-                agent.methods.job_stop.method,
-                {"job_id": job_id},
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent._execute(agent.methods.job_stop.method, {"job_id": job_id}),
             )
             return JSONResponse({"status": "stopped", "message": str(result.message)})
         except Exception as e:
@@ -272,6 +299,10 @@ def create_workbench_routes() -> APIRouter:
             from supervaizer.job import Jobs
             jobs_registry = Jobs()
             job = jobs_registry.get_job(job_id, agent_name=agent.name)
+
+            if job and job.agent_name != agent.name:
+                job = None  # Don't leak cross-agent data
+
             if not job:
                 raise HTTPException(status_code=404, detail="Job not found")
             return JSONResponse({
@@ -280,9 +311,10 @@ def create_workbench_routes() -> APIRouter:
             })
 
         try:
-            result = agent._execute(
-                agent.methods.job_status.method,
-                {"job_id": job_id},
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent._execute(agent.methods.job_status.method, {"job_id": job_id}),
             )
             return JSONResponse({"status": result.status.value, "message": result.message})
         except Exception as e:
@@ -303,6 +335,12 @@ def create_workbench_routes() -> APIRouter:
 
         if not case:
             raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+        if case.status != EntityStatus.AWAITING:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Case '{case_id}' is not awaiting input (current status: {case.status})",
+            )
 
         # Step 1: Transition case state AWAITING -> IN_PROGRESS
         update = CaseNodeUpdate(name="HITL Answer", payload=answer_data)
@@ -336,29 +374,14 @@ def create_workbench_routes() -> APIRouter:
             "message": "HITL answer submitted and dispatched",
         })
 
-    # Workbench maintains its own log buffer, populated via the add_log_to_queue hook.
-    # We patch add_log_to_queue to also write to our buffer, avoiding race conditions
-    # with the SSE consumer that reads from log_queue.
-    _workbench_log_buffer: List[Dict[str, str]] = []
-    _workbench_log_buffer_max = 500
-
-    # Monkey-patch the log handler to also feed the workbench buffer
-    from supervaizer.admin import routes as _admin_routes
-    _original_add_log = _admin_routes.add_log_to_queue
-
-    def _patched_add_log(timestamp: str, level: str, message: str) -> None:
-        _original_add_log(timestamp, level, message)
-        _workbench_log_buffer.append({"timestamp": timestamp, "level": level, "message": message})
-        if len(_workbench_log_buffer) > _workbench_log_buffer_max:
-            del _workbench_log_buffer[:len(_workbench_log_buffer) - _workbench_log_buffer_max]
-
-    _admin_routes.add_log_to_queue = _patched_add_log
-
     @router.get("/agents/{slug}/workbench/console", response_class=HTMLResponse)
     async def workbench_console(request: Request, slug: str):
         """HTMX partial — returns recent console log entries."""
-        # Get last_index from query param for append-only behavior
-        last_index = int(request.query_params.get("last_index", 0))
+        try:
+            last_index = int(request.query_params.get("last_index", 0))
+        except (ValueError, TypeError):
+            last_index = 0
+
         entries_to_send = _workbench_log_buffer[last_index:]
 
         return templates.TemplateResponse(
