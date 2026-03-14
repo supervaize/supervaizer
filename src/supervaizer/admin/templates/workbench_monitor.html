@@ -1,0 +1,255 @@
+{% from "components/field_renderer.html" import render_hitl_field %}
+
+{# Determine if the job has reached a terminal state #}
+{% set job_status = job.status.value if job.status and job.status.value is defined else job.status|string %}
+{% set is_terminal = job_status in ("COMPLETED", "FAILED", "STOPPED") %}
+
+{# Outer div — owns the polling loop via HTMX outerHTML swap #}
+<div
+    id="workbench-monitor-partial"
+    hx-get="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ job.id }}"
+    hx-swap="outerHTML"
+    {% if not is_terminal %}
+    hx-trigger="every 2s"
+    {% endif %}
+>
+
+    {# ── Job status bar ──────────────────────────────────────────────── #}
+    <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="text-xs text-gray-400 font-mono truncate">{{ job.id }}</span>
+
+            {# Status badge #}
+            {% if job_status == "COMPLETED" %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                COMPLETED
+            </span>
+            {% elif job_status == "IN_PROGRESS" %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
+                IN_PROGRESS
+            </span>
+            {% elif job_status == "AWAITING" %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                AWAITING
+            </span>
+            {% elif job_status == "FAILED" %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                FAILED
+            </span>
+            {% elif job_status == "STOPPED" %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                STOPPED
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                {{ job_status }}
+            </span>
+            {% endif %}
+
+            {# Case count #}
+            {% if cases_data %}
+            <span class="text-xs text-gray-400">{{ cases_data | length }} case{{ "s" if cases_data | length != 1 }}</span>
+            {% endif %}
+        </div>
+
+        {# Created at timestamp #}
+        {% if job.created_at %}
+        <span class="text-xs text-gray-400 font-mono flex-shrink-0">{{ job.created_at }}</span>
+        {% endif %}
+    </div>
+
+    {# ── Cases list ──────────────────────────────────────────────────── #}
+    {% if cases_data %}
+    <div class="divide-y divide-gray-100">
+        {% for case_info in cases_data %}
+        {% set case = case_info.case %}
+        {% set hitl_form = case_info.hitl_form %}
+        {% set case_status = case.status.value if case.status and case.status.value is defined else case.status|string %}
+        {% set auto_expand = case_status in ("AWAITING", "IN_PROGRESS") %}
+
+        <div
+            x-data="{ open: {{ 'true' if auto_expand else 'false' }} }"
+            class="bg-white"
+        >
+            {# Case header — clickable to toggle #}
+            <button
+                type="button"
+                @click="open = !open"
+                class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 transition-colors duration-150"
+                :aria-expanded="open"
+            >
+                <div class="flex items-center gap-2 min-w-0">
+                    {# Expand/collapse chevron #}
+                    <svg
+                        class="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200"
+                        :class="open ? 'rotate-90' : ''"
+                        :style="'color: ' + ({{ 'true' if case_status == 'AWAITING' else 'false' }} ? '#d97706' : ({{ 'true' if case_status == 'IN_PROGRESS' else 'false' }} ? '#3b82f6' : '#9ca3af'))"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+
+                    {# Case name #}
+                    <span class="text-sm font-medium text-gray-800 truncate">{{ case.name or case.id }}</span>
+
+                    {# Step count #}
+                    {% if case.updates %}
+                    <span class="text-xs text-gray-400 flex-shrink-0">{{ case.updates | length }} step{{ "s" if case.updates | length != 1 }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+                    {# Cost (sum across updates) #}
+                    {% set ns = namespace(total_cost=0) %}
+                    {% for step in (case.updates or []) %}
+                    {% if step.cost %}{% set ns.total_cost = ns.total_cost + step.cost %}{% endif %}
+                    {% endfor %}
+                    {% if ns.total_cost > 0 %}
+                    <span class="text-xs text-gray-400 font-mono">${{ "%.4f"|format(ns.total_cost) }}</span>
+                    {% endif %}
+
+                    {# Status badge #}
+                    {% if case_status == "COMPLETED" %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">COMPLETED</span>
+                    {% elif case_status == "IN_PROGRESS" %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
+                        IN_PROGRESS
+                    </span>
+                    {% elif case_status == "AWAITING" %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">AWAITING</span>
+                    {% elif case_status == "FAILED" %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">FAILED</span>
+                    {% elif case_status == "STOPPED" %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">STOPPED</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ case_status }}</span>
+                    {% endif %}
+                </div>
+            </button>
+
+            {# Expandable body: steps + HITL form #}
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-y-1"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-1"
+                x-cloak
+            >
+                {# Steps list #}
+                {% if case.updates %}
+                <div class="px-4 pb-2 space-y-1">
+                    {% for step in case.updates %}
+                    {% set step_status = step.status.value if step.status and step.status.value is defined else step.status|string %}
+                    <div class="flex items-start gap-2 py-1.5 border-b border-gray-50 last:border-0">
+
+                        {# Step status icon #}
+                        <div class="flex-shrink-0 w-4 mt-0.5">
+                            {% if step_status == "COMPLETED" %}
+                            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            {% elif step_status == "AWAITING" %}
+                            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {% elif step_status == "FAILED" %}
+                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            {% else %}
+                            {# IN_PROGRESS or unknown — blue pulsing dot #}
+                            <span class="flex items-center justify-center w-4 h-4">
+                                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse inline-block"></span>
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {# Step details #}
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-medium text-gray-700 truncate">{{ step.name or "Step" }}</span>
+                                {% if step.duration_seconds is not none and step.duration_seconds is not undefined %}
+                                <span class="text-xs text-gray-400 flex-shrink-0 font-mono">{{ "%.1f"|format(step.duration_seconds) }}s</span>
+                                {% endif %}
+                            </div>
+                            {% if step.cost or step.tokens_in or step.tokens_out %}
+                            <div class="flex items-center gap-2 mt-0.5">
+                                {% if step.cost %}
+                                <span class="text-xs text-gray-400 font-mono">${{ "%.4f"|format(step.cost) }}</span>
+                                {% endif %}
+                                {% if step.tokens_in is not none or step.tokens_out is not none %}
+                                <span class="text-xs text-gray-400 font-mono">
+                                    {{ step.tokens_in or "—" }}→{{ step.tokens_out or "—" }} tok
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-4 pb-3 text-xs text-gray-400 italic">No steps recorded yet.</div>
+                {% endif %}
+
+                {# HITL form — only shown when case is AWAITING and has form #}
+                {% if hitl_form and has_human_answer %}
+                <div class="mx-4 mb-4 mt-1 rounded-md border border-amber-200 bg-amber-50 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm font-semibold text-amber-800">Human Input Required</span>
+                    </div>
+
+                    <form
+                        id="hitl-form-{{ case.id }}"
+                        hx-post="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ job.id }}/cases/{{ case.id }}/answer"
+                        hx-ext="json-enc"
+                        hx-swap="none"
+                        hx-on::after-request="if(event.detail.successful){ window.showToast && showToast('Answer submitted', 'success'); }"
+                    >
+                        {% if hitl_form is mapping %}
+                        <div class="space-y-3">
+                            {% for field_name, field_def in hitl_form.items() %}
+                            {{ render_hitl_field(field_name, field_def) }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="mt-4">
+                            <button
+                                type="submit"
+                                class="inline-flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 cursor-pointer transition-colors duration-150"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Submit Answer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    {# No cases yet #}
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+        <svg class="w-8 h-8 text-blue-400 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <p class="text-sm text-gray-500">Waiting for cases...</p>
+    </div>
+    {% endif %}
+
+</div>
