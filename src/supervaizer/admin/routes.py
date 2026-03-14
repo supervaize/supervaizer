@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter, HTTPException, Query, Request, Security
-from fastapi.responses import HTMLResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -1101,7 +1101,10 @@ def create_admin_routes() -> APIRouter:
 
     # Include workbench sub-router
     from supervaizer.admin.workbench_routes import create_workbench_routes
-    router.include_router(create_workbench_routes())
+    router.include_router(
+        create_workbench_routes(),
+        dependencies=[Depends(verify_admin_access)],
+    )
 
     return router
 
