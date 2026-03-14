@@ -143,6 +143,7 @@ def create_workbench_routes() -> APIRouter:
                 "active_job": active_job,
                 "api_version": API_VERSION,
                 "has_human_answer": agent.methods and agent.methods.human_answer is not None,
+                "agents": [{"slug": a.slug, "name": a.name} for a in request.app.state.server.agents],
             },
         )
 
