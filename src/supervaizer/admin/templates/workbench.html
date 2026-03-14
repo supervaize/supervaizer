@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+{% from "components/field_renderer.html" import render_field, render_parameter_field, render_hitl_field %}
+
+{% block title %}Workbench — {{ agent.name }} — Supervaizer Admin{% endblock %}
+
+{% block content %}
+<div class="px-4 pb-32 sm:px-0" x-data="workbenchPage()" x-init="init()">
+
+    {# ── Zone 1: Agent Header & Parameters ─────────────────────────── #}
+    <div class="bg-white shadow rounded-lg mb-4" x-data="{ paramsOpen: true }">
+
+        {# Header row — always visible #}
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3 min-w-0">
+                    {# Agent icon #}
+                    <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h2 class="text-lg font-semibold text-gray-900 truncate">{{ agent.name }}</h2>
+                            {% if agent.version %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                v{{ agent.version }}
+                            </span>
+                            {% endif %}
+                            {% if api_version %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                API {{ api_version }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if agent.description %}
+                        <p class="text-sm text-gray-500 truncate mt-0.5">{{ agent.description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <button
+                    @click="paramsOpen = !paramsOpen"
+                    class="flex-shrink-0 ml-4 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                    :aria-expanded="paramsOpen"
+                    aria-controls="params-panel"
+                >
+                    <span class="hidden sm:inline" x-text="paramsOpen ? 'Hide Parameters' : 'Show Parameters'"></span>
+                    <svg class="w-4 h-4 transition-transform duration-200" :class="paramsOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        {# Collapsible parameters panel #}
+        <div
+            id="params-panel"
+            x-show="paramsOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            x-cloak
+        >
+            {% if parameters %}
+            <div class="px-6 py-5">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Agent Parameters</h3>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {% for param in parameters %}
+                    <div x-on:change="saveParam('{{ param.name }}', $event.target.value)">
+                        {{ render_parameter_field(param, prefix="param_") }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="px-6 py-4 text-sm text-gray-400 italic">No agent parameters configured.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Zone 2: Job Control ────────────────────────────────────────── #}
+    <div class="bg-white shadow rounded-lg mb-4" x-data="{ jobOpen: true }">
+
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <h3 class="text-sm font-semibold text-gray-700">Job Control</h3>
+                    {% if active_job %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
+                        {{ active_job.id }}
+                    </span>
+                    {% endif %}
+                </div>
+                <button
+                    @click="jobOpen = !jobOpen"
+                    class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                    :aria-expanded="jobOpen"
+                >
+                    <svg class="w-4 h-4 transition-transform duration-200" :class="jobOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div
+            x-show="jobOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            x-cloak
+        >
+            <div class="px-6 py-5">
+                {# Job fields form #}
+                {% if job_fields %}
+                <div class="mb-5">
+                    <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Job Parameters</h4>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {% for field in job_fields %}
+                        {{ render_field(field, prefix="field_") }}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Action buttons #}
+                <div class="flex items-center gap-3 flex-wrap" id="job-control-buttons">
+                    {# Validation errors #}
+                    <div id="workbench-errors" class="w-full hidden">
+                        <div class="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"></div>
+                    </div>
+
+                    {# Start button — always visible #}
+                    <button
+                        id="btn-start"
+                        type="button"
+                        onclick="workbenchForm && workbenchForm.startJob()"
+                        class="inline-flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Start Job
+                    </button>
+
+                    {% if active_job %}
+                    {# Stop button — only when job is active #}
+                    <button
+                        id="btn-stop"
+                        type="button"
+                        onclick="workbenchForm && workbenchForm.stopJob('{{ active_job.id }}')"
+                        class="inline-flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer transition-colors duration-150"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 10h6v4H9z"/>
+                        </svg>
+                        Stop
+                    </button>
+
+                    {# Status button #}
+                    <button
+                        id="btn-status"
+                        type="button"
+                        hx-get="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ active_job.id }}"
+                        hx-target="#monitor-container"
+                        hx-swap="innerHTML"
+                        class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-colors duration-150"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Status
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Zone 3: Execution Monitor ──────────────────────────────────── #}
+    <div class="bg-white shadow rounded-lg mb-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <h3 class="text-sm font-semibold text-gray-700">Execution Monitor</h3>
+                    {% if active_job %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
+                        Live
+                    </span>
+                    {% endif %}
+                </div>
+                {% if active_job %}
+                <span class="text-xs text-gray-400 font-mono">{{ active_job.id }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div
+            id="monitor-container"
+            class="min-h-[200px]"
+            {% if active_job %}
+            hx-get="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ active_job.id }}"
+            hx-trigger="every 2s"
+            hx-swap="innerHTML"
+            {% endif %}
+        >
+            {% if active_job %}
+            {# Placeholder while HTMX loads — will be replaced by partial #}
+            <div class="flex items-center justify-center py-12">
+                <div class="text-center">
+                    <svg class="mx-auto w-8 h-8 text-blue-400 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <p class="text-sm text-gray-500">Loading job status...</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-16 text-center">
+                <svg class="w-12 h-12 text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-sm font-medium text-gray-400">No active job</p>
+                <p class="text-xs text-gray-300 mt-1">Start a job above to monitor its execution here.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Zone 4: Console Log (bottom panel) ────────────────────────── #}
+    <div
+        class="bg-white shadow rounded-lg"
+        x-data="{
+            consoleOpen: true,
+            filter: 'all',
+            logCount: 0
+        }"
+    >
+        {# Console header #}
+        <div class="px-6 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-3">
+                    <button
+                        @click="consoleOpen = !consoleOpen"
+                        class="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-800 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                        :aria-expanded="consoleOpen"
+                        aria-controls="console-panel"
+                    >
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <span>Console</span>
+                        <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="consoleOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {# Filter buttons + controls #}
+                <div class="flex items-center gap-2 flex-wrap" x-show="consoleOpen" x-cloak>
+                    <div class="flex rounded-md shadow-sm" role="group" aria-label="Log filter">
+                        <button
+                            @click="filter = 'all'"
+                            :class="filter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+                            class="px-3 py-1 text-xs font-medium border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer transition-colors duration-150"
+                        >All</button>
+                        <button
+                            @click="filter = 'events'"
+                            :class="filter === 'events' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+                            class="px-3 py-1 text-xs font-medium border-t border-b border-r focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer transition-colors duration-150"
+                        >Events</button>
+                        <button
+                            @click="filter = 'errors'"
+                            :class="filter === 'errors' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+                            class="px-3 py-1 text-xs font-medium border rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer transition-colors duration-150"
+                        >Errors</button>
+                    </div>
+                    <div class="w-px h-4 bg-gray-300"></div>
+                    <button
+                        hx-get="/admin/agents/{{ agent_slug }}/workbench/console/clear"
+                        hx-target="#console-log-container"
+                        hx-swap="innerHTML"
+                        class="text-xs text-gray-500 hover:text-gray-700 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1"
+                    >Clear</button>
+                </div>
+            </div>
+        </div>
+
+        {# Collapsible console body #}
+        <div
+            id="console-panel"
+            x-show="consoleOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            x-cloak
+        >
+            <div
+                id="console-log-container"
+                class="h-48 overflow-y-auto font-mono text-xs"
+                hx-get="/admin/agents/{{ agent_slug }}/workbench/console"
+                hx-trigger="every 2s"
+                hx-swap="innerHTML scroll:bottom"
+                :data-filter="filter"
+            >
+                {# Placeholder — replaced by HTMX partial #}
+                <div class="flex items-center justify-center h-full text-gray-400">
+                    <span>Waiting for log events...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>{# end workbenchPage #}
+
+{# ── Workbench JS ────────────────────────────────────────────────── #}
+<script src="/admin/static/js/workbench-form.js"></script>
+
+<script>
+    // Alpine.js page-level component
+    function workbenchPage() {
+        return {
+            agentSlug: '{{ agent_slug }}',
+
+            init() {
+                // Pre-fill parameter fields from localStorage
+                {% for param in parameters %}
+                (function() {
+                    var key = 'wb_param_{{ agent_slug }}_{{ param.name }}';
+                    var stored = localStorage.getItem(key);
+                    if (stored !== null) {
+                        var el = document.getElementById('param_{{ param.name }}');
+                        if (el) el.value = stored;
+                    }
+                })();
+                {% endfor %}
+
+                // Initialize WorkbenchForm after DOM is ready
+                this.$nextTick(() => {
+                    window.workbenchForm = new WorkbenchForm({
+                        agentSlug: this.agentSlug,
+                        startUrl: '/admin/agents/{{ agent_slug }}/workbench/start',
+                        stopUrl: '/admin/agents/{{ agent_slug }}/workbench/stop',
+                        monitorContainerId: 'monitor-container',
+                        monitorUrl: '/admin/agents/{{ agent_slug }}/workbench/jobs/',
+                        errorsContainerId: 'workbench-errors',
+                        getApiKey: () => sessionStorage.getItem('admin_api_key') || document.body.dataset.adminKey || '',
+                        getParams: () => this._collectParams(),
+                        getFields: () => this._collectFields(),
+                    });
+                });
+            },
+
+            saveParam(name, value) {
+                var key = 'wb_param_{{ agent_slug }}_' + name;
+                try { localStorage.setItem(key, value); } catch(e) {}
+            },
+
+            _collectParams() {
+                var params = {};
+                {% for param in parameters %}
+                (function() {
+                    var el = document.getElementById('param_{{ param.name }}');
+                    if (el) params['{{ param.name }}'] = el.value;
+                })();
+                {% endfor %}
+                return params;
+            },
+
+            _collectFields() {
+                var fields = {};
+                {% for field in job_fields %}
+                (function() {
+                    var el = document.getElementById('field_{{ field.name }}');
+                    if (el) {
+                        if (el.type === 'checkbox') {
+                            fields['{{ field.name }}'] = el.checked;
+                        } else {
+                            fields['{{ field.name }}'] = el.value;
+                        }
+                    }
+                })();
+                {% endfor %}
+                return fields;
+            },
+        };
+    }
+</script>
+{% endblock %}
