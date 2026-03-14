@@ -1,5 +1,5 @@
 <!-- Navigation Component -->
-<nav class="bg-white shadow-sm border-b border-gray-200" x-data="{ mobileMenuOpen: false, jobsDropdownOpen: false, docsDropdownOpen: false }">
+<nav class="bg-white shadow-sm border-b border-gray-200" x-data="{ mobileMenuOpen: false, jobsDropdownOpen: false, docsDropdownOpen: false, workbenchDropdownOpen: false }">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
@@ -35,6 +35,31 @@
                        :class="window.location.pathname === '/admin/agents' ? 'text-blue-600 bg-blue-50' : ''">
                         Agents
                     </a>
+
+                    <!-- Workbench Dropdown -->
+                    <div class="relative" @click.away="workbenchDropdownOpen = false">
+                        <button @click="workbenchDropdownOpen = !workbenchDropdownOpen"
+                                class="nav-link text-gray-500 hover:text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center"
+                                :class="window.location.pathname.includes('/workbench') ? 'text-blue-600 bg-blue-50' : ''">
+                            Workbench
+                            <svg class="ml-1 h-4 w-4 transition-transform" :class="workbenchDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="workbenchDropdownOpen"
+                             x-transition
+                             class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                             x-cloak>
+                            <div class="py-1">
+                                {% for agent in agents %}
+                                <a href="/admin/agents/{{ agent.slug }}/workbench"
+                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                                    {{ agent.name }}
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Jobs Dropdown -->
                     <div class="relative" @click.away="jobsDropdownOpen = false">
@@ -139,6 +164,17 @@
             <a href="/admin" class="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100">Dashboard</a>
             <a href="/admin/server" class="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100">Server</a>
             <a href="/admin/agents" class="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100">Agents</a>
+
+            <!-- Workbench section -->
+            <div class="pl-3 pr-4 py-2">
+                <div class="text-base font-medium text-gray-700 mb-2">Workbench</div>
+                {% for agent in agents %}
+                <a href="/admin/agents/{{ agent.slug }}/workbench"
+                   class="block pl-4 py-1 text-sm text-gray-500 hover:text-gray-700">
+                    {{ agent.name }}
+                </a>
+                {% endfor %}
+            </div>
 
             <!-- Jobs section -->
             <div class="pl-3 pr-4 py-2">
