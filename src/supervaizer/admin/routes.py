@@ -1193,6 +1193,10 @@ def create_admin_routes() -> APIRouter:
             )
             return {"status": "error", "message": str(e)}
 
+    # Include workbench sub-router
+    from supervaizer.admin.workbench_routes import create_workbench_routes
+    router.include_router(create_workbench_routes())
+
     return router
 
 
