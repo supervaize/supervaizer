@@ -1,0 +1,18 @@
+{% if entries %}
+{% for entry in entries %}
+{% if entry.level == "SUCCESS" %}{% set level_color = "text-green-500" %}
+{% elif entry.level == "ERROR" %}{% set level_color = "text-red-500" %}
+{% elif entry.level == "WARNING" %}{% set level_color = "text-yellow-500" %}
+{% else %}{% set level_color = "text-gray-400" %}
+{% endif %}
+<div class="px-3 py-0.5 leading-tight hover:bg-gray-50">
+    <span class="text-gray-400">{{ entry.timestamp }}</span>
+    <span class="mx-1 text-gray-300">[{{ entry.level }}]</span>
+    <span class="{{ level_color }}">{{ entry.message }}</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="flex items-center justify-center h-full text-gray-400">
+    <span>Waiting for log events...</span>
+</div>
+{% endif %}
