@@ -1,7 +1,7 @@
-{% from "components/field_renderer.html" import render_hitl_field %}
+{% from "components/field_renderer.html" import render_hitl_field, status_badge %}
 
 {# Determine if the job has reached a terminal state (EntityStatus.value is lowercase) #}
-{% set job_status = job.status.value if job.status and job.status.value is defined else (job.status|string) %}
+{% set job_status = job.status.value %}
 {% set is_terminal = job_status in ("completed", "failed", "stopped", "cancelled") %}
 
 {# Outer div — owns the polling loop via HTMX outerHTML swap #}
@@ -20,33 +20,7 @@
         <div class="flex items-center gap-3 min-w-0">
             <span class="text-xs text-gray-400 font-mono truncate">{{ job.id }}</span>
 
-            {# Status badge (EntityStatus values are lowercase) #}
-            {% if job_status == "completed" %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                COMPLETED
-            </span>
-            {% elif job_status == "in_progress" %}
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
-                IN_PROGRESS
-            </span>
-            {% elif job_status == "awaiting" %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                AWAITING
-            </span>
-            {% elif job_status == "failed" %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                FAILED
-            </span>
-            {% elif job_status in ("stopped", "cancelled") %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                STOPPED
-            </span>
-            {% else %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                {{ job_status }}
-            </span>
-            {% endif %}
+            {{ status_badge(job_status) }}
 
             {# Case count #}
             {% if cases_data %}
@@ -66,7 +40,7 @@
         {% for case_info in cases_data %}
         {% set case = case_info.case %}
         {% set hitl_form = case_info.hitl_form %}
-        {% set case_status = case.status.value if case.status and case.status.value is defined else case.status|string %}
+        {% set case_status = case.status.value %}
         {% set auto_expand = case_status in ("awaiting", "in_progress") %}
 
         <div
@@ -110,23 +84,7 @@
                     <span class="text-xs text-gray-400 font-mono">${{ "%.4f"|format(ns.total_cost) }}</span>
                     {% endif %}
 
-                    {# Status badge #}
-                    {% if case_status == "completed" %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">COMPLETED</span>
-                    {% elif case_status == "in_progress" %}
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block"></span>
-                        IN_PROGRESS
-                    </span>
-                    {% elif case_status == "awaiting" %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">AWAITING</span>
-                    {% elif case_status == "failed" %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">FAILED</span>
-                    {% elif case_status == "stopped" %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">STOPPED</span>
-                    {% else %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ case_status }}</span>
-                    {% endif %}
+                    {{ status_badge(case_status) }}
                 </div>
             </button>
 
