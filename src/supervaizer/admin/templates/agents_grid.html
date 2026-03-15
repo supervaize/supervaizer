@@ -55,13 +55,17 @@
                             <span class="font-medium text-green-600">Ready</span>
                         </div>
                     </div>
-                    <div class="mt-6 flex space-x-3">
+                    <div class="mt-6 flex flex-wrap gap-2">
                         {% set agent_slug = agent.slug if agent.slug else (agent.api_path.replace('/agents/', '').rstrip('/') if agent.api_path and agent.api_path.startswith('/agents/') else '') %}
                         {% set instructions_path = agent.instructions_path if agent.instructions_path else 'supervaize_instructions.html' %}
-                        <button onclick="showAgentInstructions('{{ agent_slug }}', '{{ instructions_path }}')" class="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <a href="/admin/agents/{{ agent_slug }}/workbench{% if api_key is defined and api_key %}?key={{ api_key | e }}{% endif %}" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors">
+                            Workbench
+                        </a>
+                        <button onclick="showAgentInstructions('{{ agent_slug }}', '{{ instructions_path }}')" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
                             View
                         </button>
-                        <button onclick="showAgentDetails('{{ agent_slug }}')" class="flex-1 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <button onclick="showAgentDetails('{{ agent_slug }}')" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">
+
                             Configure
                         </button>
                     </div>
