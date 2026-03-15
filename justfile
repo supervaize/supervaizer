@@ -83,6 +83,10 @@ install-hooks:
 unicorn:
     uvicorn controller:app --reload
 
+# Local test mode: no Studio credentials, built-in Hello World agent (for agent workbench)
+local:
+    uv run supervaizer start --local
+
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:
     bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""

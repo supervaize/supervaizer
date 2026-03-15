@@ -123,29 +123,38 @@ class EntityFilter(BaseModel):
     skip: int = 0
 
 
+def _get_admin_api_key(request: Request) -> Optional[str]:
+    """API key for admin: live server's key (e.g. local-dev) or env."""
+    live = getattr(request.app.state, "server", None)
+    if live is not None and getattr(live, "api_key", None):
+        return live.api_key
+    return os.getenv("SUPERVAIZER_API_KEY")
+
+
+def _is_local_mode(request: Request) -> bool:
+    """True when server has no Studio registration (supervisor_account is None)."""
+    live = getattr(request.app.state, "server", None)
+    if live is None:
+        return False
+    return getattr(live, "supervisor_account", None) is None
+
+
 async def verify_admin_access(
     request: Request,
     api_key: Optional[str] = Security(api_key_header),
     key: Optional[str] = Query(None),
 ) -> bool:
     """Verify admin access via API key in header or query parameter."""
-    # First try header authentication
-    if api_key:
-        expected_key = os.getenv("SUPERVAIZER_API_KEY")
-        if expected_key is None:
-            expected_key = "admin-secret-key-123"
+    expected_key = _get_admin_api_key(request) or "admin-secret-key-123"
 
-        if api_key == expected_key:
-            return True
+    if api_key and api_key == expected_key:
+        return True
+    if key and key == expected_key:
+        return True
 
-    # For browser access, try query parameter
-    if key:
-        expected_key = os.getenv("SUPERVAIZER_API_KEY")
-        if expected_key is None:
-            expected_key = "admin-secret-key-123"
-
-        if key == expected_key:
-            return True
+    # In local mode, allow GET requests without a key so direct URLs (e.g. workbench) work
+    if _is_local_mode(request) and request.method == "GET":
+        return True
 
     raise HTTPException(
         status_code=403,
@@ -265,7 +274,9 @@ def create_admin_routes() -> APIRouter:
                     "system_status": "Online",
                     "db_name": "TinyDB",
                     "data_storage_path": str(storage.db_path.absolute()),
-                    "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                    "api_key": _get_admin_api_key(request),
+                    "local_mode": _is_local_mode(request),
+                    "server_id": os.getenv("SUPERVAIZER_SERVER_ID"),
                 },
             )
         except Exception as e:
@@ -280,7 +291,8 @@ def create_admin_routes() -> APIRouter:
             {
                 "request": request,
                 "api_version": API_VERSION,
-                "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                "api_key": _get_admin_api_key(request),
+                "local_mode": _is_local_mode(request),
             },
         )
 
@@ -292,7 +304,8 @@ def create_admin_routes() -> APIRouter:
             {
                 "request": request,
                 "api_version": API_VERSION,
-                "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                "api_key": _get_admin_api_key(request),
+                "local_mode": _is_local_mode(request),
             },
         )
 
@@ -311,7 +324,8 @@ def create_admin_routes() -> APIRouter:
                     "api_version": API_VERSION,
                     "server_status": server_status,
                     "server_config": server_config,
-                    "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                    "api_key": _get_admin_api_key(request),
+                    "local_mode": _is_local_mode(request),
                 },
             )
         except Exception as e:
@@ -336,7 +350,8 @@ def create_admin_routes() -> APIRouter:
                     "request": request,
                     "api_version": API_VERSION,
                     "agents": server_info.agents,
-                    "api_key": os.getenv("SUPERVAIZER_API_KEY"),
+                    "api_key": _get_admin_api_key(request),
+                    "local_mode": _is_local_mode(request),
                 },
             )
         except Exception as e:
@@ -344,6 +359,43 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(
                 status_code=503, detail="Server information unavailable"
             ) from e
+
+    @router.get("/job-start-test", response_class=HTMLResponse)
+    async def admin_job_start_test_page(request: Request) -> Response:
+        """Job start form test page."""
+        return templates.TemplateResponse(
+            request,
+            "job_start_test.html",
+            {
+                "request": request,
+                "api_version": API_VERSION,
+                "api_key": _get_admin_api_key(request),
+                "local_mode": _is_local_mode(request),
+            },
+        )
+
+    @router.get("/static/js/job-start-form.js")
+    async def serve_job_start_form_js() -> Response:
+        """Serve the JobStartForm JavaScript file."""
+        js_file_path = Path(__file__).parent / "static" / "js" / "job-start-form.js"
+        if js_file_path.exists():
+            with open(js_file_path, "r") as f:
+                content = f.read()
+            return Response(content=content, media_type="application/javascript")
+        else:
+            raise HTTPException(status_code=404, detail="JavaScript file not found")
+
+    @router.get("/static/js/workbench-form.js")
+    async def serve_workbench_form_js() -> Response:
+        """Serve the WorkbenchForm JavaScript file."""
+        js_file_path = Path(__file__).parent / "static" / "js" / "workbench-form.js"
+        if js_file_path.exists():
+            with open(js_file_path, "r") as f:
+                content = f.read()
+            return Response(content=content, media_type="application/javascript")
+        else:
+            raise HTTPException(status_code=404, detail="JavaScript file not found")
+
 
     @router.get("/console", response_class=HTMLResponse)
     async def admin_console_page(request: Request) -> Response:
@@ -447,6 +499,7 @@ def create_admin_routes() -> APIRouter:
                 {
                     "request": request,
                     "agents": filtered_agents,
+                    "api_key": _get_admin_api_key(request),
                 },
             )
 

@@ -2,17 +2,31 @@
  * WorkbenchForm — handles parameter + field collection and job start from workbench.
  */
 class WorkbenchForm {
-    constructor(agentSlug) {
-        this.agentSlug = agentSlug;
-        this.basePath = `/admin/agents/${agentSlug}/workbench`;
+    constructor(config) {
+        this.agentSlug = config.agentSlug;
+        this.startUrl = config.startUrl || `/admin/agents/${config.agentSlug}/workbench/start`;
+        this.stopUrl = config.stopUrl || `/admin/agents/${config.agentSlug}/workbench/stop`;
+        this.monitorUrl = config.monitorUrl || `/admin/agents/${config.agentSlug}/workbench/jobs/`;
+        this.monitorContainerId = config.monitorContainerId || 'monitor-container';
+        this.errorsContainerId = config.errorsContainerId || 'workbench-errors';
+        this.basePath = `/admin/agents/${config.agentSlug}/workbench`;
         this.activeJobId = null;
+
+        // Optional callback overrides for param/field collection and API key
+        this._getApiKey = config.getApiKey || (() => sessionStorage.getItem('admin_api_key') || '');
+        this._getParams = config.getParams || null;
+        this._getFields = config.getFields || null;
+        if (config.onJobStarted) this.onJobStarted = config.onJobStarted;
+        if (config.onError) this.onError = config.onError;
+        this._pollInterval = null;
     }
 
     getApiKey() {
-        return sessionStorage.getItem('admin_api_key') || '';
+        return this._getApiKey();
     }
 
     collectParameters() {
+        if (this._getParams) return this._getParams();
         const params = {};
         document.querySelectorAll('#parameters-form input, #parameters-form select').forEach(el => {
             if (el.name) {
@@ -23,6 +37,7 @@ class WorkbenchForm {
     }
 
     collectFields() {
+        if (this._getFields) return this._getFields();
         const fields = {};
         document.querySelectorAll('#fields-form input, #fields-form select, #fields-form textarea').forEach(el => {
             if (el.name) {
@@ -42,8 +57,11 @@ class WorkbenchForm {
 
     validateRequired() {
         let valid = true;
-        document.querySelectorAll('#parameters-form [required], #fields-form [required]').forEach(el => {
-            if (!el.value) {
+        const selector = '#parameters-form [required], #fields-form [required]';
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+            const value = el.type === 'checkbox' ? el.checked : (el.value || '').toString().trim();
+            if (el.type === 'checkbox' ? !value : value === '') {
                 el.classList.add('border-red-500');
                 valid = false;
             } else {
@@ -55,14 +73,19 @@ class WorkbenchForm {
 
     async startJob() {
         if (!this.validateRequired()) {
+            this.onError('Please fill in all required fields.');
+            const el = document.getElementById(this.errorsContainerId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             return;
         }
 
         const parameters = this.collectParameters();
         const fields = this.collectFields();
 
+        const btn = document.getElementById('btn-start');
+        if (btn) btn.disabled = true;
         try {
-            const response = await fetch(`${this.basePath}/start`, {
+            const response = await fetch(this.startUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -70,24 +93,39 @@ class WorkbenchForm {
                 },
                 body: JSON.stringify({ parameters, fields }),
             });
-
-            const result = await response.json();
+            let result;
+            try {
+                result = await response.json();
+            } catch (_) {
+                const text = await response.text();
+                this.onError(response.ok ? 'Invalid response from server' : (text.slice(0, 200) || `HTTP ${response.status}`));
+                return;
+            }
             if (response.ok) {
+                if (!result || result.id == null) {
+                    this.onError('Invalid response: missing job id');
+                    return;
+                }
                 this.activeJobId = result.id;
+                this.onError(''); // clear previous errors
                 this.onJobStarted(result);
             } else {
-                this.onError(result.detail || 'Failed to start job');
+                const detail = Array.isArray(result.detail) ? result.detail.map(d => d.msg || JSON.stringify(d)).join('; ') : (result.detail || 'Failed to start job');
+                this.onError(detail);
             }
         } catch (e) {
             this.onError(`Network error: ${e.message}`);
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 
-    async stopJob() {
-        if (!this.activeJobId) return;
+    async stopJob(jobId) {
+        const targetJobId = jobId || this.activeJobId;
+        if (!targetJobId) return;
 
         try {
-            const response = await fetch(`${this.basePath}/jobs/${this.activeJobId}/stop`, {
+            const response = await fetch(`${this.basePath}/jobs/${targetJobId}/stop`, {
                 method: 'POST',
                 headers: { 'X-API-Key': this.getApiKey() },
             });
@@ -149,9 +187,52 @@ class WorkbenchForm {
         }
     }
 
-    // Override these in the template
-    onJobStarted(result) {}
-    onError(message) {}
+    /** Load monitor partial and start polling. Stops when job reaches terminal state. */
+    onJobStarted(result) {
+        const container = document.getElementById(this.monitorContainerId);
+        if (!container) return;
+        const url = `${this.basePath}/jobs/${result.id}`;
+        const apiKey = this.getApiKey();
+        const self = this;
+        const loadMonitor = () => {
+            const headers = apiKey ? { 'X-API-Key': apiKey } : {};
+            fetch(url, { headers })
+                .then(r => r.text())
+                .then(html => {
+                    container.innerHTML = html;
+                    // Re-initialize Alpine on swapped content
+                    if (typeof Alpine !== 'undefined') {
+                        Alpine.initTree(container);
+                    }
+                    // Stop polling once job is terminal
+                    const partial = container.querySelector('#workbench-monitor-partial');
+                    if (partial && partial.dataset.jobTerminal === 'true' && self._pollInterval) {
+                        clearInterval(self._pollInterval);
+                        self._pollInterval = null;
+                    }
+                })
+                .catch(() => {});
+        };
+        loadMonitor();
+        if (this._pollInterval) clearInterval(this._pollInterval);
+        this._pollInterval = setInterval(loadMonitor, 2000);
+    }
+
+    /** Show error in errors container. Override in template if needed. */
+    onError(message) {
+        const el = document.getElementById(this.errorsContainerId);
+        if (el) {
+            if (message) {
+                el.classList.remove('hidden');
+                const inner = el.querySelector('div');
+                if (inner) inner.textContent = message;
+            } else {
+                el.classList.add('hidden');
+                const inner = el.querySelector('div');
+                if (inner) inner.textContent = '';
+            }
+        }
+    }
 }
 
 if (typeof window !== 'undefined') {
