@@ -132,6 +132,9 @@ class WorkbenchForm {
             const result = await response.json();
             if (!response.ok) {
                 this.onError(result.detail || 'Failed to stop job');
+            } else {
+                // Refresh monitor to show updated state
+                this.refreshMonitor();
             }
         } catch (e) {
             this.onError(`Network error: ${e.message}`);
@@ -181,10 +184,46 @@ class WorkbenchForm {
             const result = await response.json();
             if (!response.ok) {
                 this.onError(result.detail || result.message || 'Failed to submit answer');
+            } else {
+                // Remove the form so polling resumes, then refresh immediately
+                formElement.remove();
+                this.refreshMonitor();
             }
         } catch (e) {
             this.onError(`Network error: ${e.message}`);
         }
+    }
+
+    /** Show/hide Stop and Status buttons based on active job. */
+    _updateButtons(terminal) {
+        const stop = document.getElementById('btn-stop');
+        const status = document.getElementById('btn-status');
+        if (this.activeJobId && !terminal) {
+            if (stop) stop.classList.remove('hidden');
+            if (status) status.classList.remove('hidden');
+        } else {
+            if (stop) stop.classList.add('hidden');
+            if (status) status.classList.remove('hidden');
+        }
+    }
+
+    /** Fetch and render the monitor partial for the active job. */
+    refreshMonitor() {
+        if (!this.activeJobId) return;
+        const container = document.getElementById(this.monitorContainerId);
+        if (!container) return;
+        const url = `${this.basePath}/jobs/${this.activeJobId}`;
+        const apiKey = this.getApiKey();
+        const headers = apiKey ? { 'X-API-Key': apiKey } : {};
+        fetch(url, { headers })
+            .then(r => r.text())
+            .then(html => {
+                container.innerHTML = html;
+                if (typeof Alpine !== 'undefined') {
+                    Alpine.initTree(container);
+                }
+            })
+            .catch(() => {});
     }
 
     /** Load monitor partial and start polling. Stops when job reaches terminal state. */
@@ -194,7 +233,11 @@ class WorkbenchForm {
         const url = `${this.basePath}/jobs/${result.id}`;
         const apiKey = this.getApiKey();
         const self = this;
+        this._updateButtons(false);
         const loadMonitor = () => {
+            // Don't overwrite the monitor while user is filling a HITL form
+            if (container.querySelector('form[id^="hitl-form-"]')) return;
+
             const headers = apiKey ? { 'X-API-Key': apiKey } : {};
             fetch(url, { headers })
                 .then(r => r.text())
@@ -206,9 +249,12 @@ class WorkbenchForm {
                     }
                     // Stop polling once job is terminal
                     const partial = container.querySelector('#workbench-monitor-partial');
-                    if (partial && partial.dataset.jobTerminal === 'true' && self._pollInterval) {
-                        clearInterval(self._pollInterval);
-                        self._pollInterval = null;
+                    if (partial && partial.dataset.jobTerminal === 'true') {
+                        if (self._pollInterval) {
+                            clearInterval(self._pollInterval);
+                            self._pollInterval = null;
+                        }
+                        self._updateButtons(true);
                     }
                 })
                 .catch(() => {});
