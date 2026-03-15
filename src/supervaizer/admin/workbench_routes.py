@@ -1,12 +1,19 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 import asyncio
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import shortuuid
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.responses import Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -30,13 +37,20 @@ def _apply_log_patch() -> None:
     if _patch_applied:
         return
     from supervaizer.admin import routes as _admin_routes
+
     _original_add_log = _admin_routes.add_log_to_queue
 
     def _patched_add_log(timestamp: str, level: str, message: str) -> None:
         _original_add_log(timestamp, level, message)
-        _workbench_log_buffer.append({"timestamp": timestamp, "level": level, "message": message})
+        _workbench_log_buffer.append({
+            "timestamp": timestamp,
+            "level": level,
+            "message": message,
+        })
         if len(_workbench_log_buffer) > _WORKBENCH_LOG_BUFFER_MAX:
-            del _workbench_log_buffer[:len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX]
+            del _workbench_log_buffer[
+                : len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX
+            ]
 
     _admin_routes.add_log_to_queue = _patched_add_log
     _patch_applied = True
@@ -68,6 +82,7 @@ def get_agent_by_slug(request: Request, slug: str) -> Agent:
 def get_job_cases(job: Job) -> List[Any]:
     """Get all cases for a job from the Cases singleton."""
     from supervaizer.case import Cases
+
     cases_registry = Cases()
     job_cases = cases_registry.get_job_cases(job.id)  # returns dict[str, Case]
     return list(job_cases.values())
@@ -138,7 +153,7 @@ def create_workbench_routes() -> APIRouter:
     router = APIRouter(tags=["workbench"])
 
     @router.get("/agents/{slug}/workbench", response_class=HTMLResponse)
-    async def workbench_page(request: Request, slug: str):
+    async def workbench_page(request: Request, slug: str) -> Response:
         """Render the main workbench page."""
         agent = get_agent_by_slug(request, slug)
 
@@ -160,7 +175,9 @@ def create_workbench_routes() -> APIRouter:
             for field in agent.methods.job_start.fields:
                 job_fields.append({
                     "name": field.name,
-                    "field_type": field.field_type.value if hasattr(field.field_type, "value") else str(field.field_type),
+                    "field_type": field.field_type.value
+                    if hasattr(field.field_type, "value")
+                    else str(field.field_type),
                     "description": field.description,
                     "choices": field.choices,
                     "default": field.default,
@@ -170,6 +187,7 @@ def create_workbench_routes() -> APIRouter:
 
         # Check for active job
         from supervaizer.job import Jobs
+
         jobs_registry = Jobs()
         active_job = None
         agent_jobs = jobs_registry.get_agent_jobs(agent.name)  # returns dict[str, Job]
@@ -191,13 +209,17 @@ def create_workbench_routes() -> APIRouter:
                 "api_version": API_VERSION,
                 "api_key": _get_workbench_api_key(request),
                 "local_mode": _is_workbench_local_mode(request),
-                "has_human_answer": agent.methods and agent.methods.human_answer is not None,
-                "agents": [{"slug": a.slug, "name": a.name} for a in request.app.state.server.agents],
+                "has_human_answer": agent.methods
+                and agent.methods.human_answer is not None,
+                "agents": [
+                    {"slug": a.slug, "name": a.name}
+                    for a in request.app.state.server.agents
+                ],
             },
         )
 
     @router.post("/agents/{slug}/workbench/start")
-    async def workbench_start_job(request: Request, slug: str):
+    async def workbench_start_job(request: Request, slug: str) -> Response:
         """Start a job from the workbench — no Studio communication."""
         agent = get_agent_by_slug(request, slug)
 
@@ -224,9 +246,11 @@ def create_workbench_routes() -> APIRouter:
         )
 
         # Build agent_parameters as list of dicts (matching AbstractJob.agent_parameters type)
-        agent_params_list = [
-            {"name": k, "value": v} for k, v in parameters.items()
-        ] if parameters else None
+        agent_params_list = (
+            [{"name": k, "value": v} for k, v in parameters.items()]
+            if parameters
+            else None
+        )
 
         job = Job(
             id=job_id,
@@ -243,29 +267,39 @@ def create_workbench_routes() -> APIRouter:
 
         action_method = agent.methods.job_start.method
         method_params = agent.methods.job_start.params or {}
-        params = method_params | {"fields": fields, "context": context, "agent_parameters": agent_params_list or []}
+        params = method_params | {
+            "fields": fields,
+            "context": context,
+            "agent_parameters": agent_params_list or [],
+        }
 
         # Run in background thread to not block the response
         loop = asyncio.get_running_loop()
 
-        async def run_job():
+        async def run_job() -> None:
             try:
-                job.add_response(JobResponse(
-                    job_id=job.id,
-                    status=EntityStatus.IN_PROGRESS,
-                    message="Starting job execution",
-                    payload=None,
-                ))
-                result = await loop.run_in_executor(None, lambda: agent._execute(action_method, params))
+                job.add_response(
+                    JobResponse(
+                        job_id=job.id,
+                        status=EntityStatus.IN_PROGRESS,
+                        message="Starting job execution",
+                        payload=None,
+                    )
+                )
+                result = await loop.run_in_executor(
+                    None, lambda: agent._execute(action_method, params)
+                )
                 job.add_response(result)
             except Exception as e:
                 log.error(f"[Workbench] Job {job.id} failed: {e}")
-                job.add_response(JobResponse(
-                    job_id=job.id,
-                    status=EntityStatus.FAILED,
-                    message=f"Job failed: {str(e)}",
-                    error=e,
-                ))
+                job.add_response(
+                    JobResponse(
+                        job_id=job.id,
+                        status=EntityStatus.FAILED,
+                        message=f"Job failed: {str(e)}",
+                        error=e,
+                    )
+                )
 
         asyncio.create_task(run_job())
 
@@ -276,11 +310,14 @@ def create_workbench_routes() -> APIRouter:
         })
 
     @router.get("/agents/{slug}/workbench/jobs/{job_id}", response_class=HTMLResponse)
-    async def workbench_job_monitor(request: Request, slug: str, job_id: str):
+    async def workbench_job_monitor(
+        request: Request, slug: str, job_id: str
+    ) -> Response:
         """HTMX partial — returns execution monitor HTML for polling."""
         agent = get_agent_by_slug(request, slug)
 
         from supervaizer.job import Jobs
+
         jobs_registry = Jobs()
         job = jobs_registry.get_job(job_id, agent_name=agent.name)
 
@@ -288,7 +325,9 @@ def create_workbench_routes() -> APIRouter:
             job = None  # Don't leak cross-agent data
 
         if not job:
-            return HTMLResponse("<div class='text-gray-500 text-sm'>Job not found</div>")
+            return HTMLResponse(
+                "<div class='text-gray-500 text-sm'>Job not found</div>"
+            )
 
         cases = get_job_cases(job)
 
@@ -305,7 +344,9 @@ def create_workbench_routes() -> APIRouter:
                     if hasattr(update, "payload") and update.payload:
                         payload = update.payload
                         if isinstance(payload, dict) and "supervaizer_form" in payload:
-                            case_info["hitl_form"] = _normalize_hitl_form(payload["supervaizer_form"])
+                            case_info["hitl_form"] = _normalize_hitl_form(
+                                payload["supervaizer_form"]
+                            )
                             break
             cases_data.append(case_info)
 
@@ -317,47 +358,56 @@ def create_workbench_routes() -> APIRouter:
                 "agent_slug": slug,
                 "job": job,
                 "cases_data": cases_data,
-                "has_human_answer": agent.methods and agent.methods.human_answer is not None,
+                "has_human_answer": agent.methods
+                and agent.methods.human_answer is not None,
             },
         )
 
     @router.post("/agents/{slug}/workbench/jobs/{job_id}/stop")
-    async def workbench_stop_job(request: Request, slug: str, job_id: str):
+    async def workbench_stop_job(request: Request, slug: str, job_id: str) -> Response:
         """Stop a running job."""
         agent = get_agent_by_slug(request, slug)
 
         if not agent.methods or not agent.methods.job_stop:
             raise HTTPException(status_code=400, detail="Agent has no job_stop method")
 
+        job_stop_method = agent.methods.job_stop.method
+
         # Update job status in registry so the running loop can detect it
         from supervaizer.job import Jobs
+
         jobs_registry = Jobs()
         job = jobs_registry.get_job(job_id, agent_name=agent.name)
         if job:
-            job.add_response(JobResponse(
-                job_id=job_id,
-                status=EntityStatus.STOPPED,
-                message="Stopped by user",
-            ))
+            job.add_response(
+                JobResponse(
+                    job_id=job_id,
+                    status=EntityStatus.STOPPED,
+                    message="Stopped by user",
+                )
+            )
 
         try:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
-                lambda: agent._execute(agent.methods.job_stop.method, {"job_id": job_id}),
+                lambda: agent._execute(job_stop_method, {"job_id": job_id}),
             )
             return JSONResponse({"status": "stopped", "message": str(result.message)})
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
 
     @router.get("/agents/{slug}/workbench/jobs/{job_id}/status")
-    async def workbench_job_status(request: Request, slug: str, job_id: str):
+    async def workbench_job_status(
+        request: Request, slug: str, job_id: str
+    ) -> Response:
         """Get job status via agent's job_status method."""
         agent = get_agent_by_slug(request, slug)
 
         if not agent.methods or not agent.methods.job_status:
             # Fall back to reading job state directly
             from supervaizer.job import Jobs
+
             jobs_registry = Jobs()
             job = jobs_registry.get_job(job_id, agent_name=agent.name)
 
@@ -368,21 +418,29 @@ def create_workbench_routes() -> APIRouter:
                 raise HTTPException(status_code=404, detail="Job not found")
             return JSONResponse({
                 "job_id": job.id,
-                "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+                "status": job.status.value
+                if hasattr(job.status, "value")
+                else str(job.status),
             })
 
+        job_status_method = agent.methods.job_status.method
         try:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
-                lambda: agent._execute(agent.methods.job_status.method, {"job_id": job_id}),
+                lambda: agent._execute(job_status_method, {"job_id": job_id}),
             )
-            return JSONResponse({"status": result.status.value, "message": result.message})
+            return JSONResponse({
+                "status": result.status.value,
+                "message": result.message,
+            })
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get status: {e}")
 
     @router.post("/agents/{slug}/workbench/jobs/{job_id}/cases/{case_id}/answer")
-    async def workbench_answer_hitl(request: Request, slug: str, job_id: str, case_id: str):
+    async def workbench_answer_hitl(
+        request: Request, slug: str, job_id: str, case_id: str
+    ) -> Response:
         """Submit HITL answer — two-step dispatch (receive + invoke human_answer)."""
         agent = get_agent_by_slug(request, slug)
 
@@ -391,6 +449,7 @@ def create_workbench_routes() -> APIRouter:
 
         # Find the case
         from supervaizer.case import Cases
+
         cases_registry = Cases()
         case = cases_registry.get_case(case_id, job_id=job_id)
 
@@ -409,6 +468,7 @@ def create_workbench_routes() -> APIRouter:
 
         # Step 2: Invoke agent's human_answer method if defined
         if agent.methods and agent.methods.human_answer:
+            human_answer_method = agent.methods.human_answer.method
             try:
                 params = {
                     "fields": answer_data,
@@ -420,7 +480,7 @@ def create_workbench_routes() -> APIRouter:
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
                     None,
-                    lambda: agent._execute(agent.methods.human_answer.method, params),
+                    lambda: agent._execute(human_answer_method, params),
                 )
             except Exception as e:
                 log.error(f"[Workbench] human_answer failed for case {case_id}: {e}")
@@ -436,7 +496,7 @@ def create_workbench_routes() -> APIRouter:
         })
 
     @router.get("/agents/{slug}/workbench/console", response_class=HTMLResponse)
-    async def workbench_console(request: Request, slug: str):
+    async def workbench_console(request: Request, slug: str) -> Response:
         """HTMX partial — returns recent console log entries."""
         try:
             last_index = int(request.query_params.get("last_index", 0))
@@ -457,11 +517,12 @@ def create_workbench_routes() -> APIRouter:
         )
 
     @router.get("/agents/{slug}/workbench/jobs", response_class=HTMLResponse)
-    async def workbench_jobs_list(request: Request, slug: str):
+    async def workbench_jobs_list(request: Request, slug: str) -> Response:
         """HTMX partial — returns job history list."""
         agent = get_agent_by_slug(request, slug)
 
         from supervaizer.job import Jobs
+
         jobs_registry = Jobs()
         agent_jobs = jobs_registry.get_agent_jobs(agent.name)
 

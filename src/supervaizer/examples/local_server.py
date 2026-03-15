@@ -122,7 +122,7 @@ def create_local_server(
         supervisor_account=None,
         a2a_endpoints=True,
         admin_interface=True,
-        host=host or os.environ.get("SUPERVAIZER_HOST", "0.0.0.0"),
+        host=host or os.environ.get("SUPERVAIZER_HOST") or "0.0.0.0",
         port=port or int(os.environ.get("SUPERVAIZER_PORT") or "8000"),
         public_url=public_url or os.environ.get("SUPERVAIZER_PUBLIC_URL"),
         debug=debug,

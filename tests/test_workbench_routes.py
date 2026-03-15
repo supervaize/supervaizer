@@ -1,8 +1,12 @@
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 """Tests for workbench routes module."""
 
-import os
-from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -16,7 +20,6 @@ from supervaizer import (
     ParametersSetup,
 )
 from supervaizer.agent import AgentMethodField, FieldTypeEnum
-from supervaizer.job import JobContext
 
 
 @pytest.fixture
@@ -48,7 +51,9 @@ def test_client_with_agent(monkeypatch):
         description="A test agent",
         methods=AgentMethods(job_start=agent_method),
         parameters_setup=ParametersSetup.from_list([
-            Parameter(name="API_KEY", description="Test key", is_required=True, is_secret=True),
+            Parameter(
+                name="API_KEY", description="Test key", is_required=True, is_secret=True
+            ),
         ]),
     )
 
@@ -104,6 +109,7 @@ class TestGetAgentBySlug:
         request.app.state.server.agents = [agent]
 
         from supervaizer.admin.workbench_routes import get_agent_by_slug
+
         result = get_agent_by_slug(request, "hello-world")
         assert result == agent
 
@@ -115,6 +121,7 @@ class TestGetAgentBySlug:
         request.app.state.server.agents = [agent]
 
         from supervaizer.admin.workbench_routes import get_agent_by_slug
+
         with pytest.raises(HTTPException) as exc_info:
             get_agent_by_slug(request, "not-found")
         assert exc_info.value.status_code == 404
