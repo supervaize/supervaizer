@@ -1,11 +1,11 @@
 {% if entries %}
 {% for entry in entries %}
-{% if entry.level == "SUCCESS" %}{% set level_color = "text-green-500" %}
-{% elif entry.level == "ERROR" %}{% set level_color = "text-red-500" %}
-{% elif entry.level == "WARNING" %}{% set level_color = "text-yellow-500" %}
-{% else %}{% set level_color = "text-gray-400" %}
+{% if entry.level == "SUCCESS" %}{% set level_color = "text-green-500" %}{% set level_class = "event" %}
+{% elif entry.level == "ERROR" %}{% set level_color = "text-red-500" %}{% set level_class = "error" %}
+{% elif entry.level == "WARNING" %}{% set level_color = "text-yellow-500" %}{% set level_class = "error" %}
+{% else %}{% set level_color = "text-gray-400" %}{% set level_class = "event" %}
 {% endif %}
-<div class="px-3 py-0.5 leading-tight hover:bg-gray-50">
+<div class="console-entry px-3 py-0.5 leading-tight hover:bg-gray-50" data-level="{{ level_class }}">
     <span class="text-gray-400">{{ entry.timestamp }}</span>
     <span class="mx-1 text-gray-300">[{{ entry.level }}]</span>
     <span class="{{ level_color }}">{{ entry.message }}</span>

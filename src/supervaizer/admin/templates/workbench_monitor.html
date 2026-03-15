@@ -188,6 +188,24 @@
                             {% if step_message %}
                             <p class="text-xs text-gray-500 mt-0.5">{{ step_message }}</p>
                             {% endif %}
+                            {% if step.name == "HITL Answer" and step_payload is mapping %}
+                            <div class="mt-1 space-y-0.5">
+                                {% for key, val in step_payload.items() %}
+                                <div class="text-xs">
+                                    <span class="text-gray-400">{{ key }}:</span>
+                                    {% if val is sameas true %}
+                                    <span class="text-green-600 font-medium">Yes</span>
+                                    {% elif val is sameas false %}
+                                    <span class="text-red-500 font-medium">No</span>
+                                    {% elif val %}
+                                    <span class="text-gray-600">{{ val }}</span>
+                                    {% else %}
+                                    <span class="text-gray-300 italic">empty</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                             {% if step.error %}
                             <p class="text-xs text-red-600 mt-0.5">{{ step.error }}</p>
                             {% endif %}
@@ -209,13 +227,7 @@
                         <span class="text-sm font-semibold text-amber-800">Human Input Required</span>
                     </div>
 
-                    <form
-                        id="hitl-form-{{ case.id }}"
-                        hx-post="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ job.id }}/cases/{{ case.id }}/answer"
-                        hx-ext="json-enc"
-                        hx-swap="none"
-                        hx-on::after-request="if(event.detail.successful){ window.showToast && showToast('Answer submitted', 'success'); }"
-                    >
+                    <form id="hitl-form-{{ case.id }}" onsubmit="return false;">
                         {% if hitl_form is mapping %}
                         <div class="space-y-3">
                             {% for field_name, field_def in hitl_form.items() %}
@@ -226,7 +238,8 @@
 
                         <div class="mt-4">
                             <button
-                                type="submit"
+                                type="button"
+                                onclick="window.workbenchForm && window.workbenchForm.submitHitlAnswer('{{ case.id }}', this.closest('form'))"
                                 class="inline-flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 cursor-pointer transition-colors duration-150"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

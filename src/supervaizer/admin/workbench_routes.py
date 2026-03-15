@@ -86,6 +86,42 @@ def get_agent_parameters_from_env(agent: Agent) -> Dict[str, str]:
     return values
 
 
+_FIELD_TYPE_MAP = {
+    "BooleanField": "checkbox",
+    "CharField": "text",
+    "TextField": "textarea",
+    "IntegerField": "number",
+    "ChoiceField": "select",
+}
+
+
+def _normalize_hitl_form(form_data: dict) -> dict:
+    """Convert supervaizer_form payload to {field_name: {type, label, required, ...}} for the template."""
+    if not isinstance(form_data, dict):
+        return {}
+    # Already in flat {name: def} format
+    answer = form_data.get("answer")
+    if not isinstance(answer, dict):
+        return form_data
+    fields = answer.get("fields")
+    if not isinstance(fields, list):
+        return form_data
+    result = {}
+    for field in fields:
+        if not isinstance(field, dict) or "name" not in field:
+            continue
+        name = field["name"]
+        field_type = field.get("field_type", "CharField")
+        result[name] = {
+            "type": _FIELD_TYPE_MAP.get(field_type, "text"),
+            "label": field.get("description") or name,
+            "required": field.get("required", False),
+        }
+        if field_type == "ChoiceField" and "choices" in field:
+            result[name]["options"] = field["choices"]
+    return result
+
+
 class WorkbenchStartRequest(BaseModel):
     parameters: Dict[str, str] = {}
     fields: Dict[str, Any] = {}
@@ -269,7 +305,7 @@ def create_workbench_routes() -> APIRouter:
                     if hasattr(update, "payload") and update.payload:
                         payload = update.payload
                         if isinstance(payload, dict) and "supervaizer_form" in payload:
-                            case_info["hitl_form"] = payload["supervaizer_form"]
+                            case_info["hitl_form"] = _normalize_hitl_form(payload["supervaizer_form"])
                             break
             cases_data.append(case_info)
 
@@ -292,6 +328,17 @@ def create_workbench_routes() -> APIRouter:
 
         if not agent.methods or not agent.methods.job_stop:
             raise HTTPException(status_code=400, detail="Agent has no job_stop method")
+
+        # Update job status in registry so the running loop can detect it
+        from supervaizer.job import Jobs
+        jobs_registry = Jobs()
+        job = jobs_registry.get_job(job_id, agent_name=agent.name)
+        if job:
+            job.add_response(JobResponse(
+                job_id=job_id,
+                status=EntityStatus.STOPPED,
+                message="Stopped by user",
+            ))
 
         try:
             loop = asyncio.get_running_loop()
@@ -406,6 +453,32 @@ def create_workbench_routes() -> APIRouter:
                 "entries": entries_to_send,
                 "next_index": len(_workbench_log_buffer),
                 "agent_slug": slug,
+            },
+        )
+
+    @router.get("/agents/{slug}/workbench/jobs", response_class=HTMLResponse)
+    async def workbench_jobs_list(request: Request, slug: str):
+        """HTMX partial — returns job history list."""
+        agent = get_agent_by_slug(request, slug)
+
+        from supervaizer.job import Jobs
+        jobs_registry = Jobs()
+        agent_jobs = jobs_registry.get_agent_jobs(agent.name)
+
+        # Sort by created_at descending (most recent first)
+        jobs_list = sorted(
+            agent_jobs.values(),
+            key=lambda j: getattr(j, "created_at", None) or datetime.min,
+            reverse=True,
+        )
+
+        return templates.TemplateResponse(
+            request,
+            "workbench_jobs_list.html",
+            {
+                "request": request,
+                "agent_slug": slug,
+                "jobs": jobs_list,
             },
         )
 
