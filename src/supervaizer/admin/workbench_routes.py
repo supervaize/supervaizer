@@ -42,6 +42,20 @@ def _apply_log_patch() -> None:
     _patch_applied = True
 
 
+def _get_workbench_api_key(request: Request) -> str:
+    """API key for workbench requests (live server or env)."""
+    live = getattr(request.app.state, "server", None)
+    if live is not None and getattr(live, "api_key", None):
+        return live.api_key
+    return os.getenv("SUPERVAIZER_API_KEY") or ""
+
+
+def _is_workbench_local_mode(request: Request) -> bool:
+    """True when server has no Studio registration."""
+    live = getattr(request.app.state, "server", None)
+    return live is not None and getattr(live, "supervisor_account", None) is None
+
+
 def get_agent_by_slug(request: Request, slug: str) -> Agent:
     """Look up a live Agent instance by its URL slug."""
     server = request.app.state.server
@@ -124,10 +138,7 @@ def create_workbench_routes() -> APIRouter:
         active_job = None
         agent_jobs = jobs_registry.get_agent_jobs(agent.name)  # returns dict[str, Job]
         for job in agent_jobs.values():
-            if hasattr(job, "status") and job.status in (
-                EntityStatus.IN_PROGRESS,
-                EntityStatus.STARTING,
-            ):
+            if hasattr(job, "status") and job.status == EntityStatus.IN_PROGRESS:
                 active_job = job
                 break
 
@@ -142,6 +153,8 @@ def create_workbench_routes() -> APIRouter:
                 "job_fields": job_fields,
                 "active_job": active_job,
                 "api_version": API_VERSION,
+                "api_key": _get_workbench_api_key(request),
+                "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods and agent.methods.human_answer is not None,
                 "agents": [{"slug": a.slug, "name": a.name} for a in request.app.state.server.agents],
             },

@@ -5,20 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Supervaizer Admin{% endblock %}</title>
 
+    <script>
+        // Suppress Tailwind CDN warning before Tailwind loads
+        (function() {
+            var w = typeof console !== 'undefined' && console.warn ? console.warn : function() {};
+            console.warn = function(msg) {
+                if (typeof msg === 'string' && msg.indexOf('cdn.tailwindcss.com should not be used') !== -1) return;
+                return w.apply(console, arguments);
+            };
+        })();
+    </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Suppress Tailwind CDN warning in development
-        if (typeof console !== 'undefined' && console.warn) {
-            const originalWarn = console.warn;
-            console.warn = function(...args) {
-                if (args[0] && args[0].includes && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
-                    return; // Suppress this specific warning
-                }
-                originalWarn.apply(console, args);
-            };
-        }
-    </script>
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -43,6 +41,11 @@
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen" data-admin-key="{{ (api_key or '')|e }}">
+    {% if local_mode is defined and local_mode %}
+    <div class="bg-amber-100 border-b border-amber-300 text-amber-900 text-center py-1.5 text-sm font-medium">
+        Local mode — no Studio registration. For testing only.
+    </div>
+    {% endif %}
     <!-- Navigation -->
     {% include "navigation.html" %}
 
