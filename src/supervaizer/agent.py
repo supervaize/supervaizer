@@ -16,9 +16,10 @@ from typing import (
     List,
     Optional,
     TypeVar,
+    cast,
 )
 import shortuuid
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, ConfigDict, field_validator, Field
 from rich import inspect, print
 from slugify import slugify
 from supervaizer.__version__ import VERSION
@@ -99,28 +100,31 @@ class AgentMethodField(BaseModel):
         default=False, description="Whether field is required for form submission"
     )
 
-    model_config = {
-        "reference_group": "Core",
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "name": "color",
-                    "type": "list[str]",
-                    "field_type": "MultipleChoiceField",
-                    "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
-                    "widget": "RadioSelect",
-                    "required": True,
-                },
-                {
-                    "name": "age",
-                    "type": "int",
-                    "field_type": "IntegerField",
-                    "widget": "NumberInput",
-                    "required": False,
-                },
-            ]
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "json_schema_extra": {
+                "examples": [
+                    {
+                        "name": "color",
+                        "type": "list[str]",
+                        "field_type": "MultipleChoiceField",
+                        "choices": [["B", "Blue"], ["R", "Red"], ["G", "Green"]],
+                        "widget": "RadioSelect",
+                        "required": True,
+                    },
+                    {
+                        "name": "age",
+                        "type": "int",
+                        "field_type": "IntegerField",
+                        "widget": "NumberInput",
+                        "required": False,
+                    },
+                ]
+            },
         },
-    }
+    )
 
 
 class AgentJobContextBase(BaseModel):
@@ -192,24 +196,27 @@ class AgentMethodAbstract(BaseModel):
         default=False, description="Whether the method is asynchronous"
     )
 
-    model_config = {
-        "reference_group": "Core",
-        "example_dict": {
-            "name": "start",
-            "method": "example_agent.example_synchronous_job_start",
-            "params": {"action": "start"},
-            "fields": [
-                {
-                    "name": "Company to research",
-                    "type": str,
-                    "field_type": "CharField",
-                    "max_length": 100,
-                    "required": True,
-                },
-            ],
-            "description": "Start the collection of new competitor summary",
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "example_dict": {
+                "name": "start",
+                "method": "example_agent.example_synchronous_job_start",
+                "params": {"action": "start"},
+                "fields": [
+                    {
+                        "name": "Company to research",
+                        "type": str,
+                        "field_type": "CharField",
+                        "max_length": 100,
+                        "required": True,
+                    },
+                ],
+                "description": "Start the collection of new competitor summary",
+            },
         },
-    }
+    )
 
 
 class AgentMethod(AgentMethodAbstract):
@@ -458,9 +465,7 @@ class AgentAbstract(SvBaseModel):
         description="Maximum execution time in seconds, defaults to 1 hour",
     )
 
-    model_config = {
-        "reference_group": "Core",
-    }
+    model_config = cast(ConfigDict, {"reference_group": "Core"})
 
 
 class Agent(AgentAbstract):

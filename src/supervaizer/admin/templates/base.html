@@ -31,7 +31,7 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen" data-admin-key="{{ (api_key or '')|e }}">
-    {% if local_mode is defined and local_mode %}
+    {% if local_mode %}
     <div class="bg-amber-100 border-b border-amber-300 text-amber-900 text-center py-1.5 text-sm font-medium">
         Local mode — no Studio registration. For testing only.
     </div>
@@ -131,21 +131,15 @@
 
         // Live Console - Server-Sent Events
         function initializeLogStream() {
-            console.log('initializeLogStream called, pathname:', window.location.pathname);
-
             // Skip if we're on the dedicated console page to avoid conflicts
             if (window.location.pathname.includes('/console')) {
-                console.log('Skipping live console on console page');
                 return;
             }
 
             const consoleComponent = document.querySelector('#live-console');
             if (!consoleComponent) {
-                console.error('Live console component not found');
                 return;
             }
-
-            console.log('Initializing live console log stream');
 
             let eventSource = null;
             let logCounter = 0;
@@ -161,7 +155,6 @@
 
                 eventSource.onmessage = function(event) {
                     try {
-                        console.log('Received log message:', event.data);
                         // Handle different event data formats
                         let logData;
                         if (event.data.startsWith('data: ')) {
@@ -185,8 +178,6 @@
                         if (alpineData.logs.length > 1000) {
                             alpineData.logs.shift();
                         }
-                        console.log('Added log entry, total logs:', alpineData.logs.length);
-
                         // Auto-scroll to bottom if expanded
                         if (alpineData.expanded) {
                             const consoleBody = document.getElementById('console-body');
@@ -197,12 +188,11 @@
                             }
                         }
                     } catch (error) {
-                        console.error('Error processing log message:', error, event.data);
+                        // Silently ignore malformed log messages
                     }
                 };
 
                 eventSource.onerror = function(event) {
-                    console.error('Log stream error:', event);
                     showToast('Log stream disconnected. Attempting to reconnect...', 'error');
 
                     // Attempt reconnection after 5 seconds
@@ -211,9 +201,7 @@
                     }, 5000);
                 };
 
-                eventSource.onopen = function(event) {
-                    console.log('Log stream connected successfully');
-                };
+                eventSource.onopen = function(event) {};
             }
 
             // Initialize connection

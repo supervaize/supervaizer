@@ -15,6 +15,7 @@ from rich.console import Console
 from supervaizer import (
     Agent,
     AgentMethod,
+    AgentMethodField,
     AgentMethods,
     Parameter,
     ParametersSetup,
@@ -64,63 +65,63 @@ job_start_method: AgentMethod = AgentMethod(
     is_async=False,  # Only use sync methods for the moment
     params={"action": "start"},  # If default parameters must be passed to the function.
     fields=[
-        {
-            "name": "Company to research",  # Field name - displayed in the UI
-            "type": str,  # Python type of the field for pydantic validation - note , ChoiceField and MultipleChoiceField are a list[str]
-            "field_type": "CharField",  # Field type for persistence.
-            "description": "Company to research",  # Optional -  Description of the field - displayed in the UI
-            "default": "Google",  # Optional - Default value for the field
-            "required": True,  # Whether the field is required
-        },
-        {
-            "name": "Max number of results",
-            "type": int,
-            "field_type": "IntegerField",
-            "required": True,
-        },
-        {
-            "name": "Subscribe to updates",
-            "type": bool,
-            "field_type": "BooleanField",
-            "required": False,
-        },
-        {
-            "name": "Type of research",
-            "type": str,
-            "field_type": "ChoiceField",
-            "choices": [["A", "Advanced"], ["R", "Restricted"]],
-            "widget": "RadioSelect",
-            "required": True,
-        },
-        {
-            "name": "Details of research",
-            "type": str,
-            "field_type": "CharField",
-            "widget": "Textarea",
-            "required": False,
-        },
-        {
-            "name": "List of countries",
-            "type": list[str],
-            "field_type": "MultipleChoiceField",
-            "choices": [
-                ["PA", "Panama"],
-                ["PG", "Papua New Guinea"],
-                ["PY", "Paraguay"],
-                ["PE", "Peru"],
-                ["PH", "Philippines"],
-                ["PN", "Pitcairn"],
-                ["PL", "Poland"],
+        AgentMethodField(
+            name="Company to research",
+            type=str,
+            field_type="CharField",
+            description="Company to research",
+            default="Google",
+            required=True,
+        ),
+        AgentMethodField(
+            name="Max number of results",
+            type=int,
+            field_type="IntegerField",
+            required=True,
+        ),
+        AgentMethodField(
+            name="Subscribe to updates",
+            type=bool,
+            field_type="BooleanField",
+            required=False,
+        ),
+        AgentMethodField(
+            name="Type of research",
+            type=str,
+            field_type="ChoiceField",
+            choices=[("A", "Advanced"), ("R", "Restricted")],
+            widget="RadioSelect",
+            required=True,
+        ),
+        AgentMethodField(
+            name="Details of research",
+            type=str,
+            field_type="CharField",
+            widget="Textarea",
+            required=False,
+        ),
+        AgentMethodField(
+            name="List of countries",
+            type=list[str],
+            field_type="MultipleChoiceField",
+            choices=[
+                ("PA", "Panama"),
+                ("PG", "Papua New Guinea"),
+                ("PY", "Paraguay"),
+                ("PE", "Peru"),
+                ("PH", "Philippines"),
+                ("PN", "Pitcairn"),
+                ("PL", "Poland"),
             ],
-            "required": True,
-        },
-        {
-            "name": "languages",
-            "type": list[str],
-            "field_type": "MultipleChoiceField",
-            "choices": [["en", "English"], ["fr", "French"], ["es", "Spanish"]],
-            "required": False,
-        },
+            required=True,
+        ),
+        AgentMethodField(
+            name="languages",
+            type=list[str],
+            field_type="MultipleChoiceField",
+            choices=[("en", "English"), ("fr", "French"), ("es", "Spanish")],
+            required=False,
+        ),
     ],
     description="Start the collection of new competitor summary",
 )

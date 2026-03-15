@@ -13,47 +13,34 @@ from typing import Any, Dict, List
 import shortuuid
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.responses import Response
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from starlette.responses import Response
 
 from supervaizer.__version__ import API_VERSION
 from supervaizer.agent import Agent
-from supervaizer.case import CaseNodeUpdate
+from supervaizer.case import Cases, CaseNodeUpdate
 from supervaizer.common import log
-from supervaizer.job import Job, JobContext, JobResponse
+from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-# Module-level log buffer — avoids race conditions with SSE consumer
+# Shared log buffer — populated via log listener registered in routes.py
 _workbench_log_buffer: list[dict[str, str]] = []
 _WORKBENCH_LOG_BUFFER_MAX = 500
-_patch_applied = False
 
 
-def _apply_log_patch() -> None:
-    global _patch_applied
-    if _patch_applied:
-        return
-    from supervaizer.admin import routes as _admin_routes
-
-    _original_add_log = _admin_routes.add_log_to_queue
-
-    def _patched_add_log(timestamp: str, level: str, message: str) -> None:
-        _original_add_log(timestamp, level, message)
-        _workbench_log_buffer.append({
-            "timestamp": timestamp,
-            "level": level,
-            "message": message,
-        })
-        if len(_workbench_log_buffer) > _WORKBENCH_LOG_BUFFER_MAX:
-            del _workbench_log_buffer[
-                : len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX
-            ]
-
-    _admin_routes.add_log_to_queue = _patched_add_log
-    _patch_applied = True
+def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
+    """Log listener callback — appends to workbench buffer."""
+    _workbench_log_buffer.append({
+        "timestamp": timestamp,
+        "level": level,
+        "message": message,
+    })
+    if len(_workbench_log_buffer) > _WORKBENCH_LOG_BUFFER_MAX:
+        del _workbench_log_buffer[
+            : len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX
+        ]
 
 
 def _get_workbench_api_key(request: Request) -> str:
@@ -81,11 +68,7 @@ def get_agent_by_slug(request: Request, slug: str) -> Agent:
 
 def get_job_cases(job: Job) -> List[Any]:
     """Get all cases for a job from the Cases singleton."""
-    from supervaizer.case import Cases
-
-    cases_registry = Cases()
-    job_cases = cases_registry.get_job_cases(job.id)  # returns dict[str, Case]
-    return list(job_cases.values())
+    return list(Cases().get_job_cases(job.id).values())
 
 
 def get_agent_parameters_from_env(agent: Agent) -> Dict[str, str]:
@@ -137,18 +120,11 @@ def _normalize_hitl_form(form_data: dict) -> dict:
     return result
 
 
-class WorkbenchStartRequest(BaseModel):
-    parameters: Dict[str, str] = {}
-    fields: Dict[str, Any] = {}
-
-
-class WorkbenchAnswerRequest(BaseModel):
-    answer: Dict[str, Any] = {}
-
-
 def create_workbench_routes() -> APIRouter:
     """Create workbench sub-router."""
-    _apply_log_patch()
+    from supervaizer.admin.routes import register_log_listener
+
+    register_log_listener(workbench_log_listener)
 
     router = APIRouter(tags=["workbench"])
 
@@ -186,13 +162,10 @@ def create_workbench_routes() -> APIRouter:
                 })
 
         # Check for active job
-        from supervaizer.job import Jobs
-
-        jobs_registry = Jobs()
         active_job = None
-        agent_jobs = jobs_registry.get_agent_jobs(agent.name)  # returns dict[str, Job]
+        agent_jobs = Jobs().get_agent_jobs(agent.name)
         for job in agent_jobs.values():
-            if hasattr(job, "status") and job.status == EntityStatus.IN_PROGRESS:
+            if job.status == EntityStatus.IN_PROGRESS:
                 active_job = job
                 break
 
@@ -316,13 +289,7 @@ def create_workbench_routes() -> APIRouter:
         """HTMX partial — returns execution monitor HTML for polling."""
         agent = get_agent_by_slug(request, slug)
 
-        from supervaizer.job import Jobs
-
-        jobs_registry = Jobs()
-        job = jobs_registry.get_job(job_id, agent_name=agent.name)
-
-        if job and job.agent_name != agent.name:
-            job = None  # Don't leak cross-agent data
+        job = Jobs().get_job(job_id, agent_name=agent.name)
 
         if not job:
             return HTMLResponse(
@@ -338,7 +305,7 @@ def create_workbench_routes() -> APIRouter:
                 "case": case,
                 "hitl_form": None,
             }
-            if hasattr(case, "status") and case.status == EntityStatus.AWAITING:
+            if case.status == EntityStatus.AWAITING:
                 # Find the HITL update in case.updates
                 for update in reversed(case.updates):
                     if hasattr(update, "payload") and update.payload:
@@ -374,10 +341,7 @@ def create_workbench_routes() -> APIRouter:
         job_stop_method = agent.methods.job_stop.method
 
         # Update job status in registry so the running loop can detect it
-        from supervaizer.job import Jobs
-
-        jobs_registry = Jobs()
-        job = jobs_registry.get_job(job_id, agent_name=agent.name)
+        job = Jobs().get_job(job_id, agent_name=agent.name)
         if job:
             job.add_response(
                 JobResponse(
@@ -406,21 +370,12 @@ def create_workbench_routes() -> APIRouter:
 
         if not agent.methods or not agent.methods.job_status:
             # Fall back to reading job state directly
-            from supervaizer.job import Jobs
-
-            jobs_registry = Jobs()
-            job = jobs_registry.get_job(job_id, agent_name=agent.name)
-
-            if job and job.agent_name != agent.name:
-                job = None  # Don't leak cross-agent data
-
+            job = Jobs().get_job(job_id, agent_name=agent.name)
             if not job:
                 raise HTTPException(status_code=404, detail="Job not found")
             return JSONResponse({
                 "job_id": job.id,
-                "status": job.status.value
-                if hasattr(job.status, "value")
-                else str(job.status),
+                "status": job.status.value,
             })
 
         job_status_method = agent.methods.job_status.method
@@ -448,10 +403,7 @@ def create_workbench_routes() -> APIRouter:
         answer_data = body.get("answer", {})
 
         # Find the case
-        from supervaizer.case import Cases
-
-        cases_registry = Cases()
-        case = cases_registry.get_case(case_id, job_id=job_id)
+        case = Cases().get_case(case_id, job_id=job_id)
 
         if not case:
             raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
@@ -520,11 +472,7 @@ def create_workbench_routes() -> APIRouter:
     async def workbench_jobs_list(request: Request, slug: str) -> Response:
         """HTMX partial — returns job history list."""
         agent = get_agent_by_slug(request, slug)
-
-        from supervaizer.job import Jobs
-
-        jobs_registry = Jobs()
-        agent_jobs = jobs_registry.get_agent_jobs(agent.name)
+        agent_jobs = Jobs().get_agent_jobs(agent.name)
 
         # Sort by created_at descending (most recent first)
         jobs_list = sorted(

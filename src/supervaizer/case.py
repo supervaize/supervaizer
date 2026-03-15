@@ -132,8 +132,11 @@ class CaseNode(SvBaseModel):
     description: str
     type: CaseNoteType
 
-    class Config:
-        arbitrary_types_allowed = True
+    def __call__(self, *args: Any, **kwargs: Any) -> CaseNodeUpdate:
+        """Make it callable directly."""
+        if self.factory is None:
+            raise ValueError("CaseNode factory is not set")
+        return self.factory(*args, **kwargs)
 
     @property
     def registration_info(self) -> Dict[str, Any]:

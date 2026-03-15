@@ -158,6 +158,7 @@ class TestAdminAuthentication:
     ) -> None:
         """Test admin access verification with API key in header."""
         mock_request = Mock()
+        mock_request.app.state.server = None  # no live server
 
         # Mock environment variable
         mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "test-key"})
@@ -171,6 +172,7 @@ class TestAdminAuthentication:
     ) -> None:
         """Test admin access verification with API key in query parameter."""
         mock_request = Mock()
+        mock_request.app.state.server = None  # no live server
 
         # Mock environment variable
         mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "test-key"})
@@ -179,17 +181,19 @@ class TestAdminAuthentication:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_verify_admin_access_default_key(
+    async def test_verify_admin_access_denied_no_key(
         self, mocker: "MockerFixture"
     ) -> None:
-        """Test admin access with default key when no env var set."""
+        """Test admin access denied when no key configured and not local mode."""
         mock_request = Mock()
+        mock_request.app.state.server = None  # no live server
 
         # Remove environment variable
         mocker.patch.dict("os.environ", {}, clear=True)
 
-        result = await verify_admin_access(mock_request, api_key="admin-secret-key-123")
-        assert result is True
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_admin_access(mock_request, api_key="any-key")
+        assert exc_info.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_verify_admin_access_invalid_key(

@@ -7,7 +7,9 @@
 
 from pydantic import Field
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
+
+from pydantic import ConfigDict
 
 from supervaizer.common import SvBaseModel, log
 
@@ -45,16 +47,19 @@ class ParameterAbstract(SvBaseModel):
         description="Whether the parameter is required, used in the Supervaize UI",
     )
 
-    model_config = {
-        "reference_group": "Core",
-        "example_dict": {
-            "name": "OPEN_API_KEY",
-            "description": "OpenAPI Key",
-            "is_environment": True,
-            "is_secret": True,
-            "is_required": True,
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "example_dict": {
+                "name": "OPEN_API_KEY",
+                "description": "OpenAPI Key",
+                "is_environment": True,
+                "is_secret": True,
+                "is_required": True,
+            },
         },
-    }
+    )
 
 
 class Parameter(ParameterAbstract):
@@ -110,9 +115,7 @@ class ParametersSetup(SvBaseModel):
         description="A dictionary of Parameters, where the key is the parameter name and the value is the parameter object.",
     )
 
-    model_config = {
-        "reference_group": "Core",
-    }
+    model_config = cast(ConfigDict, {"reference_group": "Core"})
 
     @classmethod
     def from_list(

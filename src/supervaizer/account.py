@@ -5,10 +5,10 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union, cast
 
 import httpx
-from pydantic import Field
+from pydantic import ConfigDict, Field, field_validator
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
@@ -54,18 +54,29 @@ class AccountAbstract(SvBaseModel):
         description="The URL of the Supervaize SaaS API provided by Supervaize.com"
     )
 
-    model_config = {
-        "reference_group": "Core",
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "workspace_id": "ws_1234567890abcdef",
-                    "api_key": "sk_1234567890abcdef",
-                    "api_url": "https://api.supervaize.com",
-                }
-            ]
+    @field_validator("workspace_id", "api_key", "api_url", mode="before")
+    @classmethod
+    def strip_whitespace(cls, v: Any) -> Any:
+        """Strip leading/trailing whitespace (e.g. newlines from env vars)."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "json_schema_extra": {
+                "examples": [
+                    {
+                        "workspace_id": "ws_1234567890abcdef",
+                        "api_key": "sk_1234567890abcdef",
+                        "api_url": "https://app.supervaize.com",
+                    }
+                ]
+            },
         },
-    }
+    )
 
 
 class Account(AccountAbstract):
