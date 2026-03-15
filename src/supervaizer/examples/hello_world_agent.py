@@ -12,11 +12,12 @@ Provides job_start, job_stop, job_status that work without Case/Account.
 
 import random
 import time
+from typing import Any
 
 import shortuuid
 
 from supervaizer.account import Account
-from supervaizer.case import Case, CaseNodeUpdate, Cases
+from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.common import ApiSuccess, log
 from supervaizer.job import JobInstructions, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
@@ -29,7 +30,7 @@ HITL_POLL_INTERVAL = 1.0  # seconds between polls while waiting for human input
 class _LocalAccount(Account):
     """No-op account for local mode — skips all Studio HTTP calls."""
 
-    def send_event(self, sender, event):
+    def send_event(self, sender: Any, event: Any) -> ApiSuccess:
         return ApiSuccess(message="local-noop", detail=None)
 
 
@@ -46,16 +47,23 @@ def _job_id_from_params(params: dict) -> str:
         return "local-job"
     if hasattr(context, "job_id"):
         return getattr(context, "job_id", "local-job")
-    return context.get("job_id", "local-job") if isinstance(context, dict) else "local-job"
+    return (
+        context.get("job_id", "local-job") if isinstance(context, dict) else "local-job"
+    )
 
 
-def job_start(**kwargs) -> JobResponse:
+def job_start(**kwargs: Any) -> JobResponse:
     """Run a multi-case greeting job with simulated step durations."""
     job_id = _job_id_from_params(kwargs)
     fields = kwargs.get("fields") or {}
     n = int(fields.get("How many times to say hello", 1))
     n = max(0, min(n, 100))
-    enable_hitl = str(fields.get("Enable human review", False)).lower() in ("true", "on", "1", "yes")
+    enable_hitl = str(fields.get("Enable human review", False)).lower() in (
+        "true",
+        "on",
+        "1",
+        "yes",
+    )
     steps = STEPS_WITH_HITL if enable_hitl else STEPS_WITHOUT_HITL
 
     log.info(f"Starting job with {n} cases (HITL: {enable_hitl})")
@@ -67,13 +75,18 @@ def job_start(**kwargs) -> JobResponse:
     def _is_job_stopped() -> bool:
         """Check if the job was stopped externally."""
         job = Jobs().get_job(job_id)
-        return job is not None and job.status in (EntityStatus.STOPPED, EntityStatus.CANCELLED)
+        return job is not None and job.status in (
+            EntityStatus.STOPPED,
+            EntityStatus.CANCELLED,
+        )
 
     for case_idx in range(1, n + 1):
         # Check job instructions before each case
         can_continue, explanation = job_instructions.check(cases=cases_done, cost=0)
         if not can_continue or _is_job_stopped():
-            log.info(f"Job stopped before case {case_idx}: {explanation or 'stopped by user'}")
+            log.info(
+                f"Job stopped before case {case_idx}: {explanation or 'stopped by user'}"
+            )
             stopped = True
             break
 
@@ -150,10 +163,12 @@ def job_start(**kwargs) -> JobResponse:
                 time.sleep(duration)
                 msg = f"The step {step_idx} ({step_name}) in case {case_idx} lasted {duration} s"
                 log.info(msg)
-                case.update(CaseNodeUpdate(
-                    name=step_name,
-                    payload={"message": msg, "duration": duration},
-                ))
+                case.update(
+                    CaseNodeUpdate(
+                        name=step_name,
+                        payload={"message": msg, "duration": duration},
+                    )
+                )
 
         if case_interrupted:
             log.info(f"Case {case_idx} interrupted")
@@ -179,7 +194,7 @@ def job_start(**kwargs) -> JobResponse:
     )
 
 
-def human_answer(**kwargs) -> JobResponse:
+def human_answer(**kwargs: Any) -> JobResponse:
     """Handle HITL answer submission."""
     job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
     case_id = kwargs.get("case_id", "")
@@ -193,7 +208,7 @@ def human_answer(**kwargs) -> JobResponse:
     )
 
 
-def job_stop(**kwargs) -> JobResponse:
+def job_stop(**kwargs: Any) -> JobResponse:
     """Stop handler for local Hello World agent."""
     job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
     log.info(f"Job stopped: {job_id}")
@@ -204,7 +219,7 @@ def job_stop(**kwargs) -> JobResponse:
     )
 
 
-def job_status(**kwargs) -> JobResponse:
+def job_status(**kwargs: Any) -> JobResponse:
     """Status handler for local Hello World agent."""
     job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
     log.info(f"Job status: {job_id}")

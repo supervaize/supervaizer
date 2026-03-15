@@ -162,8 +162,12 @@ def start(
         os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
     if local:
-        console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)")
-        console.print("[dim]No Studio registration — built-in Hello World agent only[/]")
+        console.print(
+            f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)"
+        )
+        console.print(
+            "[dim]No Studio registration — built-in Hello World agent only[/]"
+        )
         from supervaizer.examples.local_server import create_local_server
 
         server = create_local_server(
@@ -175,8 +179,12 @@ def start(
             environment=environment,
         )
         base = server.public_url or f"http://{server.host}:{server.port}"
-        console.print(f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/")
-        console.print("[dim]API key for /admin: local-dev (set SUPERVAIZER_API_KEY to override)[/]")
+        console.print(
+            f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/"
+        )
+        console.print(
+            "[dim]API key for /admin: local-dev (set SUPERVAIZER_API_KEY to override)[/]"
+        )
         server.launch(log_level=log_level)
         return
 
