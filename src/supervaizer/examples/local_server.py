@@ -56,7 +56,14 @@ def get_default_local_agent() -> Agent:
                 field_type="IntegerField",
                 required=True,
                 default=3,
-            )
+            ),
+            AgentMethodField(
+                name="Enable human review",
+                type=bool,
+                field_type="BooleanField",
+                required=False,
+                default=False,
+            ),
         ],
         description="Say hello N times (local test)",
     )
@@ -74,6 +81,13 @@ def get_default_local_agent() -> Agent:
         params={"action": "status"},
         description="Get the status of the agent",
     )
+    human_answer_method = AgentMethod(
+        name="human_answer",
+        method=f"{module}.human_answer",
+        is_async=False,
+        params={"action": "human_answer"},
+        description="Handle human-in-the-loop answers",
+    )
 
     return Agent(
         name=agent_name,
@@ -86,6 +100,7 @@ def get_default_local_agent() -> Agent:
             job_start=job_start_method,
             job_stop=job_stop_method,
             job_status=job_status_method,
+            human_answer=human_answer_method,
         ),
         parameters_setup=parameters,
     )
