@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 import asyncio
 import json
 import os
@@ -39,6 +33,16 @@ from supervaizer.storage import (
 # Global log queue for streaming
 log_queue: asyncio.Queue[Dict[str, str]] = asyncio.Queue()
 
+# Log listeners — callables notified on every log entry
+_log_listeners: List[Any] = []
+
+
+def register_log_listener(listener: Any) -> None:
+    """Register a callback(timestamp, level, message) to receive log entries."""
+    if listener not in _log_listeners:
+        _log_listeners.append(listener)
+
+
 # Server start time for uptime calculation
 # This will be set when the server actually starts
 SERVER_START_TIME = time.time()
@@ -54,16 +58,14 @@ def set_server_start_time(start_time: float) -> None:
 
 
 def add_log_to_queue(timestamp: str, level: str, message: str) -> None:
-    """Add a log message to the streaming queue."""
+    """Add a log message to the streaming queue and notify listeners."""
+    log_data = {"timestamp": timestamp, "level": level, "message": message}
     try:
-        log_data = {"timestamp": timestamp, "level": level, "message": message}
-        # Non-blocking put - if queue is full, skip the message
-        try:
-            log_queue.put_nowait(log_data)
-        except asyncio.QueueFull:
-            pass  # Skip if queue is full
-    except Exception:
-        pass  # Silently ignore errors to avoid breaking logging
+        log_queue.put_nowait(log_data)
+    except asyncio.QueueFull:
+        pass  # Skip if queue is full
+    for listener in _log_listeners:
+        listener(timestamp, level, message)
 
 
 # Initialize templates
@@ -145,15 +147,16 @@ async def verify_admin_access(
     key: Optional[str] = Query(None),
 ) -> bool:
     """Verify admin access via API key in header or query parameter."""
-    expected_key = _get_admin_api_key(request) or "admin-secret-key-123"
+    expected_key = _get_admin_api_key(request)
 
-    if api_key and api_key == expected_key:
-        return True
-    if key and key == expected_key:
-        return True
+    if expected_key:
+        if api_key and api_key == expected_key:
+            return True
+        if key and key == expected_key:
+            return True
 
-    # In local mode, allow GET requests without a key so direct URLs (e.g. workbench) work
-    if _is_local_mode(request) and request.method == "GET":
+    # In local mode, allow requests without a key so direct URLs (e.g. workbench) work
+    if _is_local_mode(request):
         return True
 
     raise HTTPException(
@@ -265,6 +268,8 @@ def get_server_configuration(
 def create_admin_routes() -> APIRouter:
     """Create and configure admin routes."""
     router = APIRouter(tags=["admin"])
+
+    _static_dir = Path(__file__).parent / "static"
 
     # Initialize storage manager
     storage = StorageManager()
@@ -390,27 +395,24 @@ def create_admin_routes() -> APIRouter:
             },
         )
 
-    @router.get("/static/js/job-start-form.js")
-    async def serve_job_start_form_js() -> Response:
-        """Serve the JobStartForm JavaScript file."""
-        js_file_path = Path(__file__).parent / "static" / "js" / "job-start-form.js"
-        if js_file_path.exists():
-            with open(js_file_path, "r") as f:
-                content = f.read()
-            return Response(content=content, media_type="application/javascript")
-        else:
-            raise HTTPException(status_code=404, detail="JavaScript file not found")
-
-    @router.get("/static/js/workbench-form.js")
-    async def serve_workbench_form_js() -> Response:
-        """Serve the WorkbenchForm JavaScript file."""
-        js_file_path = Path(__file__).parent / "static" / "js" / "workbench-form.js"
-        if js_file_path.exists():
-            with open(js_file_path, "r") as f:
-                content = f.read()
-            return Response(content=content, media_type="application/javascript")
-        else:
-            raise HTTPException(status_code=404, detail="JavaScript file not found")
+    @router.get("/static/{file_path:path}")
+    async def serve_static(file_path: str) -> Response:
+        """Serve static files from the admin static directory."""
+        full_path = _static_dir / file_path
+        if not full_path.is_file() or not full_path.resolve().is_relative_to(
+            _static_dir.resolve()
+        ):
+            raise HTTPException(status_code=404, detail="File not found")
+        suffix = full_path.suffix.lower()
+        media_types = {
+            ".js": "application/javascript",
+            ".css": "text/css",
+            ".html": "text/html",
+        }
+        return Response(
+            content=full_path.read_bytes(),
+            media_type=media_types.get(suffix, "application/octet-stream"),
+        )
 
 
     @router.get("/console", response_class=HTMLResponse)

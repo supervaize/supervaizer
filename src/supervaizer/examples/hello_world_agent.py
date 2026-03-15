@@ -46,10 +46,10 @@ def _job_id_from_params(params: dict) -> str:
     if context is None:
         return "local-job"
     if hasattr(context, "job_id"):
-        return getattr(context, "job_id", "local-job")
-    return (
-        context.get("job_id", "local-job") if isinstance(context, dict) else "local-job"
-    )
+        return context.job_id
+    if isinstance(context, dict):
+        return context.get("job_id", "local-job")
+    return "local-job"
 
 
 def job_start(**kwargs: Any) -> JobResponse:

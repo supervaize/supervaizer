@@ -23,7 +23,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
@@ -131,7 +131,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         server_info = ServerInfo(
             id=getattr(server_instance, "server_id", "N/A"),
             host=getattr(server_instance, "host", "N/A"),
-            port=getattr(server_instance, "port", "N/A"),
+            port=getattr(server_instance, "port", 0),
             api_version=API_VERSION,
             environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
             agents=agents,
@@ -257,29 +257,32 @@ class ServerAbstract(SvBaseModel):
         default=None, description="API key header for authentication"
     )
 
-    model_config = {
-        "reference_group": "Core",
-        "arbitrary_types_allowed": True,  # for FastAPI
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "agents": "[agent]",
-                    "a2a_enabled": True,
-                    "supervisor_account": None,
-                },
-                {
-                    "scheme": "http",
-                    "host": "0.0.0.0",
-                    "port": 8000,
-                    "environment": "dev",
-                    "mac_addr": "00-11-22-33-44-55",
-                    "debug": False,
-                    "reload": False,
-                    "a2a_endpoints": True,
-                },
-            ]
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "arbitrary_types_allowed": True,  # for FastAPI
+            "json_schema_extra": {
+                "examples": [
+                    {
+                        "agents": "[agent]",
+                        "a2a_enabled": True,
+                        "supervisor_account": None,
+                    },
+                    {
+                        "scheme": "http",
+                        "host": "0.0.0.0",
+                        "port": 8000,
+                        "environment": "dev",
+                        "mac_addr": "00-11-22-33-44-55",
+                        "debug": False,
+                        "reload": False,
+                        "a2a_endpoints": True,
+                    },
+                ]
+            },
         },
-    }
+    )
 
     @field_validator("scheme")
     def scheme_validator(cls, v: str) -> str:

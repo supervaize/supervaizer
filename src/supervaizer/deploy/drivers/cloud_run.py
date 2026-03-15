@@ -523,8 +523,8 @@ class CloudRunDriver(BaseDriver):
         try:
             service = self.run_client.get_service(name=service_path)
 
-            # Update environment variables
-            env_vars = []
+            # Update environment variables (list accepts dicts for API update)
+            env_vars: List[Any] = []
             for env_var in service.template.containers[0].env:
                 if env_var.name != "SUPERVAIZER_PUBLIC_URL":
                     env_vars.append(env_var)

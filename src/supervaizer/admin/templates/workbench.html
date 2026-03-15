@@ -66,7 +66,7 @@
             x-cloak
         >
             {% if parameters %}
-            <div class="px-6 py-5">
+            <div class="px-6 py-5" id="parameters-form">
                 <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Agent Parameters</h3>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {% for param in parameters %}
@@ -287,7 +287,7 @@
         </div>
     </div>
 
-    {# ── Zone 4: Console Log (bottom panel) ────────────────────────── #}
+    {# ── Zone 5: Console Log (bottom panel) ────────────────────────── #}
     <div
         class="bg-white shadow rounded-lg"
         x-data="{
@@ -427,8 +427,6 @@
                         monitorUrl: '/admin/agents/{{ agent_slug }}/workbench/jobs/',
                         errorsContainerId: 'workbench-errors',
                         getApiKey: () => sessionStorage.getItem('admin_api_key') || document.body.dataset.adminKey || '{{ api_key }}',
-                        getParams: () => this._collectParams(),
-                        getFields: () => this._collectFields(),
                     });
                     {% if active_job %}
                     // Resume tracking an active job from page load
@@ -443,33 +441,6 @@
                 try { localStorage.setItem(key, value); } catch(e) {}
             },
 
-            _collectParams() {
-                var params = {};
-                {% for param in parameters %}
-                (function() {
-                    var el = document.getElementById('param_{{ param.name }}');
-                    if (el) params['{{ param.name }}'] = el.value;
-                })();
-                {% endfor %}
-                return params;
-            },
-
-            _collectFields() {
-                var fields = {};
-                {% for field in job_fields %}
-                (function() {
-                    var el = document.getElementById('field_{{ field.name }}');
-                    if (el) {
-                        if (el.type === 'checkbox') {
-                            fields['{{ field.name }}'] = el.checked;
-                        } else {
-                            fields['{{ field.name }}'] = el.value;
-                        }
-                    }
-                })();
-                {% endfor %}
-                return fields;
-            },
         };
     }
 </script>

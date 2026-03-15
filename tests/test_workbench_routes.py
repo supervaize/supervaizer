@@ -60,6 +60,8 @@ def test_client_with_agent(monkeypatch):
     # Create a mock server
     server = Mock()
     server.agents = [agent]
+    server.api_key = "test-api-key"
+    server.supervisor_account = "mock-account"  # non-None = not local mode
 
     # Mock StorageManager used inside admin routes
     mock_storage = Mock()
