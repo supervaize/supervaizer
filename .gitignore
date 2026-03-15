@@ -243,6 +243,7 @@ pyrightconfig.json
 sys.stderr
 uv.lock
 .cursorrules
+.cursor/hooks/state/
 .devaigents/documenter.md
 /.devaigents
 
