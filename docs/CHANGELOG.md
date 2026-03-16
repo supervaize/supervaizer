@@ -19,6 +19,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Agent Workbench** — Full-featured testing interface for agents directly from the admin panel. Four-zone layout with agent parameters, job control, execution monitor, and live console log. Supports starting/stopping jobs, real-time case and step tracking via HTMX polling, and Human-in-the-Loop (HITL) form rendering and submission. Job history panel lists all past executions with status badges.
+  - Backend: `workbench_routes.py` with 8 FastAPI endpoints (page, start, stop, status, monitor, console, HITL answer, job history)
+  - Frontend: `workbench.html`, `workbench_monitor.html`, `workbench_console.html`, `workbench_jobs_list.html`, `workbench-form.js`
+  - Shared field renderer macros: `field_renderer.html`
+
+- **Local test mode (`--local`)** — Run the supervaizer server without Supervaize Studio credentials for local development and workbench testing. Includes built-in Hello World agent with configurable case count, optional HITL steps, and `JobInstructions.check()` support for graceful stop. Default API key `local-dev`, amber banner in admin UI.
+  - CLI: `supervaizer start --local` / `just local`
+  - Agent: `examples/hello_world_agent.py` with `_LocalAccount` (no-op Studio stub)
+  - Server factory: `examples/local_server.py`
+
+### Changed
+
+- **Admin navigation** — Workbench access moved from nav dropdown to per-agent cards with direct green "Workbench" button. Removed "New Agent" button from agents list.
+- **Admin auth** — Refactored API key resolution to support local server instance (`_get_admin_api_key`, `_is_local_mode`), with fallback chain: server state → env var → default.
+
 ### Fixed
 
 - **CaseNode.factory now optional** — `CaseNode.factory` field changed from required to `Optional[Callable] = None`. Previously, `factory` was `exclude=True` (correctly omitted from serialization), but still required by Pydantic validation. This caused `AgentResponse(**agent.registration_info)` to fail with `Field required` errors on the `GET /supervaizer/agents` route, because the round-tripped dict never contained `factory`. Agents with CaseNode-based workflows were unable to register. ([#6](https://github.com/supervaize/supervaizer/issues/6))

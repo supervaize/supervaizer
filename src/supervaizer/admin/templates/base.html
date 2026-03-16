@@ -5,20 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Supervaizer Admin{% endblock %}</title>
 
+    <script>
+        // Suppress Tailwind CDN warning before Tailwind loads
+        (function() {
+            var w = typeof console !== 'undefined' && console.warn ? console.warn : function() {};
+            console.warn = function(msg) {
+                if (typeof msg === 'string' && msg.indexOf('cdn.tailwindcss.com should not be used') !== -1) return;
+                return w.apply(console, arguments);
+            };
+        })();
+    </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Suppress Tailwind CDN warning in development
-        if (typeof console !== 'undefined' && console.warn) {
-            const originalWarn = console.warn;
-            console.warn = function(...args) {
-                if (args[0] && args[0].includes && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
-                    return; // Suppress this specific warning
-                }
-                originalWarn.apply(console, args);
-            };
-        }
-    </script>
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -43,6 +41,11 @@
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen" data-admin-key="{{ (api_key or '')|e }}">
+    {% if local_mode %}
+    <div class="bg-amber-100 border-b border-amber-300 text-amber-900 text-center py-1.5 text-sm font-medium">
+        Local mode — no Studio registration. For testing only.
+    </div>
+    {% endif %}
     <!-- Navigation -->
     {% include "navigation.html" %}
 
@@ -138,21 +141,15 @@
 
         // Live Console - Server-Sent Events
         function initializeLogStream() {
-            console.log('initializeLogStream called, pathname:', window.location.pathname);
-
             // Skip if we're on the dedicated console page to avoid conflicts
             if (window.location.pathname.includes('/console')) {
-                console.log('Skipping live console on console page');
                 return;
             }
 
             const consoleComponent = document.querySelector('#live-console');
             if (!consoleComponent) {
-                console.error('Live console component not found');
                 return;
             }
-
-            console.log('Initializing live console log stream');
 
             let eventSource = null;
             let logCounter = 0;
@@ -168,7 +165,6 @@
 
                 eventSource.onmessage = function(event) {
                     try {
-                        console.log('Received log message:', event.data);
                         // Handle different event data formats
                         let logData;
                         if (event.data.startsWith('data: ')) {
@@ -192,8 +188,6 @@
                         if (alpineData.logs.length > 1000) {
                             alpineData.logs.shift();
                         }
-                        console.log('Added log entry, total logs:', alpineData.logs.length);
-
                         // Auto-scroll to bottom if expanded
                         if (alpineData.expanded) {
                             const consoleBody = document.getElementById('console-body');
@@ -204,12 +198,11 @@
                             }
                         }
                     } catch (error) {
-                        console.error('Error processing log message:', error, event.data);
+                        // Silently ignore malformed log messages
                     }
                 };
 
                 eventSource.onerror = function(event) {
-                    console.error('Log stream error:', event);
                     showToast('Log stream disconnected. Attempting to reconnect...', 'error');
 
                     // Attempt reconnection after 5 seconds
@@ -218,9 +211,7 @@
                     }, 5000);
                 };
 
-                eventSource.onopen = function(event) {
-                    console.log('Log stream connected successfully');
-                };
+                eventSource.onopen = function(event) {};
             }
 
             // Initialize connection

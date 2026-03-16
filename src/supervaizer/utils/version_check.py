@@ -5,14 +5,19 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+from typing import Any
+
 import httpx
 
+from supervaizer import __version__
+
+_version_module: Any = None
 try:
     from packaging import version
-except ImportError:
-    version = None
 
-from supervaizer import __version__
+    _version_module = version
+except ImportError:
+    pass
 
 
 async def get_latest_version() -> str | None:
@@ -48,8 +53,10 @@ async def check_is_latest_version() -> tuple[bool, str | None]:
         return True, None
 
     # Compare versions using packaging.version for proper semantic version comparison
-    if version is not None:
-        is_latest = version.parse(current_version) >= version.parse(latest_version)
+    if _version_module is not None:
+        is_latest = _version_module.parse(current_version) >= _version_module.parse(
+            latest_version
+        )
     else:
         # Fallback to simple string comparison if packaging is not available
         is_latest = current_version >= latest_version

@@ -17,11 +17,11 @@ dev-install:
 
 # Run pre-commit hooks manually
 precommit:
-    uv run pre-commit run --all-files --verbose
+    uv run python -m pre_commit run --all-files --verbose
 
 # Run pre-commit autoupdate (when pre-commit-config.yaml is updated)
 precommit-autoupdate:
-    uv run pre-commit autoupdate
+    uv run python -m pre_commit autoupdate
 
 # Run tests with coverage
 test-cov *args:
@@ -42,7 +42,7 @@ test-failed:
 
 # Run mypy type checking
 mypy:
-    uv run pre-commit run mypy --all-files
+    uv run python -m pre_commit run mypy --all-files
 
 # Sync dependencies (from pyproject.toml)
 env_sync:
@@ -83,7 +83,7 @@ install-hooks:
     # First unset any existing hooksPath
     @git config --unset-all core.hooksPath || true
     # Install pre-commit hooks
-    @uv run pre-commit install
+    @uv run python -m pre_commit install
     # Set up our custom hooks
     @git config core.hooksPath .githooks
     # Git hooks installed
@@ -91,6 +91,10 @@ install-hooks:
 # API documentation @http://127.0.0.1:8000/redoc
 unicorn:
     uvicorn controller:app --reload
+
+# Local test mode: no Studio credentials, built-in Hello World agent (for agent workbench)
+local:
+    uv run supervaizer start --local
 
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:

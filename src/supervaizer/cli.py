@@ -139,23 +139,17 @@ def start(
         "--persist/--no-persist",
         help="Persist data to file (default: off; set for self-hosted, off for Vercel/serverless)",
     ),
+    local: bool = typer.Option(
+        False,
+        "--local",
+        help="Local test mode: run without Studio credentials, with built-in Hello World agent (for agent workbench)",
+    ),
     script_path: Optional[str] = typer.Argument(
         None,
-        help="Path to the supervaizer_control.py script",
+        help="Path to the supervaizer_control.py script (ignored when --local)",
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
-    if script_path is None:
-        # Try to get from environment variable first, then default
-        script_path = (
-            os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
-        )
-
-    if not os.path.exists(script_path):
-        console.print(f"[bold red]Error:[/] {script_path} not found")
-        console.print("Run [bold]supervaizer scaffold[/] to create a default script")
-        sys.exit(1)
-
     # Set environment variables for the server configuration
     os.environ["SUPERVAIZER_HOST"] = host
     os.environ["SUPERVAIZER_PORT"] = str(port)
@@ -166,6 +160,43 @@ def start(
     os.environ["SUPERVAIZER_RELOAD"] = str(reload)
     if public_url is not None:
         os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
+
+    if local:
+        console.print(
+            f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)"
+        )
+        console.print(
+            "[dim]No Studio registration — built-in Hello World agent only[/]"
+        )
+        from supervaizer.examples.local_server import create_local_server
+
+        server = create_local_server(
+            host=host,
+            port=port,
+            public_url=public_url,
+            debug=debug,
+            reload=reload,
+            environment=environment,
+        )
+        base = server.public_url or f"http://{server.host}:{server.port}"
+        console.print(
+            f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/"
+        )
+        console.print(
+            "[dim]API key for /admin: local-dev (set SUPERVAIZER_API_KEY to override)[/]"
+        )
+        server.launch(log_level=log_level)
+        return
+
+    if script_path is None:
+        script_path = (
+            os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
+        )
+
+    if not os.path.exists(script_path):
+        console.print(f"[bold red]Error:[/] {script_path} not found")
+        console.print("Run [bold]supervaizer scaffold[/] to create a default script")
+        sys.exit(1)
 
     console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
     console.print(f"Loading configuration from [bold]{script_path}[/]")
