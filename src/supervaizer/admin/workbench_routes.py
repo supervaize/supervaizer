@@ -183,7 +183,7 @@ def create_workbench_routes() -> APIRouter:
                 "api_key": _get_workbench_api_key(request),
                 "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods
-                and agent.methods.human_answer is not None,
+                and getattr(agent.methods, "human_answer", None) is not None,
                 "agents": [
                     {"slug": a.slug, "name": a.name}
                     for a in request.app.state.server.agents
@@ -326,7 +326,7 @@ def create_workbench_routes() -> APIRouter:
                 "job": job,
                 "cases_data": cases_data,
                 "has_human_answer": agent.methods
-                and agent.methods.human_answer is not None,
+                and getattr(agent.methods, "human_answer", None) is not None,
             },
         )
 
@@ -419,8 +419,8 @@ def create_workbench_routes() -> APIRouter:
         case.receive_human_input(update)
 
         # Step 2: Invoke agent's human_answer method if defined
-        if agent.methods and agent.methods.human_answer:
-            human_answer_method = agent.methods.human_answer.method
+        if agent.methods and getattr(agent.methods, "human_answer", None):
+            human_answer_method = getattr(agent.methods, "human_answer", None).method
             try:
                 params = {
                     "fields": answer_data,

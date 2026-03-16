@@ -49,7 +49,11 @@ def test_client_with_agent(monkeypatch):
         name="Test Agent",
         version="1.0.0",
         description="A test agent",
-        methods=AgentMethods(job_start=agent_method),
+        methods=AgentMethods(
+            job_start=agent_method,
+            job_stop=AgentMethod(name="stop", method="test_module.stop"),
+            job_status=AgentMethod(name="status", method="test_module.status"),
+        ),
         parameters_setup=ParametersSetup.from_list([
             Parameter(
                 name="API_KEY", description="Test key", is_required=True, is_secret=True
