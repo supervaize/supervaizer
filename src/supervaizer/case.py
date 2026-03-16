@@ -7,7 +7,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 import shortuuid
 from pydantic import ConfigDict
@@ -133,6 +133,12 @@ class CaseNodeType(Enum):
 
 class CaseNode(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    name: str
+    type: CaseNodeType
+    factory: Optional[Callable[..., CaseNodeUpdate]] = None
+    description: str = ""
+    can_be_confirmed: bool = False
 
     def __call__(self, *args: Any, **kwargs: Any) -> CaseNodeUpdate:
         """Make it callable directly."""
