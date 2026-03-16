@@ -61,7 +61,9 @@ class WorkbenchForm {
         const elements = document.querySelectorAll(selector);
         elements.forEach(el => {
             const value = el.type === 'checkbox' ? el.checked : (el.value || '').toString().trim();
-            if (el.type === 'checkbox' ? !value : value === '') {
+            // Skip validation for env-set fields — backend will fill them
+            const envSet = el.dataset.envSet === 'true';
+            if (el.type === 'checkbox' ? !value : (value === '' && !envSet)) {
                 el.classList.add('border-red-500');
                 valid = false;
             } else {

@@ -71,16 +71,19 @@ def get_job_cases(job: Job) -> List[Any]:
     return list(Cases().get_job_cases(job.id).values())
 
 
-def get_agent_parameters_from_env(agent: Agent) -> Dict[str, str]:
-    """Pre-fill parameter values from environment variables."""
-    values = {}
+def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str]]:
+    """Pre-fill parameter values from environment variables.
+
+    Returns dict of {name: {"value": str, "from_env": bool}}.
+    """
+    values: Dict[str, Dict[str, str]] = {}
     if agent.parameters_setup:
         for name, param in agent.parameters_setup.definitions.items():
             env_val = os.environ.get(name, "")
             if env_val:
-                values[name] = env_val
+                values[name] = {"value": env_val, "from_env": True}
             elif param.value:
-                values[name] = param.value
+                values[name] = {"value": param.value, "from_env": False}
     return values
 
 
@@ -138,12 +141,14 @@ def create_workbench_routes() -> APIRouter:
         if agent.parameters_setup:
             env_values = get_agent_parameters_from_env(agent)
             for name, param in agent.parameters_setup.definitions.items():
+                env_info = env_values.get(name, {})
                 parameters.append({
                     "name": param.name,
                     "description": param.description,
                     "is_required": param.is_required,
                     "is_secret": param.is_secret,
-                    "value": env_values.get(name, ""),
+                    "value": env_info.get("value", ""),
+                    "from_env": env_info.get("from_env", False),
                 })
 
         job_fields = []
@@ -200,10 +205,16 @@ def create_workbench_routes() -> APIRouter:
         parameters = body.get("parameters", {})
         fields = body.get("fields", {})
 
-        # Set parameters via os.environ (matching agent convention)
+        # Set parameters via os.environ (matching agent convention).
+        # Fall back to env values for empty fields (local mode pre-fill).
         if agent.parameters_setup:
-            for name, value in parameters.items():
-                if name in agent.parameters_setup.definitions:
+            env_values = get_agent_parameters_from_env(agent)
+            for name in agent.parameters_setup.definitions:
+                value = parameters.get(name, "")
+                if not value:
+                    env_info = env_values.get(name, {})
+                    value = env_info.get("value", "")
+                if value:
                     agent.parameters_setup.definitions[name].set_value(value)
 
         # Create job context and job (Job.__init__ auto-registers in Jobs() singleton)
@@ -219,9 +230,23 @@ def create_workbench_routes() -> APIRouter:
         )
 
         # Build agent_parameters as list of dicts (matching AbstractJob.agent_parameters type)
+        # Merge submitted values with env fallbacks
+        merged_params = {}
+        if agent.parameters_setup:
+            for name in agent.parameters_setup.definitions:
+                value = parameters.get(name, "")
+                if not value:
+                    env_info = env_values.get(name, {})
+                    value = env_info.get("value", "")
+                if value:
+                    merged_params[name] = value
+        # Also include any extra params not in definitions
+        for k, v in parameters.items():
+            if v and k not in merged_params:
+                merged_params[k] = v
         agent_params_list = (
-            [{"name": k, "value": v} for k, v in parameters.items()]
-            if parameters
+            [{"name": k, "value": v} for k, v in merged_params.items()]
+            if merged_params
             else None
         )
 

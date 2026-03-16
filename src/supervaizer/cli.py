@@ -7,10 +7,7 @@
 import asyncio
 import os
 import shutil
-import signal
-import subprocess
 import sys
-from typing import Any
 from pathlib import Path
 from typing import Optional
 from supervaizer.deploy.cli import deploy_app
@@ -150,6 +147,22 @@ def start(
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
+    # In local mode, load .env file so agent parameters are available
+    if local:
+        env_file = os.path.join(os.getcwd(), ".env")
+        if os.path.isfile(env_file):
+            with open(env_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip()
+                    # Don't override already-set env vars
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+
     # Set environment variables for the server configuration
     os.environ["SUPERVAIZER_HOST"] = host
     os.environ["SUPERVAIZER_PORT"] = str(port)
@@ -163,12 +176,16 @@ def start(
 
     if local:
         os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        # In local mode, force public_url to localhost unless explicitly provided
+        if public_url is None:
+            public_url = f"http://{host}:{port}"
+            os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
         console.print(
             f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)"
         )
         console.print("[dim]No Studio registration — agents run locally[/]")
         api_key_display = os.environ.get("SUPERVAIZER_API_KEY") or "local-dev"
-        base = public_url or f"http://{host}:{port}"
+        base = public_url
         console.print(
             f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/"
         )
@@ -179,12 +196,11 @@ def start(
             os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
         )
 
+    use_fallback_server = False
     if not os.path.exists(script_path):
         if local:
-            # Use fallback script (Hello World only)
-            import supervaizer.examples.local_server as fallback_module
-
-            script_path = fallback_module.__file__
+            # Use fallback: launch a Server with Hello World agent directly
+            use_fallback_server = True
         else:
             console.print(f"[bold red]Error:[/] {script_path} not found")
             console.print(
@@ -194,22 +210,81 @@ def start(
 
     if not local:
         console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
+
+    if use_fallback_server:
+        # No control script found — create a minimal Server with Hello World agent
+        console.print(
+            "[dim]No control script found — using built-in Hello World agent[/]"
+        )
+        from supervaizer.server import Server as _Server
+
+        server_instance = _Server(
+            agents=[],
+            supervisor_account=None,
+            a2a_endpoints=True,
+            admin_interface=True,
+            host=host,
+            port=port,
+            public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
+            debug=debug,
+            reload=reload,
+            environment=environment,
+            api_key=None,
+        )
+        server_instance.launch(log_level=log_level)
+        return
+
     console.print(f"Loading configuration from [bold]{script_path}[/]")
 
-    # Execute the script in a new Python process with proper signal handling
+    # Import the control script as a module and auto-launch the Server if needed.
+    # This allows scripts that only *define* a Server (without an `if __name__`
+    # guard calling launch()) to still work via `supervaizer start`.
+    import importlib.util
 
-    def signal_handler(signum: int, frame: Any) -> None:
-        # Send the signal to the subprocess
-        if "process" in globals():
-            globals()["process"].terminate()
-        sys.exit(0)
+    spec = importlib.util.spec_from_file_location("supervaizer_control", script_path)
+    if spec is None or spec.loader is None:
+        console.print(f"[bold red]Error:[/] Could not load {script_path} as a module")
+        sys.exit(1)
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    module = importlib.util.module_from_spec(spec)
 
-    process = subprocess.Popen([sys.executable, script_path])
-    globals()["process"] = process
-    process.wait()
+    # Add the script's directory to sys.path so relative imports work
+    script_dir = os.path.dirname(os.path.abspath(script_path))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+
+    spec.loader.exec_module(module)
+
+    # Look for a Server instance that hasn't been launched yet.
+    # If the script already called launch() (via __main__ guard), uvicorn would
+    # be running and we'd never reach this point. So if we're here, we need to
+    # find the Server and call launch().
+    from supervaizer.server import Server as _Server
+
+    server_instance = None
+    for attr_name in dir(module):
+        obj = getattr(module, attr_name, None)
+        if isinstance(obj, _Server):
+            server_instance = obj
+            break
+
+    if server_instance is None:
+        console.print(
+            "[bold red]Error:[/] No Server instance found in the control script. "
+            "Define a variable of type supervaizer.Server in your script."
+        )
+        sys.exit(1)
+
+    # Override Server attributes with CLI values.
+    # Python default arguments (os.getenv in Server.__init__) are evaluated at
+    # class definition time, so if the module was already imported before the CLI
+    # set env vars, the Server instance has stale defaults.
+    server_instance.host = host
+    server_instance.port = port
+    if public_url is not None:
+        server_instance.public_url = public_url
+
+    server_instance.launch(log_level=log_level)
 
 
 def _create_instructions_file(
