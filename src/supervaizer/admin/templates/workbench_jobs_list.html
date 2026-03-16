@@ -1,0 +1,48 @@
+{% from "components/field_renderer.html" import status_badge %}
+{% if jobs %}
+<div class="divide-y divide-gray-100">
+    {% for job in jobs %}
+    {% set js = job.status.value %}
+    <button
+        type="button"
+        onclick="window.workbenchForm && (window.workbenchForm.activeJobId = '{{ job.id }}', window.workbenchForm.refreshMonitor())"
+        class="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors duration-150 cursor-pointer group"
+    >
+        <div class="flex items-center gap-3 min-w-0">
+            {# Status dot #}
+            {% if js == "completed" %}
+            <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+            {% elif js == "in_progress" %}
+            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0"></span>
+            {% elif js == "awaiting" %}
+            <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+            {% elif js == "failed" %}
+            <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+            {% elif js in ("stopped", "cancelled") %}
+            <span class="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0"></span>
+            {% else %}
+            <span class="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0"></span>
+            {% endif %}
+
+            <span class="text-xs font-mono text-gray-500 truncate group-hover:text-gray-700">{{ job.id }}</span>
+        </div>
+
+        <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+            {# Case count #}
+            {% if job.case_ids %}
+            <span class="text-xs text-gray-400">{{ job.case_ids|length }} case{{ "s" if job.case_ids|length != 1 }}</span>
+            {% endif %}
+
+            {{ status_badge(js) }}
+
+            {# Timestamp #}
+            {% if job.created_at %}
+            <span class="text-xs text-gray-400 font-mono hidden sm:inline">{{ job.created_at.strftime("%H:%M:%S") }}</span>
+            {% endif %}
+        </div>
+    </button>
+    {% endfor %}
+</div>
+{% else %}
+<div class="px-4 py-8 text-center text-sm text-gray-400 italic">No jobs yet.</div>
+{% endif %}

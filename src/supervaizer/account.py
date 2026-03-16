@@ -5,10 +5,10 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union, cast
 
 import httpx
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
@@ -63,18 +63,21 @@ class AccountAbstract(SvBaseModel):
             return v.strip()
         return v
 
-    model_config = {
-        "reference_group": "Core",
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "workspace_id": "ws_1234567890abcdef",
-                    "api_key": "sk_1234567890abcdef",
-                    "api_url": "https://app.supervaize.com",
-                }
-            ]
+    model_config = cast(
+        ConfigDict,
+        {
+            "reference_group": "Core",
+            "json_schema_extra": {
+                "examples": [
+                    {
+                        "workspace_id": "ws_1234567890abcdef",
+                        "api_key": "sk_1234567890abcdef",
+                        "api_url": "https://app.supervaize.com",
+                    }
+                ]
+            },
         },
-    }
+    )
 
 
 class Account(AccountAbstract):

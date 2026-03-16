@@ -14,7 +14,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from rich.console import Console
@@ -285,9 +285,9 @@ def _wait_for_service(url: str, timeout: int) -> bool:
     return False
 
 
-def _run_health_checks(url: str, api_key: Optional[str]) -> dict:
+def _run_health_checks(url: str, api_key: Optional[str]) -> dict[str, Any]:
     """Run comprehensive health checks."""
-    results = {}
+    results: dict[str, Any] = {}
 
     # Basic health check
     try:

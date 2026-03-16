@@ -136,16 +136,10 @@ class CaseNodeType(Enum):
 class CaseNode(SvBaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    name: str
-    type: CaseNodeType
-    factory: SkipJsonSchema[Optional[Callable[..., CaseNodeUpdate]]] = Field(
-        default=None, exclude=True, repr=False
-    )  # Exclude from JSON schema; optional so registration_info round-trips via AgentResponse
-    description: str | None = None
-    can_be_confirmed: bool = False  # Whether the user can decide that this node needs to be confirmed. This must be set in the job definition.
-
     def __call__(self, *args: Any, **kwargs: Any) -> CaseNodeUpdate:
         """Make it callable directly."""
+        if self.factory is None:
+            raise ValueError("CaseNode factory is not set")
         return self.factory(*args, **kwargs)
 
     @property
