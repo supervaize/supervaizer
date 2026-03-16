@@ -58,7 +58,18 @@ supervaizer start --debug --reload
 
 # Set log level
 supervaizer start --log-level=DEBUG
+
+# Run in local mode (no Studio registration)
+supervaizer start --local
 ```
+
+**Local mode (`--local`):**
+
+Starts the server without connecting to Studio. Your agents from `supervaizer_control.py` run alongside a built-in Hello World agent. If no `supervaizer_control.py` exists, only Hello World is loaded.
+
+- `SUPERVAIZER_LOCAL_MODE=true` is set automatically
+- API key defaults to `local-dev` (override with `SUPERVAIZER_API_KEY`)
+- Set `SUPERVAIZER_DISABLE_HELLO_WORLD=true` to deactivate the Hello World agent
 
 ### deploy
 
@@ -246,6 +257,8 @@ All CLI options can also be configured through environment variables:
 | SUPERVAIZER_FORCE_INSTALL | Force overwrite existing file    | false                         |
 | SUPERVAIZER_PRIVATE_KEY   | RSA private key (PEM string)     | generated at runtime if unset |
 | SUPERVAIZER_SERVER_ID     | Stable server instance ID (UUID) | generated at runtime if unset |
+| SUPERVAIZER_LOCAL_MODE    | Enable local mode (true/false)   | false                         |
+| SUPERVAIZER_DISABLE_HELLO_WORLD | Disable built-in Hello World agent in local mode | false |
 
 **Serverless (e.g. Vercel):** On serverless platforms, each instance may be a new process. Set `SUPERVAIZER_PRIVATE_KEY` and `SUPERVAIZER_SERVER_ID` in the platform's environment variables so the same key and ID are used across instances. Otherwise every cold start generates a new key and server ID.
 
