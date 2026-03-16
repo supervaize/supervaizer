@@ -10,7 +10,7 @@ import sys
 import time
 import uuid
 from datetime import datetime
-from typing import Any, ClassVar, Dict, List, Optional, TypeVar
+from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
 from urllib.parse import urlunparse
 
 from cryptography.hazmat.backends import default_backend
@@ -373,6 +373,9 @@ class Server(ServerAbstract):
         if self.acp_endpoints:
             log.info("[Server launch] 📢 Deploy ACP routes")
             self.app.include_router(create_acp_routes(self))
+
+        # Store server instance on app state for admin routes to access
+        self.app.state.server = self
 
         # Deploy admin routes if API key is available
         if self.api_key and admin_interface:
