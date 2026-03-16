@@ -4,22 +4,21 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-"""Local test server: no Studio registration, built-in Hello World agent.
+"""Local test server fallback: used by `supervaizer start --local` when no supervaizer_control.py exists.
 
-Use with `supervaizer start --local` to run the FastAPI server and agent workbench
-without Supervaize Studio credentials.
+Also exports get_default_local_agent() for Server to import when injecting Hello World.
 """
 
 import os
+
 import shortuuid
-from typing import Any, Optional
 
 from supervaizer import (
     Agent,
     AgentMethod,
     AgentMethods,
-    ParametersSetup,
     Parameter,
+    ParametersSetup,
     Server,
 )
 from supervaizer.agent import AgentMethodField
@@ -106,28 +105,22 @@ def get_default_local_agent() -> Agent:
     )
 
 
-def create_local_server(
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    public_url: Optional[str] = None,
-    debug: bool = False,
-    reload: bool = False,
-    environment: str = "dev",
-    api_key: Optional[str] = None,
-    **kwargs: Any,
-) -> Server:
-    """Create a Server with no supervisor_account and the default Hello World agent."""
-    return Server(
-        agents=[get_default_local_agent()],
+if __name__ == "__main__":
+    # Fallback entry point: starts a server with no user agents.
+    # Hello World is injected by Server.__init__ when SUPERVAIZER_LOCAL_MODE=true.
+    server = Server(
+        agents=[],
         supervisor_account=None,
         a2a_endpoints=True,
         admin_interface=True,
-        host=host or os.environ.get("SUPERVAIZER_HOST") or "0.0.0.0",
-        port=port or int(os.environ.get("SUPERVAIZER_PORT") or "8000"),
-        public_url=public_url or os.environ.get("SUPERVAIZER_PUBLIC_URL"),
-        debug=debug,
-        reload=reload,
-        environment=environment,
-        api_key=api_key or os.environ.get("SUPERVAIZER_API_KEY") or "local-dev",
-        **kwargs,
+        host=os.environ.get("SUPERVAIZER_HOST") or "0.0.0.0",
+        port=int(os.environ.get("SUPERVAIZER_PORT") or "8000"),
+        public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
+        debug=os.environ.get("SUPERVAIZER_DEBUG", "False").lower() == "true",
+        reload=os.environ.get("SUPERVAIZER_RELOAD", "False").lower() == "true",
+        environment=os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"),
+        # Pass None so Server.__init__ local-mode logic defaults to "local-dev"
+        api_key=None,
     )
+    log_level = os.environ.get("SUPERVAIZER_LOG_LEVEL", "INFO")
+    server.launch(log_level=log_level)

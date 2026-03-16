@@ -62,6 +62,32 @@ class TestCLIStart:
         assert result.exit_code == 1
         assert "Error: supervaizer_control.py not found" in result.stdout
 
+    def test_start_local_sets_env_and_runs_script(
+        self, runner: CliRunner, temp_script: str
+    ) -> None:
+        """--local sets SUPERVAIZER_LOCAL_MODE and runs the script normally."""
+        with patch("subprocess.Popen") as mock_popen:
+            mock_process = Mock()
+            mock_process.wait.return_value = 0
+            mock_popen.return_value = mock_process
+            result = runner.invoke(app, ["start", "--local", temp_script])
+            assert "local test mode" in result.stdout
+            mock_popen.assert_called_once()
+            assert os.environ.get("SUPERVAIZER_LOCAL_MODE") == "true"
+
+    def test_start_local_without_script_uses_fallback(self, runner: CliRunner) -> None:
+        """--local without script_path and no supervaizer_control.py uses fallback."""
+        with patch("subprocess.Popen") as mock_popen:
+            mock_process = Mock()
+            mock_process.wait.return_value = 0
+            mock_popen.return_value = mock_process
+            with patch("supervaizer.cli.os.path.exists", return_value=False):
+                result = runner.invoke(app, ["start", "--local"])
+                assert "local test mode" in result.stdout
+                mock_popen.assert_called_once()
+                call_args = mock_popen.call_args[0][0]
+                assert "local_server.py" in call_args[1]
+
 
 class TestCLIInstall:
     """Tests for the scaffold command."""
