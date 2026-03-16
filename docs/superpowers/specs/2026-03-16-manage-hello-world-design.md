@@ -49,6 +49,7 @@ Keep `get_default_local_agent()` as the canonical factory for the Hello World ag
 | `--local` + script with real `supervisor_account`              | Override to `None`, log warning that credentials are skipped in local mode |
 | `--local` + user agent named "Hello World AI Agent"            | Skip Hello World injection (no duplicate)                                  |
 
+
 ### Files to Modify
 
 1. `src/supervaizer/cli.py` — Remove separate local branch, set env var, unify paths, update help text
