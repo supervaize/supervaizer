@@ -1,18 +1,14 @@
 {% from "components/field_renderer.html" import render_hitl_field, status_badge %}
+{% from "components/dialog_renderer.html" import render_hitl_dialog, render_dialog_confirmed %}
 
 {# Determine if the job has reached a terminal state (EntityStatus.value is lowercase) #}
 {% set job_status = job.status.value %}
 {% set is_terminal = job_status in ("completed", "failed", "stopped", "cancelled") %}
 
-{# Outer div — owns the polling loop via HTMX outerHTML swap #}
+{# Outer div — WebSocket pushes updates, no HTMX polling needed #}
 <div
     id="workbench-monitor-partial"
     data-job-terminal="{{ 'true' if is_terminal else 'false' }}"
-    hx-get="/admin/agents/{{ agent_slug }}/workbench/jobs/{{ job.id }}"
-    hx-swap="outerHTML"
-    {% if not is_terminal %}
-    hx-trigger="every 2s"
-    {% endif %}
 >
 
     {# ── Job status bar ──────────────────────────────────────────────── #}
@@ -40,6 +36,7 @@
         {% for case_info in cases_data %}
         {% set case = case_info.case %}
         {% set hitl_form = case_info.hitl_form %}
+        {% set hitl_dialog = case_info.hitl_dialog %}
         {% set case_status = case.status.value %}
         {% set auto_expand = case_status in ("awaiting", "in_progress") %}
 
@@ -66,7 +63,7 @@
                     </svg>
 
                     {# Case name #}
-                    <span class="text-sm font-medium text-gray-800 truncate">{{ case.name or case.id }}</span>
+                    <span class="text-sm font-medium text-gray-800 truncate"><span class="text-gray-400">Case:</span> {{ case.name or case.id }}</span>
 
                     {# Step count #}
                     {% if case.updates %}
@@ -132,7 +129,7 @@
                                     {% if step.index %}
                                     <span class="text-gray-400 mr-1">#{{ step.index }}</span>
                                     {% endif %}
-                                    {{ step.name or "Step" }}
+                                    {% if step.name == "HITL Answer" %}👤 {{ step_payload.get("_hitl_label", "User response") if step_payload is mapping else "User response" }}{% else %}{{ step.name or "Step" }}{% endif %}
                                 </span>
                                 <div class="flex items-center gap-2 flex-shrink-0">
                                     {% if step_duration is not none %}
@@ -148,7 +145,7 @@
                             {% endif %}
                             {% if step.name == "HITL Answer" and step_payload is mapping %}
                             <div class="mt-1 space-y-0.5">
-                                {% for key, val in step_payload.items() %}
+                                {% for key, val in step_payload.items() if key != "_hitl_label" %}
                                 <div class="text-xs">
                                     <span class="text-gray-400">{{ key }}:</span>
                                     {% if val is sameas true %}
@@ -169,6 +166,10 @@
                             {% endif %}
                         </div>
                     </div>
+                    {# Show approved content card below the step row #}
+                    {% if step_payload is mapping and step_payload.get("approved_content") %}
+                    {{ render_dialog_confirmed(step_payload.get("approved_content"), step_payload.get("approved_content_type", "text")) }}
+                    {% endif %}
                     {% endfor %}
                 </div>
                 {% else %}
@@ -208,6 +209,11 @@
                         </div>
                     </form>
                 </div>
+                {% endif %}
+
+                {# HITL dialog — chat-like interface for content review #}
+                {% if hitl_dialog and has_human_answer %}
+                {{ render_hitl_dialog(case.id, hitl_dialog) }}
                 {% endif %}
             </div>
         </div>

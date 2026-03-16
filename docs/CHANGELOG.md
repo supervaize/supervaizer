@@ -19,6 +19,21 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### v0.10.29 (dev)
+
+- **Dialog HITL** — New HITL type for interactive content review via chat interface. When a `CaseNodeUpdate` payload contains `supervaizer_dialog`, the workbench renders a conversation UI instead of a fixed form. Supports iterative refinement through LLM-powered feedback loops. Fields: `content` (JSON string), `content_type` (email/text/code), `objective`, `instructions`, `messages` (conversation history), `confirm_label`.
+  - Template: `dialog_renderer.html` with `render_hitl_dialog` and `render_dialog_confirmed` macros
+  - JS: `submitDialogMessage(caseId, message)` and `confirmDialog(caseId)` in `workbench-form.js`
+  - Route: `workbench_routes.py` detects `supervaizer_dialog` in AWAITING case payloads
+
+- **Local mode URL fixes** — `supervaizer start --local --port N` now correctly shows localhost URLs everywhere: CLI output, admin interface logs, storage, and uvicorn. Fixed by resolving `Server.__init__` defaults from env vars at call time (not class definition time) and ensuring CLI-provided values take precedence over `.env` file values.
+
+- **Local mode event skipping** — `account_service.send_event()` returns a no-op `ApiSuccess` when `SUPERVAIZER_LOCAL_MODE=true`, preventing HTTP errors against the SaaS API during local development.
+
+- **Agent parameter env pre-fill** — In local mode, the workbench auto-loads `.env` values into agent parameter fields with green `.env` badge indicators. Secret fields show a masked placeholder; non-secret fields display the value. Backend falls back to env values for empty fields on job submission.
+
+- **HTMX polling guard** — Monitor template suppresses `hx-trigger` polling when a HITL dialog or form is active, preventing DOM overwrites while users interact with forms.
+
 ### v0.10.27
 
 - **Agent Workbench** — Full-featured testing interface for agents directly from the admin panel. Four-zone layout with agent parameters, job control, execution monitor, and live console log. Supports starting/stopping jobs, real-time case and step tracking via HTMX polling, and Human-in-the-Loop (HITL) form rendering and submission. Job history panel lists all past executions with status badges.

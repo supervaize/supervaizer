@@ -1223,12 +1223,17 @@ def create_admin_routes() -> APIRouter:
             return {"status": "error", "message": str(e)}
 
     # Include workbench sub-router
-    from supervaizer.admin.workbench_routes import create_workbench_routes
+    from supervaizer.admin.workbench_routes import (
+        create_workbench_routes,
+        create_workbench_ws_routes,
+    )
 
     router.include_router(
         create_workbench_routes(),
         dependencies=[Depends(verify_admin_access)],
     )
+    # WebSocket routes are mounted separately — WS can't use APIKeyHeader auth
+    router.include_router(create_workbench_ws_routes())
 
     return router
 

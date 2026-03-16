@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Union
 
 import httpx
 
-from supervaizer.common import ApiError, ApiResult, ApiSuccess, log
+from supervaizer.common import ApiError, ApiResult, ApiSuccess, is_local_mode, log
 
 logger = logging.getLogger("httpx")
 # Enable httpx debug logging (optional - uncomment for transport-level debugging)
@@ -56,6 +56,11 @@ def send_event(
 
         Tested in tests/test_account_service.py
     """
+
+    # In local mode, skip sending events to the SaaS API entirely.
+    if is_local_mode():
+        log.debug(f"[Send event] Local mode — skipping {event.type.name}")
+        return ApiSuccess(message=f"Event {event.type.name} skipped (local mode)", detail=None)
 
     headers = account.api_headers
     payload = event.payload

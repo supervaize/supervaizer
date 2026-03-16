@@ -18,7 +18,7 @@ class WorkbenchForm {
         this._getFields = config.getFields || null;
         if (config.onJobStarted) this.onJobStarted = config.onJobStarted;
         if (config.onError) this.onError = config.onError;
-        this._pollInterval = null;
+        this._ws = null;
     }
 
     getApiKey() {
@@ -157,6 +157,35 @@ class WorkbenchForm {
         }
     }
 
+    /** Shared POST to /cases/{caseId}/answer endpoint. */
+    async _postAnswer(caseId, answerPayload) {
+        if (!this.activeJobId) return null;
+        try {
+            const response = await fetch(
+                `${this.basePath}/jobs/${this.activeJobId}/cases/${caseId}/answer`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': this.getApiKey(),
+                    },
+                    body: JSON.stringify({ answer: answerPayload }),
+                },
+            );
+            const result = await response.json();
+            if (!response.ok) {
+                this.onError(result.detail || result.message || 'Failed to submit answer');
+                return null;
+            }
+            this.onError('');
+            this.refreshMonitor(true);
+            return result;
+        } catch (e) {
+            this.onError(`Network error: ${e.message}`);
+            return null;
+        }
+    }
+
     async submitHitlAnswer(caseId, formElement) {
         const answer = {};
         new FormData(formElement).forEach((value, key) => {
@@ -171,29 +200,19 @@ class WorkbenchForm {
             }
         });
 
-        try {
-            const response = await fetch(
-                `${this.basePath}/jobs/${this.activeJobId}/cases/${caseId}/answer`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': this.getApiKey(),
-                    },
-                    body: JSON.stringify({ answer }),
-                },
-            );
-            const result = await response.json();
-            if (!response.ok) {
-                this.onError(result.detail || result.message || 'Failed to submit answer');
-            } else {
-                // Remove the form so polling resumes, then refresh immediately
-                formElement.remove();
-                this.refreshMonitor();
-            }
-        } catch (e) {
-            this.onError(`Network error: ${e.message}`);
+        const result = await this._postAnswer(caseId, answer);
+        if (result) {
+            formElement.remove();
         }
+    }
+
+    async submitDialogMessage(caseId, message) {
+        if (!message) return;
+        await this._postAnswer(caseId, { action: 'message', text: message });
+    }
+
+    async confirmDialog(caseId) {
+        await this._postAnswer(caseId, { action: 'confirm' });
     }
 
     /** Show/hide Stop and Status buttons based on active job. */
@@ -209,14 +228,29 @@ class WorkbenchForm {
         }
     }
 
-    /** Fetch and render the monitor partial for the active job. */
-    refreshMonitor() {
+    /** True when a HITL dialog or form is visible in the monitor. */
+    _hasActiveHitl() {
+        const container = document.getElementById(this.monitorContainerId);
+        if (!container) return false;
+        return !!(
+            container.querySelector('form[id^="hitl-form-"]') ||
+            container.querySelector('[id^="hitl-dialog-"]')
+        );
+    }
+
+    /** Fetch and render the monitor partial for the active job.
+     *  @param {boolean} force - bypass HITL guard (used after dialog submit/confirm)
+     */
+    refreshMonitor(force) {
         if (!this.activeJobId) return;
         const container = document.getElementById(this.monitorContainerId);
         if (!container) return;
+        // Don't overwrite while user interacts with HITL (unless forced)
+        if (!force && this._hasActiveHitl()) return;
         const url = `${this.basePath}/jobs/${this.activeJobId}`;
         const apiKey = this.getApiKey();
         const headers = apiKey ? { 'X-API-Key': apiKey } : {};
+        const self = this;
         fetch(url, { headers })
             .then(r => r.text())
             .then(html => {
@@ -224,46 +258,109 @@ class WorkbenchForm {
                 if (typeof Alpine !== 'undefined') {
                     Alpine.initTree(container);
                 }
+                // Disconnect WebSocket when job reaches terminal state
+                const partial = container.querySelector('#workbench-monitor-partial');
+                if (partial && partial.dataset.jobTerminal === 'true') {
+                    self.disconnectWebSocket();
+                    self._updateButtons(true);
+                }
             })
             .catch(() => {});
     }
 
-    /** Load monitor partial and start polling. Stops when job reaches terminal state. */
+    /** Check if the monitor shows a terminal job state. */
+    _isJobTerminal() {
+        var container = document.getElementById(this.monitorContainerId);
+        if (!container) return false;
+        var partial = container.querySelector('#workbench-monitor-partial');
+        return partial && partial.dataset.jobTerminal === 'true';
+    }
+
+    /** Connect a WebSocket that pushes typed signals when state changes. */
+    connectWebSocket(jobId) {
+        // Don't connect for terminal jobs
+        if (this._isJobTerminal()) return;
+        this.disconnectWebSocket();
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${location.host}${this.basePath}/jobs/${jobId}/ws`;
+        this._ws = new WebSocket(wsUrl);
+        const self = this;
+        this._ws.onmessage = (event) => {
+            const msg = event.data;
+            if (msg === 'terminal') {
+                self.refreshMonitor(true);
+                self._refreshConsole();
+                self._refreshJobsList();
+                self.disconnectWebSocket();
+                self._updateButtons(true);
+            } else if (msg === 'monitor' || msg === 'refresh') {
+                self.refreshMonitor();
+            } else if (msg === 'console') {
+                self._refreshConsole();
+            } else if (msg === 'jobs') {
+                self._refreshJobsList();
+            } else if (msg === 'ping') {
+                self._ws.send('pong');
+            }
+        };
+        this._ws.onclose = () => {
+            // Only reconnect if job is still active and we didn't intentionally disconnect
+            if (self.activeJobId && self._ws && !self._isJobTerminal()) {
+                self._ws = null;
+                setTimeout(() => {
+                    if (self.activeJobId && !self._isJobTerminal()) {
+                        self.connectWebSocket(jobId);
+                    }
+                }, 3000);
+            }
+        };
+        this._ws.onerror = () => {};
+    }
+
+    /** Fetch and swap console log entries. */
+    _refreshConsole() {
+        var el = document.getElementById('console-log-container');
+        if (!el) return;
+        var url = el.dataset.url;
+        if (!url) return;
+        fetch(url).then(r => r.text()).then(html => {
+            el.innerHTML = html;
+            el.scrollTop = el.scrollHeight;
+            if (typeof applyConsoleFilter === 'function') applyConsoleFilter();
+        }).catch(() => {});
+    }
+
+    /** Fetch and swap job history list. */
+    _refreshJobsList() {
+        var el = document.getElementById('jobs-list-container');
+        if (!el) return;
+        var url = el.dataset.url;
+        if (!url) return;
+        fetch(url).then(r => r.text()).then(html => {
+            el.innerHTML = html;
+        }).catch(() => {});
+    }
+
+    /** Close the WebSocket connection. */
+    disconnectWebSocket() {
+        if (this._ws) {
+            const ws = this._ws;
+            this._ws = null;
+            ws.close();
+        }
+    }
+
+    /** Load monitor partial and connect WebSocket for live updates. */
     onJobStarted(result) {
         const container = document.getElementById(this.monitorContainerId);
         if (!container) return;
-        const url = `${this.basePath}/jobs/${result.id}`;
-        const apiKey = this.getApiKey();
-        const self = this;
         this._updateButtons(false);
-        const loadMonitor = () => {
-            // Don't overwrite the monitor while user is filling a HITL form
-            if (container.querySelector('form[id^="hitl-form-"]')) return;
-
-            const headers = apiKey ? { 'X-API-Key': apiKey } : {};
-            fetch(url, { headers })
-                .then(r => r.text())
-                .then(html => {
-                    container.innerHTML = html;
-                    // Re-initialize Alpine on swapped content
-                    if (typeof Alpine !== 'undefined') {
-                        Alpine.initTree(container);
-                    }
-                    // Stop polling once job is terminal
-                    const partial = container.querySelector('#workbench-monitor-partial');
-                    if (partial && partial.dataset.jobTerminal === 'true') {
-                        if (self._pollInterval) {
-                            clearInterval(self._pollInterval);
-                            self._pollInterval = null;
-                        }
-                        self._updateButtons(true);
-                    }
-                })
-                .catch(() => {});
-        };
-        loadMonitor();
-        if (this._pollInterval) clearInterval(this._pollInterval);
-        this._pollInterval = setInterval(loadMonitor, 2000);
+        // Initial load
+        this.refreshMonitor();
+        this._refreshConsole();
+        this._refreshJobsList();
+        // Connect WebSocket — pushes monitor, console, and jobs updates
+        this.connectWebSocket(result.id);
     }
 
     /** Show error in errors container. Override in template if needed. */
