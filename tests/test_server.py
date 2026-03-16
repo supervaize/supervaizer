@@ -650,7 +650,7 @@ class TestServerLocalMode:
     def test_local_mode_defaults_api_key_to_local_dev(
         self, agent_fixture: Agent
     ) -> None:
-        """In local mode without explicit api_key, default to 'local-dev'."""
+        """In local mode without SUPERVAIZER_API_KEY env var, default to 'local-dev'."""
         os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
         old_key = os.environ.pop("SUPERVAIZER_API_KEY", None)
         try:
@@ -659,7 +659,6 @@ class TestServerLocalMode:
                 host="localhost",
                 port=8002,
                 environment="test",
-                api_key=None,
             )
             assert server.api_key == "local-dev"
         finally:

@@ -10,9 +10,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
-from pydantic import ConfigDict, Field
-from pydantic.json_schema import SkipJsonSchema
-from typing import Callable
+from pydantic import ConfigDict
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
