@@ -569,3 +569,149 @@ def test_server_registration_info(server_fixture: Server) -> None:
         "environment": "test",
         "api_key": "test-api-key",
     }
+
+
+class TestServerLocalMode:
+    """Tests for SUPERVAIZER_LOCAL_MODE behavior in Server.__init__."""
+
+    def test_local_mode_injects_hello_world_agent(self, agent_fixture: Agent) -> None:
+        """When SUPERVAIZER_LOCAL_MODE=true, Hello World agent is prepended."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            server = Server(
+                agents=[agent_fixture],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            assert len(server.agents) == 2
+            assert server.agents[0].name == "Hello World AI Agent"
+            assert server.agents[1].name == agent_fixture.name
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_skips_hello_world_when_disabled(
+        self, agent_fixture: Agent
+    ) -> None:
+        """When SUPERVAIZER_DISABLE_HELLO_WORLD=true, Hello World is not injected."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        os.environ["SUPERVAIZER_DISABLE_HELLO_WORLD"] = "true"
+        try:
+            server = Server(
+                agents=[agent_fixture],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            assert len(server.agents) == 1
+            assert server.agents[0].name == agent_fixture.name
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+            del os.environ["SUPERVAIZER_DISABLE_HELLO_WORLD"]
+
+    def test_local_mode_skips_duplicate_hello_world(self) -> None:
+        """If user already has an agent with Hello World slug, skip injection."""
+        from supervaizer.examples.local_server import get_default_local_agent
+
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            hw_agent = get_default_local_agent()
+            server = Server(
+                agents=[hw_agent],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            assert len(server.agents) == 1
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_forces_supervisor_account_none(
+        self, agent_fixture: Agent, account_fixture: Any
+    ) -> None:
+        """When local mode is on, supervisor_account is forced to None."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            server = Server(
+                agents=[agent_fixture],
+                supervisor_account=account_fixture,
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            assert server.supervisor_account is None
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_defaults_api_key_to_local_dev(
+        self, agent_fixture: Agent
+    ) -> None:
+        """In local mode without SUPERVAIZER_API_KEY env var, default to 'local-dev'."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        old_key = os.environ.pop("SUPERVAIZER_API_KEY", None)
+        try:
+            server = Server(
+                agents=[agent_fixture],
+                host="localhost",
+                port=8002,
+                environment="test",
+            )
+            assert server.api_key == "local-dev"
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+            if old_key is not None:
+                os.environ["SUPERVAIZER_API_KEY"] = old_key
+
+    def test_local_mode_deploys_agent_routes(self, agent_fixture: Agent) -> None:
+        """In local mode, agent routes are deployed even without supervisor_account."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            server = Server(
+                agents=[agent_fixture],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            client = TestClient(server.app)
+            response = client.get(f"/supervaizer{agent_fixture.path}/")
+            assert response.status_code != 404
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_empty_server_still_starts(self) -> None:
+        """Local mode with Hello World disabled and no agents starts an empty server."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        os.environ["SUPERVAIZER_DISABLE_HELLO_WORLD"] = "true"
+        try:
+            server = Server(
+                agents=[],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            assert len(server.agents) == 0
+            client = TestClient(server.app)
+            response = client.get("/admin/", headers={"X-API-Key": "test-key"})
+            assert response.status_code != 404
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+            del os.environ["SUPERVAIZER_DISABLE_HELLO_WORLD"]
+
+    def test_non_local_mode_unchanged(self, agent_fixture: Agent) -> None:
+        """Without local mode, Server behaves as before (no Hello World injection)."""
+        os.environ.pop("SUPERVAIZER_LOCAL_MODE", None)
+        server = Server(
+            agents=[agent_fixture],
+            host="localhost",
+            port=8002,
+            environment="test",
+            api_key="test-key",
+        )
+        assert len(server.agents) == 1
+        assert server.agents[0].name == agent_fixture.name

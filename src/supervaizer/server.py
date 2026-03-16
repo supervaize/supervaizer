@@ -129,7 +129,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
 
         # Create server info
         server_info = ServerInfo(
-            id=getattr(server_instance, "server_id", "N/A"),
+            id="server_instance",
             host=getattr(server_instance, "host", "N/A"),
             port=getattr(server_instance, "port", 0),
             api_version=API_VERSION,
@@ -140,7 +140,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
             updated_at=datetime.now().isoformat(),
         )
 
-        # Save to storage
+        # Save to storage under the fixed singleton id so retrieval works
         storage.save_object("ServerInfo", server_info.model_dump())
 
         log.info(
@@ -343,6 +343,36 @@ class Server(ServerAbstract):
             api_key: API key for securing endpoints
 
         """
+        # Local mode: skip Studio, inject Hello World, default api_key
+        local_mode = os.environ.get("SUPERVAIZER_LOCAL_MODE", "").lower() == "true"
+        if local_mode:
+            if supervisor_account is not None:
+                log.warning(
+                    "[Server] Local mode active — ignoring supervisor_account"
+                    " (no Studio registration)"
+                )
+            supervisor_account = None
+            a2a_endpoints = True
+            admin_interface = True
+            if not os.environ.get("SUPERVAIZER_API_KEY"):
+                api_key = "local-dev"
+
+            # Inject Hello World agent unless disabled or duplicate
+            if os.environ.get("SUPERVAIZER_DISABLE_HELLO_WORLD", "").lower() != "true":
+                from supervaizer.examples.local_server import (
+                    get_default_local_agent,
+                )
+
+                hw_agent = get_default_local_agent()
+                existing_slugs = {a.slug for a in agents}
+                if hw_agent.slug not in existing_slugs:
+                    agents = [hw_agent] + list(agents)
+            elif not agents:
+                log.warning(
+                    "[Server] Local mode with Hello World disabled and no"
+                    " agents — server will be empty"
+                )
+
         if not mac_addr:
             node_id = uuid.getnode()
             mac_addr = "-".join(
@@ -437,14 +467,15 @@ class Server(ServerAbstract):
         log.info(f"[Server launch] Server ID: {self.server_id}")
 
         # Create routes
-        if self.supervisor_account:
+        if self.supervisor_account or local_mode:
             log.info(
-                "[Server launch] 🚀 Deploy Supervaizer routes - also activates A2A routes"
+                "[Server launch] 🚀 Deploy Supervaizer routes"
+                + (" (local mode)" if local_mode else " - also activates A2A routes")
             )
             self.app.include_router(create_default_routes(self))
             self.app.include_router(create_utils_routes(self))
             self.app.include_router(create_agents_routes(self))
-            self.a2a_endpoints = True  # Needed by supervaize.
+            self.a2a_endpoints = True
         if self.a2a_endpoints:
             log.info("[Server launch] 📢 Deploy A2A routes  ")
             self.app.include_router(create_a2a_routes(self))

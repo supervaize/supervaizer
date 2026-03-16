@@ -419,27 +419,31 @@ def create_workbench_routes() -> APIRouter:
         case.receive_human_input(update)
 
         # Step 2: Invoke agent's human_answer method if defined
-        if agent.methods and getattr(agent.methods, "human_answer", None):
-            human_answer_method = getattr(agent.methods, "human_answer", None).method
-            try:
-                params = {
-                    "fields": answer_data,
-                    "context": {"job_id": job_id, "case_id": case_id},
-                    "payload": answer_data,
-                    "case_id": case_id,
-                    "job_id": job_id,
-                }
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: agent._execute(human_answer_method, params),
-                )
-            except Exception as e:
-                log.error(f"[Workbench] human_answer failed for case {case_id}: {e}")
-                return JSONResponse(
-                    {"status": "error", "message": f"human_answer failed: {e}"},
-                    status_code=500,
-                )
+        if agent.methods:
+            human_answer_def = getattr(agent.methods, "human_answer", None)
+            if human_answer_def is not None:
+                human_answer_method = human_answer_def.method
+                try:
+                    params = {
+                        "fields": answer_data,
+                        "context": {"job_id": job_id, "case_id": case_id},
+                        "payload": answer_data,
+                        "case_id": case_id,
+                        "job_id": job_id,
+                    }
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(
+                        None,
+                        lambda: agent._execute(human_answer_method, params),
+                    )
+                except Exception as e:
+                    log.error(
+                        f"[Workbench] human_answer failed for case {case_id}: {e}"
+                    )
+                    return JSONResponse(
+                        {"status": "error", "message": f"human_answer failed: {e}"},
+                        status_code=500,
+                    )
 
         return JSONResponse({
             "status": "answered",

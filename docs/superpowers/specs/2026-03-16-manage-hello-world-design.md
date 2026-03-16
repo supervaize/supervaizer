@@ -7,6 +7,7 @@
 ## Goal
 
 Make `--local` behave like normal mode (same script loading, same server startup) with two differences:
+
 1. Skip Studio registration (no `supervisor_account` needed)
 2. Inject the Hello World agent alongside user agents (controllable via env var)
 
@@ -15,6 +16,7 @@ Make `--local` behave like normal mode (same script loading, same server startup
 ### 1. `cli.py` — Unify the code paths
 
 Remove the separate `if local:` branch. When `--local` is set:
+
 - Set `SUPERVAIZER_LOCAL_MODE=true` as an environment variable
 - Update `script_path` help text (remove "ignored when --local")
 - If `script_path` is provided or `supervaizer_control.py` exists in CWD, fall through to the normal subprocess path
@@ -24,6 +26,7 @@ Remove the separate `if local:` branch. When `--local` is set:
 ### 2. `Server` — Handle local mode during init/launch
 
 In `Server.__init__`, check `SUPERVAIZER_LOCAL_MODE`:
+
 - If `true`, force `supervisor_account=None` regardless of what was passed (log a warning if a non-None value was overridden)
 - If `true` and `SUPERVAIZER_DISABLE_HELLO_WORLD` is not `true`, prepend the Hello World agent to the agents list (inside `__init__`, before route setup). Skip injection if an agent with the same slug already exists.
 - Enable `admin_interface` and `a2a_endpoints` automatically in local mode
@@ -37,14 +40,15 @@ Keep `get_default_local_agent()` as the canonical factory for the Hello World ag
 
 ### Edge Cases
 
-| Scenario | Result |
-|----------|--------|
-| `--local`, no `supervaizer_control.py` | Hello World only (like today) |
-| `--local` + `supervaizer_control.py` | User agents + Hello World |
-| `--local` + `SUPERVAIZER_DISABLE_HELLO_WORLD=true` + script | User agents only |
-| `--local` + `SUPERVAIZER_DISABLE_HELLO_WORLD=true` + no script | Warn and start empty server (admin UI still accessible) |
-| `--local` + script with real `supervisor_account` | Override to `None`, log warning that credentials are skipped in local mode |
-| `--local` + user agent named "Hello World AI Agent" | Skip Hello World injection (no duplicate) |
+| Scenario                                                       | Result                                                                     |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `--local`, no `supervaizer_control.py`                         | Hello World only (like today)                                              |
+| `--local` + `supervaizer_control.py`                           | User agents + Hello World                                                  |
+| `--local` + `SUPERVAIZER_DISABLE_HELLO_WORLD=true` + script    | User agents only                                                           |
+| `--local` + `SUPERVAIZER_DISABLE_HELLO_WORLD=true` + no script | Warn and start empty server (admin UI still accessible)                    |
+| `--local` + script with real `supervisor_account`              | Override to `None`, log warning that credentials are skipped in local mode |
+| `--local` + user agent named "Hello World AI Agent"            | Skip Hello World injection (no duplicate)                                  |
+
 
 ### Files to Modify
 

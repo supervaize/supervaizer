@@ -414,7 +414,6 @@ def create_admin_routes() -> APIRouter:
             media_type=media_types.get(suffix, "application/octet-stream"),
         )
 
-
     @router.get("/console", response_class=HTMLResponse)
     async def admin_console_page(request: Request) -> Response:
         """Interactive console page - publicly accessible, authentication handled by frontend."""

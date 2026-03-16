@@ -18,7 +18,8 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
     - [3. Scaffold the controller](#3-scaffold-the-controller)
     - [(Optional) 4. Configure your Supervaize account \& environment](#optional-4-configure-your-supervaize-account--environment)
     - [5. Start the server 🚀](#5-start-the-server-)
-    - [6. Optional parameters](#6-optional-parameters)
+    - [6. Local mode](#6-local-mode)
+    - [7. Optional parameters](#7-optional-parameters)
     - [What's next?](#whats-next)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
@@ -117,7 +118,22 @@ Once the server is running, you'll have:
 - **A2A discovery**: `/.well-known/agents.json`
 - **ACP discovery**: `/agents`
 
-### 6. Optional parameters
+### 6. Local mode
+
+Run the server locally without connecting to Studio:
+
+```bash
+supervaizer start --local
+```
+
+This starts the server with your agents from `supervaizer_control.py` alongside a built-in Hello World agent. If no `supervaizer_control.py` exists, only the Hello World agent is loaded.
+
+- **No Studio registration** — the server runs fully offline
+- **`SUPERVAIZER_LOCAL_MODE=true`** is set automatically
+- **API key** defaults to `local-dev` (override with `SUPERVAIZER_API_KEY`)
+- **Disable Hello World** by setting `SUPERVAIZER_DISABLE_HELLO_WORLD=true`
+
+### 7. Optional parameters
 
 Configure retry behavior for HTTP requests to the Supervaize API:
 
