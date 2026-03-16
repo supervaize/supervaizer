@@ -129,7 +129,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
 
         # Create server info
         server_info = ServerInfo(
-            id=getattr(server_instance, "server_id", "N/A"),
+            id="server_instance",
             host=getattr(server_instance, "host", "N/A"),
             port=getattr(server_instance, "port", 0),
             api_version=API_VERSION,
@@ -140,7 +140,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
             updated_at=datetime.now().isoformat(),
         )
 
-        # Save to storage
+        # Save to storage under the fixed singleton id so retrieval works
         storage.save_object("ServerInfo", server_info.model_dump())
 
         log.info(

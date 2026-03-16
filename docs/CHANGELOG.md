@@ -44,6 +44,15 @@ All notable changes to this project will be documented in this file.
 
 - **CI** – Python package workflow: dependency install now uses `uv sync --extra dev --extra deploy` (adds deploy extras for CI).
 
+### Unit Tests Results
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 433   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 50s   |
+
 ## v0.10.19
 
 ### Added
