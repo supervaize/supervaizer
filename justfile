@@ -136,4 +136,21 @@ release:
     just merge-to-main
     just push-main
     just push_tags
+    just gh-release
     @echo "✅ Release complete! Main branch and tags pushed to remote"
+
+# Create GitHub release for the current version
+gh-release:
+    #!/usr/bin/env bash
+    VERSION=$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'"' -f2)
+    TAG="v${VERSION}"
+    echo "Creating GitHub release ${TAG}..."
+    PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1)
+    NOTES=$(git log "${PREV_TAG}..${TAG}" --oneline --no-merges | grep -v "Bump version")
+    gh release create "${TAG}" \
+        --repo supervaize/supervaizer \
+        --title "${TAG}" \
+        --latest \
+        --generate-notes \
+        --notes-start-tag "${PREV_TAG}"
+    echo "✅ GitHub release ${TAG} created"
