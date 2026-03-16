@@ -10,7 +10,6 @@ import sys
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
 from urllib.parse import urlunparse
 
@@ -448,6 +447,9 @@ class Server(ServerAbstract):
         if self.a2a_endpoints:
             log.info("[Server launch] 📢 Deploy A2A routes  ")
             self.app.include_router(create_a2a_routes(self))
+
+        # Store server instance on app state for admin routes to access
+        self.app.state.server = self
 
         # Deploy admin routes if API key is available
         if self.api_key and admin_interface:

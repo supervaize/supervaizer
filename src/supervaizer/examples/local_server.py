@@ -18,11 +18,11 @@ from supervaizer import (
     Agent,
     AgentMethod,
     AgentMethods,
-    AgentMethodField,
     ParametersSetup,
     Parameter,
     Server,
 )
+from supervaizer.agent import AgentMethodField
 
 
 def get_default_local_agent() -> Agent:
