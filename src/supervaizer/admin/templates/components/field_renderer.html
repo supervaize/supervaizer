@@ -14,14 +14,15 @@
 #}
 
 {% macro render_field(field, prefix="field_") %}
-<div class="mb-4">
-    <label for="{{ prefix }}{{ field.name }}" class="block text-sm font-medium text-gray-700 mb-1">
+<div class="flex flex-col h-full">
+    <label for="{{ prefix }}{{ field.name }}" class="block text-sm font-medium text-gray-700">
         {{ field.name }}
         {% if field.required %}<span class="text-red-500">*</span>{% endif %}
     </label>
     {% if field.description %}
-    <p class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+    <p class="text-xs text-gray-500 mt-0.5">{{ field.description }}</p>
     {% endif %}
+    <div class="mt-auto pt-1.5">
 
     {% if field.field_type == "CharField" %}
         {% if field.widget == "Textarea" %}
@@ -122,24 +123,51 @@
             class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
             {% if field.required %}required{% endif %}>
     {% endif %}
+    </div>{# end mt-auto input wrapper #}
 </div>
 {% endmacro %}
 
 
 {% macro render_parameter_field(param, prefix="param_") %}
 <div class="mb-3">
-    <label for="{{ prefix }}{{ param.name }}" class="block text-sm font-medium text-gray-700 mb-1">
-        {{ param.name }}
-        {% if param.is_required %}<span class="text-red-500">*</span>{% endif %}
-    </label>
+    <div class="flex items-center gap-2 mb-1">
+        <label for="{{ prefix }}{{ param.name }}" class="block text-sm font-medium text-gray-700">
+            {{ param.name }}
+            {% if param.is_required %}<span class="text-red-500">*</span>{% endif %}
+        </label>
+        {% if param.from_env %}
+        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200" title="Value loaded from environment variable">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            .env
+        </span>
+        {% endif %}
+    </div>
     {% if param.description %}
     <p class="text-xs text-gray-500 mb-1">{{ param.description }}</p>
     {% endif %}
+    {% if param.from_env and param.is_secret %}
+    {# Secret from env: don't expose value in HTML, show masked placeholder #}
+    <input type="password"
+        id="{{ prefix }}{{ param.name }}" name="{{ param.name }}"
+        placeholder="••••••••  (from .env)"
+        data-env-set="true"
+        class="w-full rounded-md border-emerald-300 bg-emerald-50/30 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+        {% if param.is_required %}required{% endif %}>
+    {% elif param.from_env %}
+    {# Non-secret from env: show the value, green border #}
+    <input type="text"
+        id="{{ prefix }}{{ param.name }}" name="{{ param.name }}"
+        value="{{ param.value or '' }}"
+        data-env-set="true"
+        class="w-full rounded-md border-emerald-300 bg-emerald-50/30 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+        {% if param.is_required %}required{% endif %}>
+    {% else %}
     <input type="{{ 'password' if param.is_secret else 'text' }}"
         id="{{ prefix }}{{ param.name }}" name="{{ param.name }}"
         value="{{ param.value or '' }}"
         class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
         {% if param.is_required %}required{% endif %}>
+    {% endif %}
 </div>
 {% endmacro %}
 
@@ -169,7 +197,11 @@
             {% if field_def.get("required") %}required{% endif %}>
             <option value="">-- Select --</option>
             {% for opt in field_def.get("options", []) %}
+            {% if opt is iterable and opt is not string and opt | length >= 2 %}
+            <option value="{{ opt[0] }}">{{ opt[1] }}</option>
+            {% else %}
             <option value="{{ opt }}">{{ opt }}</option>
+            {% endif %}
             {% endfor %}
         </select>
     {% elif ftype == "textarea" %}

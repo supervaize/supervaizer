@@ -457,6 +457,7 @@ class AgentMethodsAbstract(BaseModel):
     job_start: AgentMethod
     job_stop: AgentMethod | None = None
     job_status: AgentMethod | None = None
+    job_poll: AgentMethod | None = None
     human_answer: AgentMethod | None = None
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
@@ -496,6 +497,7 @@ class AgentMethods(AgentMethodsAbstract):
             "job_status": self.job_status.registration_info
             if self.job_status
             else None,
+            "job_poll": self.job_poll.registration_info if self.job_poll else None,
             "human_answer": self.human_answer.registration_info
             if self.human_answer
             else None,

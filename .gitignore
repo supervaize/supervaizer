@@ -252,3 +252,6 @@ uv.lock
 .pypirc
 
 .deployment/
+.playwright-cli/
+/
+but/

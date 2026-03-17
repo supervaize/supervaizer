@@ -1,0 +1,184 @@
+{# Dialog HITL renderer — chat-like interface for content review #}
+
+{% macro render_hitl_dialog(case_id, dialog) %}
+{% set content_raw = dialog.get("content", "") %}
+{% set content_type = dialog.get("content_type", "text") %}
+{% set objective = dialog.get("objective", "") %}
+{% set messages = dialog.get("messages", []) %}
+{% set confirm_label = dialog.get("confirm_label", "Approve") %}
+
+<div
+    id="hitl-dialog-{{ case_id }}"
+    class="mx-4 mb-4 mt-1 rounded-md border border-amber-200 bg-amber-50"
+    {% if content_type == "email" and content_raw %}
+    data-email-content="{{ content_raw | e }}"
+    {% endif %}
+    x-data="{
+        messageText: '',
+        sending: false,
+        emailData: null,
+        init() {
+            var raw = this.$el.dataset.emailContent;
+            if (raw) {
+                try { this.emailData = JSON.parse(raw); }
+                catch(e) { console.warn('Dialog: failed to parse email JSON', e); }
+            }
+        },
+        async submitMessage() {
+            const text = this.messageText.trim();
+            if (!text || this.sending) return;
+            this.sending = true;
+            this.messageText = '';
+            if (window.workbenchForm) {
+                await window.workbenchForm.submitDialogMessage('{{ case_id }}', text);
+            }
+            this.sending = false;
+        },
+        async confirmDialog() {
+            if (this.sending) return;
+            this.sending = true;
+            if (window.workbenchForm) {
+                await window.workbenchForm.confirmDialog('{{ case_id }}');
+            }
+            this.sending = false;
+        }
+    }"
+>
+    {# Header #}
+    <div class="flex items-center gap-2 px-4 pt-4 pb-2">
+        <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        <span class="text-sm font-semibold text-amber-800">Review &amp; Respond</span>
+    </div>
+
+    {# Objective #}
+    {% if objective %}
+    <div class="mx-4 mb-2 text-xs text-gray-500 italic">{{ objective }}</div>
+    {% endif %}
+
+    {# Content preview card #}
+    {% if content_raw %}
+    <div class="mx-4 mb-3 rounded border border-gray-200 bg-white overflow-hidden">
+        {% if content_type == "email" %}
+        {# Email: render subject + HTML body via Alpine #}
+        <template x-if="emailData">
+            <div>
+                <div class="px-3 pt-3 pb-1 border-b border-gray-100">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Subject</span>
+                    <p class="text-sm font-medium text-gray-800 mt-0.5" x-text="emailData.subject"></p>
+                </div>
+                <div class="p-3 text-sm text-gray-700 max-h-64 overflow-y-auto prose prose-sm" x-html="emailData.html || emailData.text"></div>
+            </div>
+        </template>
+        <template x-if="!emailData">
+            <div class="p-3 text-sm text-gray-700 max-h-64 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+        </template>
+        {% elif content_type == "code" %}
+        <pre class="p-3 text-xs text-gray-700 max-h-64 overflow-y-auto bg-gray-50 font-mono whitespace-pre-wrap">{{ content_raw }}</pre>
+        {% else %}
+        <div class="p-3 text-sm text-gray-700 max-h-64 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Chat messages #}
+    <div
+        id="dialog-messages-{{ case_id }}"
+        class="mx-4 mb-3 rounded border border-gray-200 bg-white p-3 max-h-60 overflow-y-auto space-y-2"
+        x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
+    >
+        {% if messages %}
+        {% for msg in messages %}
+        {% set role = msg.get("role", "assistant") %}
+        {% set text = msg.get("text", "") %}
+        {% if role == "user" %}
+        <div class="flex justify-end">
+            <div class="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-blue-600 text-white">
+                {{ text }}
+            </div>
+        </div>
+        {% else %}
+        <div class="flex justify-start">
+            <div class="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-800">
+                {{ text }}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <div class="text-xs text-gray-400 italic text-center py-2">No messages yet.</div>
+        {% endif %}
+    </div>
+
+    {# Input + action buttons #}
+    <div class="mx-4 mb-3">
+        <div class="flex gap-2 mb-3">
+            <textarea
+                x-model="messageText"
+                @keydown.enter.prevent="if (!$event.shiftKey) { submitMessage() }"
+                placeholder="Suggest changes to the email... (Enter to send)"
+                rows="2"
+                class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            ></textarea>
+            <button
+                type="button"
+                @click="submitMessage()"
+                :disabled="sending || !messageText.trim()"
+                class="self-end px-3 py-2 rounded-md text-xs font-medium text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </div>
+        <button
+            type="button"
+            @click="confirmDialog()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md shadow-sm text-sm font-semibold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer transition-colors duration-150"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            {{ confirm_label }}
+        </button>
+    </div>
+</div>
+{% endmacro %}
+
+
+{# Confirmed content display — shown after dialog is approved #}
+{% macro render_dialog_confirmed(content_raw, content_type) %}
+<div class="mx-4 mb-3 rounded border border-green-200 bg-green-50 overflow-hidden">
+    <div class="px-3 py-2 bg-green-100 border-b border-green-200">
+        <span class="text-xs font-semibold text-green-700 uppercase tracking-wider flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Approved Content
+        </span>
+    </div>
+    {% if content_type == "email" %}
+    <div data-email-content="{{ content_raw | e }}" x-data="{
+        email: null,
+        init() {
+            var raw = this.$el.dataset.emailContent;
+            if (raw) { try { this.email = JSON.parse(raw); } catch(e) {} }
+        }
+    }">
+        <template x-if="email">
+            <div>
+                <div class="px-3 pt-2 pb-1 border-b border-green-100">
+                    <span class="text-xs font-medium text-gray-400">Subject:</span>
+                    <span class="text-sm font-medium text-gray-800 ml-1" x-text="email.subject"></span>
+                </div>
+                <div class="p-3 text-sm text-gray-700 max-h-48 overflow-y-auto prose prose-sm" x-html="email.html || email.text"></div>
+            </div>
+        </template>
+        <template x-if="!email">
+            <div class="p-3 text-sm text-gray-700 max-h-48 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+        </template>
+    </div>
+    {% else %}
+    <div class="p-3 text-sm text-gray-700 max-h-48 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -147,18 +147,50 @@ release:
     just gh-release
     @echo "✅ Release complete! Main branch and tags pushed to remote"
 
-# Create GitHub release for the current version
+# Create or update GitHub release for the latest tag on origin/main
 gh-release:
     #!/usr/bin/env bash
-    VERSION=$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'"' -f2)
-    TAG="v${VERSION}"
-    echo "Creating GitHub release ${TAG}..."
-    PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1)
-    NOTES=$(git log "${PREV_TAG}..${TAG}" --oneline --no-merges | grep -v "Bump version")
-    gh release create "${TAG}" \
-        --repo supervaize/supervaizer \
-        --title "${TAG}" \
-        --latest \
-        --generate-notes \
-        --notes-start-tag "${PREV_TAG}"
-    echo "✅ GitHub release ${TAG} created"
+    set -euo pipefail
+
+    echo "Fetching latest tags from origin..."
+    git fetch origin --tags
+
+    # Find the latest tag reachable from origin/main
+    LATEST_TAG=$(git describe --tags --abbrev=0 origin/main)
+
+    if [ -z "${LATEST_TAG}" ]; then
+        echo "❌ No tags found on origin/main. Aborting."
+        exit 1
+    fi
+
+    echo "Using latest tag on origin/main: ${LATEST_TAG}"
+
+    # Find previous tag (for release notes range)
+    PREV_TAG=$(git tag --merged origin/main --sort=-creatordate | grep -v "^${LATEST_TAG}$" | head -1 || true)
+
+    # If a release already exists, just mark it as latest; otherwise create it
+    if gh release view "${LATEST_TAG}" --repo supervaize/supervaizer >/dev/null 2>&1; then
+        echo "GitHub release ${LATEST_TAG} already exists. Marking as latest..."
+        gh release edit "${LATEST_TAG}" \
+            --repo supervaize/supervaizer \
+            --latest
+        echo "✅ GitHub release ${LATEST_TAG} updated as latest"
+    else
+        echo "Creating GitHub release ${LATEST_TAG}..."
+        if [ -n "${PREV_TAG}" ]; then
+            gh release create "${LATEST_TAG}" \
+                --repo supervaize/supervaizer \
+                --title "${LATEST_TAG}" \
+                --latest \
+                --generate-notes \
+                --notes-start-tag "${PREV_TAG}"
+        else
+            # First release: no previous tag
+            gh release create "${LATEST_TAG}" \
+                --repo supervaize/supervaizer \
+                --title "${LATEST_TAG}" \
+                --latest \
+                --generate-notes
+        fi
+        echo "✅ GitHub release ${LATEST_TAG} created"
+    fi
