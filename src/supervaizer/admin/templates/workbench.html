@@ -160,6 +160,21 @@
                         Start Job
                     </button>
 
+                    {# Poll button — visible only when agent has job_poll #}
+                    {% if has_poll %}
+                    <button
+                        id="btn-poll"
+                        type="button"
+                        onclick="workbenchForm && workbenchForm.pollJob()"
+                        class="hidden inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-100 cursor-pointer transition-colors"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Check for updates
+                    </button>
+                    {% endif %}
+
                     {# Stop button #}
                     <button
                         id="btn-stop"
