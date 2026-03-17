@@ -21,7 +21,25 @@ All notable changes to this project will be documented in this file.
 
 ### v0.11.0
 
-- **Dialog HITL** — New HITL type for interactive content review via chat interface. When a `CaseNodeUpdate` payload contains `supervaizer_dialog`, the workbench renders a conversation UI instead of a fixed form. Supports iterative refinement through LLM-powered feedback loops. Fields: `content` (JSON string), `content_type` (email/text/code), `objective`, `instructions`, `messages` (conversation history), `confirm_label`.
+- **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
+  - `AgentMethods`: new `job_poll: AgentMethod | None` field
+  - Route: `POST /workbench/jobs/{job_id}/poll` triggers the agent's poll handler
+  - UI: "Check for updates" button with loading state, conditionally rendered via `has_poll` template variable
+  - JS: `pollJob()` in `workbench-form.js` with disable-during-request pattern
+
+- **HITL double-click guard** — All HITL buttons are disabled during submission via `_postAnswer()`. Buttons get `opacity-50 cursor-not-allowed` while in flight and re-enable on error. Dialog HITL `submitMessage`/`confirmDialog` are now async, properly awaiting the form submission before resetting state.
+
+- **Monitor reply display** — Step payloads with a `reply` key render as a blue blockquote below the step row. Step payloads with `approved_content` render as a green confirmed card.
+
+- **Monitor duration display** — `step_duration` format now handles both numeric and string values, preventing Jinja2 `TypeError` when duration comes from HITL form input.
+
+- **WebSocket terminal signal** — Terminal job state sends a `terminal` WS signal that keeps the connection idle, preventing reconnect loops.
+
+- **`is_local_mode()` helper** — Centralized in `supervaizer.common`, replacing inline `os.environ.get("SUPERVAIZER_LOCAL_MODE")` checks across `account_service.py`, `server.py`.
+
+- **`deque` for log buffer** — `_workbench_log_buffer` changed from `list` to `collections.deque(maxlen=500)`, removing manual trim logic.
+
+- **Dialog HITL** — New HITL type for interactive content review via chat interface. When a `CaseNodeUpdate` payload contains `supervaizer_dialog`, the workbench renders a conversation UI instead of a fixed form. Supports iterative refinement through LLM-powered feedback loops. Fields: `content` (JSON string or plain text), `content_type` (email/text/code), `objective`, `instructions`, `messages` (conversation history), `confirm_label`.
   - Template: `dialog_renderer.html` with `render_hitl_dialog` and `render_dialog_confirmed` macros
   - JS: `submitDialogMessage(caseId, message)` and `confirmDialog(caseId)` in `workbench-form.js`
   - Route: `workbench_routes.py` detects `supervaizer_dialog` in AWAITING case payloads
