@@ -36,6 +36,7 @@ from supervaizer.common import (
     SvBaseModel,
     decrypt_value,
     encrypt_value,
+    is_local_mode,
     log,
 )
 from supervaizer.instructions import display_instructions
@@ -311,17 +312,15 @@ class Server(ServerAbstract):
         a2a_endpoints: bool = True,
         admin_interface: bool = True,
         scheme: str = "http",
-        environment: str = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev"),
-        host: str = os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
-        port: int = int(os.getenv("SUPERVAIZER_PORT", 8000)),
+        environment: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",
         private_key: Optional[RSAPrivateKey] = None,
-        public_url: Optional[str] = os.getenv("SUPERVAIZER_PUBLIC_URL", None),
-        api_key: Optional[str] = os.getenv(
-            "SUPERVAIZER_API_KEY", secrets.token_urlsafe(32)
-        ),
+        public_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration.
@@ -343,8 +342,22 @@ class Server(ServerAbstract):
             api_key: API key for securing endpoints
 
         """
+        # Resolve defaults from env vars at call time (not class definition time).
+        # This ensures CLI-set env vars are picked up even when the module was
+        # imported before the CLI ran.
+        if environment is None:
+            environment = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev")
+        if host is None:
+            host = os.getenv("SUPERVAIZER_HOST", "0.0.0.0")
+        if port is None:
+            port = int(os.getenv("SUPERVAIZER_PORT", "8000"))
+        if public_url is None:
+            public_url = os.getenv("SUPERVAIZER_PUBLIC_URL") or None
+        if api_key is None:
+            api_key = os.getenv("SUPERVAIZER_API_KEY") or secrets.token_urlsafe(32)
+
         # Local mode: skip Studio, inject Hello World, default api_key
-        local_mode = os.environ.get("SUPERVAIZER_LOCAL_MODE", "").lower() == "true"
+        local_mode = is_local_mode()
         if local_mode:
             if supervisor_account is not None:
                 log.warning(

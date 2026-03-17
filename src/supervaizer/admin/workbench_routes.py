@@ -5,13 +5,15 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+import collections
+import hashlib
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
 import shortuuid
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
@@ -26,21 +28,27 @@ from supervaizer.lifecycle import EntityStatus
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # Shared log buffer — populated via log listener registered in routes.py
-_workbench_log_buffer: list[dict[str, str]] = []
 _WORKBENCH_LOG_BUFFER_MAX = 500
+_workbench_log_buffer: collections.deque[dict[str, str]] = collections.deque(
+    maxlen=_WORKBENCH_LOG_BUFFER_MAX
+)
+
+
+# Counter incremented only for non-admin log entries (avoids WS feedback loop)
+_workbench_log_version = 0
 
 
 def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
     """Log listener callback — appends to workbench buffer."""
+    global _workbench_log_version  # noqa: PLW0603
     _workbench_log_buffer.append({
         "timestamp": timestamp,
         "level": level,
         "message": message,
     })
-    if len(_workbench_log_buffer) > _WORKBENCH_LOG_BUFFER_MAX:
-        del _workbench_log_buffer[
-            : len(_workbench_log_buffer) - _WORKBENCH_LOG_BUFFER_MAX
-        ]
+    # Only bump version for meaningful logs (not HTTP access logs from admin endpoints)
+    if "/admin/" not in message and "HTTP/1.1" not in message:
+        _workbench_log_version += 1
 
 
 def _get_workbench_api_key(request: Request) -> str:
@@ -57,7 +65,7 @@ def _is_workbench_local_mode(request: Request) -> bool:
     return live is not None and getattr(live, "supervisor_account", None) is None
 
 
-def get_agent_by_slug(request: Request, slug: str) -> Agent:
+def get_agent_by_slug(request: Request | WebSocket, slug: str) -> Agent:
     """Look up a live Agent instance by its URL slug."""
     server = request.app.state.server
     for agent in server.agents:
@@ -71,12 +79,12 @@ def get_job_cases(job: Job) -> List[Any]:
     return list(Cases().get_job_cases(job.id).values())
 
 
-def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str]]:
+def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str | bool]]:
     """Pre-fill parameter values from environment variables.
 
     Returns dict of {name: {"value": str, "from_env": bool}}.
     """
-    values: Dict[str, Dict[str, str]] = {}
+    values: Dict[str, Dict[str, str | bool]] = {}
     if agent.parameters_setup:
         for name, param in agent.parameters_setup.definitions.items():
             env_val = os.environ.get(name, "")
@@ -121,6 +129,19 @@ def _normalize_hitl_form(form_data: dict) -> dict:
         if field_type == "ChoiceField" and "choices" in field:
             result[name]["options"] = field["choices"]
     return result
+
+
+def _compute_job_state_hash(job: "Job") -> str:
+    """Compute a hash of the job's observable state (status, cases, updates).
+
+    Used by the WebSocket endpoint to detect changes without sending full HTML.
+    """
+    parts: list[str] = [job.status.value]
+    cases = get_job_cases(job)
+    for case in cases:
+        parts.append(f"{case.id}:{case.status.value}:{len(case.updates)}")
+    raw = "|".join(parts)
+    return hashlib.md5(raw.encode()).hexdigest()
 
 
 def create_workbench_routes() -> APIRouter:
@@ -189,6 +210,8 @@ def create_workbench_routes() -> APIRouter:
                 "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods
                 and getattr(agent.methods, "human_answer", None) is not None,
+                "has_poll": agent.methods
+                and getattr(agent.methods, "job_poll", None) is not None,
                 "agents": [
                     {"slug": a.slug, "name": a.name}
                     for a in request.app.state.server.agents
@@ -329,17 +352,22 @@ def create_workbench_routes() -> APIRouter:
             case_info = {
                 "case": case,
                 "hitl_form": None,
+                "hitl_dialog": None,
             }
             if case.status == EntityStatus.AWAITING:
                 # Find the HITL update in case.updates
                 for update in reversed(case.updates):
                     if hasattr(update, "payload") and update.payload:
                         payload = update.payload
-                        if isinstance(payload, dict) and "supervaizer_form" in payload:
-                            case_info["hitl_form"] = _normalize_hitl_form(
-                                payload["supervaizer_form"]
-                            )
-                            break
+                        if isinstance(payload, dict):
+                            if "supervaizer_dialog" in payload:
+                                case_info["hitl_dialog"] = payload["supervaizer_dialog"]
+                                break
+                            elif "supervaizer_form" in payload:
+                                case_info["hitl_form"] = _normalize_hitl_form(
+                                    payload["supervaizer_form"]
+                                )
+                                break
             cases_data.append(case_info)
 
         return templates.TemplateResponse(
@@ -385,6 +413,30 @@ def create_workbench_routes() -> APIRouter:
             return JSONResponse({"status": "stopped", "message": str(result.message)})
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
+
+    @router.post("/agents/{slug}/workbench/jobs/{job_id}/poll")
+    async def workbench_poll_job(request: Request, slug: str, job_id: str) -> Response:
+        """Trigger manual poll for external updates on a job."""
+        agent = get_agent_by_slug(request, slug)
+
+        if not agent.methods or not agent.methods.job_poll:
+            raise HTTPException(status_code=404, detail="Agent has no poll method")
+
+        job_poll_method = agent.methods.job_poll.method
+
+        try:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent._execute(job_poll_method, {"job_id": job_id}),
+            )
+            return JSONResponse({
+                "status": result.status.value if result.status else "unknown",
+                "message": result.message or "Poll completed",
+                "payload": result.payload,
+            })
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to poll job: {e}")
 
     @router.get("/agents/{slug}/workbench/jobs/{job_id}/status")
     async def workbench_job_status(
@@ -439,8 +491,24 @@ def create_workbench_routes() -> APIRouter:
                 detail=f"Case '{case_id}' is not awaiting input (current status: {case.status})",
             )
 
+        # Derive a human-readable label from the HITL step that prompted this answer
+        hitl_label = "User response"
+        for prev_update in reversed(case.updates):
+            if hasattr(prev_update, "payload") and prev_update.payload:
+                p = prev_update.payload
+                if isinstance(p, dict) and (
+                    "supervaizer_form" in p or "supervaizer_dialog" in p
+                ):
+                    hitl_label = prev_update.name or hitl_label
+                    break
+
         # Step 1: Transition case state AWAITING -> IN_PROGRESS
-        update = CaseNodeUpdate(name="HITL Answer", payload=answer_data)
+        answer_with_label = (
+            dict(answer_data) if isinstance(answer_data, dict) else answer_data
+        )
+        if isinstance(answer_with_label, dict):
+            answer_with_label["_hitl_label"] = hitl_label
+        update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
         case.receive_human_input(update)
 
         # Step 2: Invoke agent's human_answer method if defined
@@ -484,7 +552,8 @@ def create_workbench_routes() -> APIRouter:
         except (ValueError, TypeError):
             last_index = 0
 
-        entries_to_send = _workbench_log_buffer[last_index:]
+        buf = list(_workbench_log_buffer)
+        entries_to_send = buf[last_index:]
 
         return templates.TemplateResponse(
             request,
@@ -492,7 +561,7 @@ def create_workbench_routes() -> APIRouter:
             {
                 "request": request,
                 "entries": entries_to_send,
-                "next_index": len(_workbench_log_buffer),
+                "next_index": len(buf),
                 "agent_slug": slug,
             },
         )
@@ -521,3 +590,85 @@ def create_workbench_routes() -> APIRouter:
         )
 
     return router
+
+
+def create_workbench_ws_routes() -> APIRouter:
+    """Create WebSocket routes for workbench (no auth dependency — WS can't use APIKeyHeader)."""
+    ws_router = APIRouter(tags=["workbench-ws"])
+
+    @ws_router.websocket("/agents/{slug}/workbench/jobs/{job_id}/ws")
+    async def workbench_job_ws(websocket: WebSocket, slug: str, job_id: str) -> None:
+        """WebSocket that pushes typed refresh signals when state changes.
+
+        Sends: "monitor" (job/case state changed), "console" (new log entries),
+               "jobs" (job list changed). Client fetches the relevant partial.
+        """
+        await websocket.accept()
+        last_monitor_hash = ""
+        last_log_version = _workbench_log_version
+        last_jobs_count = -1
+        # Cache agent outside the loop — it doesn't change during a WS session
+        try:
+            agent = get_agent_by_slug(websocket, slug)
+        except Exception:
+            await websocket.close()
+            return
+        try:
+            while True:
+                try:
+                    job = Jobs().get_job(job_id, agent_name=agent.name)
+                except Exception:
+                    job = None
+
+                if not job:
+                    await websocket.send_text("monitor")
+                    break
+
+                # Monitor: job/case state changes
+                current_hash = _compute_job_state_hash(job)
+                if current_hash != last_monitor_hash:
+                    last_monitor_hash = current_hash
+                    await websocket.send_text("monitor")
+
+                # Console: only meaningful log entries (filtered, no admin HTTP noise)
+                if _workbench_log_version != last_log_version:
+                    last_log_version = _workbench_log_version
+                    await websocket.send_text("console")
+
+                # Jobs: job count changed
+                agent_jobs = Jobs().get_agent_jobs(agent.name)
+                if len(agent_jobs) != last_jobs_count:
+                    last_jobs_count = len(agent_jobs)
+                    await websocket.send_text("jobs")
+
+                is_terminal = job.status.value in (
+                    "completed",
+                    "failed",
+                    "stopped",
+                    "cancelled",
+                )
+                if is_terminal:
+                    await websocket.send_text("console")
+                    await websocket.send_text("jobs")
+                    await websocket.send_text("terminal")
+                    # Keep connection open but idle — prevents client reconnect loop
+                    try:
+                        while True:
+                            await asyncio.wait_for(websocket.receive_text(), timeout=60)
+                    except (asyncio.TimeoutError, WebSocketDisconnect):
+                        pass
+                    break
+
+                try:
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(),
+                        timeout=2.0,
+                    )
+                    if data == "ping":
+                        await websocket.send_text("pong")
+                except asyncio.TimeoutError:
+                    pass
+        except WebSocketDisconnect:
+            pass
+
+    return ws_router

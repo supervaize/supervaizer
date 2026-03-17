@@ -253,3 +253,5 @@ uv.lock
 
 .deployment/
 .playwright-cli/
+/
+but/

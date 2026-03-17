@@ -23,6 +23,11 @@ log = logger.bind(module="supervaize")
 T = TypeVar("T")
 
 
+def is_local_mode() -> bool:
+    """Check if running in local test mode."""
+    return os.environ.get("SUPERVAIZER_LOCAL_MODE", "").lower() == "true"
+
+
 class SvBaseModel(BaseModel):
     """
     Base model for all Supervaize models.

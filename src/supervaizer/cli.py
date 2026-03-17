@@ -105,8 +105,8 @@ app.add_typer(scaffold_app, name="scaffold", invoke_without_command=True)
 @app.command()
 def start(
     public_url: Optional[str] = typer.Option(
-        os.environ.get("SUPERVAIZER_PUBLIC_URL") or None,
-        help="Public URL to use for inbound connections",
+        None,
+        help="Public URL to use for inbound connections (reads SUPERVAIZER_PUBLIC_URL env var if not set)",
     ),
     host: str = typer.Option(
         os.environ.get("SUPERVAIZER_HOST", "0.0.0.0"), help="Host to bind the server to"
@@ -147,7 +147,25 @@ def start(
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
-    # In local mode, load .env file so agent parameters are available
+    # Track whether the user explicitly passed --public-url on the CLI.
+    # Since the default is None, a non-None value means it was explicit.
+    user_provided_public_url = public_url is not None
+
+    # Set CLI-provided env vars BEFORE .env loading so they take precedence.
+    # The .env loader skips keys already present in os.environ.
+    os.environ["SUPERVAIZER_HOST"] = host
+    os.environ["SUPERVAIZER_PORT"] = str(port)
+    os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
+    os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
+    os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
+    os.environ["SUPERVAIZER_DEBUG"] = str(debug)
+    os.environ["SUPERVAIZER_RELOAD"] = str(reload)
+    if user_provided_public_url:
+        assert public_url is not None
+        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
+
+    # In local mode, load .env file so agent parameters are available.
+    # CLI-provided values above won't be overridden (loader skips existing keys).
     if local:
         env_file = os.path.join(os.getcwd(), ".env")
         if os.path.isfile(env_file):
@@ -163,21 +181,11 @@ def start(
                     if key and key not in os.environ:
                         os.environ[key] = value
 
-    # Set environment variables for the server configuration
-    os.environ["SUPERVAIZER_HOST"] = host
-    os.environ["SUPERVAIZER_PORT"] = str(port)
-    os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
-    os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
-    os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
-    os.environ["SUPERVAIZER_DEBUG"] = str(debug)
-    os.environ["SUPERVAIZER_RELOAD"] = str(reload)
-    if public_url is not None:
-        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
-
     if local:
         os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
-        # In local mode, force public_url to localhost unless explicitly provided
-        if public_url is None:
+        # In local mode, force public_url to localhost unless the user
+        # explicitly passed --public-url on the CLI.
+        if not user_provided_public_url:
             public_url = f"http://{host}:{port}"
             os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
         console.print(
@@ -190,6 +198,12 @@ def start(
             f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/"
         )
         console.print(f"[dim]API key for /admin: {api_key_display}[/]")
+    else:
+        # Non-local mode: resolve public_url from env var if not explicitly provided
+        if not user_provided_public_url:
+            public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
+            if public_url is not None:
+                os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
     if script_path is None:
         script_path = (
@@ -218,7 +232,7 @@ def start(
         )
         from supervaizer.server import Server as _Server
 
-        server_instance = _Server(
+        _local_server = _Server(
             agents=[],
             supervisor_account=None,
             a2a_endpoints=True,
@@ -231,7 +245,7 @@ def start(
             environment=environment,
             api_key=None,
         )
-        server_instance.launch(log_level=log_level)
+        _local_server.launch(log_level=log_level)
         return
 
     console.print(f"Loading configuration from [bold]{script_path}[/]")
@@ -261,7 +275,7 @@ def start(
     # find the Server and call launch().
     from supervaizer.server import Server as _Server
 
-    server_instance = None
+    server_instance: _Server | None = None
     for attr_name in dir(module):
         obj = getattr(module, attr_name, None)
         if isinstance(obj, _Server):

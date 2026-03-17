@@ -14,14 +14,15 @@
 #}
 
 {% macro render_field(field, prefix="field_") %}
-<div class="mb-4">
-    <label for="{{ prefix }}{{ field.name }}" class="block text-sm font-medium text-gray-700 mb-1">
+<div class="flex flex-col h-full">
+    <label for="{{ prefix }}{{ field.name }}" class="block text-sm font-medium text-gray-700">
         {{ field.name }}
         {% if field.required %}<span class="text-red-500">*</span>{% endif %}
     </label>
     {% if field.description %}
-    <p class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
+    <p class="text-xs text-gray-500 mt-0.5">{{ field.description }}</p>
     {% endif %}
+    <div class="mt-auto pt-1.5">
 
     {% if field.field_type == "CharField" %}
         {% if field.widget == "Textarea" %}
@@ -122,6 +123,7 @@
             class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
             {% if field.required %}required{% endif %}>
     {% endif %}
+    </div>{# end mt-auto input wrapper #}
 </div>
 {% endmacro %}
 
@@ -195,7 +197,11 @@
             {% if field_def.get("required") %}required{% endif %}>
             <option value="">-- Select --</option>
             {% for opt in field_def.get("options", []) %}
+            {% if opt is iterable and opt is not string and opt | length >= 2 %}
+            <option value="{{ opt[0] }}">{{ opt[1] }}</option>
+            {% else %}
             <option value="{{ opt }}">{{ opt }}</option>
+            {% endif %}
             {% endfor %}
         </select>
     {% elif ftype == "textarea" %}
