@@ -157,9 +157,22 @@ class WorkbenchForm {
         }
     }
 
+    /** Disable/enable all HITL buttons in the monitor to prevent double-clicks. */
+    _setHitlButtonsDisabled(disabled) {
+        const container = document.getElementById(this.monitorContainerId);
+        if (!container) return;
+        container.querySelectorAll('button').forEach(btn => {
+            btn.disabled = disabled;
+            if (disabled) btn.classList.add('opacity-50', 'cursor-not-allowed');
+            else btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        });
+    }
+
     /** Shared POST to /cases/{caseId}/answer endpoint. */
     async _postAnswer(caseId, answerPayload) {
-        if (!this.activeJobId) return null;
+        if (!this.activeJobId || this._submitting) return null;
+        this._submitting = true;
+        this._setHitlButtonsDisabled(true);
         try {
             const response = await fetch(
                 `${this.basePath}/jobs/${this.activeJobId}/cases/${caseId}/answer`,
@@ -175,6 +188,7 @@ class WorkbenchForm {
             const result = await response.json();
             if (!response.ok) {
                 this.onError(result.detail || result.message || 'Failed to submit answer');
+                this._setHitlButtonsDisabled(false);
                 return null;
             }
             this.onError('');
@@ -182,7 +196,10 @@ class WorkbenchForm {
             return result;
         } catch (e) {
             this.onError(`Network error: ${e.message}`);
+            this._setHitlButtonsDisabled(false);
             return null;
+        } finally {
+            this._submitting = false;
         }
     }
 

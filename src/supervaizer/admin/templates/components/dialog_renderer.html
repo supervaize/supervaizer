@@ -24,16 +24,23 @@
                 catch(e) { console.warn('Dialog: failed to parse email JSON', e); }
             }
         },
-        submitMessage() {
+        async submitMessage() {
             const text = this.messageText.trim();
             if (!text || this.sending) return;
             this.sending = true;
-            window.workbenchForm && window.workbenchForm.submitDialogMessage('{{ case_id }}', text);
             this.messageText = '';
+            if (window.workbenchForm) {
+                await window.workbenchForm.submitDialogMessage('{{ case_id }}', text);
+            }
             this.sending = false;
         },
-        confirmDialog() {
-            window.workbenchForm && window.workbenchForm.confirmDialog('{{ case_id }}');
+        async confirmDialog() {
+            if (this.sending) return;
+            this.sending = true;
+            if (window.workbenchForm) {
+                await window.workbenchForm.confirmDialog('{{ case_id }}');
+            }
+            this.sending = false;
         }
     }"
 >

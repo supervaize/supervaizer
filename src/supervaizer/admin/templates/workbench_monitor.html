@@ -166,6 +166,13 @@
                             {% endif %}
                         </div>
                     </div>
+                    {# Show reply content as a blockquote #}
+                    {% if step_payload is mapping and step_payload.get("reply") %}
+                    <div class="mx-4 mb-2 rounded border border-blue-200 bg-blue-50 p-3">
+                        <p class="text-xs font-medium text-blue-600 mb-1">Reply content:</p>
+                        <blockquote class="text-xs text-gray-700 whitespace-pre-wrap border-l-2 border-blue-300 pl-2">{{ step_payload.get("reply") }}</blockquote>
+                    </div>
+                    {% endif %}
                     {# Show approved content card below the step row #}
                     {% if step_payload is mapping and step_payload.get("approved_content") %}
                     {{ render_dialog_confirmed(step_payload.get("approved_content"), step_payload.get("approved_content_type", "text")) }}
