@@ -122,6 +122,35 @@ class WorkbenchForm {
         }
     }
 
+    async pollJob() {
+        if (!this.activeJobId) return;
+        const btn = document.getElementById('btn-poll');
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+        }
+        try {
+            const response = await fetch(`${this.basePath}/jobs/${this.activeJobId}/poll`, {
+                method: 'POST',
+                headers: { 'X-API-Key': this.getApiKey() },
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                this.onError(result.detail || 'Poll failed');
+            } else {
+                this.onError('');
+                this.refreshMonitor(true);
+            }
+        } catch (e) {
+            this.onError(`Network error: ${e.message}`);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+    }
+
     async stopJob(jobId) {
         const targetJobId = jobId || this.activeJobId;
         if (!targetJobId) return;
@@ -232,15 +261,18 @@ class WorkbenchForm {
         await this._postAnswer(caseId, { action: 'confirm' });
     }
 
-    /** Show/hide Stop and Status buttons based on active job. */
+    /** Show/hide Stop, Poll, and Status buttons based on active job. */
     _updateButtons(terminal) {
         const stop = document.getElementById('btn-stop');
         const status = document.getElementById('btn-status');
+        const poll = document.getElementById('btn-poll');
         if (this.activeJobId && !terminal) {
             if (stop) stop.classList.remove('hidden');
             if (status) status.classList.remove('hidden');
+            if (poll) poll.classList.remove('hidden');
         } else {
             if (stop) stop.classList.add('hidden');
+            if (poll) poll.classList.add('hidden');
             if (status) status.classList.remove('hidden');
         }
     }

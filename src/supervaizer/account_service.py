@@ -60,7 +60,9 @@ def send_event(
     # In local mode, skip sending events to the SaaS API entirely.
     if is_local_mode():
         log.debug(f"[Send event] Local mode — skipping {event.type.name}")
-        return ApiSuccess(message=f"Event {event.type.name} skipped (local mode)", detail=None)
+        return ApiSuccess(
+            message=f"Event {event.type.name} skipped (local mode)", detail=None
+        )
 
     headers = account.api_headers
     payload = event.payload

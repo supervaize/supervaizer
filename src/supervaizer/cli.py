@@ -161,7 +161,8 @@ def start(
     os.environ["SUPERVAIZER_DEBUG"] = str(debug)
     os.environ["SUPERVAIZER_RELOAD"] = str(reload)
     if user_provided_public_url:
-        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url  # type: ignore[arg-type]
+        assert public_url is not None
+        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
     # In local mode, load .env file so agent parameters are available.
     # CLI-provided values above won't be overridden (loader skips existing keys).
@@ -231,7 +232,7 @@ def start(
         )
         from supervaizer.server import Server as _Server
 
-        server_instance = _Server(
+        _local_server = _Server(
             agents=[],
             supervisor_account=None,
             a2a_endpoints=True,
@@ -244,7 +245,7 @@ def start(
             environment=environment,
             api_key=None,
         )
-        server_instance.launch(log_level=log_level)
+        _local_server.launch(log_level=log_level)
         return
 
     console.print(f"Loading configuration from [bold]{script_path}[/]")
@@ -274,7 +275,7 @@ def start(
     # find the Server and call launch().
     from supervaizer.server import Server as _Server
 
-    server_instance = None
+    server_instance: _Server | None = None
     for attr_name in dir(module):
         obj = getattr(module, attr_name, None)
         if isinstance(obj, _Server):

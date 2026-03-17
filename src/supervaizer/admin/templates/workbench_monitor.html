@@ -132,8 +132,10 @@
                                     {% if step.name == "HITL Answer" %}👤 {{ step_payload.get("_hitl_label", "User response") if step_payload is mapping else "User response" }}{% else %}{{ step.name or "Step" }}{% endif %}
                                 </span>
                                 <div class="flex items-center gap-2 flex-shrink-0">
-                                    {% if step_duration is not none %}
+                                    {% if step_duration is not none and step_duration is number %}
                                     <span class="text-xs text-gray-400 font-mono">{{ "%.1f"|format(step_duration) }}s</span>
+                                    {% elif step_duration is not none and step_duration %}
+                                    <span class="text-xs text-gray-400 font-mono">{{ step_duration }}s</span>
                                     {% endif %}
                                     {% if step.cost %}
                                     <span class="text-xs text-gray-400 font-mono">${{ "%.4f"|format(step.cost) }}</span>

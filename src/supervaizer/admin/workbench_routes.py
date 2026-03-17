@@ -79,12 +79,12 @@ def get_job_cases(job: Job) -> List[Any]:
     return list(Cases().get_job_cases(job.id).values())
 
 
-def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str]]:
+def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str | bool]]:
     """Pre-fill parameter values from environment variables.
 
     Returns dict of {name: {"value": str, "from_env": bool}}.
     """
-    values: Dict[str, Dict[str, str]] = {}
+    values: Dict[str, Dict[str, str | bool]] = {}
     if agent.parameters_setup:
         for name, param in agent.parameters_setup.definitions.items():
             env_val = os.environ.get(name, "")
@@ -210,6 +210,8 @@ def create_workbench_routes() -> APIRouter:
                 "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods
                 and getattr(agent.methods, "human_answer", None) is not None,
+                "has_poll": agent.methods
+                and getattr(agent.methods, "job_poll", None) is not None,
                 "agents": [
                     {"slug": a.slug, "name": a.name}
                     for a in request.app.state.server.agents
@@ -359,9 +361,7 @@ def create_workbench_routes() -> APIRouter:
                         payload = update.payload
                         if isinstance(payload, dict):
                             if "supervaizer_dialog" in payload:
-                                case_info["hitl_dialog"] = payload[
-                                    "supervaizer_dialog"
-                                ]
+                                case_info["hitl_dialog"] = payload["supervaizer_dialog"]
                                 break
                             elif "supervaizer_form" in payload:
                                 case_info["hitl_form"] = _normalize_hitl_form(
@@ -413,6 +413,30 @@ def create_workbench_routes() -> APIRouter:
             return JSONResponse({"status": "stopped", "message": str(result.message)})
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
+
+    @router.post("/agents/{slug}/workbench/jobs/{job_id}/poll")
+    async def workbench_poll_job(request: Request, slug: str, job_id: str) -> Response:
+        """Trigger manual poll for external updates on a job."""
+        agent = get_agent_by_slug(request, slug)
+
+        if not agent.methods or not agent.methods.job_poll:
+            raise HTTPException(status_code=404, detail="Agent has no poll method")
+
+        job_poll_method = agent.methods.job_poll.method
+
+        try:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent._execute(job_poll_method, {"job_id": job_id}),
+            )
+            return JSONResponse({
+                "status": result.status.value if result.status else "unknown",
+                "message": result.message or "Poll completed",
+                "payload": result.payload,
+            })
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to poll job: {e}")
 
     @router.get("/agents/{slug}/workbench/jobs/{job_id}/status")
     async def workbench_job_status(
@@ -472,12 +496,16 @@ def create_workbench_routes() -> APIRouter:
         for prev_update in reversed(case.updates):
             if hasattr(prev_update, "payload") and prev_update.payload:
                 p = prev_update.payload
-                if isinstance(p, dict) and ("supervaizer_form" in p or "supervaizer_dialog" in p):
+                if isinstance(p, dict) and (
+                    "supervaizer_form" in p or "supervaizer_dialog" in p
+                ):
                     hitl_label = prev_update.name or hitl_label
                     break
 
         # Step 1: Transition case state AWAITING -> IN_PROGRESS
-        answer_with_label = dict(answer_data) if isinstance(answer_data, dict) else answer_data
+        answer_with_label = (
+            dict(answer_data) if isinstance(answer_data, dict) else answer_data
+        )
         if isinstance(answer_with_label, dict):
             answer_with_label["_hitl_label"] = hitl_label
         update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
@@ -614,7 +642,10 @@ def create_workbench_ws_routes() -> APIRouter:
                     await websocket.send_text("jobs")
 
                 is_terminal = job.status.value in (
-                    "completed", "failed", "stopped", "cancelled",
+                    "completed",
+                    "failed",
+                    "stopped",
+                    "cancelled",
                 )
                 if is_terminal:
                     await websocket.send_text("console")
@@ -630,7 +661,8 @@ def create_workbench_ws_routes() -> APIRouter:
 
                 try:
                     data = await asyncio.wait_for(
-                        websocket.receive_text(), timeout=2.0,
+                        websocket.receive_text(),
+                        timeout=2.0,
                     )
                     if data == "ping":
                         await websocket.send_text("pong")
