@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### v0.10.29 (dev)
+### v0.11.0
 
 - **Dialog HITL** — New HITL type for interactive content review via chat interface. When a `CaseNodeUpdate` payload contains `supervaizer_dialog`, the workbench renders a conversation UI instead of a fixed form. Supports iterative refinement through LLM-powered feedback loops. Fields: `content` (JSON string), `content_type` (email/text/code), `objective`, `instructions`, `messages` (conversation history), `confirm_label`.
   - Template: `dialog_renderer.html` with `render_hitl_dialog` and `render_dialog_confirmed` macros
