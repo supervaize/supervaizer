@@ -5,7 +5,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
@@ -35,6 +35,10 @@ class CaseNodeUpdate(SvBaseModel):
     payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
     error: Optional[str] = None
+    scheduled_at: datetime | None = None  # When to execute (UTC)
+    scheduled_method: str | None = None  # Agent method dotted path
+    scheduled_params: Optional[Dict[str, Any]] = None  # Params for the method
+    scheduled_status: str | None = None  # pending, executing, completed, failed, cancelled
 
     def __init__(
         self,
@@ -44,6 +48,10 @@ class CaseNodeUpdate(SvBaseModel):
         is_final: bool = False,
         index: int | None = None,
         error: Optional[str] = None,
+        scheduled_at: datetime | None = None,
+        scheduled_method: str | None = None,
+        scheduled_params: Dict[str, Any] | None = None,
+        scheduled_status: str | None = None,
     ) -> None:
         """Initialize a CaseNodeUpdate.
 
@@ -85,6 +93,10 @@ class CaseNodeUpdate(SvBaseModel):
             "is_final": is_final,
             "index": index,
             "error": error,
+            "scheduled_at": scheduled_at,
+            "scheduled_method": scheduled_method,
+            "scheduled_params": scheduled_params,
+            "scheduled_status": scheduled_status,
         }
         object.__setattr__(self, "__dict__", {})
         object.__setattr__(self, "__pydantic_fields_set__", set())
@@ -96,13 +108,17 @@ class CaseNodeUpdate(SvBaseModel):
             setattr(self, key, value)
 
     @property
+    def is_scheduled(self) -> bool:
+        return self.scheduled_at is not None
+
+    @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case node update"""
         # Serialize payload to convert type objects to strings for JSON serialization
         serialized_payload = (
             self.serialize_value(self.payload) if self.payload else None
         )
-        return {
+        info = {
             "index": self.index,
             "name": self.name,
             "error": self.error,
@@ -110,6 +126,13 @@ class CaseNodeUpdate(SvBaseModel):
             "payload": serialized_payload,
             "is_final": self.is_final,
         }
+        if self.scheduled_at:
+            info["scheduled_at"] = self.scheduled_at.isoformat()
+        if self.scheduled_method:
+            info["scheduled_method"] = self.scheduled_method
+        if self.scheduled_status:
+            info["scheduled_status"] = self.scheduled_status
+        return info
 
 
 class CaseNodeType(Enum):
@@ -289,6 +312,13 @@ class Case(CaseAbstractModel):
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
+    def cancel_scheduled_steps(self):
+        """Cancel all pending scheduled steps for this case."""
+        for update in self.updates:
+            if (getattr(update, 'scheduled_at', None) is not None
+                    and getattr(update, 'scheduled_status', None) == 'pending'):
+                object.__setattr__(update, 'scheduled_status', 'cancelled')
+
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case"""
@@ -424,6 +454,22 @@ class Cases:
             dict[str, Case]: Dictionary of cases for this job, empty if job not found
         """
         return self.cases_by_job.get(job_id, {})
+
+    def get_due_scheduled_steps(self) -> list[tuple]:
+        """Return all steps where scheduled_at <= now() and status == 'pending'.
+
+        Returns list of (case, step_index, update) tuples.
+        """
+        now = datetime.now(timezone.utc)
+        due = []
+        for job_cases in self.cases_by_job.values():
+            for case_id, case in job_cases.items():
+                for i, update in enumerate(case.updates):
+                    if (getattr(update, 'scheduled_at', None) is not None
+                            and getattr(update, 'scheduled_status', None) == 'pending'
+                            and update.scheduled_at <= now):
+                        due.append((case, i, update))
+        return due
 
     def __contains__(self, case_id: str) -> bool:
         """Check if case exists in any job's registry"""

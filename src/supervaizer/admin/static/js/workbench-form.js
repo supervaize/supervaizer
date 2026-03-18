@@ -151,6 +151,43 @@ class WorkbenchForm {
         }
     }
 
+    async executeStepNow(caseId, stepIndex) {
+        if (!this.activeJobId) return;
+        try {
+            const response = await fetch(
+                `${this.basePath}/jobs/${this.activeJobId}/steps/${caseId}/${stepIndex}/execute`,
+                { method: 'POST', headers: { 'X-API-Key': this.getApiKey() } },
+            );
+            const result = await response.json();
+            if (!response.ok) {
+                this.onError(result.detail || 'Execute failed');
+            } else {
+                this.onError('');
+                this.refreshMonitor(true);
+            }
+        } catch (e) {
+            this.onError(`Network error: ${e.message}`);
+        }
+    }
+
+    async cancelStep(caseId, stepIndex) {
+        if (!this.activeJobId) return;
+        try {
+            const response = await fetch(
+                `${this.basePath}/jobs/${this.activeJobId}/steps/${caseId}/${stepIndex}/cancel`,
+                { method: 'POST', headers: { 'X-API-Key': this.getApiKey() } },
+            );
+            if (!response.ok) {
+                this.onError('Cancel failed');
+            } else {
+                this.onError('');
+                this.refreshMonitor(true);
+            }
+        } catch (e) {
+            this.onError(`Network error: ${e.message}`);
+        }
+    }
+
     async stopJob(jobId) {
         const targetJobId = jobId || this.activeJobId;
         if (!targetJobId) return;

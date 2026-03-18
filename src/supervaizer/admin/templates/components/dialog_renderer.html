@@ -77,7 +77,45 @@
         {% elif content_type == "code" %}
         <pre class="p-3 text-xs text-gray-700 max-h-64 overflow-y-auto bg-gray-50 font-mono whitespace-pre-wrap">{{ content_raw }}</pre>
         {% else %}
-        <div class="p-3 text-sm text-gray-700 max-h-64 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+        {# Text/markdown: render with lightweight markdown via Alpine #}
+        <div class="p-3 text-sm text-gray-700 max-h-96 overflow-y-auto prose prose-sm prose-headings:text-gray-800 prose-headings:font-semibold"
+             x-data="{ rendered: '' }"
+             x-init="
+                let raw = {{ content_raw | tojson }};
+                // Unescape literal \\n to real newlines
+                raw = raw.replace(/\\\\n/g, '\n').replace(/\\n/g, '\n');
+                // Lightweight markdown rendering
+                let lines = raw.split('\n');
+                let html = '';
+                let inList = false;
+                for (let line of lines) {
+                    let trimmed = line.trim();
+                    if (trimmed.startsWith('## ')) {
+                        if (inList) { html += '</ul>'; inList = false; }
+                        html += '<h3>' + trimmed.slice(3) + '</h3>';
+                    } else if (trimmed.startsWith('# ')) {
+                        if (inList) { html += '</ul>'; inList = false; }
+                        html += '<h2>' + trimmed.slice(2) + '</h2>';
+                    } else if (trimmed.startsWith('- ')) {
+                        if (!inList) { html += '<ul class=\"list-disc pl-4 my-1\">'; inList = true; }
+                        html += '<li>' + trimmed.slice(2) + '</li>';
+                    } else if (trimmed === '') {
+                        if (inList) { html += '</ul>'; inList = false; }
+                        html += '<br>';
+                    } else {
+                        if (inList) { html += '</ul>'; inList = false; }
+                        html += '<p class=\"my-0.5\">' + trimmed + '</p>';
+                    }
+                }
+                if (inList) html += '</ul>';
+                // Inline formatting: bold, italic, code
+                html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+                html = html.replace(/`(.+?)`/g, '<code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">$1</code>');
+                rendered = html;
+             "
+             x-html="rendered">
+        </div>
         {% endif %}
     </div>
     {% endif %}
@@ -178,7 +216,27 @@
         </template>
     </div>
     {% else %}
-    <div class="p-3 text-sm text-gray-700 max-h-48 overflow-y-auto whitespace-pre-wrap">{{ content_raw }}</div>
+    <div class="p-3 text-sm text-gray-700 max-h-48 overflow-y-auto prose prose-sm"
+         x-data="{ rendered: '' }"
+         x-init="
+            let raw = {{ content_raw | tojson }};
+            raw = raw.replace(/\\\\n/g, '\n').replace(/\\n/g, '\n');
+            let lines = raw.split('\n');
+            let html = '';
+            for (let line of lines) {
+                let t = line.trim();
+                if (t.startsWith('## ')) html += '<h3>' + t.slice(3) + '</h3>';
+                else if (t.startsWith('# ')) html += '<h2>' + t.slice(2) + '</h2>';
+                else if (t.startsWith('- ')) html += '<p class=\"my-0.5\">• ' + t.slice(2) + '</p>';
+                else if (t === '') html += '<br>';
+                else html += '<p class=\"my-0.5\">' + t + '</p>';
+            }
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/`(.+?)`/g, '<code class=\"text-xs bg-gray-100 px-1 rounded\">$1</code>');
+            rendered = html;
+         "
+         x-html="rendered">
+    </div>
     {% endif %}
 </div>
 {% endmacro %}

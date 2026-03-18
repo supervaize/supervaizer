@@ -21,6 +21,16 @@ All notable changes to this project will be documented in this file.
 
 ### v0.11.0
 
+- **Custom routes** — Agents can mount their own FastAPI routers via `custom_routes` field on Agent. Supervaizer mounts them at `/agents/{slug}/api/` without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
+
+- **Scheduled steps** — CaseNodeUpdate gains `scheduled_at`, `scheduled_method`, `scheduled_params`, `scheduled_status` fields. Steps with `scheduled_at` are deferred until the time arrives. A background executor polls every 60s and calls the agent method. Workbench shows countdown, "Execute now", and "Cancel" controls on pending scheduled steps. Enables time-based orchestration (call scheduling, retries with backoff, follow-up actions).
+  - Model: `CaseNodeUpdate.scheduled_at/scheduled_method/scheduled_params/scheduled_status`
+  - Executor: `_run_scheduled_step_loop` in server.py (local mode)
+  - Routes: `POST/PATCH .../steps/{case_id}/{step_index}/execute|cancel|schedule`
+  - UI: status badges, execute now / cancel buttons in workbench monitor
+  - Case: `cancel_scheduled_steps()` for job stop cascading
+  - Cases: `get_due_scheduled_steps()` for executor polling
+
 - **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
   - `AgentMethods`: new `job_poll: AgentMethod | None` field
   - Route: `POST /workbench/jobs/{job_id}/poll` triggers the agent's poll handler

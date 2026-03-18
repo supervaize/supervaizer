@@ -168,6 +168,32 @@
                             {% endif %}
                         </div>
                     </div>
+                    {# Scheduled step controls #}
+                    {% set is_sched = step.scheduled_at is not none if step.scheduled_at is defined else false %}
+                    {% if is_sched %}
+                    <div class="ml-8 mt-1 flex items-center gap-2 text-xs">
+                        {% set sched_status = step.scheduled_status if step.scheduled_status is defined else "pending" %}
+                        {% if sched_status == "pending" %}
+                        <span class="text-blue-600 font-medium">&#9200; Scheduled: {{ step.scheduled_at }}</span>
+                        <button onclick="window.workbenchForm && window.workbenchForm.executeStepNow('{{ case.id }}', {{ loop.index0 }})"
+                                class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-100 transition-colors">
+                            Execute now
+                        </button>
+                        <button onclick="window.workbenchForm && window.workbenchForm.cancelStep('{{ case.id }}', {{ loop.index0 }})"
+                                class="bg-red-50 text-red-600 px-2 py-0.5 rounded hover:bg-red-100 transition-colors">
+                            Cancel
+                        </button>
+                        {% elif sched_status == "executing" %}
+                        <span class="text-amber-600">&#9889; Executing...</span>
+                        {% elif sched_status == "completed" %}
+                        <span class="text-green-600">&#9989; Executed</span>
+                        {% elif sched_status == "failed" %}
+                        <span class="text-red-600">&#10060; Failed</span>
+                        {% elif sched_status == "cancelled" %}
+                        <span class="text-gray-400 line-through">Cancelled</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {# Show reply content as a blockquote #}
                     {% if step_payload is mapping and step_payload.get("reply") %}
                     <div class="mx-4 mb-2 rounded border border-blue-200 bg-blue-50 p-3">
