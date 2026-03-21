@@ -208,7 +208,8 @@ class AgentMethodAbstract(BaseModel):
                 "fields": [
                     {
                         "name": "Company to research",
-                        "type": str,
+                        # String label for docs / JSON Schema — not the `str` type object (Pydantic 2.12+ OpenAPI)
+                        "type": "str",
                         "field_type": "CharField",
                         "max_length": 100,
                         "required": True,
@@ -606,8 +607,15 @@ class AgentAbstract(SvBaseModel):
         default="supervaize_instructions.html",
         description="Path where the supervaize instructions page is served (relative to agent path)",
     )
+    custom_routes: Any | None = Field(
+        default=None,
+        description="Optional FastAPI APIRouter with custom routes for this agent",
+        exclude=True,
+    )
 
-    model_config = cast(ConfigDict, {"reference_group": "Core"})
+    model_config = cast(
+        ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
+    )
 
 
 class Agent(AgentAbstract):
@@ -629,6 +637,7 @@ class Agent(AgentAbstract):
         server_agent_onboarding_status: str | None = None,
         server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
+        custom_routes: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -681,6 +690,7 @@ class Agent(AgentAbstract):
             server_agent_onboarding_status=server_agent_onboarding_status,
             server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
+            custom_routes=custom_routes,
             **kwargs,
         )
 

@@ -56,6 +56,12 @@ env_sync_all:
 build:
     hatch build
 
+# Toggle PEP 440 .dev0 on canonical version (syncs src/supervaizer/__version__.py + pyproject [tool.bumpversion]).
+# Does not edit CHANGELOG or historical docs. After `on`, avoid `just tag_version` until `off` (tags should be release-only).
+# Usage: just version-dev on | just version-dev off
+version-dev cmd:
+    uv run python tools/dev_version.py {{cmd}}
+
 # Reusable recipe to bump version
 _bump_version bump_type:
     @echo "VERSION BUMP IN CICD - not running: hatch version {{bump_type}} "

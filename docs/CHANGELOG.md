@@ -19,7 +19,26 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### v0.11.0
+### Added
+
+- **Scheduled steps** — CaseNodeUpdate gains `scheduled_at`, `scheduled_method`, `scheduled_params`, `scheduled_status` fields. Steps with `scheduled_at` are deferred until the time arrives. A background executor polls every 60s and calls the agent method. Workbench shows countdown, "Execute now", and "Cancel" controls on pending scheduled steps. Enables time-based orchestration (call scheduling, retries with backoff, follow-up actions).
+  - Model: `CaseNodeUpdate.scheduled_at/scheduled_method/scheduled_params/scheduled_status`
+  - Executor: `_run_scheduled_step_loop` in server.py (local mode)
+  - Routes: `POST/PATCH .../steps/{case_id}/{step_index}/execute|cancel|schedule`
+  - UI: status badges, execute now / cancel buttons in workbench monitor
+  - Case: `cancel_scheduled_steps()` for job stop cascading
+  - Cases: `get_due_scheduled_steps()` for executor polling
+
+### Fixed
+
+- **OpenAPI / JSON Schema (Pydantic 2.12+)** — Building the full FastAPI schema (`GET /openapi.json`, Swagger UI) could raise `PydanticInvalidForJsonSchema: … CallableSchema`. Causes and fixes:
+  - **`AgentMethodAbstract.model_config["example_dict"]`** — The sample field dict used `"type": str` (Python’s `str` builtin). Pydantic’s JSON Schema generator walks that value and emits a callable schema for builtins. **Fix:** use the string `"str"` (documentation-only example data, not a type annotation).
+  - **`AgentResponse` nested schemas** — `AgentResponse` (which embeds `AgentMethods` → `CaseNodes` → `CaseNode`) must be rebuilt after other models so OpenAPI sees consistent inner definitions. **Fix:** call `AgentResponse.model_rebuild()` after `Case.model_rebuild()` in `supervaizer/__init__.py`.
+  - **`CaseNode.factory`** — Runtime value is `Callable[..., CaseNodeUpdate] | None`, which cannot appear in JSON Schema. `Annotated[..., SkipJsonSchema()]` was insufficient: Pydantic 2.12 still registered a `Callable` core definition for `$ref` resolution and OpenAPI failed. **Fix:** declare the field as `Any` (documented in code); behaviour and `registration_info` are unchanged.
+
+- **Custom routes** — Agents can mount their own FastAPI routers via `custom_routes` field on Agent. Supervaizer mounts them at `/agents/{slug}/api/` without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
+
+## v0.11.0
 
 - **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
   - `AgentMethods`: new `job_poll: AgentMethod | None` field
