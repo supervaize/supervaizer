@@ -208,7 +208,8 @@ class AgentMethodAbstract(BaseModel):
                 "fields": [
                     {
                         "name": "Company to research",
-                        "type": str,
+                        # String label for docs / JSON Schema — not the `str` type object (Pydantic 2.12+ OpenAPI)
+                        "type": "str",
                         "field_type": "CharField",
                         "max_length": 100,
                         "required": True,

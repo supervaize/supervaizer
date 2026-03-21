@@ -7,7 +7,7 @@
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
 from pydantic import ConfigDict
@@ -159,7 +159,10 @@ class CaseNode(SvBaseModel):
 
     name: str
     type: CaseNodeType
-    factory: Optional[Callable[..., CaseNodeUpdate]] = None
+    # Runtime type is ``Callable[..., CaseNodeUpdate] | None``. Declared as ``Any`` so Pydantic JSON
+    # Schema / FastAPI OpenAPI never emit ``CallableSchema`` (SkipJsonSchema on Callable is not
+    # enough for $ref / definitions generation in Pydantic 2.12+).
+    factory: Any = None
     description: str = ""
     can_be_confirmed: bool = False
 
