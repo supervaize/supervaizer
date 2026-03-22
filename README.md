@@ -156,6 +156,10 @@ For detailed instructions on customizing your controller, see the [Controller Se
 - **Agent Management**: Register, update, and control agents
 - **Job Control**: Create, track, and manage jobs
 - **Event Handling**: Process and respond to system events
+- **Custom Routes**: Agents can mount their own FastAPI routers at `/agents/{slug}/api/` for tool endpoints, webhooks, or custom APIs
+- **Scheduled Steps**: Defer step execution to a future time with automatic background polling and workbench controls (execute now, cancel, reschedule)
+- **Human-in-the-Loop (HITL)**: Form-based and dialog-based interactive content review with chat interface
+- **Agent Workbench**: Built-in testing interface with real-time monitoring, job control, HITL forms, and live console
 - **🚀 Cloud Deployment**: Automated deployment to GCP Cloud Run, AWS App Runner, and DigitalOcean App Platform
 - **A2A Protocol Support**: Full integration with the Agent-to-Agent protocol for standardized agent discovery and interaction
 - **Server Communication**: Interact with SUPERVAIZE servers (see [supervaize.com](https://www.supervaize.com) for more info)
