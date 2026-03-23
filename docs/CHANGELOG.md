@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.12.0
+
 ### Added
 
 - **Custom routes** — Agents can mount their own FastAPI `APIRouter` via the new `custom_routes` field on `Agent`. Supervaizer mounts them at `/agents/{slug}/api/` without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
