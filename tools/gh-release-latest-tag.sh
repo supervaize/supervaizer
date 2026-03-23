@@ -43,4 +43,3 @@ else
   fi
   echo "✅ GitHub release ${LATEST_TAG} created"
 fi
-
