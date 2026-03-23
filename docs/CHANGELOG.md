@@ -19,7 +19,29 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### v0.11.0
+### Added
+
+- **Custom routes** — Agents can mount their own FastAPI `APIRouter` via the new `custom_routes` field on `Agent`. Supervaizer mounts them at `/agents/{slug}/api/` without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
+
+- **Scheduled steps** — `CaseNodeUpdate` gains `scheduled_at`, `scheduled_method`, `scheduled_params`, `scheduled_status` fields. Steps with `scheduled_at` are deferred until the scheduled time. A background executor polls every 60 seconds and calls the agent method automatically. The workbench shows countdown, "Execute now", and "Cancel" controls on pending scheduled steps. Enables time-based orchestration (call scheduling, retries with backoff, follow-up actions).
+  - Model: `CaseNodeUpdate.scheduled_at / scheduled_method / scheduled_params / scheduled_status`
+  - Property: `CaseNodeUpdate.is_scheduled` returns `True` when `scheduled_at` is set
+  - Executor: `_run_scheduled_step_loop` — background asyncio task, polls every 60s
+  - Routes: `POST .../execute`, `POST .../cancel`, `PATCH .../schedule` for step management
+  - UI: status badges (pending/executing/completed/failed/cancelled), execute now / cancel buttons
+  - `Case.cancel_scheduled_steps()` — cancels all pending steps on job stop
+  - `Cases.get_due_scheduled_steps()` — returns steps where `scheduled_at <= now()` and status is `pending`
+
+- **`AgentResponse` export** — `AgentResponse` is now exported from `supervaizer.__init__` for use as a typed response model in custom routes and agent endpoints.
+
+### Fixed
+
+- **OpenAPI / JSON Schema (Pydantic 2.12+)** — Building the full FastAPI schema (`GET /openapi.json`, Swagger UI) could raise `PydanticInvalidForJsonSchema: … CallableSchema`. Three root causes fixed:
+  - `AgentMethodAbstract.model_config["example_dict"]` used `"type": str` (Python builtin) — changed to string `"str"`
+  - `AgentResponse` nested schemas not rebuilt after dependent models — added `AgentResponse.model_rebuild()` after `Case.model_rebuild()` in `supervaizer/__init__.py`
+  - `CaseNode.factory` typed as `Callable` which cannot appear in JSON Schema — changed to `Any` (behaviour unchanged)
+
+## v0.11.0
 
 - **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
   - `AgentMethods`: new `job_poll: AgentMethod | None` field

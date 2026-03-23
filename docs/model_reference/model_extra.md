@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 0.10.1
+**Version:** 0.11.0
 
 ### `common.SvBaseModel`
 
@@ -68,6 +68,7 @@ A base class for creating Pydantic models.
 | `job_start` | `AgentMethod` | **required** |  |
 | `job_stop` | `AgentMethod` | `None` |  |
 | `job_status` | `AgentMethod` | `None` |  |
+| `job_poll` | `AgentMethod` | `None` |  |
 | `human_answer` | `AgentMethod` | `None` |  |
 | `chat` | `AgentMethod` | `None` |  |
 | `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` |  |
@@ -198,8 +199,8 @@ _No additional fields beyond parent class._
 |---|---|---|---|
 | `name` | `str` | **required** |  |
 | `type` | `<enum 'CaseNodeType'>` | **required** |  |
-| `factory` | `Callable[..., case.CaseNodeUpdate]` | **required** |  |
-| `description` | `str` | `None` |  |
+| `factory` | `Any` | `None` |  |
+| `description` | `str` | '' |  |
 | `can_be_confirmed` | `bool` | False |  |
 
 ### `case.CaseNodeUpdate`
@@ -222,6 +223,10 @@ Returns:
 | `payload` | `typing.Dict[str, typing.Any]` | `None` |  |
 | `is_final` | `bool` | False |  |
 | `error` | `str` | `None` |  |
+| `scheduled_at` | `datetime` | `None` |  |
+| `scheduled_method` | `str` | `None` |  |
+| `scheduled_params` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `scheduled_status` | `str` | `None` |  |
 
 ### `deploy.drivers.base.DeploymentPlan`
 
@@ -453,7 +458,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 1, 25, 14, 28, 58, 746390) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 3, 23, 18, 38, 29, 522267) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `server.ServerInfo`
@@ -485,4 +490,4 @@ A base class for creating Pydantic models.
 | `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Uploaded on 2026-01-25 14:28:59*
+*Uploaded on 2026-03-23 18:38:30*

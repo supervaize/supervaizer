@@ -14,6 +14,7 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentMethods,
     AgentMethodField,
+    AgentResponse,
     FieldTypeEnum,
 )
 from supervaizer.case import (
@@ -99,3 +100,4 @@ __all__ = [
 
 # Rebuild models to resolve forward references after all imports are done
 Case.model_rebuild()
+AgentResponse.model_rebuild()

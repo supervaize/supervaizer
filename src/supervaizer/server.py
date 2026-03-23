@@ -4,6 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import asyncio
 import os
 import secrets
 import sys
@@ -186,6 +187,42 @@ def get_server_info_from_live(server_instance: "Server") -> ServerInfo:
         created_at=datetime.now().isoformat(),
         updated_at=datetime.now().isoformat(),
     )
+
+
+def _execute_scheduled_method(method_path: str, params: dict) -> Any:
+    """Execute a method by its full dotted path (module.func)."""
+    module_name, func_name = method_path.rsplit(".", 1)
+    module = __import__(module_name, fromlist=[func_name])
+    method = getattr(module, func_name)
+    return method(**params)
+
+
+async def _run_scheduled_step_loop(server: "Server") -> None:
+    """Poll for due scheduled steps every 60 seconds and execute them."""
+    from supervaizer.case import Cases
+
+    while True:
+        await asyncio.sleep(60)
+        try:
+            cases = Cases()
+            due_steps = cases.get_due_scheduled_steps()
+            for _case, _step_index, update in due_steps:
+                if not update.scheduled_method:
+                    continue
+                try:
+                    object.__setattr__(update, "scheduled_status", "executing")
+                    log.info(f"[Scheduled step] Executing: {update.name}")
+                    _execute_scheduled_method(
+                        update.scheduled_method,
+                        update.scheduled_params or {},
+                    )
+                    object.__setattr__(update, "scheduled_status", "completed")
+                    log.info(f"[Scheduled step] Completed: {update.name}")
+                except Exception as exc:
+                    object.__setattr__(update, "scheduled_status", "failed")
+                    log.error(f"[Scheduled step] Failed: {update.name}: {exc}")
+        except Exception as exc:
+            log.error(f"[Scheduled step loop] Error: {exc}")
 
 
 class ServerAbstract(SvBaseModel):
@@ -493,6 +530,14 @@ class Server(ServerAbstract):
             log.info("[Server launch] 📢 Deploy A2A routes  ")
             self.app.include_router(create_a2a_routes(self))
 
+        # Mount agent custom routes
+        for agent in self.agents:
+            if agent.custom_routes:
+                self.app.include_router(
+                    agent.custom_routes,
+                    prefix=f"/agents/{agent.slug}/api",
+                )
+
         # Store server instance on app state for admin routes to access
         self.app.state.server = self
 
@@ -554,6 +599,11 @@ class Server(ServerAbstract):
                 log.warning(f"[Server launch] Using auto-generated API key: {api_key}")
         else:
             log.info("[Server launch] API Key authentication disabled")
+
+        # Start the scheduled-step executor loop on app startup
+        @self.app.on_event("startup")
+        async def _start_scheduled_executor() -> None:
+            asyncio.create_task(_run_scheduled_step_loop(self))
 
         if not self.public_url:
             self.public_url = f"{self.scheme}://{self.host}:{self.port}"

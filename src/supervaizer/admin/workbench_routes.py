@@ -544,6 +544,122 @@ def create_workbench_routes() -> APIRouter:
             "message": "HITL answer submitted and dispatched",
         })
 
+    @router.post(
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/execute"
+    )
+    async def workbench_execute_step(
+        request: Request, slug: str, job_id: str, case_id: str, step_index: int
+    ) -> Response:
+        """Execute a scheduled step immediately."""
+        from supervaizer.server import _execute_scheduled_method
+
+        get_agent_by_slug(request, slug)
+
+        case = Cases().get_case(case_id, job_id=job_id)
+        if not case:
+            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+        if step_index < 0 or step_index >= len(case.updates):
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        update = case.updates[step_index]
+        if getattr(update, "scheduled_at", None) is None:
+            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+        if getattr(update, "scheduled_status", None) != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+            )
+
+        object.__setattr__(update, "scheduled_status", "executing")
+        try:
+            if update.scheduled_method:
+                _execute_scheduled_method(
+                    update.scheduled_method,
+                    update.scheduled_params or {},
+                )
+            object.__setattr__(update, "scheduled_status", "completed")
+            return JSONResponse({
+                "status": "completed",
+                "message": "Step executed successfully",
+            })
+        except Exception as e:
+            object.__setattr__(update, "scheduled_status", "failed")
+            log.error(f"[Workbench] Scheduled step execute failed: {e}")
+            return JSONResponse(
+                {"status": "failed", "message": f"Execution failed: {e}"},
+                status_code=500,
+            )
+
+    @router.post(
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/cancel"
+    )
+    async def workbench_cancel_step(
+        request: Request, slug: str, job_id: str, case_id: str, step_index: int
+    ) -> Response:
+        """Cancel a pending scheduled step."""
+        get_agent_by_slug(request, slug)
+
+        case = Cases().get_case(case_id, job_id=job_id)
+        if not case:
+            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+        if step_index < 0 or step_index >= len(case.updates):
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        update = case.updates[step_index]
+        if getattr(update, "scheduled_at", None) is None:
+            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+        if getattr(update, "scheduled_status", None) != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+            )
+
+        object.__setattr__(update, "scheduled_status", "cancelled")
+        return JSONResponse({"status": "cancelled", "message": "Step cancelled"})
+
+    @router.patch(
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/schedule"
+    )
+    async def workbench_reschedule_step(
+        request: Request, slug: str, job_id: str, case_id: str, step_index: int
+    ) -> Response:
+        """Reschedule a pending scheduled step."""
+        get_agent_by_slug(request, slug)
+
+        case = Cases().get_case(case_id, job_id=job_id)
+        if not case:
+            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+        if step_index < 0 or step_index >= len(case.updates):
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        update = case.updates[step_index]
+        if getattr(update, "scheduled_at", None) is None:
+            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+        if getattr(update, "scheduled_status", None) != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+            )
+
+        body = await request.json()
+        new_scheduled_at = body.get("scheduled_at")
+        if not new_scheduled_at:
+            raise HTTPException(status_code=400, detail="scheduled_at is required")
+
+        try:
+            new_dt = datetime.fromisoformat(new_scheduled_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid datetime format")
+
+        object.__setattr__(update, "scheduled_at", new_dt)
+        return JSONResponse({
+            "status": "rescheduled",
+            "message": f"Step rescheduled to {new_dt.isoformat()}",
+        })
+
     @router.get("/agents/{slug}/workbench/console", response_class=HTMLResponse)
     async def workbench_console(request: Request, slug: str) -> Response:
         """HTMX partial — returns recent console log entries."""
