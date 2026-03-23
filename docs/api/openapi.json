@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.11.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 0.12.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -4023,7 +4023,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-03-23T18:38:30.447473"
+            "default": "2026-03-23T22:47:03.534997"
           },
           "status_code": {
             "type": "integer",

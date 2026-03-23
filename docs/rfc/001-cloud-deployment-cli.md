@@ -81,6 +81,7 @@ Set for all platforms:
 - `SUPERVAIZER_PORT` = `--port`
 - `SV_LOG_LEVEL=INFO` (default)
 - `SUPERVAIZER_API_KEY` – stored in provider secret store (generated if `--generate-api-key`)
+- `ADMIN_ALLOWED_IPS` (optional) – comma-separated IPv4/IPv6 addresses and/or CIDR ranges allowed to access the `/admin` web UI; if unset or empty, all IPs are allowed (see `docs/ADMIN_README.md`). Uses the first hop in `X-Forwarded-For` when present.
 - **RSA** (choose one):
   - `SV_RSA_PRIVATE_KEY` (secret value), or
   - `SV_RSA_PRIVATE_KEY_PATH` (if platform supports volumes)
@@ -270,13 +271,11 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **CLI Structure Setup** ✅
-
    - ✅ Add `deploy` subcommand to existing CLI (`src/supervaizer/cli.py`)
    - ✅ Create `src/supervaizer/deploy/` module structure
    - ✅ Add Docker-related dependencies to `pyproject.toml`
 
 2. **Docker Support** ✅
-
    - ✅ Create `Dockerfile` generator (`src/supervaizer/deploy/docker.py`)
    - ✅ Create `.dockerignore` generator
    - ✅ Add `docker-compose.yml` generator for local testing
@@ -284,7 +283,6 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
    - ✅ Generate all files under `.deployment/` directory
 
 3. **State Management** ✅
-
    - ✅ Create deployment state manager (`src/supervaizer/deploy/state.py`)
    - ✅ Implement `.deployment/state.json` persistence
    - ✅ Add state validation and migration logic
@@ -307,27 +305,23 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **GCP Cloud Run Driver** (`src/supervaizer/deploy/drivers/cloud_run.py`) ✅
-
    - ✅ Artifact Registry integration
    - ✅ Secret Manager integration
    - ✅ Cloud Run service management
    - ✅ Health check verification
 
 2. **AWS App Runner Driver** (`src/supervaizer/deploy/drivers/aws_app_runner.py`) ✅
-
    - ✅ ECR integration
    - ✅ Secrets Manager integration
    - ✅ App Runner service management
    - ✅ Health check verification
 
 3. **DigitalOcean App Platform Driver** (`src/supervaizer/deploy/drivers/do_app_platform.py`) ✅
-
    - ✅ DOCR integration
    - ✅ App Platform service management
    - ✅ Health check verification
 
 4. **Driver Testing** ✅
-
    - ✅ Unit tests for each driver with mocked APIs
    - ✅ Test authentication and permission handling
    - ✅ Test resource creation, update, and deletion
@@ -350,31 +344,26 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **Plan Command** (`src/supervaizer/deploy/commands/plan.py`) ✅
-
    - ✅ Resource detection and diff generation
    - ✅ Cost estimation (optional)
    - ✅ Dry-run validation
 
 2. **Up Command** (`src/supervaizer/deploy/commands/up.py`) ✅
-
    - ✅ Orchestrate build → push → deploy → verify workflow
    - ✅ Handle rollback on failure
    - ✅ Progress reporting with rich console
 
 3. **Down Command** (`src/supervaizer/deploy/commands/down.py`) ✅
-
    - ✅ Safe resource cleanup
    - ✅ Confirmation prompts
    - ✅ Resource dependency handling
 
 4. **Status Command** (`src/supervaizer/deploy/commands/status.py`) ✅
-
    - ✅ Service health reporting
    - ✅ Resource utilization metrics
    - ✅ Configuration validation
 
 5. **Command Testing** ✅
-
    - ✅ Unit tests for each command with mocked dependencies
    - ✅ Test command-line argument parsing and validation
    - ✅ Test workflow orchestration and error handling
@@ -397,7 +386,6 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **Local Command Implementation** (`src/supervaizer/deploy/commands/local.py`) ✅
-
    - ✅ Docker availability checking
    - ✅ Test secret generation (API keys and RSA keys)
    - ✅ Docker Compose service management
@@ -405,7 +393,6 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
    - ✅ Service information display
 
 2. **Local Testing Features** ✅
-
    - ✅ Automatic Docker image building with local-test tag
    - ✅ Environment variable configuration for local testing
    - ✅ Comprehensive health endpoint testing
@@ -413,21 +400,18 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
    - ✅ Cleanup instructions and resource management
 
 3. **Local Testing Integration** ✅
-
    - ✅ Integration with existing Docker management system
    - ✅ Consistent secret generation across local and cloud deployments
    - ✅ Health check endpoint validation
    - ✅ Error handling and cleanup on failure
 
 4. **Local Testing Documentation** ✅
-
    - ✅ Created comprehensive LOCAL_TESTING.md guide
    - ✅ Added usage examples and troubleshooting
    - ✅ Documented environment variables and configuration
    - ✅ Provided cleanup and debugging instructions
 
 5. **Local Testing Validation** ✅
-
    - ✅ Unit tests for all local testing functions
    - ✅ Integration tests with Docker Compose
    - ✅ Health check endpoint testing
@@ -445,13 +429,11 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **Secret Management** ✅
-
    - ✅ Environment variables setup in docker
    - ✅ Centralized environment variable management with `get_docker_env_vars()` function
    - ✅ Factorized environment variable handling in Dockerfile generation
 
 2. **Health Verification** ✅
-
    - ✅ Enhanced health check endpoints with retry logic and exponential backoff
    - ✅ Created comprehensive `health.py` utility module with `HealthVerifier` class
    - ✅ Implemented `HealthCheckConfig` for configurable health check parameters
@@ -478,9 +460,7 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **Testing**
-
    - **Unit Testing**
-
      - Test all driver classes (`src/supervaizer/deploy/drivers/`)
      - Test all command implementations (`src/supervaizer/deploy/commands/`)
      - Test state management (`src/supervaizer/deploy/state.py`)
@@ -490,7 +470,6 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
      - Achieve 90%+ code coverage
 
    - **Integration Testing**
-
      - Mock cloud provider APIs for all three platforms
      - Test complete deployment workflows (plan → up → status → down)
      - Test error handling and rollback scenarios
@@ -519,19 +498,16 @@ All deployment artifacts are stored under `.deployment/` directory (added to `.g
 **Tasks**:
 
 1. **Security Audit**
-
    - Secret handling validation
    - Permission scope review
    - Security best practices implementation
 
 2. **Performance Optimization**
-
    - Parallel deployment operations
    - Caching improvements
    - Resource cleanup optimization
 
 3. **Release Preparation**
-
    - Version bumping and changelog
    - Release notes and migration guides
    - Community feedback integration
