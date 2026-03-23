@@ -38,7 +38,9 @@ class CaseNodeUpdate(SvBaseModel):
     scheduled_at: datetime | None = None  # When to execute (UTC)
     scheduled_method: str | None = None  # Agent method dotted path
     scheduled_params: Optional[Dict[str, Any]] = None  # Params for the method
-    scheduled_status: str | None = None  # pending, executing, completed, failed, cancelled
+    scheduled_status: str | None = (
+        None  # pending, executing, completed, failed, cancelled
+    )
 
     def __init__(
         self,
@@ -315,12 +317,14 @@ class Case(CaseAbstractModel):
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
-    def cancel_scheduled_steps(self):
+    def cancel_scheduled_steps(self) -> None:
         """Cancel all pending scheduled steps for this case."""
         for update in self.updates:
-            if (getattr(update, 'scheduled_at', None) is not None
-                    and getattr(update, 'scheduled_status', None) == 'pending'):
-                object.__setattr__(update, 'scheduled_status', 'cancelled')
+            if (
+                getattr(update, "scheduled_at", None) is not None
+                and getattr(update, "scheduled_status", None) == "pending"
+            ):
+                object.__setattr__(update, "scheduled_status", "cancelled")
 
     @property
     def registration_info(self) -> Dict[str, Any]:
@@ -468,9 +472,13 @@ class Cases:
         for job_cases in self.cases_by_job.values():
             for case_id, case in job_cases.items():
                 for i, update in enumerate(case.updates):
-                    if (getattr(update, 'scheduled_at', None) is not None
-                            and getattr(update, 'scheduled_status', None) == 'pending'
-                            and update.scheduled_at <= now):
+                    scheduled_at = getattr(update, "scheduled_at", None)
+                    scheduled_status = getattr(update, "scheduled_status", None)
+                    if (
+                        scheduled_at is not None
+                        and scheduled_status == "pending"
+                        and scheduled_at <= now
+                    ):
                         due.append((case, i, update))
         return due
 

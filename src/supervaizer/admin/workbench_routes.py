@@ -579,7 +579,10 @@ def create_workbench_routes() -> APIRouter:
                     update.scheduled_params or {},
                 )
             object.__setattr__(update, "scheduled_status", "completed")
-            return JSONResponse({"status": "completed", "message": "Step executed successfully"})
+            return JSONResponse({
+                "status": "completed",
+                "message": "Step executed successfully",
+            })
         except Exception as e:
             object.__setattr__(update, "scheduled_status", "failed")
             log.error(f"[Workbench] Scheduled step execute failed: {e}")

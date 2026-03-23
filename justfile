@@ -116,17 +116,17 @@ trufflehog_scan_git_history:
 
 # Generate model reference documentation
 generate_documentation:
-    python tools/gen_model_docs.py
-    python tools/export_openapi.py
+    uv run python tools/gen_model_docs.py
+    uv run python tools/export_openapi.py
 
 
 # Deployment sequence
 ready-to-go:
     just test-no-cov
     just precommit
-    just build_fix
+    just version-dev off
     just generate_documentation
-    git add . && git commit -m "chore: update documentation"
+    bash -euc 'branch_id="$(but status --json | uv run python tools/get_applied_but_branch_id.py)"; but commit "$branch_id" -m "chore: update documentation" --json --status-after'
     just tag_version
 
 # Merge develop to main - after just tag_version
