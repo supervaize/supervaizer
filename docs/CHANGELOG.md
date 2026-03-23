@@ -23,6 +23,17 @@ All notable changes to this project will be documented in this file.
 
 - **`ADMIN_ALLOWED_IPS` for admin UI** — When set, only matching client IPs may access `/admin` (HTML, APIs, static files, WebSocket). Comma-separated IPs and optional CIDR notation; empty or unset allows all. Uses the first address in `X-Forwarded-For` when present.
 
+### Unit Tests Results
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 446   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 48s   |
+
 ## v0.12.0
 
 ### Added
