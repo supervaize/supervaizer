@@ -60,7 +60,26 @@ from rich import print
 PACKAGE = "supervaizer"
 LOCAL_DOCS = Path("./docs")
 LOCAL_MODEL_DOCS = LOCAL_DOCS / "model_reference"
-EXTERNAL_DOCS = Path(os.environ.get("EXTERNAL_DOCS", "../"))
+
+# Default: sibling repo `supervaize-doc/docs` (relative to this file).
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_EXTERNAL_DOCS_ROOT = REPO_ROOT / "supervaize-doc" / "docs"
+
+# This script is intended to write into the sibling repo under this checkout.
+# If the environment variable points elsewhere, prefer the repo-derived default.
+_external_docs_env = os.environ.get("EXTERNAL_DOCS")
+if _external_docs_env:
+    env_path = Path(_external_docs_env)
+    if env_path.resolve() == DEFAULT_EXTERNAL_DOCS_ROOT.resolve():
+        EXTERNAL_DOCS = env_path
+    else:
+        print(
+            f"⚠️  Ignoring EXTERNAL_DOCS='{env_path}' (expected '{DEFAULT_EXTERNAL_DOCS_ROOT}')."
+        )
+        EXTERNAL_DOCS = DEFAULT_EXTERNAL_DOCS_ROOT
+else:
+    EXTERNAL_DOCS = DEFAULT_EXTERNAL_DOCS_ROOT
+
 EXTERNAL_DOC_PATH = EXTERNAL_DOCS / "supervaizer-controller/model_reference"
 EXTERNAL_REF_PATH = EXTERNAL_DOCS / "supervaizer-controller/ref"
 
@@ -68,12 +87,8 @@ EXTERNAL_REF_PATH = EXTERNAL_DOCS / "supervaizer-controller/ref"
 if not LOCAL_MODEL_DOCS.exists():
     print(f"⚠️  LOCAL_MODEL_DOCS directory {LOCAL_MODEL_DOCS} does not exist")
     sys.exit(1)
-if not EXTERNAL_DOC_PATH.exists():
-    print(f"⚠️  EXTERNAL_DOC_PATH directory {EXTERNAL_DOC_PATH} does not exist")
-    sys.exit(1)
-if not EXTERNAL_REF_PATH.exists():
-    print(f"⚠️  EXTERNAL_REF_PATH directory {EXTERNAL_REF_PATH} does not exist")
-    sys.exit(1)
+if not EXTERNAL_DOCS.exists():
+    print(f"⚠️  EXTERNAL_DOCS root directory {EXTERNAL_DOCS} does not exist")
 
 print(f"LOCAL_MODEL_DOCS: {LOCAL_MODEL_DOCS}")
 print(f"EXTERNAL_DOCS: {EXTERNAL_DOCS}")
@@ -796,6 +811,11 @@ def generate_model_docs() -> None:
 
 def copy_to_docs_dir() -> None:
     """Copy all docs/*.md and some root files to the OUTPUT/ref folder."""
+    try:
+        EXTERNAL_REF_PATH.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"⚠️  Failed to create EXTERNAL_REF_PATH {EXTERNAL_REF_PATH}: {e}")
+        return
 
     # Get all .md files from docs directory
     docs_md_files = list(LOCAL_DOCS.glob("*.md"))

@@ -104,7 +104,7 @@ local:
 
 # Create git tag for current version - Automated done in post-commit hook
 tag_version:
-    bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && git tag -a \"v\${VERSION}\" -m \"Version \${VERSION}\" && echo \"Created tag v\${VERSION}\""
+    bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && TAG=\"v\${VERSION}\" && if git rev-parse -q --verify \"refs/tags/\${TAG}\" >/dev/null; then echo \"Tag \${TAG} already exists - skipping\"; else git tag -a \"\${TAG}\" -m \"Version \${VERSION}\" && echo \"Created tag \${TAG}\"; fi"
 
 # Generate RSA private key (PEM) for SUPERVAIZER_PRIVATE_KEY (e.g. Vercel env)
 generate-private-key:
@@ -116,18 +116,17 @@ trufflehog_scan_git_history:
 
 # Generate model reference documentation
 generate_documentation:
-    python tools/gen_model_docs.py
-    python tools/export_openapi.py
+    uv run python tools/gen_model_docs.py
+    uv run python tools/export_openapi.py
 
 
 # Deployment sequence
 ready-to-go:
     just test-no-cov
     just precommit
-    just build_fix
+    just version-dev off
     just generate_documentation
-    git add . && git commit -m "chore: update documentation"
-    just tag_version
+    bash -euc 'branch_id="$(but status --json | uv run python tools/get_applied_but_branch_id.py)"; but commit "$branch_id" -m "chore: update documentation" --json --status-after'
 
 # Merge develop to main - after just tag_version
 merge-to-main:
@@ -155,48 +154,4 @@ release:
 
 # Create or update GitHub release for the latest tag on origin/main
 gh-release:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "Fetching latest tags from origin..."
-    git fetch origin --tags
-
-    # Find the latest tag reachable from origin/main
-    LATEST_TAG=$(git describe --tags --abbrev=0 origin/main)
-
-    if [ -z "${LATEST_TAG}" ]; then
-        echo "❌ No tags found on origin/main. Aborting."
-        exit 1
-    fi
-
-    echo "Using latest tag on origin/main: ${LATEST_TAG}"
-
-    # Find previous tag (for release notes range)
-    PREV_TAG=$(git tag --merged origin/main --sort=-creatordate | grep -v "^${LATEST_TAG}$" | head -1 || true)
-
-    # If a release already exists, just mark it as latest; otherwise create it
-    if gh release view "${LATEST_TAG}" --repo supervaize/supervaizer >/dev/null 2>&1; then
-        echo "GitHub release ${LATEST_TAG} already exists. Marking as latest..."
-        gh release edit "${LATEST_TAG}" \
-            --repo supervaize/supervaizer \
-            --latest
-        echo "✅ GitHub release ${LATEST_TAG} updated as latest"
-    else
-        echo "Creating GitHub release ${LATEST_TAG}..."
-        if [ -n "${PREV_TAG}" ]; then
-            gh release create "${LATEST_TAG}" \
-                --repo supervaize/supervaizer \
-                --title "${LATEST_TAG}" \
-                --latest \
-                --generate-notes \
-                --notes-start-tag "${PREV_TAG}"
-        else
-            # First release: no previous tag
-            gh release create "${LATEST_TAG}" \
-                --repo supervaize/supervaizer \
-                --title "${LATEST_TAG}" \
-                --latest \
-                --generate-notes
-        fi
-        echo "✅ GitHub release ${LATEST_TAG} created"
-    fi
+    bash tools/gh-release-latest-tag.sh supervaize/supervaizer

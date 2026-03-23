@@ -8,25 +8,25 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "cryptography>=46.0.0",
+    "cryptography>=46.0.5",
     "demjson3>=3.0.0",
     "deprecated>=1.3.0",
-    "fastapi>=0.128.0",
+    "fastapi>=0.135.2",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "orjson>=3.11.5",
+    "orjson>=3.11.7",
     "packaging>=25.0",
-    "psutil>=7.2.0",
+    "psutil>=7.2.2",
     "pydantic>=2.12.0",
     "python-slugify>=8.0.0",
     "pyyaml>=6.0.0",
-    "rich>=14.3.0",
+    "rich>=14.3.3",
     "shortuuid>=1.0.0",
-    "sse-starlette>=3.2.0",
+    "sse-starlette>=3.3.3",
     "tinydb>=4.8.0",
-    "typer>=0.21.0",
-    "uvicorn>=0.40.0",
+    "typer>=0.24.1",
+    "uvicorn>=0.42.0",
 ]
 license = "MPL-2.0"
 classifiers = [
@@ -50,24 +50,24 @@ supervaizer = "supervaizer.cli:app"
 
 [project.optional-dependencies]
 deploy = [
-    "boto3>=1.42.41",
+    "boto3>=1.42.73",
     "docker>=7.0.0",
-    "google-cloud-artifact-registry>=1.19.0",
+    "google-cloud-artifact-registry>=1.20.0",
     "google-cloud-run>=0.15.0",
     "google-cloud-secret-manager>=2.26.0",
 ]
 dev = [
-    "hatch>=1.16.3",
+    "hatch>=1.16.5",
     "jsonschema>=4.26.0",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
     "pytest-asyncio>=1.3.0",
-    "pytest-cov>=7.0.0",
+    "pytest-cov>=7.1.0",
     "pytest-mock>=3.15.1",
     "pytest-sugar>=1.1.1",
     "pytest>=8.5.0",
     "respx>=0.22.0",
-    "ruff>=0.15.0",
+    "ruff>=0.15.7",
     "types-deprecated>=1.3.1",
     "types-PyYAML>=6.0.0",
     "types-python-slugify>=8.0.2.20240310",
@@ -126,7 +126,7 @@ mypy_path = "src"
 disallow_any_expr = false
 
 [tool.bumpversion]
-current_version = "0.11.0.dev0"
+current_version = "0.12.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"

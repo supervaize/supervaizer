@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 """Toggle PEP 440 .devN suffix for local dev (keeps __version__.py and bumpversion config in sync)."""
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ def _read_version_py() -> str:
     text = VERSION_FILE.read_text(encoding="utf-8")
     m = VERSION_LINE_RE.search(text)
     if not m:
-        msg = f"Could not find VERSION = \"...\" line in {VERSION_FILE}"
+        msg = f'Could not find VERSION = "..." line in {VERSION_FILE}'
         raise SystemExit(msg)
     return m.group(2)
 
@@ -40,7 +46,7 @@ def _read_pyproject_version() -> str:
     text = PYPROJECT.read_text(encoding="utf-8")
     m = CURRENT_VERSION_LINE_RE.search(text)
     if not m:
-        msg = f"Could not find current_version = \"...\" under [tool.bumpversion] in {PYPROJECT}"
+        msg = f'Could not find current_version = "..." under [tool.bumpversion] in {PYPROJECT}'
         raise SystemExit(msg)
     return m.group(2)
 

@@ -387,7 +387,13 @@ class DOAppPlatformDriver(BaseDriver):
         spec_path = Path(".deployment") / "do-app-spec.yaml"
         spec_path.parent.mkdir(exist_ok=True)
 
-        import yaml  # type: ignore[import-untyped]
+        # Avoid mypy depending on PyYAML's optional type stubs.
+        from typing import TYPE_CHECKING, Any
+
+        if TYPE_CHECKING:
+            yaml: Any
+        else:
+            import yaml
 
         with open(spec_path, "w") as f:
             yaml.dump(app_spec, f, default_flow_style=False)
@@ -470,7 +476,13 @@ class DOAppPlatformDriver(BaseDriver):
         """Set SUPERVAIZER_PUBLIC_URL environment variable."""
         try:
             # Read current spec
-            import yaml
+            # Avoid mypy depending on PyYAML's optional type stubs.
+            from typing import TYPE_CHECKING, Any
+
+            if TYPE_CHECKING:
+                yaml: Any
+            else:
+                import yaml
 
             with open(spec_path, "r") as f:
                 spec = yaml.safe_load(f)
