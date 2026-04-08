@@ -118,6 +118,80 @@ def test_dynamic_choices_endpoint(server_fixture: Server, mocker: Any) -> None:
     assert data["choices"]["projects"] == [["P1", "Project 1"], ["P2", "Project 2"]]
 
 
+def test_dynamic_choices_endpoint_multiple_keys(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """Test endpoint returns multiple choice keys."""
+
+    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        return {
+            "projects": [("P1", "Project 1")],
+            "teams": [("T1", "Team Alpha")],
+        }
+
+    agent = server_fixture.agents[0]
+    agent.get_dynamic_choices = mock_dynamic_choices
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.get(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "projects" in data["choices"]
+    assert "teams" in data["choices"]
+
+
+def test_dynamic_choices_endpoint_empty_result(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """Test endpoint returns empty choices when callback returns empty dict."""
+
+    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        return {}
+
+    agent = server_fixture.agents[0]
+    agent.get_dynamic_choices = mock_dynamic_choices
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.get(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["choices"] == {}
+
+
+def test_dynamic_choices_endpoint_requires_api_key(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """Test that the dynamic choices endpoint requires API key authentication."""
+
+    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        return {"projects": [("P1", "Project 1")]}
+
+    agent = server_fixture.agents[0]
+    agent.get_dynamic_choices = mock_dynamic_choices
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+
+    # No API key header
+    resp = client.get(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices"
+    )
+    assert resp.status_code == 401
+
+
 def test_dynamic_choices_endpoint_no_callback(
     server_fixture: Server, mocker: Any
 ) -> None:

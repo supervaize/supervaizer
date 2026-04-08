@@ -903,6 +903,128 @@ def test_agent_without_dynamic_choices_callback(agent_method_fixture: AgentMetho
     assert agent.get_dynamic_choices is None
 
 
+def test_agent_method_field_dynamic_choices_in_model_dump():
+    """Test that dynamic_choices appears in model_dump output."""
+    field = AgentMethodField(
+        name="Project",
+        type=str,
+        field_type="ChoiceField",
+        dynamic_choices="projects",
+        required=True,
+    )
+    dumped = field.model_dump()
+    assert dumped["dynamic_choices"] == "projects"
+    assert dumped["choices"] is None
+
+
+def test_agent_method_field_static_choices_no_dynamic():
+    """Test that static choices field has dynamic_choices=None in model_dump."""
+    field = AgentMethodField(
+        name="Color",
+        type=str,
+        field_type="ChoiceField",
+        choices=[("R", "Red"), ("B", "Blue")],
+        required=True,
+    )
+    dumped = field.model_dump()
+    assert dumped["dynamic_choices"] is None
+    assert dumped["choices"] == [("R", "Red"), ("B", "Blue")]
+
+
+def test_agent_method_field_non_choice_field_with_dynamic_choices():
+    """Test that dynamic_choices can be set on a ChoiceField type."""
+    field = AgentMethodField(
+        name="Items",
+        type=str,
+        field_type="ChoiceField",
+        dynamic_choices="items",
+        required=False,
+    )
+    assert field.dynamic_choices == "items"
+    assert field.field_type == "ChoiceField"
+
+
+def test_agent_method_mixed_static_and_dynamic_fields():
+    """Test a method with both static and dynamic choice fields."""
+    method = AgentMethod(
+        name="start",
+        method="my_module.start",
+        fields=[
+            AgentMethodField(
+                name="Type",
+                type=str,
+                field_type="ChoiceField",
+                choices=[("A", "Alpha"), ("B", "Beta")],
+                required=True,
+            ),
+            AgentMethodField(
+                name="Project",
+                type=str,
+                field_type="ChoiceField",
+                dynamic_choices="projects",
+                required=True,
+            ),
+            AgentMethodField(
+                name="Name",
+                type=str,
+                field_type="CharField",
+                required=True,
+            ),
+        ],
+        description="Start",
+    )
+    defs = method.fields_definitions
+    assert defs[0]["choices"] == [("A", "Alpha"), ("B", "Beta")]
+    assert defs[0]["dynamic_choices"] is None
+    assert defs[1]["choices"] is None
+    assert defs[1]["dynamic_choices"] == "projects"
+    assert defs[2]["dynamic_choices"] is None
+
+
+def test_agent_dynamic_choices_callback_returns_empty(agent_method_fixture: AgentMethod):
+    """Test callback that returns empty dict for unknown method."""
+
+    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        if method_name == "start":
+            return {"projects": [("P1", "Project 1")]}
+        return {}
+
+    agent = Agent(
+        name="emptyCallbackAgent",
+        author="test",
+        version="1.0",
+        description="test",
+        methods=AgentMethods(job_start=agent_method_fixture),
+        get_dynamic_choices=my_dynamic_choices,
+    )
+    assert agent.get_dynamic_choices("start") == {"projects": [("P1", "Project 1")]}
+    assert agent.get_dynamic_choices("unknown") == {}
+
+
+def test_agent_dynamic_choices_callback_multiple_keys(agent_method_fixture: AgentMethod):
+    """Test callback returning multiple choice keys."""
+
+    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        return {
+            "projects": [("P1", "Project 1"), ("P2", "Project 2")],
+            "teams": [("T1", "Team Alpha"), ("T2", "Team Beta")],
+        }
+
+    agent = Agent(
+        name="multiKeyAgent",
+        author="test",
+        version="1.0",
+        description="test",
+        methods=AgentMethods(job_start=agent_method_fixture),
+        get_dynamic_choices=my_dynamic_choices,
+    )
+    result = agent.get_dynamic_choices("start")
+    assert "projects" in result
+    assert "teams" in result
+    assert len(result["projects"]) == 2
+    assert len(result["teams"]) == 2
+
+
 def test_agent_method_fields_definitions() -> None:
     from supervaizer.agent import AgentMethod, AgentMethodField
 
