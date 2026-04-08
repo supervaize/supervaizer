@@ -5,6 +5,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 API_VERSION = "v1"
 TELEMETRY_VERSION = "v1"
