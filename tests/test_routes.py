@@ -101,7 +101,9 @@ def test_get_agents_and_agent_details(
 def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
     """Test POST /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
 
-    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(
+        method_name: str, context: dict
+    ) -> dict[str, list[tuple[str, str]]]:
         if method_name == "start":
             return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
         return {}
@@ -129,7 +131,9 @@ def test_dynamic_choices_endpoint_multiple_keys(
 ) -> None:
     """Test endpoint returns multiple choice keys."""
 
-    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(
+        method_name: str, context: dict
+    ) -> dict[str, list[tuple[str, str]]]:
         return {
             "projects": [("P1", "Project 1")],
             "teams": [("T1", "Team Alpha")],
@@ -159,7 +163,9 @@ def test_dynamic_choices_endpoint_empty_result(
 ) -> None:
     """Test endpoint returns empty choices when callback returns empty dict."""
 
-    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(
+        method_name: str, context: dict
+    ) -> dict[str, list[tuple[str, str]]]:
         return {}
 
     agent = server_fixture.agents[0]
@@ -185,7 +191,9 @@ def test_dynamic_choices_endpoint_requires_api_key(
 ) -> None:
     """Test that the dynamic choices endpoint requires API key authentication."""
 
-    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(
+        method_name: str, context: dict
+    ) -> dict[str, list[tuple[str, str]]]:
         return {"projects": [("P1", "Project 1")]}
 
     agent = server_fixture.agents[0]

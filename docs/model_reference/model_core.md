@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.12.0
+**Version:** 0.13.0
 
 ### `account.Account`
 
@@ -128,6 +128,7 @@ _No additional fields beyond parent class._
 | `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
 | `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
 | `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter with custom routes for this agent |
+| `dynamic_choices_callback` | `Any` | `None` | Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]] |
 
 ### `agent.AgentMethod`
 
@@ -241,6 +242,7 @@ field definitions for consistency.
 | `default` | `Any` | `None` | Default value for the field - displayed in the UI |
 | `widget` | `str` | `None` | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | False | Whether field is required for form submission |
+| `dynamic_choices` | `str` | `None` | Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'. |
 
 #### Examples
 
@@ -438,4 +440,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-03-23 22:47:03*
+*Uploaded on 2026-04-09 00:25:26*
