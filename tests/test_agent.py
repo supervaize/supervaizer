@@ -830,6 +830,79 @@ def test_agent_method_field_dynamic_choices_mutual_exclusion():
         )
 
 
+def test_agent_method_fields_definitions_includes_dynamic_choices():
+    """Test that fields_definitions includes dynamic_choices in the output."""
+    method = AgentMethod(
+        name="start",
+        method="my_module.start",
+        fields=[
+            AgentMethodField(
+                name="Project",
+                type=str,
+                field_type="ChoiceField",
+                dynamic_choices="projects",
+                required=True,
+            ),
+        ],
+        description="Start",
+    )
+    definitions = method.fields_definitions
+    assert len(definitions) == 1
+    assert definitions[0]["dynamic_choices"] == "projects"
+    assert definitions[0]["choices"] is None
+
+
+def test_agent_method_registration_info_includes_dynamic_choices():
+    """Test that registration_info propagates dynamic_choices through fields."""
+    method = AgentMethod(
+        name="start",
+        method="my_module.start",
+        fields=[
+            AgentMethodField(
+                name="Project",
+                type=str,
+                field_type="ChoiceField",
+                dynamic_choices="projects",
+                required=True,
+            ),
+        ],
+        description="Start",
+    )
+    info = method.registration_info
+    assert info["fields"][0]["dynamic_choices"] == "projects"
+
+
+def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
+    """Test that Agent accepts a get_dynamic_choices callable."""
+
+    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
+
+    agent = Agent(
+        name="dynamicAgent",
+        author="test",
+        version="1.0",
+        description="test agent",
+        methods=AgentMethods(job_start=agent_method_fixture),
+        get_dynamic_choices=my_dynamic_choices,
+    )
+    assert agent.get_dynamic_choices is not None
+    result = agent.get_dynamic_choices("start")
+    assert result == {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
+
+
+def test_agent_without_dynamic_choices_callback(agent_method_fixture: AgentMethod):
+    """Test that get_dynamic_choices defaults to None."""
+    agent = Agent(
+        name="staticAgent",
+        author="test",
+        version="1.0",
+        description="test agent",
+        methods=AgentMethods(job_start=agent_method_fixture),
+    )
+    assert agent.get_dynamic_choices is None
+
+
 def test_agent_method_fields_definitions() -> None:
     from supervaizer.agent import AgentMethod, AgentMethodField
 
