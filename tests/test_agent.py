@@ -981,7 +981,9 @@ def test_agent_method_mixed_static_and_dynamic_fields():
     assert defs[2]["dynamic_choices"] is None
 
 
-def test_agent_dynamic_choices_callback_dispatches_by_method_name(agent_method_fixture: AgentMethod):
+def test_agent_dynamic_choices_callback_dispatches_by_method_name(
+    agent_method_fixture: AgentMethod,
+):
     """Test that the callback receives the method name and can return different results per method."""
 
     def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
@@ -997,11 +999,15 @@ def test_agent_dynamic_choices_callback_dispatches_by_method_name(agent_method_f
         methods=AgentMethods(job_start=agent_method_fixture),
         dynamic_choices_callback=my_dynamic_choices,
     )
-    assert agent.dynamic_choices_callback("start") == {"projects": [("P1", "Project 1")]}
+    assert agent.dynamic_choices_callback("start") == {
+        "projects": [("P1", "Project 1")]
+    }
     assert agent.dynamic_choices_callback("unknown") == {}
 
 
-def test_agent_dynamic_choices_callback_multiple_keys(agent_method_fixture: AgentMethod):
+def test_agent_dynamic_choices_callback_multiple_keys(
+    agent_method_fixture: AgentMethod,
+):
     """Test callback returning multiple choice keys."""
 
     def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:

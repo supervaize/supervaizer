@@ -9,7 +9,11 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Job, Server
-from supervaizer.routes import create_agents_routes, create_default_routes, create_utils_routes
+from supervaizer.routes import (
+    create_agents_routes,
+    create_default_routes,
+    create_utils_routes,
+)
 
 
 def test_utils_public_key_and_encrypt(server_fixture: Server, mocker: Any) -> None:
@@ -186,9 +190,7 @@ def test_dynamic_choices_endpoint_requires_api_key(
     client = TestClient(app)
 
     # No API key header
-    resp = client.get(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices"
-    )
+    resp = client.get(f"/supervaizer/agents/{agent.slug}/start/dynamic_choices")
     assert resp.status_code == 401
 
 

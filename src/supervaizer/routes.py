@@ -635,9 +635,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         agent: Agent = Depends(get_agent),
     ) -> Dict[str, Any]:
         """Get dynamic choices for the start method fields."""
-        log.info(
-            f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}"
-        )
+        log.info(f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}")
 
         if not agent.dynamic_choices_callback:
             raise HTTPException(
@@ -647,9 +645,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         choices = agent.dynamic_choices_callback("start")
 
-        log.info(
-            f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}"
-        )
+        log.info(f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}")
         return {"choices": choices}
 
     if not agent.methods:
