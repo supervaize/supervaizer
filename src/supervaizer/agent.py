@@ -627,7 +627,7 @@ class AgentAbstract(SvBaseModel):
     )
     dynamic_choices_callback: Any | None = Field(
         default=None,
-        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str) -> dict[str, list[tuple[str, str]]]",
+        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]",
         exclude=True,
     )
 

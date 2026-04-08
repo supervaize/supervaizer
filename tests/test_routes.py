@@ -99,9 +99,9 @@ def test_get_agents_and_agent_details(
 
 
 def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
-    """Test GET /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
+    """Test POST /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
 
-    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         if method_name == "start":
             return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
         return {}
@@ -114,8 +114,10 @@ def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
     client = TestClient(app)
     headers = {"X-API-Key": server_fixture.api_key or ""}
 
-    resp = client.get(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        headers=headers,
+        json={"workspace_id": "ws-1", "mission_id": "m-1"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -127,7 +129,7 @@ def test_dynamic_choices_endpoint_multiple_keys(
 ) -> None:
     """Test endpoint returns multiple choice keys."""
 
-    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         return {
             "projects": [("P1", "Project 1")],
             "teams": [("T1", "Team Alpha")],
@@ -141,8 +143,10 @@ def test_dynamic_choices_endpoint_multiple_keys(
     client = TestClient(app)
     headers = {"X-API-Key": server_fixture.api_key or ""}
 
-    resp = client.get(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        headers=headers,
+        json={"workspace_id": "ws-1", "mission_id": "m-1"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -155,7 +159,7 @@ def test_dynamic_choices_endpoint_empty_result(
 ) -> None:
     """Test endpoint returns empty choices when callback returns empty dict."""
 
-    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         return {}
 
     agent = server_fixture.agents[0]
@@ -166,8 +170,10 @@ def test_dynamic_choices_endpoint_empty_result(
     client = TestClient(app)
     headers = {"X-API-Key": server_fixture.api_key or ""}
 
-    resp = client.get(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        headers=headers,
+        json={"workspace_id": "ws-1", "mission_id": "m-1"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -179,7 +185,7 @@ def test_dynamic_choices_endpoint_requires_api_key(
 ) -> None:
     """Test that the dynamic choices endpoint requires API key authentication."""
 
-    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def mock_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         return {"projects": [("P1", "Project 1")]}
 
     agent = server_fixture.agents[0]
@@ -190,7 +196,10 @@ def test_dynamic_choices_endpoint_requires_api_key(
     client = TestClient(app)
 
     # No API key header
-    resp = client.get(f"/supervaizer/agents/{agent.slug}/start/dynamic_choices")
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        json={},
+    )
     assert resp.status_code == 401
 
 
@@ -206,7 +215,9 @@ def test_dynamic_choices_endpoint_no_callback(
     client = TestClient(app)
     headers = {"X-API-Key": server_fixture.api_key or ""}
 
-    resp = client.get(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        headers=headers,
+        json={"workspace_id": "ws-1", "mission_id": "m-1"},
     )
     assert resp.status_code == 404

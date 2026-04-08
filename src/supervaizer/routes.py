@@ -618,10 +618,10 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
-    @router.get(
+    @router.post(
         "/start/dynamic_choices",
         summary=f"Get dynamic choices for agent: {agent.name} start method",
-        description="Returns dynamic choice values for fields that use dynamic_choices",
+        description="Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context for contextualized choices.",
         response_model=Dict[str, Any],
         responses={
             http_status.HTTP_200_OK: {"model": Dict[str, Any]},
@@ -632,10 +632,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     )
     @handle_route_errors()
     async def get_dynamic_choices(
+        body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
     ) -> Dict[str, Any]:
         """Get dynamic choices for the start method fields."""
-        log.info(f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}")
+        log.info(
+            f"📥 POST /start/dynamic_choices [Dynamic choices] {agent.name}"
+        )
 
         if not agent.dynamic_choices_callback:
             raise HTTPException(
@@ -643,9 +646,19 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 detail=f"Agent {agent.name} does not have dynamic choices configured",
             )
 
-        choices = agent.dynamic_choices_callback("start")
+        if body_params is None:
+            body_params = {}
 
-        log.info(f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}")
+        context = {
+            "workspace_id": body_params.get("workspace_id"),
+            "mission_id": body_params.get("mission_id"),
+        }
+
+        choices = agent.dynamic_choices_callback("start", context)
+
+        log.info(
+            f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}"
+        )
         return {"choices": choices}
 
     if not agent.methods:

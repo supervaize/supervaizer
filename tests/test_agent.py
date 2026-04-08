@@ -875,7 +875,7 @@ def test_agent_method_registration_info_includes_dynamic_choices():
 def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
     """Test that Agent accepts a dynamic_choices_callback callable."""
 
-    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def my_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
 
     agent = Agent(
@@ -887,7 +887,7 @@ def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
         dynamic_choices_callback=my_dynamic_choices,
     )
     assert agent.dynamic_choices_callback is not None
-    result = agent.dynamic_choices_callback("start")
+    result = agent.dynamic_choices_callback("start", {})
     assert result == {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
 
 
@@ -986,7 +986,7 @@ def test_agent_dynamic_choices_callback_dispatches_by_method_name(
 ):
     """Test that the callback receives the method name and can return different results per method."""
 
-    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def my_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         if method_name == "start":
             return {"projects": [("P1", "Project 1")]}
         return {}
@@ -999,10 +999,10 @@ def test_agent_dynamic_choices_callback_dispatches_by_method_name(
         methods=AgentMethods(job_start=agent_method_fixture),
         dynamic_choices_callback=my_dynamic_choices,
     )
-    assert agent.dynamic_choices_callback("start") == {
+    assert agent.dynamic_choices_callback("start", {}) == {
         "projects": [("P1", "Project 1")]
     }
-    assert agent.dynamic_choices_callback("unknown") == {}
+    assert agent.dynamic_choices_callback("unknown", {}) == {}
 
 
 def test_agent_dynamic_choices_callback_multiple_keys(
@@ -1010,7 +1010,7 @@ def test_agent_dynamic_choices_callback_multiple_keys(
 ):
     """Test callback returning multiple choice keys."""
 
-    def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+    def my_dynamic_choices(method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]:
         return {
             "projects": [("P1", "Project 1"), ("P2", "Project 2")],
             "teams": [("T1", "Team Alpha"), ("T2", "Team Beta")],
@@ -1024,7 +1024,7 @@ def test_agent_dynamic_choices_callback_multiple_keys(
         methods=AgentMethods(job_start=agent_method_fixture),
         dynamic_choices_callback=my_dynamic_choices,
     )
-    result = agent.dynamic_choices_callback("start")
+    result = agent.dynamic_choices_callback("start", {})
     assert "projects" in result
     assert "teams" in result
     assert len(result["projects"]) == 2
