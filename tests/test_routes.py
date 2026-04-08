@@ -103,7 +103,7 @@ def test_dynamic_choices_endpoint(server_fixture: Server, mocker: Any) -> None:
         return {}
 
     agent = server_fixture.agents[0]
-    agent.get_dynamic_choices = mock_dynamic_choices
+    agent.dynamic_choices_callback = mock_dynamic_choices
 
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))
@@ -130,7 +130,7 @@ def test_dynamic_choices_endpoint_multiple_keys(
         }
 
     agent = server_fixture.agents[0]
-    agent.get_dynamic_choices = mock_dynamic_choices
+    agent.dynamic_choices_callback = mock_dynamic_choices
 
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))
@@ -155,7 +155,7 @@ def test_dynamic_choices_endpoint_empty_result(
         return {}
 
     agent = server_fixture.agents[0]
-    agent.get_dynamic_choices = mock_dynamic_choices
+    agent.dynamic_choices_callback = mock_dynamic_choices
 
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))
@@ -179,7 +179,7 @@ def test_dynamic_choices_endpoint_requires_api_key(
         return {"projects": [("P1", "Project 1")]}
 
     agent = server_fixture.agents[0]
-    agent.get_dynamic_choices = mock_dynamic_choices
+    agent.dynamic_choices_callback = mock_dynamic_choices
 
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))
@@ -197,7 +197,7 @@ def test_dynamic_choices_endpoint_no_callback(
 ) -> None:
     """Test that endpoint returns 404 when no callback is registered."""
     agent = server_fixture.agents[0]
-    agent.get_dynamic_choices = None
+    agent.dynamic_choices_callback = None
 
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))

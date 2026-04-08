@@ -639,13 +639,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}"
         )
 
-        if not agent.get_dynamic_choices:
+        if not agent.dynamic_choices_callback:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Agent {agent.name} does not have dynamic choices configured",
             )
 
-        choices = agent.get_dynamic_choices("start")
+        choices = agent.dynamic_choices_callback("start")
 
         log.info(
             f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}"

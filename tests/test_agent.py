@@ -873,7 +873,7 @@ def test_agent_method_registration_info_includes_dynamic_choices():
 
 
 def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
-    """Test that Agent accepts a get_dynamic_choices callable."""
+    """Test that Agent accepts a dynamic_choices_callback callable."""
 
     def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
         return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
@@ -884,15 +884,15 @@ def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
         version="1.0",
         description="test agent",
         methods=AgentMethods(job_start=agent_method_fixture),
-        get_dynamic_choices=my_dynamic_choices,
+        dynamic_choices_callback=my_dynamic_choices,
     )
-    assert agent.get_dynamic_choices is not None
-    result = agent.get_dynamic_choices("start")
+    assert agent.dynamic_choices_callback is not None
+    result = agent.dynamic_choices_callback("start")
     assert result == {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
 
 
 def test_agent_without_dynamic_choices_callback(agent_method_fixture: AgentMethod):
-    """Test that get_dynamic_choices defaults to None."""
+    """Test that dynamic_choices_callback defaults to None."""
     agent = Agent(
         name="staticAgent",
         author="test",
@@ -900,7 +900,7 @@ def test_agent_without_dynamic_choices_callback(agent_method_fixture: AgentMetho
         description="test agent",
         methods=AgentMethods(job_start=agent_method_fixture),
     )
-    assert agent.get_dynamic_choices is None
+    assert agent.dynamic_choices_callback is None
 
 
 def test_agent_method_field_dynamic_choices_in_model_dump():
@@ -995,10 +995,10 @@ def test_agent_dynamic_choices_callback_returns_empty(agent_method_fixture: Agen
         version="1.0",
         description="test",
         methods=AgentMethods(job_start=agent_method_fixture),
-        get_dynamic_choices=my_dynamic_choices,
+        dynamic_choices_callback=my_dynamic_choices,
     )
-    assert agent.get_dynamic_choices("start") == {"projects": [("P1", "Project 1")]}
-    assert agent.get_dynamic_choices("unknown") == {}
+    assert agent.dynamic_choices_callback("start") == {"projects": [("P1", "Project 1")]}
+    assert agent.dynamic_choices_callback("unknown") == {}
 
 
 def test_agent_dynamic_choices_callback_multiple_keys(agent_method_fixture: AgentMethod):
@@ -1016,9 +1016,9 @@ def test_agent_dynamic_choices_callback_multiple_keys(agent_method_fixture: Agen
         version="1.0",
         description="test",
         methods=AgentMethods(job_start=agent_method_fixture),
-        get_dynamic_choices=my_dynamic_choices,
+        dynamic_choices_callback=my_dynamic_choices,
     )
-    result = agent.get_dynamic_choices("start")
+    result = agent.dynamic_choices_callback("start")
     assert "projects" in result
     assert "teams" in result
     assert len(result["projects"]) == 2

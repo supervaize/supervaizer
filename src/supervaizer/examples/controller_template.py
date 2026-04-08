@@ -192,7 +192,7 @@ agent: Agent = Agent(
     ),
     parameters_setup=agent_parameters,
     instructions_path="supervaize_instructions.html",  # Path where instructions page is served
-    get_dynamic_choices=get_dynamic_choices,
+    dynamic_choices_callback=get_dynamic_choices,
 )
 
 # For export purposes, use dummy values if environment variables are not set
