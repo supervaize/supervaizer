@@ -633,7 +633,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def get_dynamic_choices(
         agent: Agent = Depends(get_agent),
-    ) -> Dict[str, Any] | JSONResponse:
+    ) -> Dict[str, Any]:
         """Get dynamic choices for the start method fields."""
         log.info(
             f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}"

@@ -94,7 +94,7 @@ def test_get_agents_and_agent_details(
     assert "not found" in resp.json()["detail"].lower()
 
 
-def test_dynamic_choices_endpoint(server_fixture: Server, mocker: Any) -> None:
+def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
     """Test GET /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
 
     def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
@@ -119,7 +119,7 @@ def test_dynamic_choices_endpoint(server_fixture: Server, mocker: Any) -> None:
 
 
 def test_dynamic_choices_endpoint_multiple_keys(
-    server_fixture: Server, mocker: Any
+    server_fixture: Server,
 ) -> None:
     """Test endpoint returns multiple choice keys."""
 
@@ -142,12 +142,12 @@ def test_dynamic_choices_endpoint_multiple_keys(
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "projects" in data["choices"]
-    assert "teams" in data["choices"]
+    assert data["choices"]["projects"] == [["P1", "Project 1"]]
+    assert data["choices"]["teams"] == [["T1", "Team Alpha"]]
 
 
 def test_dynamic_choices_endpoint_empty_result(
-    server_fixture: Server, mocker: Any
+    server_fixture: Server,
 ) -> None:
     """Test endpoint returns empty choices when callback returns empty dict."""
 
@@ -171,7 +171,7 @@ def test_dynamic_choices_endpoint_empty_result(
 
 
 def test_dynamic_choices_endpoint_requires_api_key(
-    server_fixture: Server, mocker: Any
+    server_fixture: Server,
 ) -> None:
     """Test that the dynamic choices endpoint requires API key authentication."""
 
@@ -193,7 +193,7 @@ def test_dynamic_choices_endpoint_requires_api_key(
 
 
 def test_dynamic_choices_endpoint_no_callback(
-    server_fixture: Server, mocker: Any
+    server_fixture: Server,
 ) -> None:
     """Test that endpoint returns 404 when no callback is registered."""
     agent = server_fixture.agents[0]

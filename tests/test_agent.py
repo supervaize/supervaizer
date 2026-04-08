@@ -931,8 +931,8 @@ def test_agent_method_field_static_choices_no_dynamic():
     assert dumped["choices"] == [("R", "Red"), ("B", "Blue")]
 
 
-def test_agent_method_field_non_choice_field_with_dynamic_choices():
-    """Test that dynamic_choices can be set on a ChoiceField type."""
+def test_agent_method_field_optional_choice_field_with_dynamic_choices():
+    """Test that dynamic_choices can be set on an optional (required=False) ChoiceField."""
     field = AgentMethodField(
         name="Items",
         type=str,
@@ -981,8 +981,8 @@ def test_agent_method_mixed_static_and_dynamic_fields():
     assert defs[2]["dynamic_choices"] is None
 
 
-def test_agent_dynamic_choices_callback_returns_empty(agent_method_fixture: AgentMethod):
-    """Test callback that returns empty dict for unknown method."""
+def test_agent_dynamic_choices_callback_dispatches_by_method_name(agent_method_fixture: AgentMethod):
+    """Test that the callback receives the method name and can return different results per method."""
 
     def my_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
         if method_name == "start":
