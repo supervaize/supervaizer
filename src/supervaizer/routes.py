@@ -618,6 +618,40 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
+    @router.get(
+        "/start/dynamic_choices",
+        summary=f"Get dynamic choices for agent: {agent.name} start method",
+        description="Returns dynamic choice values for fields that use dynamic_choices",
+        response_model=Dict[str, Any],
+        responses={
+            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
+            http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[Security(server.verify_api_key)],
+    )
+    @handle_route_errors()
+    async def get_dynamic_choices(
+        agent: Agent = Depends(get_agent),
+    ) -> Dict[str, Any] | JSONResponse:
+        """Get dynamic choices for the start method fields."""
+        log.info(
+            f"📥 GET /start/dynamic_choices [Dynamic choices] {agent.name}"
+        )
+
+        if not agent.get_dynamic_choices:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Agent {agent.name} does not have dynamic choices configured",
+            )
+
+        choices = agent.get_dynamic_choices("start")
+
+        log.info(
+            f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}"
+        )
+        return {"choices": choices}
+
     if not agent.methods:
         raise ValueError(f"Agent {agent.name} has no methods defined")
 

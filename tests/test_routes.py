@@ -9,7 +9,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Job, Server
-from supervaizer.routes import create_default_routes, create_utils_routes
+from supervaizer.routes import create_agents_routes, create_default_routes, create_utils_routes
 
 
 def test_utils_public_key_and_encrypt(server_fixture: Server, mocker: Any) -> None:
@@ -92,3 +92,45 @@ def test_get_agents_and_agent_details(
     resp = client.get("/supervaizer/agent/doesnotexist", headers=headers)
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
+
+
+def test_dynamic_choices_endpoint(server_fixture: Server, mocker: Any) -> None:
+    """Test GET /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
+
+    def mock_dynamic_choices(method_name: str) -> dict[str, list[tuple[str, str]]]:
+        if method_name == "start":
+            return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
+        return {}
+
+    agent = server_fixture.agents[0]
+    agent.get_dynamic_choices = mock_dynamic_choices
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.get(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["choices"]["projects"] == [["P1", "Project 1"], ["P2", "Project 2"]]
+
+
+def test_dynamic_choices_endpoint_no_callback(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """Test that endpoint returns 404 when no callback is registered."""
+    agent = server_fixture.agents[0]
+    agent.get_dynamic_choices = None
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.get(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices", headers=headers
+    )
+    assert resp.status_code == 404
