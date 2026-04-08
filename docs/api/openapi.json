@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.11.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 0.13.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -596,6 +596,76 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response 400 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/supervaizer/agents/competitor-summary/start/dynamic_choices": {
+      "post": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get dynamic choices for agent: competitor_summary start method",
+        "description": "Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context for contextualized choices.",
+        "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Get Dynamic Choices Supervaizer Agents Competitor Summary Start Dynamic Choices Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3578,6 +3648,18 @@
             "title": "Required",
             "description": "Whether field is required for form submission",
             "default": false
+          },
+          "dynamic_choices": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamic Choices",
+            "description": "Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'."
           }
         },
         "type": "object",
@@ -4023,7 +4105,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-03-23T18:38:30.447473"
+            "default": "2026-04-09T00:25:26.894055"
           },
           "status_code": {
             "type": "integer",

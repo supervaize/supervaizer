@@ -29,6 +29,7 @@ from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.account import Account
+from supervaizer.admin.ip_allowlist import AdminIPAllowlistMiddleware
 from supervaizer.admin.routes import create_admin_routes
 from supervaizer.agent import Agent
 from supervaizer.common import (
@@ -543,6 +544,7 @@ class Server(ServerAbstract):
 
         # Deploy admin routes if API key is available
         if self.api_key and admin_interface:
+            self.app.add_middleware(AdminIPAllowlistMiddleware)
             log.info(
                 f"[Server launch] 💼 Deploy Admin interface @ {self.public_url}/admin"
             )

@@ -19,7 +19,7 @@ from typing import (
     cast,
 )
 import shortuuid
-from pydantic import BaseModel, ConfigDict, field_validator, Field
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field
 from rich import inspect, print
 from slugify import slugify
 from supervaizer.__version__ import VERSION
@@ -99,6 +99,19 @@ class AgentMethodField(BaseModel):
     required: bool = Field(
         default=False, description="Whether field is required for form submission"
     )
+    dynamic_choices: str | None = Field(
+        default=None,
+        description="Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_choices_mutual_exclusion(self) -> "AgentMethodField":
+        if self.choices is not None and self.dynamic_choices is not None:
+            raise ValueError(
+                "'choices' and 'dynamic_choices' are mutually exclusive. "
+                "Use 'choices' for static options or 'dynamic_choices' for runtime-resolved options."
+            )
+        return self
 
     model_config = cast(
         ConfigDict,
@@ -612,6 +625,11 @@ class AgentAbstract(SvBaseModel):
         description="Optional FastAPI APIRouter with custom routes for this agent",
         exclude=True,
     )
+    dynamic_choices_callback: Any | None = Field(
+        default=None,
+        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]",
+        exclude=True,
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -638,6 +656,7 @@ class Agent(AgentAbstract):
         server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
+        dynamic_choices_callback: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -691,6 +710,7 @@ class Agent(AgentAbstract):
             server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
+            dynamic_choices_callback=dynamic_choices_callback,
             **kwargs,
         )
 

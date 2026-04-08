@@ -128,7 +128,7 @@ ready-to-go:
     just generate_documentation
     bash -euc 'branch_id="$(but status --json | uv run python tools/get_applied_but_branch_id.py)"; but commit "$branch_id" -m "chore: update documentation" --json --status-after'
 
-# Merge develop to main - after just tag_version
+# Merge develop to main
 merge-to-main:
     @echo "Switching to main branch..."
     git checkout main
