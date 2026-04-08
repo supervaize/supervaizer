@@ -19,7 +19,7 @@ from typing import (
     cast,
 )
 import shortuuid
-from pydantic import BaseModel, ConfigDict, field_validator, Field
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field
 from rich import inspect, print
 from slugify import slugify
 from supervaizer.__version__ import VERSION
@@ -99,6 +99,19 @@ class AgentMethodField(BaseModel):
     required: bool = Field(
         default=False, description="Whether field is required for form submission"
     )
+    dynamic_choices: str | None = Field(
+        default=None,
+        description="Key name for dynamic choices resolved at runtime via Agent.get_dynamic_choices callback. Mutually exclusive with 'choices'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_choices_mutual_exclusion(self) -> "AgentMethodField":
+        if self.choices is not None and self.dynamic_choices is not None:
+            raise ValueError(
+                "'choices' and 'dynamic_choices' are mutually exclusive. "
+                "Use 'choices' for static options or 'dynamic_choices' for runtime-resolved options."
+            )
+        return self
 
     model_config = cast(
         ConfigDict,

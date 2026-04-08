@@ -790,6 +790,46 @@ def test_custom_method_key_validation_empty_dict() -> None:
     assert methods.custom == {}
 
 
+def test_agent_method_field_dynamic_choices():
+    """Test that AgentMethodField accepts dynamic_choices attribute."""
+    field = AgentMethodField(
+        name="List of projects",
+        type=str,
+        field_type="ChoiceField",
+        dynamic_choices="projects",
+        required=True,
+    )
+    assert field.dynamic_choices == "projects"
+    assert field.choices is None
+
+
+def test_agent_method_field_dynamic_choices_default_none():
+    """Test that dynamic_choices defaults to None."""
+    field = AgentMethodField(
+        name="color",
+        type=str,
+        field_type="ChoiceField",
+        choices=[("R", "Red"), ("B", "Blue")],
+        required=True,
+    )
+    assert field.dynamic_choices is None
+
+
+def test_agent_method_field_dynamic_choices_mutual_exclusion():
+    """Test that choices and dynamic_choices cannot both be set."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        AgentMethodField(
+            name="List of projects",
+            type=str,
+            field_type="ChoiceField",
+            choices=[("A", "Option A")],
+            dynamic_choices="projects",
+            required=True,
+        )
+
+
 def test_agent_method_fields_definitions() -> None:
     from supervaizer.agent import AgentMethod, AgentMethodField
 
