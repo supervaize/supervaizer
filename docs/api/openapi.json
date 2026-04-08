@@ -628,6 +628,56 @@
         ]
       }
     },
+    "/supervaizer/agents/competitor-summary/start/dynamic_choices": {
+      "get": {
+        "tags": [
+          "Supervision",
+          "Supervision"
+        ],
+        "summary": "Get dynamic choices for agent: competitor_summary start method",
+        "description": "Returns dynamic choice values for fields that use dynamic_choices",
+        "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response 200 Get Dynamic Choices Supervaizer Agents Competitor Summary Start Dynamic Choices Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/supervaizer/agents/competitor-summary/jobs": {
       "post": {
         "tags": [
@@ -3578,6 +3628,18 @@
             "title": "Required",
             "description": "Whether field is required for form submission",
             "default": false
+          },
+          "dynamic_choices": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamic Choices",
+            "description": "Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'."
           }
         },
         "type": "object",
@@ -4023,7 +4085,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-03-23T22:47:03.534997"
+            "default": "2026-04-08T23:08:57.508080"
           },
           "status_code": {
             "type": "integer",
