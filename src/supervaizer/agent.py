@@ -625,6 +625,11 @@ class AgentAbstract(SvBaseModel):
         description="Optional FastAPI APIRouter with custom routes for this agent",
         exclude=True,
     )
+    get_dynamic_choices: Any | None = Field(
+        default=None,
+        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str) -> dict[str, list[tuple[str, str]]]",
+        exclude=True,
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -651,6 +656,7 @@ class Agent(AgentAbstract):
         server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
+        get_dynamic_choices: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -704,6 +710,7 @@ class Agent(AgentAbstract):
             server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
+            get_dynamic_choices=get_dynamic_choices,
             **kwargs,
         )
 
