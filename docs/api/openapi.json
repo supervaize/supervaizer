@@ -629,14 +629,24 @@
       }
     },
     "/supervaizer/agents/competitor-summary/start/dynamic_choices": {
-      "get": {
+      "post": {
         "tags": [
           "Supervision",
           "Supervision"
         ],
         "summary": "Get dynamic choices for agent: competitor_summary start method",
-        "description": "Returns dynamic choice values for fields that use dynamic_choices",
-        "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_get",
+        "description": "Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context for contextualized choices.",
+        "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Body Params"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -645,7 +655,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 200 Get Dynamic Choices Supervaizer Agents Competitor Summary Start Dynamic Choices Get"
+                  "title": "Response 200 Get Dynamic Choices Supervaizer Agents Competitor Summary Start Dynamic Choices Post"
                 }
               }
             }
@@ -666,6 +676,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -4085,7 +4105,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-04-08T23:08:57.508080"
+            "default": "2026-04-08T23:59:53.027216"
           },
           "status_code": {
             "type": "integer",
