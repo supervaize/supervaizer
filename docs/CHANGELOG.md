@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **`ADMIN_ALLOWED_IPS` for admin UI** — When set, only matching client IPs may access `/admin` (HTML, APIs, static files, WebSocket). Comma-separated IPs and optional CIDR notation; empty or unset allows all. Uses the first address in `X-Forwarded-For` when present.
+- **Dynamic choices for `AgentMethodField`** — Fields can now use `dynamic_choices` instead of static `choices` to resolve options at runtime via a callback. Add a `dynamic_choices_callback` callable to the `Agent` constructor and a `dynamic_choices` key to your `AgentMethodField`. Supervaize Studio fetches choices from the new `GET /agents/{slug}/start/dynamic_choices` endpoint when rendering the job start form. Static `choices` and `dynamic_choices` are mutually exclusive on a field.
 
 ### Unit Tests Results
 
@@ -29,10 +30,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 446   |
+| ✅ Passed  | 464   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 48s   |
+| ⏱️ in      | 65s   |
 
 ## v0.12.0
 
