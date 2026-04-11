@@ -119,11 +119,53 @@ def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
     resp = client.post(
         f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
         headers=headers,
-        json={"workspace_id": "ws-1", "mission_id": "m-1"},
+        json={
+            "workspace_id": "ws-1",
+            "workspace_slug": "adl",
+            "mission_id": "m-1",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["choices"]["projects"] == [["P1", "Project 1"], ["P2", "Project 2"]]
+
+
+def test_dynamic_choices_endpoint_passes_workspace_slug_in_context(
+    server_fixture: Server,
+) -> None:
+    """Callback context includes workspace_slug from the request body."""
+
+    captured: dict[str, Any] = {}
+
+    def mock_dynamic_choices(
+        method_name: str, context: dict
+    ) -> dict[str, list[tuple[str, str]]]:
+        captured["context"] = dict(context)
+        return {"projects": [("P1", "Project 1")]}
+
+    agent = server_fixture.agents[0]
+    agent.dynamic_choices_callback = mock_dynamic_choices
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
+        headers=headers,
+        json={
+            "workspace_id": 23,
+            "workspace_slug": "adl",
+            "mission_id": "01KNPPT249HFSSW662KW9R477N",
+        },
+    )
+    assert resp.status_code == 200
+    assert captured["context"] == {
+        "workspace_id": 23,
+        "workspace_slug": "adl",
+        "mission_id": "01KNPPT249HFSSW662KW9R477N",
+    }
 
 
 def test_dynamic_choices_endpoint_multiple_keys(
@@ -150,7 +192,11 @@ def test_dynamic_choices_endpoint_multiple_keys(
     resp = client.post(
         f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
         headers=headers,
-        json={"workspace_id": "ws-1", "mission_id": "m-1"},
+        json={
+            "workspace_id": "ws-1",
+            "workspace_slug": "slug-1",
+            "mission_id": "m-1",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -179,7 +225,11 @@ def test_dynamic_choices_endpoint_empty_result(
     resp = client.post(
         f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
         headers=headers,
-        json={"workspace_id": "ws-1", "mission_id": "m-1"},
+        json={
+            "workspace_id": "ws-1",
+            "workspace_slug": "slug-1",
+            "mission_id": "m-1",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -226,6 +276,10 @@ def test_dynamic_choices_endpoint_no_callback(
     resp = client.post(
         f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
         headers=headers,
-        json={"workspace_id": "ws-1", "mission_id": "m-1"},
+        json={
+            "workspace_id": "ws-1",
+            "workspace_slug": "slug-1",
+            "mission_id": "m-1",
+        },
     )
     assert resp.status_code == 404

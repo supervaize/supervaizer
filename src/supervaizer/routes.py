@@ -621,7 +621,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @router.post(
         "/start/dynamic_choices",
         summary=f"Get dynamic choices for agent: {agent.name} start method",
-        description="Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context for contextualized choices.",
+        description="Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context (including workspace slug) for contextualized choices.",
         response_model=Dict[str, Any],
         responses={
             http_status.HTTP_200_OK: {"model": Dict[str, Any]},
@@ -649,6 +649,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         context = {
             "workspace_id": body_params.get("workspace_id"),
+            "workspace_slug": body_params.get("workspace_slug"),
             "mission_id": body_params.get("mission_id"),
         }
 

@@ -635,7 +635,7 @@
           "Supervision"
         ],
         "summary": "Get dynamic choices for agent: competitor_summary start method",
-        "description": "Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context for contextualized choices.",
+        "description": "Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context (including workspace slug) for contextualized choices.",
         "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_post",
         "requestBody": {
           "content": {
