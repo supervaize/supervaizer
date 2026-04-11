@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
 
+from pydantic import field_validator
+
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import (
@@ -159,6 +161,16 @@ class JobContext(SvBaseModel):
     mission_name: str
     mission_context: Any = None
     job_instructions: Optional[JobInstructions] = None
+
+    @field_validator("workspace_id", mode="before")
+    @classmethod
+    def coerce_workspace_id(cls, v: Any) -> Any:
+        """Supervaize API may send numeric workspace ids (JSON); normalize to str."""
+        if isinstance(v, str):
+            return v.strip()
+        if isinstance(v, (int, float)):
+            return str(v)
+        return v
 
     @property
     def registration_info(self) -> Dict[str, Any]:

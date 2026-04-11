@@ -36,6 +36,18 @@ def job_fixture(context_fixture: JobContext) -> Job:
     )
 
 
+def test_job_context_workspace_id_int_coerced_to_str() -> None:
+    ctx = JobContext(
+        workspace_id=23,
+        job_id="j1",
+        started_by="u",
+        started_at=datetime.now(),
+        mission_id="m1",
+        mission_name="M",
+    )
+    assert ctx.workspace_id == "23"
+
+
 def test_job_creation(context_fixture: JobContext, job_fixture: Job) -> None:
     job_context = context_fixture
     job = job_fixture
