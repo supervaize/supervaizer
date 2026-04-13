@@ -377,7 +377,9 @@ def test_case_patch_step_no_index_match_still_sends_but_keeps_registry_unchanged
     mocker: MockerFixture,
 ) -> None:
     """Studio still receives the upsert; only the local updates list is left as-is if no index matches."""
-    mock_send = mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mock_send = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
     prior = CaseNodeUpdate(name="Only", payload={})
     prior.index = 1
     case_fixture.updates = [prior]

@@ -246,7 +246,10 @@ def create_default_routes(server: "Server") -> APIRouter:
                 case.patch_step(int(casestep_index), update)
                 from supervaizer.lifecycle import EntityEvents
                 from supervaizer.storage import PersistentEntityLifecycle
-                PersistentEntityLifecycle.handle_event(case, EntityEvents.INPUT_RECEIVED)
+
+                PersistentEntityLifecycle.handle_event(
+                    case, EntityEvents.INPUT_RECEIVED
+                )
             else:
                 case.receive_human_input(update)
             case_status = case.status.value
@@ -259,6 +262,7 @@ def create_default_routes(server: "Server") -> APIRouter:
 
         # Call the agent's human_answer method if registered
         import importlib
+
         for sv_agent in server.agents:
             if sv_agent.methods and sv_agent.methods.human_answer:
                 try:
