@@ -277,9 +277,7 @@ def create_default_routes(server: "Server") -> APIRouter:
                 answer_payload = request.answer
                 if isinstance(answer_payload, dict):
                     fields = {
-                        k: v
-                        for k, v in answer_payload.items()
-                        if k != "casestep_index"
+                        k: v for k, v in answer_payload.items() if k != "casestep_index"
                     }
                 else:
                     fields = answer_payload
@@ -299,9 +297,7 @@ def create_default_routes(server: "Server") -> APIRouter:
                         params,
                     )
                 except Exception as hook_exc:
-                    log.error(
-                        f"[human_answer hook] {owning_agent.name}: {hook_exc}"
-                    )
+                    log.error(f"[human_answer hook] {owning_agent.name}: {hook_exc}")
 
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"

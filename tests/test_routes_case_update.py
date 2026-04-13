@@ -1,6 +1,12 @@
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
+# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, You can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
@@ -344,9 +350,9 @@ def test_human_answer_only_owning_agent_executed(
         custom={"m1": stub_method},
         human_answer=ha,
     )
-    params_setup = ParametersSetup.from_list(
-        [Parameter(name="p", value="v", is_environment=True)]
-    )
+    params_setup = ParametersSetup.from_list([
+        Parameter(name="p", value="v", is_environment=True)
+    ])
     assert params_setup is not None
     owner = Agent(
         name="owner-agent",
