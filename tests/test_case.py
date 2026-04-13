@@ -341,3 +341,54 @@ def test_case_node_with_complex_factory(
     assert update.payload.get("duration_seconds") == duration_seconds
     assert update.payload.get("extracted_values") == extracted_values
     assert update.payload.get("metadata") == metadata
+
+
+def test_case_node_update_registration_info_includes_upsert() -> None:
+    """CaseNodeUpdate.registration_info exposes upsert for Studio payloads."""
+    u = CaseNodeUpdate(name="step", payload={"k": "v"})
+    assert u.registration_info["upsert"] is False
+    u.upsert = True
+    assert u.registration_info["upsert"] is True
+
+
+def test_case_patch_step_replaces_in_memory_step_and_sets_upsert(
+    case_fixture: Case,
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    prior = CaseNodeUpdate(name="Prior", payload={"original": True})
+    prior.index = 2
+    case_fixture.updates = [prior]
+
+    new_u = CaseNodeUpdate(
+        name="Human Input Response",
+        payload={"answer": {"x": 1}, "message": "m", "response_type": "human_input"},
+    )
+    case_fixture.patch_step(2, new_u)
+
+    assert len(case_fixture.updates) == 1
+    assert case_fixture.updates[0] is new_u
+    assert new_u.index == 2
+    assert new_u.upsert is True
+
+
+def test_case_patch_step_no_index_match_still_sends_but_keeps_registry_unchanged(
+    case_fixture: Case,
+    mocker: MockerFixture,
+) -> None:
+    """Studio still receives the upsert; only the local updates list is left as-is if no index matches."""
+    mock_send = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
+    prior = CaseNodeUpdate(name="Only", payload={})
+    prior.index = 1
+    case_fixture.updates = [prior]
+
+    orphan = CaseNodeUpdate(name="Patch", payload={"p": 1})
+    case_fixture.patch_step(99, orphan)
+
+    assert mock_send.call_count == 1
+    assert len(case_fixture.updates) == 1
+    assert case_fixture.updates[0] is prior
+    assert orphan.index == 99
+    assert orphan.upsert is True
