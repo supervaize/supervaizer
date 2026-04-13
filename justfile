@@ -10,10 +10,9 @@ YYYYMMDD:= `date +%Y%m%d`
 default:
     @just --list
 
-# Dev install
-dev-install:
-    uv venv
-    uv pip install -e .[dev]
+# Install dev dependencies
+install-dev:
+    uv sync --extra dev
 
 # Run pre-commit hooks manually
 precommit:
@@ -83,7 +82,7 @@ release-major:
     just _bump-version major
 
 # Push tags to remote
-push-tags:
+push_tags:
     git push origin --tags
     @echo "Tags pushed to remote"
 
@@ -151,9 +150,22 @@ push-main:
 release:
     just merge-to-main
     just push-main
-    just push-tags
+    just push_tags
     just gh-release
     @echo "✅ Release complete! Main branch and tags pushed to remote"
+
+# Ship to production: precommit, merge develop→main, push (CI does the version bump)
+# Embed bump type token ([MINOR]/[PATCH]/[MAJOR]) so CI picks up the right part.
+# Usage: just ship [patch|minor|major]
+ship part="minor":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just precommit
+    BUMP_TOKEN=$(echo "{{part}}" | tr '[:lower:]' '[:upper:]')
+    git checkout main
+    git pull origin main
+    git merge develop --no-ff -m "[${BUMP_TOKEN}] chore: merge develop to main"
+    git push origin main
 
 # Create or update GitHub release for the latest tag on origin/main
 gh-release:

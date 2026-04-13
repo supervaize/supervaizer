@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
   - example: here the 'How many times to say hello' is supposed to be an 'int'.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -44,7 +44,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | ~70s  |
 
-## v0.13.1
+## [0.13.1]
 
 ### Added
 
@@ -62,7 +62,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 65s   |
 
-## v0.12.0
+## [0.12.0]
 
 ### Added
 
@@ -86,7 +86,7 @@ All notable changes to this project will be documented in this file.
   - `AgentResponse` nested schemas not rebuilt after dependent models — added `AgentResponse.model_rebuild()` after `Case.model_rebuild()` in `supervaizer/__init__.py`
   - `CaseNode.factory` typed as `Callable` which cannot appear in JSON Schema — changed to `Any` (behaviour unchanged)
 
-## v0.11.0
+## [0.11.0]
 
 - **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
   - `AgentMethods`: new `job_poll: AgentMethod | None` field
@@ -153,7 +153,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 50s   |
 
-## v0.10.19
+## [0.10.19]
 
 ### Added
 
@@ -165,7 +165,7 @@ All notable changes to this project will be documented in this file.
 - **Admin index** – Simplified displayed information in the admin index template.
 - **CI** – PyPI publish workflow: added concurrency settings to cancel in-progress runs.
 
-## v0.10.18
+## [0.10.18]
 
 ### Added
 
@@ -175,7 +175,7 @@ All notable changes to this project will be documented in this file.
 
 - **Refactor** – Code formatting and trailing whitespace cleanup (admin routes, server, examples, tests, templates).
 
-## v0.10.17
+## [0.10.17]
 
 ### Added
 
@@ -201,7 +201,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0      |
 | ⏱️ in      | 53.16s |
 
-## v0.10.11
+## [0.10.11]
 
 ### Added
 

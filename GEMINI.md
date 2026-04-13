@@ -7,7 +7,7 @@ This is a Python project that provides a toolkit for building, managing, and con
 The project's dependencies are listed in the `pyproject.toml` file. To install them, you can use the `just` command:
 
 ```bash
-just dev-install
+just install-dev
 ```
 
 **2. Scaffolding:**

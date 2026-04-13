@@ -131,7 +131,7 @@ commit = true
 tag = true
 tag_name = "v{new_version}"
 tag_message = "Release {new_version}"
-message = "Bump version: {current_version} → {new_version}"
+message = "chore(release): v{new_version}"
 # Optional .devN is stripped on bump (CI publishes X.Y.Z only); use `just version-dev on` locally.
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)(\\.dev(?P<dev>\\d+))?"
 serialize = ["{major}.{minor}.{patch}"]
@@ -145,3 +145,8 @@ replace = 'VERSION = "{new_version}"'
 filename = "pyproject.toml"
 search = 'current_version = "{current_version}"'
 replace = 'current_version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "docs/CHANGELOG.md"
+search = "## [Unreleased]"
+replace = "## [Unreleased]\n\n## [{new_version}] - {now:%Y-%m-%d}"
