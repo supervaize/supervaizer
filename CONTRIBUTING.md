@@ -18,7 +18,7 @@ just -l
    - `uv venv`
    - Windows: `.venv\Scripts\activate`
    - Unix/MacOS: `source .venv/bin/activate`
-4. Install development dependencies: `uv pip install -e ".[dev]"` or `just dev-install`
+4. Install development dependencies: `just install-dev`
 5. Install Git hooks: `just install-hooks`
 
 ### Running Tests

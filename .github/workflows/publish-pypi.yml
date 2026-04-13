@@ -65,11 +65,10 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --rebase origin main
           bump-my-version bump ${{ steps.bump-type.outputs.part }} \
             --config-file pyproject.toml \
             --verbose
-          git fetch origin main
-          git rebase origin/main
           git push --follow-tags
 
       - name: Install Hatch
