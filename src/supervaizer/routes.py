@@ -224,48 +224,49 @@ def create_default_routes(server: "Server") -> APIRouter:
             f"📥 POST /jobs/{job_id}/cases/{case_id}/update [Update case with answer]"
         )
 
-        # Get the job first
-        job = Jobs().get_job(job_id)
-        if not job:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Job with ID {job_id} not found §SRCU01",
-            )
-
-        # Get the case from the Cases registry
+        # Try in-memory registry (populated on job_start; may be empty on Cloud Run replicas)
         case = Cases().get_case(case_id, job_id)
-        if not case:
-            log.warning(f"Case with ID {case_id} not found for job {job_id} §SRCU02")
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Case with ID {case_id} not found for job {job_id} §SRCU02",
+        if case is not None:
+            if case.status != EntityStatus.AWAITING:
+                raise HTTPException(
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
+                    detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
+                )
+            update = CaseNodeUpdate(
+                name="Human Input Response",
+                payload={
+                    "answer": request.answer,
+                    "message": request.message,
+                    "response_type": "human_input",
+                },
+                is_final=False,
             )
-        # Check if the case is in AWAITING status (waiting for human input)
-        if case.status != EntityStatus.AWAITING:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
+            case.receive_human_input(update)
+            case_status = case.status.value
+        else:
+            log.warning(
+                f"[Case update] Case {case_id} not in registry for job {job_id} — "
+                "calling human_answer hook only (stateless replica)"
             )
+            case_status = "unknown"
 
-        # Create a case node update with the answer
-        update = CaseNodeUpdate(
-            name="Human Input Response",
-            payload={
-                "answer": request.answer,
-                "message": request.message,
-                "response_type": "human_input",
-            },
-            is_final=False,
-        )
-
-        # Update the case with the answer
-        # case.update(update) - Redundant, receive_human_input calls update()
-
-        # Transition the case from AWAITING to IN_PROGRESS
-        case.receive_human_input(update)
-
-        # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
-        # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE
+        # Call the agent's human_answer method if registered
+        import importlib
+        for sv_agent in server.agents:
+            if sv_agent.methods and sv_agent.methods.human_answer:
+                try:
+                    method_path = sv_agent.methods.human_answer.method
+                    module_name, func_name = method_path.rsplit(".", 1)
+                    module = importlib.import_module(module_name)
+                    func = getattr(module, func_name)
+                    func(
+                        job_id=job_id,
+                        case_id=case_id,
+                        answer=request.answer,
+                        message=request.message,
+                    )
+                except Exception as _hook_exc:
+                    log.error(f"[human_answer hook] {sv_agent.name}: {_hook_exc}")
 
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
@@ -276,7 +277,7 @@ def create_default_routes(server: "Server") -> APIRouter:
             "message": f"Answer received and processed for case {case_id} in job {job_id}",
             "job_id": job_id,
             "case_id": case_id,
-            "case_status": case.status.value,
+            "case_status": case_status,
         }
 
     @router.get("/agents", response_model=List[AgentResponse])

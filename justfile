@@ -48,6 +48,9 @@ mypy:
 env_sync:
     uv sync
 
+env_upgrade:
+    uv sync -U
+
 # Sync all dependencies - including dev dependencies
 env_sync_all:
     uv sync --all-extras
