@@ -19,6 +19,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **`CaseNodeUpdate.upsert` and `Case.patch_step`** — Optional step update path for Studio: when `upsert` is true, the existing case step at the same index is updated instead of appending. `Case.patch_step(index, update)` sets `index` and `upsert` on the update, sends `send_update_case`, and replaces the matching entry in `Case.updates`. Serialized in `CaseNodeUpdate.registration_info` for the controller payload.
+
+- **Human answer with `casestep_index`** — `POST /jobs/{job_id}/cases/{case_id}/update`: if `request.answer` includes `casestep_index`, the controller calls `case.patch_step(int(casestep_index), update)` and runs `PersistentEntityLifecycle.handle_event(..., INPUT_RECEIVED)` instead of `receive_human_input`. Omit `casestep_index` for the previous append/receive-human-input behavior.
+
 ### Changed
 
 - **Dynamic choices request context** — `POST .../start/dynamic_choices` now passes `workspace_slug` through to `dynamic_choices_callback` alongside `workspace_id` and `mission_id` (Supervaize Studio sends it in the JSON body).
@@ -32,7 +38,7 @@ All notable changes to this project will be documented in this file.
 | ✅ Passed  | 466   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 54s   |
+| ⏱️ in      | ~70s  |
 
 ## v0.13.1
 

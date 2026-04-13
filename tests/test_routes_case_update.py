@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from supervaizer import Account, Case, Job, Server
+from supervaizer import Account, Case, CaseNodeUpdate, Job, Server
 from supervaizer.lifecycle import EntityStatus
 
 
@@ -67,8 +67,61 @@ def test_update_case_with_answer_success(
     assert mock_send_event.call_count == 1
 
 
+def test_update_case_with_casestep_index_patches_step(
+    server_fixture: Server,
+    job_fixture: Job,
+    account_fixture: Account,
+    mocker: MockerFixture,
+) -> None:
+    """answer.casestep_index routes to Case.patch_step (upsert) instead of receive_human_input."""
+    test_case = Case(
+        id=f"test-case-upsert-{uuid4()}",
+        job_id=job_fixture.id,
+        account=account_fixture,
+        status=EntityStatus.AWAITING,
+        name="Test Case",
+        description="Test Case Description",
+    )
+    prior = CaseNodeUpdate(name="Question", payload={"supervaizer_form": {"q": "?"}})
+    prior.index = 1
+    test_case.updates = [prior]
+
+    client = TestClient(server_fixture.app)
+    headers = {"X-API-Key": server_fixture.api_key}
+
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
+
+    request_data = {
+        "answer": {"field1": "value1", "casestep_index": 1},
+        "message": "Human reply",
+    }
+
+    response = client.post(
+        f"/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
+        headers=headers,  # type: ignore
+        json=request_data,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["case_status"] == EntityStatus.IN_PROGRESS.value
+
+    assert len(test_case.updates) == 1
+    assert test_case.updates[0].upsert is True
+    assert test_case.updates[0].index == 1
+    assert test_case.status == EntityStatus.IN_PROGRESS
+    assert mock_send_event.call_count == 1
+
+
 def test_update_case_job_not_found(server_fixture: Server) -> None:
-    """Test case update when job is not found."""
+    """When the case is not in the in-memory registry, the route still returns 200.
+
+    Wrong or unknown job_id yields no Case match; the handler forwards to human_answer
+    hooks only (stateless replica / empty registry) with case_status unknown — not 404.
+    """
     client = TestClient(server_fixture.app)
     headers = {"X-API-Key": server_fixture.api_key}
 
@@ -82,15 +135,18 @@ def test_update_case_job_not_found(server_fixture: Server) -> None:
         json=request_data,
     )
 
-    assert response.status_code == 404
-    assert "Job with ID nonexistent-job not found" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["case_status"] == "unknown"
+    assert data["job_id"] == "nonexistent-job"
 
 
 def test_update_case_case_not_found(
     server_fixture: Server,
     job_fixture: Job,
 ) -> None:
-    """Test case update when case is not found."""
+    """When case_id is not registered for the job, registry miss — same as job_not_found path."""
     client = TestClient(server_fixture.app)
     headers = {"X-API-Key": server_fixture.api_key}
 
@@ -104,11 +160,12 @@ def test_update_case_case_not_found(
         json=request_data,
     )
 
-    assert response.status_code == 404
-    assert (
-        f"Case with ID nonexistent-case not found for job {job_fixture.id}"
-        in response.json()["detail"]
-    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["case_status"] == "unknown"
+    assert data["case_id"] == "nonexistent-case"
+    assert data["job_id"] == job_fixture.id
 
 
 def test_update_case_not_awaiting_input(

@@ -34,6 +34,7 @@ class CaseNodeUpdate(SvBaseModel):
     # Todo: test with non-serializable objects. Make sure it works.
     payload: Optional[Dict[str, Any]] = None
     is_final: bool = False
+    upsert: bool = False  # if True, Studio updates the existing step at the same index instead of creating a new one
     error: Optional[str] = None
     scheduled_at: datetime | None = None  # When to execute (UTC)
     scheduled_method: str | None = None  # Agent method dotted path
@@ -48,6 +49,7 @@ class CaseNodeUpdate(SvBaseModel):
         name: str | None = None,
         payload: Dict[str, Any] | None = None,
         is_final: bool = False,
+        upsert: bool = False,
         index: int | None = None,
         error: Optional[str] = None,
         scheduled_at: datetime | None = None,
@@ -93,6 +95,7 @@ class CaseNodeUpdate(SvBaseModel):
             "name": name,
             "payload": payload,
             "is_final": is_final,
+            "upsert": upsert,
             "index": index,
             "error": error,
             "scheduled_at": scheduled_at,
@@ -127,6 +130,7 @@ class CaseNodeUpdate(SvBaseModel):
             "cost": self.cost,
             "payload": serialized_payload,
             "is_final": self.is_final,
+            "upsert": self.upsert,
         }
         if self.scheduled_at:
             info["scheduled_at"] = self.scheduled_at.isoformat()
@@ -249,6 +253,24 @@ class Case(CaseAbstractModel):
         self.account.send_update_case(self, updateCaseNode)
         self.updates.append(updateCaseNode)
 
+        storage = StorageManager()
+        storage.save_object("Case", self.to_dict)
+
+    def patch_step(self, index: int, updateCaseNode: CaseNodeUpdate) -> None:
+        """Update an existing step at the given index instead of appending a new one.
+
+        Sets upsert=True so Studio performs an update_or_create on the step at that index.
+        Use this when a later event should enrich or complete a previously sent step
+        (e.g. adding interview end time to the interview start step).
+        """
+        updateCaseNode.index = index
+        updateCaseNode.upsert = True
+        self.account.send_update_case(self, updateCaseNode)
+        # Update the matching entry in the in-memory registry
+        for i, existing in enumerate(self.updates):
+            if existing.index == index:
+                self.updates[i] = updateCaseNode
+                break
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 

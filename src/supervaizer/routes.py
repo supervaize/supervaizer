@@ -241,7 +241,14 @@ def create_default_routes(server: "Server") -> APIRouter:
                 },
                 is_final=False,
             )
-            case.receive_human_input(update)
+            casestep_index = request.answer.get("casestep_index")
+            if casestep_index is not None:
+                case.patch_step(int(casestep_index), update)
+                from supervaizer.lifecycle import EntityEvents
+                from supervaizer.storage import PersistentEntityLifecycle
+                PersistentEntityLifecycle.handle_event(case, EntityEvents.INPUT_RECEIVED)
+            else:
+                case.receive_human_input(update)
             case_status = case.status.value
         else:
             log.warning(
