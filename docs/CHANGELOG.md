@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-04-14
+
 ### Added
 
 - **`CaseNodeUpdate.upsert` and `Case.patch_step`** — Optional step update path for Studio: when `upsert` is true, the existing case step at the same index is updated instead of appending. `Case.patch_step(index, update)` sets `index` and `upsert` on the update, sends `send_update_case`, and replaces the matching entry in `Case.updates`. Serialized in `CaseNodeUpdate.registration_info` for the controller payload.
