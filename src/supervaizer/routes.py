@@ -4,19 +4,15 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import asyncio
 import traceback
+from collections.abc import Awaitable, Callable
 from functools import wraps
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
-    Optional,
     TypeVar,
-    Union,
 )
 
 from cryptography.hazmat.primitives import serialization
@@ -57,14 +53,14 @@ T = TypeVar("T")
 class CaseUpdateRequest(SvBaseModel):
     """Request model for updating a case with answer to a question."""
 
-    answer: Dict[str, Any]
-    message: Optional[str] = None
+    answer: dict[str, Any]
+    message: str | None = None
 
 
 def handle_route_errors(
     job_conflict_check: bool = False,
 ) -> Callable[
-    [Callable[..., Awaitable[T]]], Callable[..., Awaitable[Union[T, JSONResponse]]]
+    [Callable[..., Awaitable[T]]], Callable[..., Awaitable[T | JSONResponse]]
 ]:
     """
     Decorator to handle common route error patterns.
@@ -76,9 +72,9 @@ def handle_route_errors(
 
     def decorator(
         func: Callable[..., Awaitable[T]],
-    ) -> Callable[..., Awaitable[Union[T, JSONResponse]]]:
+    ) -> Callable[..., Awaitable[T | JSONResponse]]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Union[T, JSONResponse]:
+        async def wrapper(*args: Any, **kwargs: Any) -> T | JSONResponse:
             # log.debug(f"------[DEBUG]----------\n args :{args} \n kwargs :{kwargs}")
             try:
                 result: T = await func(*args, **kwargs)
@@ -150,7 +146,7 @@ def create_default_routes(server: "Server") -> APIRouter:
 
     @router.get(
         "/jobs",
-        response_model=Dict[str, List[JobResponse]],
+        response_model=dict[str, list[JobResponse]],
         dependencies=[Security(server.verify_api_key)],
     )
     @handle_route_errors()
@@ -159,13 +155,13 @@ def create_default_routes(server: "Server") -> APIRouter:
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
         ),
-        status: Optional[EntityStatus] = Query(
+        status: EntityStatus | None = Query(
             default=None, description="Filter jobs by status"
         ),
-    ) -> Dict[str, List[JobResponse]]:
+    ) -> dict[str, list[JobResponse]]:
         """Get all jobs across all agents with pagination and optional status filtering"""
         jobs_registry = Jobs()
-        all_jobs: Dict[str, List[JobResponse]] = {}
+        all_jobs: dict[str, list[JobResponse]] = {}
 
         for agent_name, agent_jobs in jobs_registry.jobs_by_agent.items():
             filtered_jobs = list(agent_jobs.values())
@@ -204,9 +200,9 @@ def create_default_routes(server: "Server") -> APIRouter:
         "/jobs/{job_id}/cases/{case_id}/update",
         summary="Update case with answer to question",
         description="Provide an answer to a question that was requested by a case step",
-        response_model=Dict[str, str],
+        response_model=dict[str, str],
         responses={
-            http_status.HTTP_200_OK: {"model": Dict[str, str]},
+            http_status.HTTP_200_OK: {"model": dict[str, str]},
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
             http_status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
@@ -218,36 +214,41 @@ def create_default_routes(server: "Server") -> APIRouter:
         job_id: str,
         case_id: str,
         request: CaseUpdateRequest = Body(...),
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Update a case with an answer to a question requested by a case step"""
         log.info(
             f"📥 POST /jobs/{job_id}/cases/{case_id}/update [Update case with answer]"
         )
 
-        # Get the job first
-        job = Jobs().get_job(job_id)
-        if not job:
+        jobs_registry = Jobs()
+        job = jobs_registry.get_job(job_id, include_persisted=False)
+        if job is None:
+            job = jobs_registry.get_job(job_id, include_persisted=True)
+        if job is None:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Job with ID {job_id} not found §SRCU01",
+                detail=f"Job with ID {job_id} not found §SRCCWU01",
             )
 
-        # Get the case from the Cases registry
+        # In-memory registry only (populated on job_start / startup reload). No case in
+        # registry ⇒ cannot apply the update or validate lifecycle — do not succeed or
+        # dispatch human_answer (matches workbench 404 on missing case).
         case = Cases().get_case(case_id, job_id)
-        if not case:
-            log.warning(f"Case with ID {case_id} not found for job {job_id} §SRCU02")
+        if case is None:
+            log.warning(
+                f"[Case update] Case {case_id} not in registry for job {job_id} — "
+                "stateless replica, wrong replica, or unknown id; rejecting update"
+            )
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Case with ID {case_id} not found for job {job_id} §SRCU02",
+                detail=f"Case '{case_id}' not found §SRCCWU02",
             )
-        # Check if the case is in AWAITING status (waiting for human input)
+
         if case.status != EntityStatus.AWAITING:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
             )
-
-        # Create a case node update with the answer
         update = CaseNodeUpdate(
             name="Human Input Response",
             payload={
@@ -257,15 +258,46 @@ def create_default_routes(server: "Server") -> APIRouter:
             },
             is_final=False,
         )
+        casestep_index = request.answer.get("casestep_index")
+        if casestep_index is not None:
+            case.patch_step(int(casestep_index), update)
+            from supervaizer.lifecycle import EntityEvents
+            from supervaizer.storage import PersistentEntityLifecycle
 
-        # Update the case with the answer
-        # case.update(update) - Redundant, receive_human_input calls update()
+            PersistentEntityLifecycle.handle_event(case, EntityEvents.INPUT_RECEIVED)
+        else:
+            case.receive_human_input(update)
+        case_status = case.status.value
 
-        # Transition the case from AWAITING to IN_PROGRESS
-        case.receive_human_input(update)
-
-        # TODO CALL CUSTOM HOOKS HERE - AS DEFINED IN THE AGENT CONFIGURATION
-        # TODO REDEFINE AGENT TO ADD CUSTOM HOOKS HERE
+        owning_agent = server.get_agent_by_name(job.agent_name)
+        if owning_agent and owning_agent.methods:
+            human_answer_def = getattr(owning_agent.methods, "human_answer", None)
+            if human_answer_def is not None:
+                human_answer_method = human_answer_def.method
+                answer_payload = request.answer
+                if isinstance(answer_payload, dict):
+                    fields = {
+                        k: v for k, v in answer_payload.items() if k != "casestep_index"
+                    }
+                else:
+                    fields = answer_payload
+                params: dict[str, Any] = {
+                    "fields": fields,
+                    "context": {"job_id": job_id, "case_id": case_id},
+                    "payload": answer_payload,
+                    "case_id": case_id,
+                    "job_id": job_id,
+                }
+                if request.message is not None:
+                    params["message"] = request.message
+                try:
+                    await asyncio.to_thread(
+                        owning_agent._execute,
+                        human_answer_method,
+                        params,
+                    )
+                except Exception as hook_exc:
+                    log.error(f"[human_answer hook] {owning_agent.name}: {hook_exc}")
 
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
@@ -276,17 +308,17 @@ def create_default_routes(server: "Server") -> APIRouter:
             "message": f"Answer received and processed for case {case_id} in job {job_id}",
             "job_id": job_id,
             "case_id": case_id,
-            "case_status": case.status.value,
+            "case_status": case_status,
         }
 
-    @router.get("/agents", response_model=List[AgentResponse])
+    @router.get("/agents", response_model=list[AgentResponse])
     @handle_route_errors()
     async def get_all_agents(
         skip: int = Query(default=0, ge=0, description="Number of jobs to skip"),
         limit: int = Query(
             default=100, ge=1, le=1000, description="Number of jobs to return"
         ),
-    ) -> List[AgentResponse]:
+    ) -> list[AgentResponse]:
         """Get all registered agents with pagination"""
         if not server:
             raise ValueError("Server instance not found")
@@ -438,10 +470,10 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/validate-agent-parameters",
         summary=f"Validate agent parameters for agent: {agent.name}",
         description="Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
         responses={
-            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
-            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+            http_status.HTTP_200_OK: {"model": dict[str, Any]},
+            http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
         dependencies=[Security(server.verify_api_key)],
@@ -450,7 +482,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def validate_agent_parameters(
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate agent parameters for this agent"""
         log.info(
             f"📥 POST /validate-agent-parameters [Validate agent parameters] {agent.name}"
@@ -471,7 +503,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
-        agent_parameters: Dict[str, Any] = {}
+        agent_parameters: dict[str, Any] = {}
         if encrypted_agent_parameters:
             # Basic debug trace
             log.info(
@@ -511,13 +543,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     agent_parameters = {}
 
             except Exception as e:
-                log.error(f"❌ Decryption failed: {type(e).__name__}: {str(e)}")
+                log.error(f"❌ Decryption failed: {type(e).__name__}: {e!s}")
                 result = {
                     "valid": False,
-                    "message": f"Failed to decrypt agent parameters: {str(e)}",
-                    "errors": [f"Decryption failed: {str(e)}"],
+                    "message": f"Failed to decrypt agent parameters: {e!s}",
+                    "errors": [f"Decryption failed: {e!s}"],
                     "invalid_parameters": {
-                        "encrypted_agent_parameters": f"Decryption failed: {str(e)}"
+                        "encrypted_agent_parameters": f"Decryption failed: {e!s}"
                     },
                 }
                 log.info(f"📤 Agent {agent.name}: Decryption failed → {result}")
@@ -547,10 +579,10 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/validate-method-fields",
         summary=f"Validate method fields for agent: {agent.name}",
         description="Validate job input fields against the method's field definitions before starting a job",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
         responses={
-            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
-            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+            http_status.HTTP_200_OK: {"model": dict[str, Any]},
+            http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
         dependencies=[Security(server.verify_api_key)],
@@ -559,7 +591,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def validate_method_fields(
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate method fields for this agent"""
         log.info(
             f"📥 POST /validate-method-fields [Validate method fields] {agent.name}"
@@ -622,9 +654,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/start/dynamic_choices",
         summary=f"Get dynamic choices for agent: {agent.name} start method",
         description="Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context (including workspace slug) for contextualized choices.",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
         responses={
-            http_status.HTTP_200_OK: {"model": Dict[str, Any]},
+            http_status.HTTP_200_OK: {"model": dict[str, Any]},
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
@@ -634,7 +666,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     async def get_dynamic_choices(
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get dynamic choices for the start method fields."""
         log.info(f"📥 POST /start/dynamic_choices [Dynamic choices] {agent.name}")
 
@@ -675,7 +707,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         description=f"{agent.methods.job_start.description}",
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": Job},
-            http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+            http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
             http_status.HTTP_409_CONFLICT: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
@@ -688,7 +720,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         background_tasks: BackgroundTasks,
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
-    ) -> Union[Job, JSONResponse]:
+    ) -> Job | JSONResponse:
         """Start a new job for this agent"""
         log.info(f"📥 POST /jobs [Start job] {agent.name} with params {body_params}")
 
@@ -721,9 +753,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/jobs",
         summary=f"Get all jobs for agent: {agent.name}",
         description="Get all jobs for this agent with pagination and optional status filtering",
-        response_model=List[JobResponse],
+        response_model=list[JobResponse],
         responses={
-            http_status.HTTP_200_OK: {"model": List[JobResponse]},
+            http_status.HTTP_200_OK: {"model": list[JobResponse]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
         dependencies=[Security(server.verify_api_key)],
@@ -738,7 +770,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         status: EntityStatus | None = Query(
             default=None, description="Filter jobs by status"
         ),
-    ) -> List[JobResponse] | JSONResponse:
+    ) -> list[JobResponse] | JSONResponse:
         """Get all jobs for this agent"""
         log.info(f"📥  GET /jobs [Get agent jobs] {agent.name}")
         jobs = list(Jobs().get_agent_jobs(agent.name).values())
@@ -858,8 +890,8 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     )
     @handle_route_errors()
     async def server_update_agent(
-        onboarding_status: Optional[str] = Body(None),
-        parameters_encrypted: Optional[str] = Body(None),
+        onboarding_status: str | None = Body(None),
+        parameters_encrypted: str | None = Body(None),
         agent: Agent = Depends(get_agent),
     ) -> AgentResponse:
         log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
@@ -907,7 +939,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             response_model=JobResponse,
             responses={
                 http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
-                http_status.HTTP_400_BAD_REQUEST: {"model": Dict[str, Any]},
+                http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
                 http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
             },
             dependencies=[Security(server.verify_api_key)],
@@ -918,7 +950,7 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             background_tasks: BackgroundTasks,
             body_params: Any = Body(...),
             agent: Agent = Depends(get_agent),
-        ) -> Union[JobResponse, JSONResponse]:
+        ) -> JobResponse | JSONResponse:
             log.info(
                 f"📥 POST /custom/{method_name} [custom job] {agent.name} with params {body_params}"
             )

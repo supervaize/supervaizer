@@ -17,11 +17,21 @@ All notable changes to this project will be documented in this file.
   - example: here the 'How many times to say hello' is supposed to be an 'int'.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
-## Unreleased
+## [Unreleased]
+
+### Added
+
+- **`CaseNodeUpdate.upsert` and `Case.patch_step`** — Optional step update path for Studio: when `upsert` is true, the existing case step at the same index is updated instead of appending. `Case.patch_step(index, update)` sets `index` and `upsert` on the update, sends `send_update_case`, and replaces the matching entry in `Case.updates`. Serialized in `CaseNodeUpdate.registration_info` for the controller payload.
+
+- **Human answer with `casestep_index`** — `POST /jobs/{job_id}/cases/{case_id}/update`: if `request.answer` includes `casestep_index`, the controller calls `case.patch_step(int(casestep_index), update)` and runs `PersistentEntityLifecycle.handle_event(..., INPUT_RECEIVED)` instead of `receive_human_input`. Omit `casestep_index` for the previous append/receive-human-input behavior.
+
+- **Tests** — `tests/test_routes_case_update.py` covers job 404, workbench-style `human_answer` params (including `casestep_index` stripped from `fields`), single owning agent vs multiple agents, and skip when `job.agent_name` is not on the server.
 
 ### Changed
 
 - **Dynamic choices request context** — `POST .../start/dynamic_choices` now passes `workspace_slug` through to `dynamic_choices_callback` alongside `workspace_id` and `mission_id` (Supervaize Studio sends it in the JSON body).
+
+- **`POST /jobs/{job_id}/cases/{case_id}/update` (human_answer)** — Resolves the job with in-memory `Jobs().get_job` first, then persisted (`include_persisted=True`) if missing. Returns **404** when the job does not exist. Dispatches `human_answer` only for the job owner via `server.get_agent_by_name(job.agent_name)` and `agent._execute(...)`, using the same parameter shape as the workbench HITL route (`fields`, `context`, `payload`, `job_id`, `case_id`, optional `message`). Strips `casestep_index` from `fields` for the hook. Runs the hook in a thread pool executor to avoid blocking the event loop.
 
 ### Unit Tests Results
 
@@ -29,12 +39,12 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 466   |
+| ✅ Passed  | 473   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 54s   |
+| ⏱️ in      | ~70s  |
 
-## v0.13.1
+## [0.13.1]
 
 ### Added
 
@@ -52,7 +62,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 65s   |
 
-## v0.12.0
+## [0.12.0]
 
 ### Added
 
@@ -76,7 +86,7 @@ All notable changes to this project will be documented in this file.
   - `AgentResponse` nested schemas not rebuilt after dependent models — added `AgentResponse.model_rebuild()` after `Case.model_rebuild()` in `supervaizer/__init__.py`
   - `CaseNode.factory` typed as `Callable` which cannot appear in JSON Schema — changed to `Any` (behaviour unchanged)
 
-## v0.11.0
+## [0.11.0]
 
 - **Job Poll mechanism** — New optional `job_poll` method in `AgentMethods` for manual external service polling. When defined, the workbench shows a "Check for updates" button on active jobs. Clicking it calls the agent's poll handler, which checks external services (email inboxes, call status APIs, etc.) and updates cases accordingly. Enables local development without webhooks — production uses real-time webhooks, local mode uses the poll button.
   - `AgentMethods`: new `job_poll: AgentMethod | None` field
@@ -143,7 +153,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 50s   |
 
-## v0.10.19
+## [0.10.19]
 
 ### Added
 
@@ -155,7 +165,7 @@ All notable changes to this project will be documented in this file.
 - **Admin index** – Simplified displayed information in the admin index template.
 - **CI** – PyPI publish workflow: added concurrency settings to cancel in-progress runs.
 
-## v0.10.18
+## [0.10.18]
 
 ### Added
 
@@ -165,7 +175,7 @@ All notable changes to this project will be documented in this file.
 
 - **Refactor** – Code formatting and trailing whitespace cleanup (admin routes, server, examples, tests, templates).
 
-## v0.10.17
+## [0.10.17]
 
 ### Added
 
@@ -191,7 +201,7 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0      |
 | ⏱️ in      | 53.16s |
 
-## v0.10.11
+## [0.10.11]
 
 ### Added
 
