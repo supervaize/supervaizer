@@ -30,6 +30,7 @@ from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.case import CaseNodes
+from supervaizer.data_resource import DataResource
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -630,6 +631,11 @@ class AgentAbstract(SvBaseModel):
         description="Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]. Context includes workspace_id, workspace_slug, mission_id from the dynamic_choices request body.",
         exclude=True,
     )
+    data_resources: list[DataResource] = Field(
+        default_factory=list,
+        description="Data resources this agent exposes for Studio CRUD access",
+        exclude=True,
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -657,6 +663,7 @@ class Agent(AgentAbstract):
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
         dynamic_choices_callback: Any | None = None,
+        data_resources: list["DataResource"] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -711,6 +718,7 @@ class Agent(AgentAbstract):
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
             dynamic_choices_callback=dynamic_choices_callback,
+            data_resources=data_resources or [],
             **kwargs,
         )
 
@@ -750,6 +758,7 @@ class Agent(AgentAbstract):
             "server_encrypted_parameters": self.server_encrypted_parameters,
             "max_execution_time": self.max_execution_time,
             "instructions_path": self.instructions_path,
+            "data_resources": [r.registration_info for r in self.data_resources],
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
