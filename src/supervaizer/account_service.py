@@ -14,7 +14,14 @@ from typing import TYPE_CHECKING, Union
 
 import httpx
 
-from supervaizer.common import ApiError, ApiResult, ApiSuccess, is_local_mode, log
+from supervaizer.common import (
+    ApiError,
+    ApiResult,
+    ApiSuccess,
+    SvBaseModel,
+    is_local_mode,
+    log,
+)
 
 logger = logging.getLogger("httpx")
 # Enable httpx debug logging (optional - uncomment for transport-level debugging)
@@ -65,7 +72,7 @@ def send_event(
         )
 
     headers = account.api_headers
-    payload = event.payload
+    payload = SvBaseModel.serialize_value(event.payload)
     url_event = (
         account.url_event.strip()
     )  # defensive: env vars often have trailing newline

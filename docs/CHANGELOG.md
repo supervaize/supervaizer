@@ -21,6 +21,37 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`DataResource` class** — Declares agent-owned CRUD endpoints exposed to Studio with `name`, `entity_type`, `description`, `operations` (list of CRUD operations), `importable` (bulk import support), and `deletable` flags.
+
+- **`DataResourceField` class** — Describes field schema with `name`, `type`, `description`, `editable`, and `visible` attributes for validated rendering in Studio forms.
+
+- **`FieldType` enum** — Validated field types: `STRING`, `INTEGER`, `BOOLEAN`, `DATE`, `DATETIME`, `TEXT`, `EMAIL`, `URL` for consistent data handling across agents and Studio.
+
+- **`Editable` enum** — Controls Studio form behaviour per field: `ALWAYS` (edit in all forms), `CREATE_ONLY` (edit only on creation), `NEVER` (read-only display).
+
+- **`metadata: dict` on `AbstractJob` and `CaseAbstractModel`** — Arbitrary metadata flows through `registration_info` to Studio, enabling agents to attach custom context and tracking data to jobs and cases.
+
+- **`data_resources: list[DataResource]` on `Agent`** — Included in `registration_info` for Studio to discover and render CRUD interfaces for agent-managed data.
+
+- **Auto-generated FastAPI CRUD routes** — For each declared `DataResource` operation, Supervaizer auto-mounts routes (GET, POST, PATCH, DELETE) at `/agents/{slug}/data/{resource}/...`.
+
+- **Bulk import route** — When `importable=True` on a `DataResource`, a `POST /data/{resource}/import/` route accepts CSV or JSON for batch creation, enabling Studio to load data in bulk.
+
+### Unit Tests Results
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 492   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | ~70s  |
+
+## [0.13.3] 2026-04-14
+
+### Added
+
 - **`CaseNodeUpdate.upsert` and `Case.patch_step`** — Optional step update path for Studio: when `upsert` is true, the existing case step at the same index is updated instead of appending. `Case.patch_step(index, update)` sets `index` and `upsert` on the update, sends `send_update_case`, and replaces the matching entry in `Case.updates`. Serialized in `CaseNodeUpdate.registration_info` for the controller payload.
 
 - **Human answer with `casestep_index`** — `POST /jobs/{job_id}/cases/{case_id}/update`: if `request.answer` includes `casestep_index`, the controller calls `case.patch_step(int(casestep_index), update)` and runs `PersistentEntityLifecycle.handle_event(..., INPUT_RECEIVED)` instead of `receive_human_input`. Omit `casestep_index` for the previous append/receive-human-input behavior.

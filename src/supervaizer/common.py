@@ -35,7 +35,12 @@ class SvBaseModel(BaseModel):
 
     @staticmethod
     def serialize_value(value: Any) -> Any:
-        """Recursively serialize values, converting type objects and datetimes to strings."""
+        """Recursively serialize values for JSON-compatible output.
+
+        Converts type objects to their name and datetime values to ISO-8601 strings.
+        Dicts and lists are processed recursively. Used by ``to_dict``, job/case
+        ``registration_info`` metadata, and ``send_event`` HTTP bodies.
+        """
         from datetime import datetime
 
         if isinstance(value, type):

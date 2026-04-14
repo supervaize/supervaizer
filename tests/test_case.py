@@ -392,3 +392,42 @@ def test_case_patch_step_no_index_match_still_sends_but_keeps_registry_unchanged
     assert case_fixture.updates[0] is prior
     assert orphan.index == 99
     assert orphan.upsert is True
+
+
+def test_case_metadata_default_is_empty_dict(case_fixture: Case) -> None:
+    """CaseAbstractModel.metadata defaults to empty dict."""
+    assert case_fixture.metadata == {}
+
+
+def test_case_registration_info_includes_metadata(account_fixture: Account) -> None:
+    """Case.registration_info includes the metadata field."""
+    from uuid import uuid4
+
+    case = Case(
+        id=str(uuid4()),
+        job_id="job-meta-test",
+        account=account_fixture,
+        status=EntityStatus.IN_PROGRESS,
+        name="Meta Test Case",
+        description="Test",
+        metadata={"contact_email": "a@b.com", "language": "en"},
+    )
+    info = case.registration_info
+    assert info["metadata"] == {"contact_email": "a@b.com", "language": "en"}
+
+
+def test_case_start_accepts_metadata(
+    account_fixture: Account,
+    mocker: MockerFixture,
+) -> None:
+    """Case.start() passes metadata through to the Case instance."""
+    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    meta = {"contact_email": "test@example.com", "language": "fr"}
+    case = Case.start(
+        job_id="job-start-meta",
+        name="Test Contact",
+        account=account_fixture,
+        description="Test interview",
+        metadata=meta,
+    )
+    assert case.metadata == meta

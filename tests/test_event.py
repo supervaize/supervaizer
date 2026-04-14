@@ -4,6 +4,9 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import json
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from supervaizer import (
     Account,
@@ -20,7 +23,8 @@ from supervaizer import (
     Server,
     ServerRegisterEvent,
 )
-from supervaizer.job import Job
+from supervaizer.job import Job, JobContext
+from supervaizer.lifecycle import EntityStatus
 
 
 def test_event(event_fixture: Event) -> None:
@@ -118,3 +122,33 @@ def test_job_finished_event(job_fixture: Job, account_fixture: Account) -> None:
         account=account_fixture,
     )
     assert isinstance(job_finished_event, JobFinishedEvent)
+
+
+def test_event_payload_json_encodable_with_metadata_datetime(
+    context_fixture: JobContext,
+    account_fixture: Account,
+) -> None:
+    """Metadata with datetime/type must JSON-encode for httpx (event.details → payload)."""
+    dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+    job = Job.new(
+        job_context=context_fixture,
+        agent_name="test-agent",
+        metadata={"scheduled_at": dt, "kind": str},
+    )
+    job_event = JobStartConfirmationEvent(job=job, account=account_fixture)
+    json.dumps(job_event.payload)
+    assert job_event.details["metadata"]["scheduled_at"] == dt.isoformat()
+    assert job_event.details["metadata"]["kind"] == "str"
+
+    case = Case(
+        id=str(uuid4()),
+        job_id=context_fixture.job_id,
+        account=account_fixture,
+        status=EntityStatus.IN_PROGRESS,
+        name="n",
+        description="d",
+        metadata={"at": dt},
+    )
+    case_event = CaseStartEvent(case=case, account=account_fixture)
+    json.dumps(case_event.payload)
+    assert case_event.details["metadata"]["at"] == dt.isoformat()
