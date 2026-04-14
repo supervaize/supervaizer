@@ -15,9 +15,22 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Callable
 
-from pydantic import Field, computed_field, model_validator
+from pydantic import Field, model_validator
 
 from supervaizer.common import SvBaseModel
+
+
+class FieldType(StrEnum):
+    """Allowed field types for DataResourceField."""
+
+    STRING = "string"
+    INTEGER = "integer"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    DATETIME = "datetime"
+    TEXT = "text"
+    EMAIL = "email"
+    URL = "url"
 
 
 class Editable(StrEnum):
@@ -32,8 +45,8 @@ class DataResourceField(SvBaseModel):
     """Describes a single field in a DataResource for Studio rendering."""
 
     name: str = Field(description="Column/attribute name")
-    field_type: str = Field(
-        default="string",
+    field_type: FieldType = Field(
+        default=FieldType.STRING,
         description="One of: string, integer, boolean, date, datetime, text, email, url",
     )
     label: str | None = Field(default=None, description="Human-readable label; defaults to name.title()")
@@ -67,13 +80,13 @@ class DataResource(SvBaseModel):
             display_name="Contacts",
             fields=[
                 DataResourceField(name="id", editable=Editable.NEVER, visible_on=["list", "detail"]),
-                DataResourceField(name="email", field_type="email", required=True),
+                DataResourceField(name="email", field_type=FieldType.EMAIL, required=True),
             ],
             on_list=lambda: repo.list_all(),
-            on_get=lambda id: repo.get(id),
+            on_get=lambda item_id: repo.get(item_id),
             on_create=lambda data: repo.create(data),
-            on_update=lambda id, data: repo.update(id, data),
-            on_delete=lambda id: repo.delete(id),
+            on_update=lambda item_id, data: repo.update(item_id, data),
+            on_delete=lambda item_id: repo.delete(item_id),
         )
     """
 
@@ -95,6 +108,16 @@ class DataResource(SvBaseModel):
 
     @model_validator(mode="after")
     def check_callbacks(self) -> "DataResource":
+        """Validate required callbacks.
+
+        on_list is always required.
+        on_create is required for writable resources (read_only=False).
+        on_import is required when importable=True.
+
+        on_get, on_update, and on_delete are optional — their presence is
+        reflected in the operations dict. A writable resource may support
+        create-only (no update/delete).
+        """
         if self.on_list is None:
             raise ValueError(f"DataResource '{self.name}' must define on_list")
         if not self.read_only and self.on_create is None:
@@ -103,7 +126,6 @@ class DataResource(SvBaseModel):
             raise ValueError(f"Importable DataResource '{self.name}' must define on_import")
         return self
 
-    @computed_field
     @property
     def operations(self) -> dict[str, bool]:
         return {

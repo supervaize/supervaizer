@@ -5,12 +5,12 @@
 # https://mozilla.org/MPL/2.0/.
 
 import pytest
-from supervaizer.data_resource import DataResource, DataResourceField, Editable
+from supervaizer.data_resource import DataResource, DataResourceField, Editable, FieldType
 
 
 def test_field_defaults():
     f = DataResourceField(name="email")
-    assert f.field_type == "string"
+    assert f.field_type == FieldType.STRING
     assert f.editable == Editable.ALWAYS
     assert f.visible_on == ["list", "detail", "create", "edit"]
     assert f.required is False
@@ -60,10 +60,10 @@ def test_data_resource_operations_full():
         name="contacts",
         fields=[],
         on_list=lambda: [],
-        on_get=lambda id: {"id": id},
+        on_get=lambda item_id: {"id": item_id},
         on_create=lambda d: {**d, "id": "new"},
-        on_update=lambda id, d: {**d, "id": id},
-        on_delete=lambda id: True,
+        on_update=lambda item_id, d: {**d, "id": item_id},
+        on_delete=lambda item_id: True,
     )
     assert dr.operations == {
         "list": True,
@@ -81,7 +81,7 @@ def test_data_resource_registration_info():
         display_name="Contacts",
         fields=[
             DataResourceField(name="id", editable=Editable.NEVER, visible_on=["list", "detail"]),
-            DataResourceField(name="email", field_type="email", required=True),
+            DataResourceField(name="email", field_type=FieldType.EMAIL, required=True),
         ],
         on_list=lambda: [],
         on_create=lambda d: {**d, "id": "1"},
