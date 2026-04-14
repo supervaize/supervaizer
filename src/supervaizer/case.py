@@ -10,7 +10,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 from supervaizer.common import SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
@@ -215,6 +215,7 @@ class CaseAbstractModel(SvBaseModel):
     total_cost: float = 0.0
     final_delivery: Optional[Dict[str, Any]] = None
     finished_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Agent-provided domain metadata (e.g. contact context)")
 
 
 class Case(CaseAbstractModel):
@@ -361,6 +362,7 @@ class Case(CaseAbstractModel):
             "updates": [update.registration_info for update in self.updates],
             "total_cost": self.total_cost,
             "final_delivery": self.final_delivery,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -371,6 +373,7 @@ class Case(CaseAbstractModel):
         account: "Account",
         description: str,
         case_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> "Case":
         """
         Start a new case
@@ -393,6 +396,7 @@ class Case(CaseAbstractModel):
             name=name,
             description=description,
             status=EntityStatus.STOPPED,
+            metadata=metadata or {},
         )
         log.info(f"[Case created] {case.id}")
 

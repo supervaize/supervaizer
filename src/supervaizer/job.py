@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel, log, singleton
@@ -256,6 +256,7 @@ class AbstractJob(SvBaseModel):
     created_at: datetime | None = None
     agent_parameters: list[dict[str, Any]] | None = None
     case_ids: list[str] = []  # Foreign key relationship to cases
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Agent-provided domain metadata (e.g. campaign context)")
 
 
 class Job(AbstractJob):
@@ -349,6 +350,7 @@ class Job(AbstractJob):
             "finished_at": self.finished_at.isoformat() if self.finished_at else "",
             "created_at": self.created_at.isoformat() if self.created_at else "",
             "case_ids": self.case_ids,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -358,6 +360,7 @@ class Job(AbstractJob):
         agent_name: str,
         agent_parameters: Optional[list[dict[str, Any]]] = None,
         name: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> "Job":
         """Create a new job
 
@@ -394,6 +397,7 @@ class Job(AbstractJob):
             job_context=job_context,
             status=EntityStatus.STOPPED,
             agent_parameters=agent_parameters,
+            metadata=metadata or {},
         )
 
         # Transition from STOPPED to IN_PROGRESS
