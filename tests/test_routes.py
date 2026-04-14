@@ -6,9 +6,19 @@
 
 from typing import Any
 
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
-from supervaizer import Agent, Job, Server
+from supervaizer import (
+    Account,
+    Agent,
+    AgentMethod,
+    AgentMethods,
+    Job,
+    Server,
+)
+from supervaizer.data_resource import DataResource
+from supervaizer.parameter import ParametersSetup
 from supervaizer.routes import (
     create_agents_routes,
     create_default_routes,
@@ -283,3 +293,67 @@ def test_dynamic_choices_endpoint_no_callback(
         },
     )
     assert resp.status_code == 404
+
+
+def test_data_resource_openapi_operation_ids_unique_per_agent(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    """Same resource name on different agents must not share operationId (OpenAPI)."""
+    methods = AgentMethods(
+        job_start=agent_method_fixture,
+        job_stop=agent_method_fixture,
+        job_status=agent_method_fixture,
+        chat=None,
+        custom={"method1": agent_method_fixture},
+    )
+    dr_a = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    dr_b = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    agent_a = Agent(
+        name="First Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        data_resources=[dr_a],
+    )
+    agent_b = Agent(
+        name="Second Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        data_resources=[dr_b],
+    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server = Server(
+        scheme="http",
+        host="localhost",
+        port=8001,
+        environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
+        debug=True,
+        agent_timeout=10,
+        private_key=private_key,
+        a2a_endpoints=False,
+        supervisor_account=account_fixture,
+        agents=[agent_a, agent_b],
+        api_key="test-api-key",
+    )
+    client = TestClient(server.app)
+    schema = client.get("/openapi.json").json()
+    op_ids: list[str] = []
+    for path_item in schema.get("paths", {}).values():
+        for op in path_item.values():
+            if isinstance(op, dict) and "operationId" in op:
+                op_ids.append(op["operationId"])
+    list_ids = [oid for oid in op_ids if oid.endswith("_items_list")]
+    assert len(list_ids) == 2
+    assert len(set(list_ids)) == 2
+    assert f"{agent_a.slug}_items_list" in list_ids
+    assert f"{agent_b.slug}_items_list" in list_ids

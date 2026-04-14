@@ -365,7 +365,7 @@ class Case(CaseAbstractModel):
             "updates": [update.registration_info for update in self.updates],
             "total_cost": self.total_cost,
             "final_delivery": self.final_delivery,
-            "metadata": self.metadata,
+            "metadata": SvBaseModel.serialize_value(self.metadata),
         }
 
     @classmethod

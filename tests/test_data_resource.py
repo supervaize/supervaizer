@@ -5,6 +5,8 @@
 # https://mozilla.org/MPL/2.0/.
 
 import pytest
+from pydantic import ValidationError
+
 from supervaizer.data_resource import (
     DataResource,
     DataResourceField,
@@ -13,7 +15,7 @@ from supervaizer.data_resource import (
 )
 
 
-def test_field_defaults():
+def test_field_defaults() -> None:
     f = DataResourceField(name="email")
     assert f.field_type == FieldType.STRING
     assert f.editable == Editable.ALWAYS
@@ -21,27 +23,42 @@ def test_field_defaults():
     assert f.required is False
 
 
-def test_field_display_label_defaults_to_name_title():
+def test_field_display_label_defaults_to_name_title() -> None:
     f = DataResourceField(name="first_name")
     assert f.display_label == "First Name"
 
 
-def test_field_display_label_custom():
+def test_field_display_label_custom() -> None:
     f = DataResourceField(name="first_name", label="Given Name")
     assert f.display_label == "Given Name"
 
 
-def test_data_resource_requires_on_list():
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "",
+        "contacts/admin",
+        "{id}",
+        "bad name",
+        "CamelCase",
+    ],
+)
+def test_data_resource_name_must_be_url_safe(bad_name: str) -> None:
+    with pytest.raises(ValidationError):
+        DataResource(name=bad_name, fields=[], on_list=lambda: [])
+
+
+def test_data_resource_requires_on_list() -> None:
     with pytest.raises(ValueError, match="must define on_list"):
         DataResource(name="contacts", fields=[])
 
 
-def test_data_resource_writable_requires_on_create():
+def test_data_resource_writable_requires_on_create() -> None:
     with pytest.raises(ValueError, match="must define on_create"):
         DataResource(name="contacts", fields=[], on_list=lambda: [], read_only=False)
 
 
-def test_data_resource_read_only_no_on_create_required():
+def test_data_resource_read_only_no_on_create_required() -> None:
     dr = DataResource(name="prompts", fields=[], on_list=lambda: [], read_only=True)
     assert dr.operations["create"] is False
     assert dr.operations["update"] is False
@@ -49,7 +66,7 @@ def test_data_resource_read_only_no_on_create_required():
     assert dr.operations["list"] is True
 
 
-def test_data_resource_importable_requires_on_import():
+def test_data_resource_importable_requires_on_import() -> None:
     with pytest.raises(ValueError, match="must define on_import"):
         DataResource(
             name="contacts",
@@ -60,7 +77,7 @@ def test_data_resource_importable_requires_on_import():
         )
 
 
-def test_data_resource_operations_full():
+def test_data_resource_operations_full() -> None:
     dr = DataResource(
         name="contacts",
         fields=[],
@@ -80,7 +97,7 @@ def test_data_resource_operations_full():
     }
 
 
-def test_data_resource_registration_info():
+def test_data_resource_registration_info() -> None:
     dr = DataResource(
         name="contacts",
         display_name="Contacts",
@@ -104,14 +121,14 @@ def test_data_resource_registration_info():
     assert info["operations"]["import"] is False
 
 
-def test_data_resource_display_name_derived_from_name():
+def test_data_resource_display_name_derived_from_name() -> None:
     dr = DataResource(
         name="contact_knowledge", fields=[], on_list=lambda: [], read_only=True
     )
     assert dr.display_name_resolved == "Contact Knowledge"
 
 
-def test_data_resource_callbacks_excluded_from_serialization():
+def test_data_resource_callbacks_excluded_from_serialization() -> None:
     dr = DataResource(name="prompts", fields=[], on_list=lambda: [], read_only=True)
     dumped = dr.model_dump()
     assert "on_list" not in dumped

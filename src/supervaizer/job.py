@@ -353,7 +353,7 @@ class Job(AbstractJob):
             "finished_at": self.finished_at.isoformat() if self.finished_at else "",
             "created_at": self.created_at.isoformat() if self.created_at else "",
             "case_ids": self.case_ids,
-            "metadata": self.metadata,
+            "metadata": SvBaseModel.serialize_value(self.metadata),
         }
 
     @classmethod

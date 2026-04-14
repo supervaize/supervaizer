@@ -20,6 +20,9 @@ from pydantic import Field, model_validator
 
 from supervaizer.common import SvBaseModel
 
+# Used for URL path segments (/data/{name}/) and OpenAPI operation_id fragments.
+_DATA_RESOURCE_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
+
 
 class FieldType(StrEnum):
     """Allowed field types for DataResourceField."""
@@ -97,7 +100,14 @@ class DataResource(SvBaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    name: str = Field(description="URL-safe resource identifier, e.g. 'contacts'")
+    name: str = Field(
+        description=(
+            "URL-safe resource identifier, e.g. 'contacts'. "
+            "Lowercase letters, digits, underscores, and hyphens only; "
+            "must start with a letter or digit."
+        ),
+        pattern=_DATA_RESOURCE_NAME_PATTERN,
+    )
     display_name: str = Field(default="")
     description: str = Field(default="")
     fields: list[DataResourceField] = Field(default_factory=list)
@@ -113,7 +123,7 @@ class DataResource(SvBaseModel):
     on_create: Callable[[dict[str, Any]], dict[str, Any]] | None = Field(
         default=None, exclude=True
     )
-    on_update: Callable[[str, dict[str, Any]], dict[str, Any]] | None = Field(
+    on_update: Callable[[str, dict[str, Any]], dict[str, Any] | None] | None = Field(
         default=None, exclude=True
     )
     on_delete: Callable[[str], bool] | None = Field(default=None, exclude=True)

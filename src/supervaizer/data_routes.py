@@ -36,75 +36,95 @@ if TYPE_CHECKING:
 def create_agent_data_routes(server: "Server", agent: "Agent") -> APIRouter:
     """Generate CRUD REST routes for all DataResources declared on an agent."""
     router = APIRouter(prefix=agent.path, tags=["Data Resources"])
+    agent_slug = agent.slug
     for resource in agent.data_resources:
-        _add_resource_routes(router, resource, server)
+        _add_resource_routes(router, resource, server, agent_slug)
     return router
 
 
+def _data_resource_operation_id(
+    agent_slug: str, resource_name: str, action: str
+) -> str:
+    """Build a globally unique OpenAPI operation_id (per app, all agents)."""
+    return f"{agent_slug}_{resource_name}_{action}"
+
+
 def _add_resource_routes(
-    router: APIRouter, resource: DataResource, server: "Server"
+    router: APIRouter, resource: DataResource, server: "Server", agent_slug: str
 ) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
 
     if resource.on_list is not None:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "list")
         router.add_api_route(
             f"{prefix}/",
             _make_list_handler(resource, prefix),
             methods=["GET"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"List {resource.display_name_resolved}",
-            operation_id=f"{resource.name}_list",
+            operation_id=op_id,
+            name=op_id,
         )
 
     if resource.on_get is not None:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "get")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
             _make_get_handler(resource, prefix),
             methods=["GET"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"Get {resource.display_name_resolved}",
-            operation_id=f"{resource.name}_get",
+            operation_id=op_id,
+            name=op_id,
         )
 
     if resource.on_create is not None and not resource.read_only:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "create")
         router.add_api_route(
             f"{prefix}/",
             _make_create_handler(resource, prefix),
             methods=["POST"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"Create {resource.display_name_resolved}",
-            operation_id=f"{resource.name}_create",
+            operation_id=op_id,
+            name=op_id,
         )
 
     if resource.on_update is not None and not resource.read_only:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "update")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
             _make_update_handler(resource, prefix),
             methods=["PUT"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"Update {resource.display_name_resolved}",
-            operation_id=f"{resource.name}_update",
+            operation_id=op_id,
+            name=op_id,
         )
 
     if resource.on_delete is not None and not resource.read_only:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "delete")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
             _make_delete_handler(resource, prefix),
             methods=["DELETE"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"Delete {resource.display_name_resolved}",
-            operation_id=f"{resource.name}_delete",
+            operation_id=op_id,
+            name=op_id,
         )
 
     if resource.importable and resource.on_import is not None:
+        op_id = _data_resource_operation_id(agent_slug, resource.name, "import")
         router.add_api_route(
             f"{prefix}/import/",
             _make_import_handler(resource, prefix),
             methods=["POST"],
             dependencies=[Security(server.verify_api_key)],
             summary=f"Import {resource.display_name_resolved} (bulk)",
-            operation_id=f"{resource.name}_import",
+            operation_id=op_id,
+            name=op_id,
         )
 
 
@@ -148,11 +168,14 @@ def _make_create_handler(r: DataResource, prefix: str) -> Any:
 
 
 def _make_update_handler(r: DataResource, prefix: str) -> Any:
+    on_update = r.on_update
+    assert on_update is not None  # route registered only when on_update is set
+
     async def _handler(
         item_id: str, data: dict[str, Any] = Body(...)
     ) -> dict[str, Any]:
         log.info(f"📥 PUT {prefix}/{item_id} [DataResource update: {r.name}]")
-        result = r.on_update(item_id, data)  # type: ignore[misc]
+        result = on_update(item_id, data)
         if result is None:
             raise HTTPException(
                 status_code=404, detail=f"{r.name} '{item_id}' not found"

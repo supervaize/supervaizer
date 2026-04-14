@@ -722,6 +722,15 @@ class Agent(AgentAbstract):
             **kwargs,
         )
 
+        seen_resource_names: set[str] = set()
+        for r in self.data_resources:
+            if r.name in seen_resource_names:
+                raise ValueError(
+                    f"Duplicate DataResource name {r.name!r} on agent {self.name!r}; "
+                    "each data resource must have a unique name per agent."
+                )
+            seen_resource_names.add(r.name)
+
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
 
