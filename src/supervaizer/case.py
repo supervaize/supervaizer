@@ -215,7 +215,10 @@ class CaseAbstractModel(SvBaseModel):
     total_cost: float = 0.0
     final_delivery: Optional[Dict[str, Any]] = None
     finished_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Agent-provided domain metadata (e.g. contact context)")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Agent-provided domain metadata (e.g. contact context)",
+    )
 
 
 class Case(CaseAbstractModel):

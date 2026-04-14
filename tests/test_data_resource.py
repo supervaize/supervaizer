@@ -5,7 +5,12 @@
 # https://mozilla.org/MPL/2.0/.
 
 import pytest
-from supervaizer.data_resource import DataResource, DataResourceField, Editable, FieldType
+from supervaizer.data_resource import (
+    DataResource,
+    DataResourceField,
+    Editable,
+    FieldType,
+)
 
 
 def test_field_defaults():
@@ -80,7 +85,9 @@ def test_data_resource_registration_info():
         name="contacts",
         display_name="Contacts",
         fields=[
-            DataResourceField(name="id", editable=Editable.NEVER, visible_on=["list", "detail"]),
+            DataResourceField(
+                name="id", editable=Editable.NEVER, visible_on=["list", "detail"]
+            ),
             DataResourceField(name="email", field_type=FieldType.EMAIL, required=True),
         ],
         on_list=lambda: [],
@@ -98,7 +105,9 @@ def test_data_resource_registration_info():
 
 
 def test_data_resource_display_name_derived_from_name():
-    dr = DataResource(name="contact_knowledge", fields=[], on_list=lambda: [], read_only=True)
+    dr = DataResource(
+        name="contact_knowledge", fields=[], on_list=lambda: [], read_only=True
+    )
     assert dr.display_name_resolved == "Contact Knowledge"
 
 

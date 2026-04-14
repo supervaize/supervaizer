@@ -17,6 +17,7 @@ For each DataResource declared on an Agent, generates routes under:
 All routes require the server API key (same auth as existing agent routes).
 Uses factory functions per resource to avoid Python closure-in-loop capture bugs.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -40,7 +41,9 @@ def create_agent_data_routes(server: "Server", agent: "Agent") -> APIRouter:
     return router
 
 
-def _add_resource_routes(router: APIRouter, resource: DataResource, server: "Server") -> None:
+def _add_resource_routes(
+    router: APIRouter, resource: DataResource, server: "Server"
+) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
 
@@ -112,7 +115,8 @@ def _make_list_handler(r: DataResource, prefix: str) -> Any:
     ) -> list[dict[str, Any]]:
         log.info(f"📥 GET {prefix}/ [DataResource list: {r.name}]")
         result = r.on_list()  # type: ignore[misc]
-        return result[skip: skip + limit]
+        return result[skip : skip + limit]
+
     return _handler
 
 
@@ -121,8 +125,11 @@ def _make_get_handler(r: DataResource, prefix: str) -> Any:
         log.info(f"📥 GET {prefix}/{item_id} [DataResource get: {r.name}]")
         result = r.on_get(item_id)  # type: ignore[misc]
         if result is None:
-            raise HTTPException(status_code=404, detail=f"{r.name} '{item_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"{r.name} '{item_id}' not found"
+            )
         return result
+
     return _handler
 
 
@@ -136,16 +143,22 @@ def _make_create_handler(r: DataResource, prefix: str) -> Any:
                 detail=f"on_create for '{r.name}' must return a dict with 'id'",
             )
         return JSONResponse(content=result, status_code=201)
+
     return _handler
 
 
 def _make_update_handler(r: DataResource, prefix: str) -> Any:
-    async def _handler(item_id: str, data: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    async def _handler(
+        item_id: str, data: dict[str, Any] = Body(...)
+    ) -> dict[str, Any]:
         log.info(f"📥 PUT {prefix}/{item_id} [DataResource update: {r.name}]")
         result = r.on_update(item_id, data)  # type: ignore[misc]
         if result is None:
-            raise HTTPException(status_code=404, detail=f"{r.name} '{item_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"{r.name} '{item_id}' not found"
+            )
         return result
+
     return _handler
 
 
@@ -154,8 +167,11 @@ def _make_delete_handler(r: DataResource, prefix: str) -> Any:
         log.info(f"📥 DELETE {prefix}/{item_id} [DataResource delete: {r.name}]")
         success = r.on_delete(item_id)  # type: ignore[misc]
         if not success:
-            raise HTTPException(status_code=404, detail=f"{r.name} '{item_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"{r.name} '{item_id}' not found"
+            )
         return JSONResponse(content={"deleted": True}, status_code=200)
+
     return _handler
 
 
@@ -163,4 +179,5 @@ def _make_import_handler(r: DataResource, prefix: str) -> Any:
     async def _handler(records: list[dict[str, Any]] = Body(...)) -> dict[str, Any]:
         log.info(f"📥 POST {prefix}/import/ [DataResource import: {r.name}]")
         return r.on_import(records)  # type: ignore[misc]
+
     return _handler

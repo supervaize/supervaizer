@@ -256,7 +256,10 @@ class AbstractJob(SvBaseModel):
     created_at: datetime | None = None
     agent_parameters: list[dict[str, Any]] | None = None
     case_ids: list[str] = []  # Foreign key relationship to cases
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Agent-provided domain metadata (e.g. campaign context)")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Agent-provided domain metadata (e.g. campaign context)",
+    )
 
 
 class Job(AbstractJob):

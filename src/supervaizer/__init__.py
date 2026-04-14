@@ -26,7 +26,12 @@ from supervaizer.case import (
     CaseNodes,
 )
 from supervaizer.common import ApiError, ApiResult, ApiSuccess
-from supervaizer.data_resource import DataResource, DataResourceField, Editable, FieldType
+from supervaizer.data_resource import (
+    DataResource,
+    DataResourceField,
+    Editable,
+    FieldType,
+)
 from supervaizer.event import (
     AgentRegisterEvent,
     CaseStartEvent,

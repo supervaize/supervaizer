@@ -1111,7 +1111,9 @@ def test_agent_registration_info_includes_data_resources() -> None:
         name="contacts",
         display_name="Contacts",
         fields=[
-            DataResourceField(name="id", editable=Editable.NEVER, visible_on=["list", "detail"]),
+            DataResourceField(
+                name="id", editable=Editable.NEVER, visible_on=["list", "detail"]
+            ),
             DataResourceField(name="email", field_type="email", required=True),
         ],
         on_list=lambda: [],

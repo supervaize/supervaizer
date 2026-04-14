@@ -10,6 +10,7 @@ Agents declare DataResource objects on their Agent instance. The SDK
 auto-generates FastAPI CRUD routes for each declared resource, secured
 with the same API key as all other agent routes.
 """
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -36,9 +37,9 @@ class FieldType(StrEnum):
 class Editable(StrEnum):
     """Controls when Studio may edit a field."""
 
-    ALWAYS = "always"          # Editable on create and update forms
+    ALWAYS = "always"  # Editable on create and update forms
     CREATE_ONLY = "create_only"  # Set on create; shown read-only on edit
-    NEVER = "never"            # Agent-controlled; never shown in a form input
+    NEVER = "never"  # Agent-controlled; never shown in a form input
 
 
 class DataResourceField(SvBaseModel):
@@ -49,14 +50,18 @@ class DataResourceField(SvBaseModel):
         default=FieldType.STRING,
         description="One of: string, integer, boolean, date, datetime, text, email, url",
     )
-    label: str | None = Field(default=None, description="Human-readable label; defaults to name.title()")
+    label: str | None = Field(
+        default=None, description="Human-readable label; defaults to name.title()"
+    )
     required: bool = Field(default=False, description="Required on create form")
     editable: Editable = Field(default=Editable.ALWAYS)
     visible_on: list[str] = Field(
         default_factory=lambda: ["list", "detail", "create", "edit"],
         description="Views that render this field: list, detail, create, edit",
     )
-    description: str | None = Field(default=None, description="Help text shown in Studio")
+    description: str | None = Field(
+        default=None, description="Help text shown in Studio"
+    )
     related_resource: str | None = Field(
         default=None,
         description="Name of another DataResource this field FK-references",
@@ -99,12 +104,22 @@ class DataResource(SvBaseModel):
     read_only: bool = Field(default=False)
     importable: bool = Field(default=False, description="Enables CSV bulk import route")
     # Callbacks — excluded from model serialization
-    on_list: Callable[[], list[dict[str, Any]]] | None = Field(default=None, exclude=True)
-    on_get: Callable[[str], dict[str, Any] | None] | None = Field(default=None, exclude=True)
-    on_create: Callable[[dict[str, Any]], dict[str, Any]] | None = Field(default=None, exclude=True)
-    on_update: Callable[[str, dict[str, Any]], dict[str, Any]] | None = Field(default=None, exclude=True)
+    on_list: Callable[[], list[dict[str, Any]]] | None = Field(
+        default=None, exclude=True
+    )
+    on_get: Callable[[str], dict[str, Any] | None] | None = Field(
+        default=None, exclude=True
+    )
+    on_create: Callable[[dict[str, Any]], dict[str, Any]] | None = Field(
+        default=None, exclude=True
+    )
+    on_update: Callable[[str, dict[str, Any]], dict[str, Any]] | None = Field(
+        default=None, exclude=True
+    )
     on_delete: Callable[[str], bool] | None = Field(default=None, exclude=True)
-    on_import: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = Field(default=None, exclude=True)
+    on_import: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = Field(
+        default=None, exclude=True
+    )
 
     @model_validator(mode="after")
     def check_callbacks(self) -> "DataResource":
@@ -121,9 +136,13 @@ class DataResource(SvBaseModel):
         if self.on_list is None:
             raise ValueError(f"DataResource '{self.name}' must define on_list")
         if not self.read_only and self.on_create is None:
-            raise ValueError(f"Writable DataResource '{self.name}' must define on_create")
+            raise ValueError(
+                f"Writable DataResource '{self.name}' must define on_create"
+            )
         if self.importable and self.on_import is None:
-            raise ValueError(f"Importable DataResource '{self.name}' must define on_import")
+            raise ValueError(
+                f"Importable DataResource '{self.name}' must define on_import"
+            )
         return self
 
     @property
