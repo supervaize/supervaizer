@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 
 from supervaizer import Account, ApiSuccess
 from supervaizer.account_service import send_event
+from supervaizer.common import SvBaseModel
 from supervaizer.event import Event
 from supervaizer.server import Server
 
@@ -36,7 +37,7 @@ def test_send_event_success(
     mock_post.assert_called_once_with(
         account_fixture.url_event,
         headers=account_fixture.api_headers,
-        json=event_fixture.payload,
+        json=SvBaseModel.serialize_value(event_fixture.payload),
     )
     assert isinstance(result, ApiSuccess)
     assert result.message == f"POST Event {event_fixture.type.name} sent"

@@ -1089,3 +1089,62 @@ def test_agent_method_fields_definitions() -> None:
     assert defs[1]["description"] == "Enter your age"
     assert defs[1]["type"] == "int"
     assert defs[1]["choices"] is None
+
+
+def test_agent_data_resources_default_empty() -> None:
+    """Agent.data_resources defaults to empty list."""
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+    )
+    assert agent.data_resources == []
+
+
+def test_agent_rejects_duplicate_data_resource_names() -> None:
+    """Two DataResources with the same name on one agent are invalid."""
+    from supervaizer.data_resource import DataResource
+
+    dup = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    with pytest.raises(ValueError, match="Duplicate DataResource name"):
+        Agent(
+            name="agentName",
+            author="authorName",
+            developer="Dev",
+            version="1.0.0",
+            description="description",
+            data_resources=[dup, dup],
+        )
+
+
+def test_agent_registration_info_includes_data_resources() -> None:
+    """Agent.registration_info includes data_resources when declared."""
+    from supervaizer.data_resource import DataResource, DataResourceField, Editable
+
+    contacts_resource = DataResource(
+        name="contacts",
+        display_name="Contacts",
+        fields=[
+            DataResourceField(
+                name="id", editable=Editable.NEVER, visible_on=["list", "detail"]
+            ),
+            DataResourceField(name="email", field_type="email", required=True),
+        ],
+        on_list=lambda: [],
+        on_create=lambda d: {**d, "id": "1"},
+    )
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        data_resources=[contacts_resource],
+    )
+    info = agent.registration_info
+    assert "data_resources" in info
+    assert len(info["data_resources"]) == 1
+    assert info["data_resources"][0]["name"] == "contacts"
+    assert info["data_resources"][0]["operations"]["create"] is True

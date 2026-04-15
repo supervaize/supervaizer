@@ -219,3 +219,28 @@ def test_get_job_include_persisted_not_found() -> None:
         mock_get.return_value = None  # Simulate job not found in persistence
         result = Jobs().get_job(job_id, include_persisted=True)
         assert result is None
+
+
+def test_job_metadata_default_is_empty_dict(context_fixture: JobContext) -> None:
+    """AbstractJob.metadata defaults to empty dict."""
+    job = Job.new(job_context=context_fixture, agent_name="test-agent")
+    assert job.metadata == {}
+
+
+def test_job_registration_info_includes_metadata(context_fixture: JobContext) -> None:
+    """Job.registration_info includes the metadata field."""
+    meta = {"campaign_id": "c1", "phase": "interviews"}
+    job = Job.new(job_context=context_fixture, agent_name="test-agent", metadata=meta)
+    info = job.registration_info
+    assert info["metadata"] == {"campaign_id": "c1", "phase": "interviews"}
+
+
+def test_job_new_accepts_metadata(context_fixture: JobContext) -> None:
+    """Job.new() passes metadata through to the Job instance."""
+    meta = {"campaign_id": "c1", "scenario": "hr_screening"}
+    job = Job.new(
+        job_context=context_fixture,
+        agent_name="test-agent",
+        metadata=meta,
+    )
+    assert job.metadata == meta
