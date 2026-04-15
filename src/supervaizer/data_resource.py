@@ -176,7 +176,7 @@ class DataResource(SvBaseModel):
             "name": self.name,
             "display_name": self.display_name_resolved,
             "description": self.description,
-            "fields": [f.model_dump() for f in self.fields],
+            "fields": [{**f.model_dump(), "display_label": f.display_label} for f in self.fields],
             "read_only": self.read_only,
             "importable": self.importable,
             "operations": self.operations,
