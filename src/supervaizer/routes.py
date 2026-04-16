@@ -388,8 +388,6 @@ def create_agents_routes(server: "Server") -> APIRouter:
         # Add custom method routes for each agent
         if agent.methods and agent.methods.custom:
             routers.include_router(create_agent_custom_routes(server, agent))
-        if agent.data_resources:
-            routers.include_router(create_agent_data_routes(server, agent))
     return routers
 
 
