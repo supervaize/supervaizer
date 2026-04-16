@@ -156,6 +156,7 @@ release:
 
 # Ship to production: precommit, merge develop→main, push (CI does the version bump)
 # Embed bump type token ([MINOR]/[PATCH]/[MAJOR]) so CI picks up the right part.
+# Run "ready-to-go" to ensure the documentation commit happens in the active stack only.
 # Usage: just ship [patch|minor|major]
 ship part="minor":
     #!/usr/bin/env bash
@@ -170,3 +171,8 @@ ship part="minor":
 # Create or update GitHub release for the latest tag on origin/main
 gh-release:
     bash tools/gh-release-latest-tag.sh supervaize/supervaizer
+
+# After `just ship`, wait for the GitHub release to be published, then
+# merge main back into develop and refresh release notes from CHANGELOG.md.
+ship-reconcile repo="supervaize/supervaizer" mode="merge" timeout_seconds="600" poll_seconds="10":
+    bash tools/reconcile-release-after-ship.sh "{{repo}}" --mode "{{mode}}" --timeout-seconds {{timeout_seconds}} --poll-seconds {{poll_seconds}}
