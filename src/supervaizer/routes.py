@@ -35,7 +35,6 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentResponse,
 )
-from supervaizer.data_routes import create_agent_data_routes
 from supervaizer.case import CaseNodeUpdate, Cases
 from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
