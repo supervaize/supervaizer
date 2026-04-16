@@ -2,7 +2,7 @@
 #
 # Reconcile release after `just ship`:
 # 1. Detect latest tag on `origin/main` vs latest tag on `origin/develop`.
-# 2. Wait until the GitHub Release for that tag is published.
+# 2. Wait until the PyPI package version for that tag is published.
 # 3. Merge (or rebase) `origin/main` back into `develop` and push `develop`.
 # 4. Overwrite GitHub Release notes using the matching changelog section.
 #
@@ -15,11 +15,13 @@ REPO_SLUG="${1:-supervaize/supervaizer}"
 shift || true
 
 MODE="merge"
-TIMEOUT_SECONDS=600
-POLL_SECONDS=10
+TIMEOUT_SECONDS=1800
+POLL_SECONDS=15
 
 DEVELOP_BRANCH="${DEVELOP_BRANCH:-develop}"
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
+PYPI_PACKAGE="${PYPI_PACKAGE:-supervaizer}"
+PYPI_BASE_URL="${PYPI_BASE_URL:-https://pypi.org/pypi}"
 
 while [[ $# -gt 0 ]]; do
   case "${1}" in
@@ -74,45 +76,43 @@ fi
 
 echo "Detected new release: ${LATEST_TAG} (develop had: ${DEV_TAG:-<none>})"
 
-echo "Waiting for GitHub Release (${LATEST_TAG}) to be published..."
+VERSION="${LATEST_TAG#v}"
+echo "Waiting for PyPI publish: ${PYPI_PACKAGE}==${VERSION}..."
 deadline_epoch="$(date +%s)"
 deadline_epoch="$((deadline_epoch + TIMEOUT_SECONDS))"
 
-is_release_published() {
-  local tag="$1"
+is_pypi_published() {
+  local pkg="$1"
+  local version="$2"
 
-  # If the release doesn't exist yet, this will exit non-zero.
-  if ! gh release view "${tag}" --repo "${REPO_SLUG}" >/dev/null 2>&1; then
-    return 1
-  fi
+  PYPI_BASE_URL="${PYPI_BASE_URL}" python -c '
+import os, sys
+from urllib.request import urlopen
+from urllib.error import HTTPError
 
-  local release_json
-  release_json="$(gh api "repos/${REPO_SLUG}/releases/tags/${tag}")"
-
-  # We consider the release "published" when GitHub sets a non-null `published_at`
-  # and the release isn't a draft.
-  if python -c '
-import json,sys
-payload=json.load(sys.stdin)
-published_at=payload.get("published_at")
-draft=bool(payload.get("draft", False))
-sys.exit(0 if (published_at and not draft) else 1)
-' <<<"${release_json}"; then
-    return 0
-  fi
-
-  return 1
+pkg = sys.argv[1]
+version = sys.argv[2]
+base = os.environ.get("PYPI_BASE_URL", "https://pypi.org/pypi")
+url = f"{base}/{pkg}/{version}/json"
+try:
+    with urlopen(url, timeout=20) as r:
+        if r.status != 200:
+            sys.exit(1)
+except HTTPError:
+    sys.exit(1)
+sys.exit(0)
+' "${pkg}" "${version}"
 }
 
 while true; do
-  if is_release_published "${LATEST_TAG}"; then
-    echo "✅ GitHub release ${LATEST_TAG} appears published."
+  if is_pypi_published "${PYPI_PACKAGE}" "${VERSION}"; then
+    echo "✅ PyPI publish detected for ${PYPI_PACKAGE}==${VERSION}."
     break
   fi
 
   now_epoch="$(date +%s)"
   if (( now_epoch >= deadline_epoch )); then
-    echo "❌ Timed out waiting for GitHub release ${LATEST_TAG} to be published." >&2
+    echo "❌ Timed out waiting for PyPI publish: ${PYPI_PACKAGE}==${VERSION}." >&2
     exit 1
   fi
 
@@ -134,7 +134,6 @@ echo "Pushing ${DEVELOP_BRANCH}..."
 git push origin "${DEVELOP_BRANCH}"
 
 echo "Extracting changelog notes for ${LATEST_TAG}..."
-VERSION="${LATEST_TAG#v}"
 
 NOTES="$(python - <<PY
 import re
