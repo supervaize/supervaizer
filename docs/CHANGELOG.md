@@ -19,6 +19,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Automatic data resource route mounting at startup** — `Server` now mounts generated CRUD routers for any agent that declares `data_resources`, so endpoints are available immediately after server boot without extra manual wiring.
+
+### Fixed
+
+- **`DataResource.registration_info` now includes computed `display_label` per field** — Resource field payloads sent to Studio now expose resolved labels (`display_label`) instead of only raw model dumps, ensuring proper field naming in the UI.
+
+- **`JobStartConfirmationEvent` is emitted after `job_start` execution metadata is available** — The confirmation event is now sent after `job.metadata` is populated from the `job_start` response payload, so Studio receives complete metadata in the start confirmation event.
+
+### Unit Tests Results
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 500   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | ~70s  |
+
 ## [0.14.1] - 2026-04-15
 
 ## [0.14.0] - 2026-04-14

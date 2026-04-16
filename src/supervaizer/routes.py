@@ -35,7 +35,6 @@ from supervaizer.agent import (
     AgentMethodParams,
     AgentResponse,
 )
-from supervaizer.data_routes import create_agent_data_routes
 from supervaizer.case import CaseNodeUpdate, Cases
 from supervaizer.common import SvBaseModel, log
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
@@ -388,8 +387,6 @@ def create_agents_routes(server: "Server") -> APIRouter:
         # Add custom method routes for each agent
         if agent.methods and agent.methods.custom:
             routers.include_router(create_agent_custom_routes(server, agent))
-        if agent.data_resources:
-            routers.include_router(create_agent_data_routes(server, agent))
     return routers
 
 

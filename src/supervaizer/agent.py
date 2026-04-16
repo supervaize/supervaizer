@@ -877,17 +877,6 @@ class Agent(AgentAbstract):
         log.debug(
             f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
         )
-        event = JobStartConfirmationEvent(
-            job=job,
-            account=server.supervisor_account,
-        )
-        if server.supervisor_account is not None:
-            server.supervisor_account.send_event(sender=job, event=event)
-        else:
-            log.warning(
-                f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
-            )
-
         # Mark job as in progress when execution starts
         job.add_response(
             JobResponse(
@@ -932,6 +921,20 @@ class Agent(AgentAbstract):
                 )
             else:
                 job_response = self._execute(action_method, params)
+                # Populate job.metadata from payload so Studio receives it in the confirmation event
+                if job_response.payload:
+                    job.metadata = job_response.payload
+                # Send confirmation event now that metadata is populated
+                event = JobStartConfirmationEvent(
+                    job=job,
+                    account=server.supervisor_account,
+                )
+                if server.supervisor_account is not None:
+                    server.supervisor_account.send_event(sender=job, event=event)
+                else:
+                    log.warning(
+                        f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
+                    )
                 if (
                     job_response.status == EntityStatus.COMPLETED
                     or job_response.status == EntityStatus.FAILED
