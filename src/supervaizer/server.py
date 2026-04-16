@@ -539,12 +539,6 @@ class Server(ServerAbstract):
                     prefix=f"/agents/{agent.slug}/api",
                 )
 
-        # Mount data resource routes for agents that declare them
-        from supervaizer.data_routes import create_agent_data_routes
-
-        for agent in self.agents:
-            if agent.data_resources:
-                self.app.include_router(create_agent_data_routes(self, agent))
 
         # Store server instance on app state for admin routes to access
         self.app.state.server = self
