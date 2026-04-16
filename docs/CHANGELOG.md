@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-04-16
+
 ### Added
 
 - **Automatic data resource route mounting at startup** — `Server` now mounts generated CRUD routers for any agent that declares `data_resources`, so endpoints are available immediately after server boot without extra manual wiring.
