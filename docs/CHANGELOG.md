@@ -56,6 +56,15 @@ All notable changes to this project will be documented in this file.
 - Updated: `test_admin_routes.py`, `test_workbench_routes.py` — prefix `/admin` → `/manage`; Tailscale gate bypassed via `dependency_overrides`.
 - Deleted: `test_admin_ip_allowlist.py` — coverage moved to new access tests.
 
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 502   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | ~54s  |
+
 ## [0.14.2] - 2026-04-16
 
 ### Added
