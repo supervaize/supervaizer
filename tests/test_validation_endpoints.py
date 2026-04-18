@@ -20,6 +20,7 @@ def mock_server():
     """Create a mock server for testing."""
     server = MagicMock(spec=Server)
     server.private_key = "test_private_key"
+    server.api_key = "test-api-key"  # <-- ADDED: used by require_api_key live-server fallback
 
     # Create a proper dependency function for verify_api_key
     def verify_api_key(api_key: str = Header(alias="X-API-Key")):
@@ -98,6 +99,7 @@ def test_client(mock_server, test_agent):
     from fastapi import FastAPI
 
     app = FastAPI()
+    app.state.server = mock_server  # <-- ADDED: enables require_api_key live-server fallback
     # Mount the router at the agent path
     app.include_router(router, prefix="/test-agent")
 

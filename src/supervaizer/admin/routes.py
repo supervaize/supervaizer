@@ -7,16 +7,14 @@
 import asyncio
 import json
 import os
-import secrets
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
+from fastapi import APIRouter, HTTPException, Query, Request  # <-- MODIFIED: removed Depends, Security
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from fastapi.security import APIKeyHeader
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -47,9 +45,6 @@ def register_log_listener(listener: Any) -> None:
 # This will be set when the server actually starts
 SERVER_START_TIME = time.time()
 
-# Console token storage (in production, use Redis or database)
-_console_tokens: Dict[str, float] = {}  # token -> expiry_timestamp
-
 
 def set_server_start_time(start_time: float) -> None:
     """Set the server start time for uptime calculation."""
@@ -70,9 +65,7 @@ def add_log_to_queue(timestamp: str, level: str, message: str) -> None:
 
 # Initialize templates
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-
-# API key authentication
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+# <-- REMOVED: api_key_header / APIKeyHeader (Tailscale enforced at router level)
 
 
 class AdminStats(BaseModel):
@@ -141,29 +134,7 @@ def _is_local_mode(request: Request) -> bool:
     return getattr(live, "supervisor_account", None) is None
 
 
-async def verify_admin_access(
-    request: Request,
-    api_key: Optional[str] = Security(api_key_header),
-    key: Optional[str] = Query(None),
-) -> bool:
-    """Verify admin access via API key in header or query parameter."""
-    expected_key = _get_admin_api_key(request)
-
-    if expected_key:
-        if api_key and api_key == expected_key:
-            return True
-        if key and key == expected_key:
-            return True
-
-    # In local mode, allow requests without a key so direct URLs (e.g. workbench) work
-    if _is_local_mode(request):
-        return True
-
-    raise HTTPException(
-        status_code=403,
-        detail="Invalid API key. Provide via X-API-Key header or ?key=<api_key> parameter",
-        headers={"WWW-Authenticate": "APIKey"},
-    )
+# <-- REMOVED: verify_admin_access (Tailscale enforced at router level in private_router)
 
 
 def format_uptime(seconds: int) -> str:
@@ -416,17 +387,12 @@ def create_admin_routes() -> APIRouter:
 
     @router.get("/console", response_class=HTMLResponse)
     async def admin_console_page(request: Request) -> Response:
-        """Interactive console page - publicly accessible, authentication handled by frontend."""
-        # Clean up expired tokens
-        cleanup_expired_tokens()
-
-        # Generate a secure token for this console session
-        console_token = generate_console_token()
-
+        """Interactive console page — access enforced by Tailscale at router level."""
+        # <-- MODIFIED: removed console token generation; Tailscale is the gate
         return templates.TemplateResponse(
             request,
             "console.html",
-            {"request": request, "console_token": console_token},
+            {"request": request},
         )
 
     # API Routes
@@ -997,52 +963,8 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/log-stream")
-    async def log_stream(
-        token: Optional[str] = Query(None, alias="token"),
-        key: Optional[str] = Query(None, alias="key"),
-    ) -> EventSourceResponse:
+    async def log_stream() -> EventSourceResponse:  # <-- MODIFIED: removed token/key params; Tailscale is the gate
         """Stream log messages via Server-Sent Events."""
-
-        # Support both console token and API key authentication
-        auth_valid = False
-        auth_method = None
-
-        if token:
-            auth_valid = validate_console_token(token)
-            auth_method = "console_token"
-            # If token validation fails, fall back to admin console mode
-            if not auth_valid:
-                auth_valid = True
-                auth_method = "admin_console_fallback"
-        elif key:
-            # Use API key validation
-            try:
-                from supervaizer.server import get_server_info_from_storage
-
-                server_info = get_server_info_from_storage()
-                if (
-                    server_info
-                    and hasattr(server_info, "api_key")
-                    and key == server_info.api_key
-                ):
-                    auth_valid = True
-                    auth_method = "api_key"
-            except Exception:
-                # Fallback: just check if key is provided for now
-                if key:
-                    auth_valid = True
-                    auth_method = "api_key_fallback"
-        else:
-            # Allow access without authentication for admin interface live console
-            # In a production environment, you might want to add additional security
-            auth_valid = True
-            auth_method = "admin_console"
-
-        if not auth_valid:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Invalid or expired authentication token (method: {auth_method or 'none'})",
-            )
 
         async def generate_log_events() -> AsyncGenerator[str, None]:
             try:
@@ -1050,7 +972,7 @@ def create_admin_routes() -> APIRouter:
                 test_message = {
                     "timestamp": datetime.now().isoformat(),
                     "level": "INFO",
-                    "message": f"Log stream connected using {auth_method}",
+                    "message": "Log stream connected",
                 }
                 yield f"data: {json.dumps(test_message, ensure_ascii=False)}\n\n"
 
@@ -1138,23 +1060,7 @@ def create_admin_routes() -> APIRouter:
 
         return {"message": "Test log added to queue"}
 
-    @router.get("/debug-tokens")
-    async def debug_tokens() -> Dict[str, Any]:
-        """Debug endpoint to see current tokens."""
-        cleanup_expired_tokens()
-        return {
-            "current_tokens": [
-                {
-                    "token": token[:10] + "...",
-                    "expires_at": expiry,
-                    "expires_in": expiry - time.time(),
-                    "is_valid": expiry > time.time(),
-                }
-                for token, expiry in _console_tokens.items()
-            ],
-            "token_count": len(_console_tokens),
-            "current_time": time.time(),
-        }
+    # <-- REMOVED: debug-tokens endpoint (console tokens removed)
 
     @router.get("/test-loguru")
     async def test_loguru() -> Dict[str, str]:
@@ -1186,14 +1092,9 @@ def create_admin_routes() -> APIRouter:
     async def execute_console_command(
         request: Request,
         command_data: Dict[str, str],
-        token: Optional[str] = Query(None, alias="token"),
     ) -> Dict[str, str]:
-        """Execute a console command and add output to log stream."""
-        # Validate console token
-        if not validate_console_token(token):
-            raise HTTPException(
-                status_code=401, detail="Invalid or expired console token"
-            )
+        """Execute a console command — access enforced by Tailscale at router level."""
+        # <-- MODIFIED: removed token parameter; Tailscale is the gate
 
         command = command_data.get("command", "").strip()
         if not command:
@@ -1223,17 +1124,11 @@ def create_admin_routes() -> APIRouter:
             return {"status": "error", "message": str(e)}
 
     # Include workbench sub-router
-    from supervaizer.admin.workbench_routes import (
-        create_workbench_routes,
-        create_workbench_ws_routes,
-    )
+    from supervaizer.admin.workbench_routes import create_workbench_routes
 
-    router.include_router(
-        create_workbench_routes(),
-        dependencies=[Depends(verify_admin_access)],
-    )
-    # WebSocket routes are mounted separately — WS can't use APIKeyHeader auth
-    router.include_router(create_workbench_ws_routes())
+    # <-- MODIFIED: removed verify_admin_access dep; Tailscale covers both HTTP and WS
+    router.include_router(create_workbench_routes())
+    # WebSocket routes are included in private_router (routers/private.py)
 
     return router
 
@@ -1359,32 +1254,5 @@ async def process_console_command(command: str) -> Dict[str, str]:
         return {"level": "ERROR", "message": f"Command processing error: {str(e)}"}
 
 
-def generate_console_token() -> str:
-    """Generate a temporary token for console access."""
-    token = secrets.token_urlsafe(32)
-    # Token expires in 1 hour
-    _console_tokens[token] = time.time() + 3600
-    return token
-
-
-def validate_console_token(token: Optional[str]) -> bool:
-    """Validate a console token."""
-    if not token or token not in _console_tokens:
-        return False
-
-    # Check if token is expired
-    if time.time() > _console_tokens[token]:
-        del _console_tokens[token]
-        return False
-
-    return True
-
-
-def cleanup_expired_tokens() -> None:
-    """Clean up expired tokens."""
-    current_time = time.time()
-    expired_tokens = [
-        token for token, expiry in _console_tokens.items() if current_time > expiry
-    ]
-    for token in expired_tokens:
-        del _console_tokens[token]
+# <-- REMOVED: generate_console_token, validate_console_token, cleanup_expired_tokens
+# (console token system removed; Tailscale is the sole gate for /manage routes)

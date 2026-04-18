@@ -58,7 +58,7 @@
                     <div class="mt-6 flex flex-wrap gap-2">
                         {% set agent_slug = agent.slug if agent.slug else (agent.api_path.replace('/agents/', '').rstrip('/') if agent.api_path and agent.api_path.startswith('/agents/') else '') %}
                         {% set instructions_path = agent.instructions_path if agent.instructions_path else 'supervaize_instructions.html' %}
-                        <a href="/admin/agents/{{ agent_slug }}/workbench{% if api_key is defined and api_key %}?key={{ api_key | e }}{% endif %}" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors">
+                        <a href="/manage/agents/{{ agent_slug }}/workbench" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"><!-- <-- MODIFIED: removed ?key= param -->
                             Workbench
                         </a>
                         <button onclick="showAgentInstructions('{{ agent_slug }}', '{{ instructions_path }}')" class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">

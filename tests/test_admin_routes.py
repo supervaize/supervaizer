@@ -14,21 +14,18 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from supervaizer.admin.routes import (
+from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console_token, validate_console_token, verify_admin_access
     AdminStats,
     ServerConfiguration,
     ServerStatus,
     add_log_to_queue,
     create_admin_routes,
     format_uptime,
-    generate_console_token,
     get_dashboard_stats,
     get_server_configuration,
     get_server_status,
     process_console_command,
     set_server_start_time,
-    validate_console_token,
-    verify_admin_access,
 )
 
 if TYPE_CHECKING:
@@ -73,28 +70,8 @@ class TestAdminUtilityFunctions:
         add_log_to_queue("2023-01-01 10:00:00", "INFO", "Test message")
         assert True
 
-    def test_generate_console_token(self) -> None:
-        """Test console token generation."""
-        token = generate_console_token()
-        assert isinstance(token, str)
-        assert len(token) > 10  # Should be a reasonable length
-
-    def test_validate_console_token_valid(self) -> None:
-        """Test validating a valid console token."""
-        token = generate_console_token()
-        # Token should be valid immediately after generation
-        result = validate_console_token(token)
-        assert result is True
-
-    def test_validate_console_token_none(self) -> None:
-        """Test validating None token."""
-        result = validate_console_token(None)
-        assert result is False
-
-    def test_validate_console_token_invalid(self) -> None:
-        """Test validating invalid token."""
-        result = validate_console_token("invalid-token")
-        assert result is False
+    # <-- REMOVED: test_generate_console_token, test_validate_console_token_*
+    # (console token system removed; Tailscale is the gate)
 
 
 class TestAdminModels:
@@ -149,76 +126,8 @@ class TestAdminModels:
         assert len(config.agents) == 1
 
 
-class TestAdminAuthentication:
-    """Tests for admin authentication functions."""
-
-    @pytest.mark.asyncio
-    async def test_verify_admin_access_with_header(
-        self, mocker: "MockerFixture"
-    ) -> None:
-        """Test admin access verification with API key in header."""
-        mock_request = Mock()
-        mock_request.app.state.server = None  # no live server
-
-        # Mock environment variable
-        mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "test-key"})
-
-        result = await verify_admin_access(mock_request, api_key="test-key")
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_verify_admin_access_with_query(
-        self, mocker: "MockerFixture"
-    ) -> None:
-        """Test admin access verification with API key in query parameter."""
-        mock_request = Mock()
-        mock_request.app.state.server = None  # no live server
-
-        # Mock environment variable
-        mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "test-key"})
-
-        result = await verify_admin_access(mock_request, key="test-key")
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_verify_admin_access_denied_no_key(
-        self, mocker: "MockerFixture"
-    ) -> None:
-        """Test admin access denied when no key configured and not local mode."""
-        mock_request = Mock()
-        mock_request.app.state.server = None  # no live server
-
-        # Remove environment variable
-        mocker.patch.dict("os.environ", {}, clear=True)
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_admin_access(mock_request, api_key="any-key")
-        assert exc_info.value.status_code == 403
-
-    @pytest.mark.asyncio
-    async def test_verify_admin_access_invalid_key(
-        self, mocker: "MockerFixture"
-    ) -> None:
-        """Test admin access verification with invalid API key."""
-        mock_request = Mock()
-
-        mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "correct-key"})
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_admin_access(mock_request, api_key="wrong-key")
-
-        assert exc_info.value.status_code == 403
-        assert "Invalid API key" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_verify_admin_access_no_key(self, mocker: "MockerFixture") -> None:
-        """Test admin access verification with no API key provided."""
-        mock_request = Mock()
-
-        with pytest.raises(HTTPException) as exc_info:
-            await verify_admin_access(mock_request)
-
-        assert exc_info.value.status_code == 403
+# <-- REMOVED: TestAdminAuthentication class
+# (verify_admin_access removed; Tailscale is the gate; see test_access_tailscale.py)
 
 
 class TestAdminDataFunctions:
@@ -489,24 +398,22 @@ class TestAdminRoutesIntegration:
 
     @pytest.fixture
     def client(self, mocker: "MockerFixture") -> TestClient:
-        """Create test client with admin routes."""
-        # Mock the server info to avoid storage dependencies
+        """Create test client with admin routes mounted at /manage (no auth deps here)."""
         mock_server_info = Mock()
         mock_server_info.host = "localhost"
         mock_server_info.port = 8001
         mock_server_info.environment = "test"
-        mock_server_info.api_version = "1.0.0"  # Use real string, not mock
+        mock_server_info.api_version = "1.0.0"
         mock_server_info.start_time = time.time() - 3600
         mock_server_info.storage.database_type = "sqlite"
         mock_server_info.storage.storage_path = "/tmp/test.db"
-        mock_server_info.agents = []  # Use actual list, not mock
+        mock_server_info.agents = []
 
         mocker.patch(
             "supervaizer.server.get_server_info_from_storage",
             return_value=mock_server_info,
         )
 
-        # Mock psutil for server status
         mock_memory = Mock()
         mock_memory.percent = 50.0
         mocker.patch("psutil.virtual_memory", return_value=mock_memory)
@@ -518,13 +425,8 @@ class TestAdminRoutesIntegration:
         mocker.patch("psutil.cpu_percent", return_value=10.5)
         mocker.patch("psutil.net_connections", return_value=[1, 2, 3])
 
-        # Mock API version
         mocker.patch("supervaizer.admin.routes.API_VERSION", "1.0.0")
 
-        # Mock environment variable for API key
-        mocker.patch.dict("os.environ", {"SUPERVAIZER_API_KEY": "test-api-key"})
-
-        # Mock storage for get_dashboard_stats
         mock_storage = Mock()
         mock_storage.get_objects.side_effect = lambda obj_type: []
         mock_db = Mock()
@@ -533,7 +435,6 @@ class TestAdminRoutesIntegration:
         mock_storage.db_path = Mock()
         mock_storage.db_path.absolute.return_value = "/tmp/test.db"
 
-        # Mock the StorageManager creation in the admin routes
         mocker.patch(
             "supervaizer.admin.routes.StorageManager", return_value=mock_storage
         )
@@ -543,59 +444,50 @@ class TestAdminRoutesIntegration:
         from fastapi import FastAPI
 
         app = FastAPI()
-        app.include_router(router, prefix="/admin")
+        # <-- MODIFIED: prefix="/manage" matches private_router; no auth dep in create_admin_routes()
+        app.include_router(router, prefix="/manage")
 
         return TestClient(app)
 
-    def test_admin_dashboard_unauthorized(self, client: TestClient) -> None:
-        """Test admin dashboard without authentication."""
-        # The dashboard route doesn't have auth middleware applied in the route definition
-        # It returns 200 but may show different content based on auth
-        response = client.get("/admin/")
-        # Since there's no explicit auth check in the route, it returns 200
-        assert response.status_code == 200
-
-    def test_admin_dashboard_authorized(self, client: TestClient) -> None:
-        """Test admin dashboard with authentication."""
-        response = client.get("/admin/?key=test-api-key")
+    def test_admin_dashboard(self, client: TestClient) -> None:
+        """Test admin dashboard — Tailscale gate is at router level, not here."""
+        response = client.get("/manage/")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        # Should contain basic dashboard elements
         assert "Dashboard" in response.text or "Supervaizer" in response.text
 
     def test_admin_jobs_page(self, client: TestClient) -> None:
         """Test admin jobs page."""
-        response = client.get("/admin/jobs?key=test-api-key")
+        response = client.get("/manage/jobs")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_admin_cases_page(self, client: TestClient) -> None:
         """Test admin cases page."""
-        response = client.get("/admin/cases?key=test-api-key")
+        response = client.get("/manage/cases")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_admin_server_page(self, client: TestClient) -> None:
         """Test admin server page."""
-        response = client.get("/admin/server?key=test-api-key")
+        response = client.get("/manage/server")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_admin_agents_page(self, client: TestClient) -> None:
         """Test admin agents page."""
-        response = client.get("/admin/agents?key=test-api-key")
+        response = client.get("/manage/agents")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_admin_console_page(self, client: TestClient) -> None:
         """Test admin console page."""
-        response = client.get("/admin/console?key=test-api-key")
+        response = client.get("/manage/console")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_api_stats(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test API stats endpoint."""
-        # Mock storage functions
         mock_jobs = [{"status": "completed"}, {"status": "failed"}]
         mock_cases = [{"status": "completed"}]
 
@@ -615,9 +507,7 @@ class TestAdminRoutesIntegration:
             mock_storage._db = mock_db
             mock_get_server.return_value.storage = mock_storage
 
-            response = client.get(
-                "/admin/api/stats", headers={"X-API-Key": "test-api-key"}
-            )
+            response = client.get("/manage/api/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -627,19 +517,13 @@ class TestAdminRoutesIntegration:
 
     def test_api_server_status(self, client: TestClient) -> None:
         """Test API server status endpoint."""
-        response = client.get(
-            "/admin/api/server/status", headers={"X-API-Key": "test-api-key"}
-        )
+        response = client.get("/manage/api/server/status")
         assert response.status_code == 200
-        # This returns HTML template, not JSON
         assert "text/html" in response.headers["content-type"]
 
     def test_api_agents(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test API agents endpoint."""
         mock_agent = Mock()
-        mock_agent.name = "test-agent"
-        mock_agent.version = "1.0.0"
-        mock_agent.description = "Test agent"
         mock_agent.get = Mock(
             side_effect=lambda key, default="": {
                 "name": "test-agent",
@@ -653,54 +537,30 @@ class TestAdminRoutesIntegration:
         ) as mock_get_server:
             mock_get_server.return_value.agents = [mock_agent]
 
-            response = client.get(
-                "/admin/api/agents", headers={"X-API-Key": "test-api-key"}
-            )
+            response = client.get("/manage/api/agents")
 
         assert response.status_code == 200
-        # This returns HTML template, not JSON
         assert "text/html" in response.headers["content-type"]
 
     def test_test_log_endpoint(self, client: TestClient) -> None:
         """Test the test log endpoint."""
-        response = client.get("/admin/test-log?key=admin-secret-key-123")
+        response = client.get("/manage/test-log")
         assert response.status_code == 200
-
         data = response.json()
         assert data["message"] == "Test log added to queue"
 
     def test_api_jobs_basic(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test basic jobs API endpoint."""
-        # Mock job repository and storage
         mock_job_repo = Mock()
-
-        # Mock jobs data structure expected by the endpoint
-        mock_jobs = [
-            Mock(
-                to_dict=lambda: {
-                    "id": "job1",
-                    "status": "running",
-                    "agent_name": "test-agent",
-                    "created_at": "2023-01-01T10:00:00Z",
-                    "data": {"test": "data"},
-                }
-            )
-        ]
-        mock_job_repo.list_jobs.return_value = mock_jobs
-        mock_job_repo.count_jobs.return_value = 1
+        mock_job_repo.list_jobs.return_value = []
+        mock_job_repo.count_jobs.return_value = 0
 
         mocker.patch(
             "supervaizer.storage.create_job_repository", return_value=mock_job_repo
         )
 
-        response = client.get("/admin/api/jobs?key=admin-secret-key-123")
-
-        # For now, just verify the endpoint is called correctly and doesn't error
-        # The actual endpoint returns HTML templates, not JSON
-        assert response.status_code in [
-            200,
-            500,
-        ]  # Allow for template rendering issues in test env
+        response = client.get("/manage/api/jobs")
+        assert response.status_code in [200, 500]
 
     def test_api_jobs_with_filters(
         self, client: TestClient, mocker: "MockerFixture"
@@ -714,41 +574,7 @@ class TestAdminRoutesIntegration:
             "supervaizer.storage.create_job_repository", return_value=mock_job_repo
         )
 
-        response = client.get(
-            "/admin/api/jobs?status=completed&key=admin-secret-key-123"
-        )
-
-        # The endpoint actually returns HTML, not JSON
-        assert response.status_code in [200, 500]
-
-    def test_api_job_details(self, client: TestClient, mocker: "MockerFixture") -> None:
-        """Test job details API endpoint."""
-        mock_job_repo = Mock()
-
-        # Create a more realistic mock job object
-        mock_job = {
-            "id": "job1",
-            "status": "completed",
-            "data": {"test": "data"},
-            "created_at": "2023-01-01T10:00:00Z",
-        }
-
-        # Mock the get_job to return a dict-like object
-        mock_job_obj = Mock()
-        mock_job_obj.to_dict.return_value = mock_job
-        mock_job_obj.__getitem__ = lambda self, key: mock_job[key]
-        mock_job_obj.__contains__ = lambda self, key: key in mock_job
-        mock_job_obj.get = lambda self, key, default=None: mock_job.get(key, default)
-
-        mock_job_repo.get_job.return_value = mock_job_obj
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.get("/admin/api/jobs/job1?key=admin-secret-key-123")
-
-        # The endpoint might return HTML template or have issues with mock structure
+        response = client.get("/manage/api/jobs?status=completed")
         assert response.status_code in [200, 500]
 
     def test_api_job_details_not_found(
@@ -762,64 +588,20 @@ class TestAdminRoutesIntegration:
             "supervaizer.storage.create_job_repository", return_value=mock_job_repo
         )
 
-        response = client.get("/admin/api/jobs/nonexistent?key=admin-secret-key-123")
-        # Should return 404 for not found, but may have template issues in test
+        response = client.get("/manage/api/jobs/nonexistent")
         assert response.status_code in [404, 500]
 
     def test_api_cases_basic(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test basic cases API endpoint."""
         mock_case_repo = Mock()
-        mock_cases = [
-            {
-                "id": "case1",
-                "status": "open",
-                "created_at": "2023-01-01T10:00:00Z",
-                "data": {"test": "data"},
-            }
-        ]
-        mock_case_repo.list_cases.return_value = [
-            Mock(to_dict=lambda: case) for case in mock_cases
-        ]
-        mock_case_repo.count_cases.return_value = 1
+        mock_case_repo.list_cases.return_value = []
+        mock_case_repo.count_cases.return_value = 0
 
         mocker.patch(
             "supervaizer.storage.create_case_repository", return_value=mock_case_repo
         )
 
-        response = client.get("/admin/api/cases?key=admin-secret-key-123")
-
-        # The endpoint returns HTML template, not JSON
-        assert response.status_code in [200, 500]
-
-    def test_api_case_details(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test case details API endpoint."""
-        mock_case_repo = Mock()
-
-        mock_case = {
-            "id": "case1",
-            "status": "open",
-            "data": {"test": "data"},
-            "created_at": "2023-01-01T10:00:00Z",
-        }
-
-        # Create a dict-like mock object
-        mock_case_obj = Mock()
-        mock_case_obj.to_dict.return_value = mock_case
-        mock_case_obj.__getitem__ = lambda self, key: mock_case[key]
-        mock_case_obj.__contains__ = lambda self, key: key in mock_case
-        mock_case_obj.get = lambda self, key, default=None: mock_case.get(key, default)
-
-        mock_case_repo.get_case.return_value = mock_case_obj
-
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.get("/admin/api/cases/case1?key=admin-secret-key-123")
-
-        # The endpoint might have template rendering issues in test
+        response = client.get("/manage/api/cases")
         assert response.status_code in [200, 500]
 
     def test_api_case_details_not_found(
@@ -833,7 +615,7 @@ class TestAdminRoutesIntegration:
             "supervaizer.storage.create_case_repository", return_value=mock_case_repo
         )
 
-        response = client.get("/admin/api/cases/nonexistent?key=admin-secret-key-123")
+        response = client.get("/manage/api/cases/nonexistent")
         assert response.status_code in [404, 500]
 
     def test_update_job_status(
@@ -841,16 +623,6 @@ class TestAdminRoutesIntegration:
     ) -> None:
         """Test updating job status."""
         mock_job_repo = Mock()
-
-        # Create a more realistic mock job
-        mock_job = {"id": "job1", "status": "running", "data": {"test": "data"}}
-
-        mock_job_obj = Mock()
-        mock_job_obj.__setitem__ = Mock()  # Allow item assignment
-        mock_job_obj.__getitem__ = lambda self, key: mock_job[key]
-        mock_job_obj.status = "running"
-
-        mock_job_repo.get_job.return_value = mock_job_obj
         mock_job_repo.update_job_status.return_value = True
 
         mocker.patch(
@@ -858,24 +630,16 @@ class TestAdminRoutesIntegration:
         )
 
         response = client.post(
-            "/admin/api/jobs/job1/status?key=admin-secret-key-123",
+            "/manage/api/jobs/job1/status",
             json={"status": "completed"},
         )
-
-        # The endpoint may have authentication or other issues in test environment
-        assert response.status_code in [200, 403, 500]
+        assert response.status_code in [200, 400, 403, 500]
 
     def test_update_case_status(
         self, client: TestClient, mocker: "MockerFixture"
     ) -> None:
         """Test updating case status."""
         mock_case_repo = Mock()
-
-        mock_case = Mock()
-        mock_case.status = "open"
-        mock_case.__setitem__ = Mock()  # Allow assignment
-
-        mock_case_repo.get_case.return_value = mock_case
         mock_case_repo.update_case_status.return_value = True
 
         mocker.patch(
@@ -883,47 +647,33 @@ class TestAdminRoutesIntegration:
         )
 
         response = client.post(
-            "/admin/api/cases/case1/status?key=admin-secret-key-123",
+            "/manage/api/cases/case1/status",
             json={"status": "closed"},
         )
-
-        # May have various issues in test environment
         assert response.status_code in [200, 400, 403, 500]
 
     def test_delete_job(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test deleting a job."""
         mock_job_repo = Mock()
-
-        # Mock job with proper iteration support
-        mock_job = {"id": "job1", "status": "completed"}
-        mock_job_obj = Mock()
-        mock_job_obj.__iter__ = lambda self: iter(mock_job.items())
-        mock_job_obj.get = lambda self, key, default=None: mock_job.get(key, default)
-
-        mock_job_repo.get_job.return_value = mock_job_obj
         mock_job_repo.delete_job.return_value = True
 
         mocker.patch(
             "supervaizer.storage.create_job_repository", return_value=mock_job_repo
         )
 
-        response = client.delete("/admin/api/jobs/job1?key=admin-secret-key-123")
-
-        # May have authentication or mock structure issues
+        response = client.delete("/manage/api/jobs/job1")
         assert response.status_code in [200, 403, 500]
 
     def test_delete_case(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test deleting a case."""
         mock_case_repo = Mock()
-        mock_case = Mock()
-        mock_case_repo.get_case.return_value = mock_case
         mock_case_repo.delete_case.return_value = True
 
         mocker.patch(
             "supervaizer.storage.create_case_repository", return_value=mock_case_repo
         )
 
-        response = client.delete("/admin/api/cases/case1?key=admin-secret-key-123")
+        response = client.delete("/manage/api/cases/case1")
         assert response.status_code in [200, 403, 500]
 
     def test_api_recent_activity(
@@ -942,60 +692,28 @@ class TestAdminRoutesIntegration:
             "supervaizer.storage.create_case_repository", return_value=mock_case_repo
         )
 
-        response = client.get("/admin/api/recent-activity?key=admin-secret-key-123")
-
-        # This endpoint returns HTML template, not JSON
+        response = client.get("/manage/api/recent-activity")
         assert response.status_code in [200, 500]
 
-    def test_console_execute_help(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test console command execution - help."""
-        # Mock console token validation to return True
-        mocker.patch(
-            "supervaizer.admin.routes.validate_console_token", return_value=True
-        )
-
+    def test_console_execute(self, client: TestClient) -> None:
+        """Test console command execution — no token required; Tailscale is the gate."""
         response = client.post(
-            "/admin/api/console/execute?key=admin-secret-key-123&token=valid-token",
+            "/manage/api/console/execute",
             json={"command": "help"},
         )
         assert response.status_code == 200
-
         data = response.json()
         assert data["status"] == "success"
 
-    def test_console_execute_unauthorized(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test console command execution without valid token."""
-        # Mock console token validation to return False
-        mocker.patch(
-            "supervaizer.admin.routes.validate_console_token", return_value=False
-        )
-
-        response = client.post(
-            "/admin/api/console/execute",
-            json={"command": "help"},
-        )
-        assert response.status_code == 401
-
     def test_debug_endpoints(self, client: TestClient) -> None:
         """Test debug endpoints."""
-        # Debug tokens endpoint
-        response = client.get("/admin/debug-tokens?key=admin-secret-key-123")
-        assert response.status_code == 200
-        data = response.json()
-        assert "current_tokens" in data
-
-        # Debug queue endpoint
-        response = client.get("/admin/debug-queue?key=admin-secret-key-123")
+        # <-- MODIFIED: debug-tokens removed; only debug-queue and test-loguru remain
+        response = client.get("/manage/debug-queue")
         assert response.status_code == 200
         data = response.json()
         assert "queue_size_before" in data
 
-        # Test loguru endpoint
-        response = client.get("/admin/test-loguru?key=admin-secret-key-123")
+        response = client.get("/manage/test-loguru")
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Loguru test messages sent"

@@ -242,7 +242,7 @@
             <div
                 id="jobs-list-container"
                 class="max-h-[250px] overflow-y-auto"
-                data-url="/admin/agents/{{ agent_slug }}/workbench/jobs"
+                data-url="/manage/agents/{{ agent_slug }}/workbench/jobs"
             >
                 <div class="px-4 py-6 text-center text-sm text-gray-400 italic">Loading...</div>
             </div>
@@ -351,7 +351,7 @@
                     </div>
                     <div class="w-px h-4 bg-gray-300"></div>
                     <button
-                        hx-get="/admin/agents/{{ agent_slug }}/workbench/console/clear"
+                        hx-get="/manage/agents/{{ agent_slug }}/workbench/console/clear"
                         hx-target="#console-log-container"
                         hx-swap="innerHTML"
                         class="text-xs text-gray-500 hover:text-gray-700 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1"
@@ -375,7 +375,7 @@
             <div
                 id="console-log-container"
                 class="h-48 overflow-y-auto font-mono text-xs"
-                data-url="/admin/agents/{{ agent_slug }}/workbench/console"
+                data-url="/manage/agents/{{ agent_slug }}/workbench/console"
                 x-effect="$el.dataset.filter = filter; if (typeof applyConsoleFilter === 'function') applyConsoleFilter();"
             >
                 {# Placeholder — replaced by HTMX partial #}
@@ -389,7 +389,7 @@
 </div>{# end workbenchPage #}
 
 {# ── Workbench JS ────────────────────────────────────────────────── #}
-<script src="/admin/static/js/workbench-form.js?v=14"></script>
+<script src="/manage/static/js/workbench-form.js?v=14"></script>
 <script>
     function applyConsoleFilter() {
         var container = document.getElementById('console-log-container');
@@ -432,10 +432,10 @@
                 this.$nextTick(() => {
                     window.workbenchForm = new WorkbenchForm({
                         agentSlug: this.agentSlug,
-                        startUrl: '/admin/agents/{{ agent_slug }}/workbench/start',
-                        stopUrl: '/admin/agents/{{ agent_slug }}/workbench/stop',
+                        startUrl: '/manage/agents/{{ agent_slug }}/workbench/start',
+                        stopUrl: '/manage/agents/{{ agent_slug }}/workbench/stop',
                         monitorContainerId: 'monitor-container',
-                        monitorUrl: '/admin/agents/{{ agent_slug }}/workbench/jobs/',
+                        monitorUrl: '/manage/agents/{{ agent_slug }}/workbench/jobs/',
                         errorsContainerId: 'workbench-errors',
                         getApiKey: () => sessionStorage.getItem('admin_api_key') || document.body.dataset.adminKey || '{{ api_key }}',
                     });

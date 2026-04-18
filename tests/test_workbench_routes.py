@@ -80,7 +80,7 @@ def test_client_with_agent(monkeypatch):
     app.state.server = server
 
     with patch("supervaizer.admin.routes.StorageManager", return_value=mock_storage):
-        app.include_router(create_admin_routes(), prefix="/admin")
+        app.include_router(create_admin_routes(), prefix="/manage")  # <-- MODIFIED
 
     client = TestClient(app)
     yield client, agent.slug
@@ -92,14 +92,14 @@ class TestWorkbenchPageRendering:
     def test_workbench_page_loads(self, test_client_with_agent):
         """Workbench page should render for a valid agent slug."""
         client, agent_slug = test_client_with_agent
-        response = client.get(f"/admin/agents/{agent_slug}/workbench?key=test-api-key")
+        response = client.get(f"/manage/agents/{agent_slug}/workbench")  # <-- MODIFIED
         assert response.status_code == 200
         assert "Workbench" in response.text
 
     def test_workbench_page_404_for_unknown_agent(self, test_client_with_agent):
         """Workbench page should 404 for unknown agent slug."""
         client, _ = test_client_with_agent
-        response = client.get("/admin/agents/unknown-agent/workbench?key=test-api-key")
+        response = client.get("/manage/agents/unknown-agent/workbench")  # <-- MODIFIED
         assert response.status_code == 404
 
 
