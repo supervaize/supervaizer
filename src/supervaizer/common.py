@@ -213,9 +213,7 @@ class ApiError(ApiResult):
 
 def log_access_denied_tailscale(ip: str, path: str, reason: str) -> None:  # <-- ADDED
     """Log a Tailscale access denial with structured fields."""
-    log.warning(
-        f"[access:tailscale] denied ip={ip!r} path={path!r} reason={reason!r}"
-    )
+    log.warning(f"[access:tailscale] denied ip={ip!r} path={path!r} reason={reason!r}")
 
 
 def log_access_denied_api(key: str | None, path: str, reason: str) -> None:  # <-- ADDED

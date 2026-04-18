@@ -28,7 +28,9 @@ if _raw:
             try:
                 TRUSTED_PROXIES.append(ipaddress.ip_network(_entry, strict=False))
             except ValueError:
-                log.warning(f"[client_ip] Invalid TRUSTED_PROXIES entry ignored: {_entry!r}")
+                log.warning(
+                    f"[client_ip] Invalid TRUSTED_PROXIES entry ignored: {_entry!r}"
+                )
 
 
 def _extract_client_ip(scope: Scope) -> str:  # <-- ADDED

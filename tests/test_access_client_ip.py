@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from supervaizer.access.client_ip import TRUSTED_PROXIES, _extract_client_ip
+from supervaizer.access.client_ip import _extract_client_ip
 
 
 def _make_scope(peer_ip: str, xff: str = "") -> dict:

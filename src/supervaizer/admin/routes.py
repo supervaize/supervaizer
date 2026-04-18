@@ -13,7 +13,12 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter, HTTPException, Query, Request  # <-- MODIFIED: removed Depends, Security
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Request,
+)  # <-- MODIFIED: removed Depends, Security
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -963,7 +968,9 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/log-stream")
-    async def log_stream() -> EventSourceResponse:  # <-- MODIFIED: removed token/key params; Tailscale is the gate
+    async def log_stream() -> (
+        EventSourceResponse
+    ):  # <-- MODIFIED: removed token/key params; Tailscale is the gate
         """Stream log messages via Server-Sent Events."""
 
         async def generate_log_events() -> AsyncGenerator[str, None]:

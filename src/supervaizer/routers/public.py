@@ -28,7 +28,9 @@ _home_templates = Jinja2Templates(
 )
 
 
-def create_public_router(server: "Server", admin_interface: bool = True) -> APIRouter:  # <-- ADDED
+def create_public_router(
+    server: "Server", admin_interface: bool = True
+) -> APIRouter:  # <-- ADDED
     """Build and return the public router wired to *server*.
 
     Includes:

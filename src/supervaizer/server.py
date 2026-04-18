@@ -22,13 +22,16 @@ from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
 from fastapi.security import APIKeyHeader
+
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.account import Account
-from supervaizer.agent import Agent  # <-- MODIFIED: removed AdminIPAllowlistMiddleware, create_admin_routes imports
+from supervaizer.agent import (
+    Agent,
+)  # <-- MODIFIED: removed AdminIPAllowlistMiddleware, create_admin_routes imports
 from supervaizer.common import (
     ApiResult,
     ApiSuccess,
@@ -40,7 +43,11 @@ from supervaizer.common import (
 )
 from supervaizer.instructions import display_instructions
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
-from supervaizer.routers import create_api_router, create_private_router, create_public_router  # <-- ADDED
+from supervaizer.routers import (
+    create_api_router,
+    create_private_router,
+    create_public_router,
+)  # <-- ADDED
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 insp = inspect
@@ -532,7 +539,9 @@ class Server(ServerAbstract):
             log.info(
                 f"[Server launch] 💼 Deploy admin interface @ {self.public_url}/manage"
             )
-            self.app.include_router(create_private_router())  # <-- ADDED: /manage surface
+            self.app.include_router(
+                create_private_router()
+            )  # <-- ADDED: /manage surface
             # <-- REMOVED: AdminIPAllowlistMiddleware (replaced by require_tailscale)
             # <-- REMOVED: create_admin_routes() prefix="/admin" (now inside private_router)
 

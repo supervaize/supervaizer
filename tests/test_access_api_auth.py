@@ -7,9 +7,7 @@
 """Tests for require_api_key and require_scope dependencies."""
 
 import os
-from unittest.mock import patch
 
-import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 

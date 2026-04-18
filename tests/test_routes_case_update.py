@@ -256,7 +256,9 @@ def test_update_case_unauthorized(
     )
 
     assert response.status_code == 401
-    assert "API key" in response.json()["detail"]  # <-- MODIFIED: require_api_key message
+    assert (
+        "API key" in response.json()["detail"]
+    )  # <-- MODIFIED: require_api_key message
 
 
 def test_human_answer_uses_workbench_style_params_and_strips_casestep_index(

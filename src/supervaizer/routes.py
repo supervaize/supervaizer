@@ -207,7 +207,9 @@ def create_default_routes(server: "Server") -> APIRouter:
             http_status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def update_case_with_answer(
@@ -476,7 +478,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def validate_agent_parameters(
@@ -585,7 +589,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def validate_method_fields(
@@ -660,7 +666,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def get_dynamic_choices(
@@ -713,7 +721,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         },
         response_model=Job,
         status_code=http_status.HTTP_202_ACCEPTED,
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors(job_conflict_check=True)
     async def start_job(
@@ -831,7 +841,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def stop_agent(
@@ -860,7 +872,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def status_agent(
@@ -886,7 +900,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             http_status.HTTP_200_OK: {"model": AgentResponse},
             http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
-        dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
     )
     @handle_route_errors()
     async def server_update_agent(
@@ -942,7 +958,9 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
                 http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
                 http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
             },
-            dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             name=f"{agent.slug}_custom_{method_name}",  # Unique operation ID
         )
         @handle_route_errors()

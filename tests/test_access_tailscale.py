@@ -8,7 +8,6 @@
 
 from unittest.mock import patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -85,7 +84,9 @@ class TestRequireTailscale:
 
         app = _make_app("100.127.255.255")
 
-        with patch.object(ts_module, "_extract_client_ip", return_value="100.127.255.255"):
+        with patch.object(
+            ts_module, "_extract_client_ip", return_value="100.127.255.255"
+        ):
             client = TestClient(app)
             response = client.get("/protected")
 
@@ -111,7 +112,9 @@ class TestRequireTailscale:
 
         with (
             patch.object(ts_module, "_extract_client_ip", return_value="5.5.5.5"),
-            patch("supervaizer.access.tailscale.log_access_denied_tailscale") as mock_log,
+            patch(
+                "supervaizer.access.tailscale.log_access_denied_tailscale"
+            ) as mock_log,
         ):
             client = TestClient(app)
             client.get("/protected")

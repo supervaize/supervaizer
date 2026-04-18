@@ -214,7 +214,9 @@ def test_utils_routes(server_fixture: Server) -> None:
     assert "BEGIN PUBLIC KEY" in response.text
 
     # Test encrypt endpoint
-    response = client.post("/api/supervaizer/utils/encrypt", headers=headers, json="test_string")
+    response = client.post(
+        "/api/supervaizer/utils/encrypt", headers=headers, json="test_string"
+    )
     assert response.status_code == 200
     encrypted = response.json()
     assert isinstance(encrypted, str)

@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from supervaizer.common import log, log_access_denied_api
+from supervaizer.common import log_access_denied_api
 
 # In-memory API key registry.  Populated at import time from SUPERVAIZER_API_KEY env.
 # <-- ADDED
@@ -69,6 +69,7 @@ def require_scope(required_scope: str) -> Callable[..., dict[str, str]]:  # <-- 
 
     Scope is hierarchical: 'write' satisfies 'read' (but not the reverse).
     """
+
     def _check(
         meta: Annotated[dict[str, str], Depends(require_api_key)],
         request: Request,

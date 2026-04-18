@@ -22,7 +22,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query  # <-- MODIFIED: removed Security, added Depends
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+)  # <-- MODIFIED: removed Security, added Depends
 from fastapi.responses import JSONResponse
 
 from supervaizer.access import require_scope  # <-- ADDED
@@ -39,7 +45,9 @@ def create_agent_data_routes(server: "Server", agent: "Agent") -> APIRouter:
     router = APIRouter(prefix=agent.path, tags=["Data Resources"])
     agent_slug = agent.slug
     for resource in agent.data_resources:
-        _add_resource_routes(router, resource, agent_slug)  # <-- MODIFIED: removed server arg
+        _add_resource_routes(
+            router, resource, agent_slug
+        )  # <-- MODIFIED: removed server arg
     return router
 
 
@@ -51,7 +59,9 @@ def _data_resource_operation_id(
 
 
 def _add_resource_routes(
-    router: APIRouter, resource: DataResource, agent_slug: str  # <-- MODIFIED: removed server arg
+    router: APIRouter,
+    resource: DataResource,
+    agent_slug: str,  # <-- MODIFIED: removed server arg
 ) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
@@ -86,7 +96,9 @@ def _add_resource_routes(
             f"{prefix}/",
             _make_create_handler(resource, prefix),
             methods=["POST"],
-            dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Create {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -98,7 +110,9 @@ def _add_resource_routes(
             f"{prefix}/{{item_id}}",
             _make_update_handler(resource, prefix),
             methods=["PUT"],
-            dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Update {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -110,7 +124,9 @@ def _add_resource_routes(
             f"{prefix}/{{item_id}}",
             _make_delete_handler(resource, prefix),
             methods=["DELETE"],
-            dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Delete {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -122,7 +138,9 @@ def _add_resource_routes(
             f"{prefix}/import/",
             _make_import_handler(resource, prefix),
             methods=["POST"],
-            dependencies=[Depends(require_scope("write"))],  # <-- MODIFIED: scope-enforced write
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Import {resource.display_name_resolved} (bulk)",
             operation_id=op_id,
             name=op_id,
