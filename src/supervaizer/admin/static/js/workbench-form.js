@@ -4,12 +4,12 @@
 class WorkbenchForm {
     constructor(config) {
         this.agentSlug = config.agentSlug;
-        this.startUrl = config.startUrl || `/admin/agents/${config.agentSlug}/workbench/start`;
-        this.stopUrl = config.stopUrl || `/admin/agents/${config.agentSlug}/workbench/stop`;
-        this.monitorUrl = config.monitorUrl || `/admin/agents/${config.agentSlug}/workbench/jobs/`;
+        this.startUrl = config.startUrl || `/manage/agents/${config.agentSlug}/workbench/start`;
+        this.stopUrl = config.stopUrl || `/manage/agents/${config.agentSlug}/workbench/stop`;
+        this.monitorUrl = config.monitorUrl || `/manage/agents/${config.agentSlug}/workbench/jobs/`;
         this.monitorContainerId = config.monitorContainerId || 'monitor-container';
         this.errorsContainerId = config.errorsContainerId || 'workbench-errors';
-        this.basePath = `/admin/agents/${config.agentSlug}/workbench`;
+        this.basePath = `/manage/agents/${config.agentSlug}/workbench`;
         this.activeJobId = null;
 
         // Optional callback overrides for param/field collection and API key

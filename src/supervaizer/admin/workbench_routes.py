@@ -47,7 +47,7 @@ def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
         "message": message,
     })
     # Only bump version for meaningful logs (not HTTP access logs from admin endpoints)
-    if "/admin/" not in message and "HTTP/1.1" not in message:
+    if "/manage/" not in message and "HTTP/1.1" not in message:
         _workbench_log_version += 1
 
 
