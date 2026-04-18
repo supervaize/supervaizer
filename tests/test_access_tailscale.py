@@ -123,3 +123,33 @@ class TestRequireTailscale:
         args = mock_log.call_args[0]
         assert args[0] == "5.5.5.5"
         assert args[2] == "not in tailscale range"
+
+    def test_loopback_allowed_in_local_mode(self: "TestRequireTailscale") -> None:
+        """127.0.0.1 should pass when SUPERVAIZER_LOCAL_MODE=true."""
+        from supervaizer.access import tailscale as ts_module
+
+        app = _make_app("127.0.0.1")
+
+        with (
+            patch.object(ts_module, "_extract_client_ip", return_value="127.0.0.1"),
+            patch.dict("os.environ", {"SUPERVAIZER_LOCAL_MODE": "true"}),
+        ):
+            client = TestClient(app)
+            response = client.get("/protected")
+
+        assert response.status_code == 200
+
+    def test_loopback_denied_without_local_mode(self: "TestRequireTailscale") -> None:
+        """127.0.0.1 should be denied when SUPERVAIZER_LOCAL_MODE is not set."""
+        from supervaizer.access import tailscale as ts_module
+
+        app = _make_app("127.0.0.1")
+
+        with (
+            patch.object(ts_module, "_extract_client_ip", return_value="127.0.0.1"),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            client = TestClient(app)
+            response = client.get("/protected")
+
+        assert response.status_code == 403
