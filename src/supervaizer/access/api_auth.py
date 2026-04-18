@@ -17,11 +17,8 @@ from fastapi import Depends, Header, HTTPException, Request
 from supervaizer.common import log_access_denied_api
 
 # In-memory API key registry.  Populated at import time from SUPERVAIZER_API_KEY env.
-# <-- ADDED
-API_KEYS: dict[str, dict[str, str]] = {
-    "key_123": {"scope": "read"},
-    "key_456": {"scope": "write"},
-}
+# Empty by default — no hard-coded credentials ship in production.  # <-- ADDED
+API_KEYS: dict[str, dict[str, str]] = {}
 
 # Scope hierarchy: higher rank implies all lower scopes.
 _SCOPE_RANK: dict[str, int] = {"read": 0, "write": 1}  # <-- ADDED

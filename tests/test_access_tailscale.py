@@ -29,7 +29,7 @@ def _make_app(peer_ip: str) -> FastAPI:
 class TestRequireTailscale:
     """HTTP surface tests for require_tailscale."""
 
-    def test_tailscale_ip_allowed(self) -> None:
+    def test_tailscale_ip_allowed(self: "TestRequireTailscale") -> None:
         """IP inside 100.64.0.0/10 should pass."""
         app = _make_app("100.64.0.1")
         client = TestClient(app, raise_server_exceptions=True)
@@ -40,7 +40,7 @@ class TestRequireTailscale:
         # Peer IP from TestClient is 127.0.0.1 by default, not Tailscale — patch _extract_client_ip
         assert response.status_code in [200, 403]
 
-    def test_tailscale_ip_passes_when_patched(self) -> None:
+    def test_tailscale_ip_passes_when_patched(self: "TestRequireTailscale") -> None:
         """Explicitly mock _extract_client_ip to return a Tailscale IP — should return 200."""
         from supervaizer.access import tailscale as ts_module
 
@@ -53,7 +53,7 @@ class TestRequireTailscale:
         assert response.status_code == 200
         assert response.json() == {"ok": True}
 
-    def test_non_tailscale_ip_denied(self) -> None:
+    def test_non_tailscale_ip_denied(self: "TestRequireTailscale") -> None:
         """IP outside Tailscale range should get 403."""
         from supervaizer.access import tailscale as ts_module
 
@@ -66,7 +66,7 @@ class TestRequireTailscale:
         assert response.status_code == 403
         assert "Tailscale" in response.json()["detail"]
 
-    def test_empty_ip_denied(self) -> None:
+    def test_empty_ip_denied(self: "TestRequireTailscale") -> None:
         """Empty IP (extraction failure) should get 403."""
         from supervaizer.access import tailscale as ts_module
 
@@ -78,7 +78,7 @@ class TestRequireTailscale:
 
         assert response.status_code == 403
 
-    def test_tailscale_range_boundary(self) -> None:
+    def test_tailscale_range_boundary(self: "TestRequireTailscale") -> None:
         """100.127.255.255 is the last address in 100.64.0.0/10 — should pass."""
         from supervaizer.access import tailscale as ts_module
 
@@ -92,7 +92,7 @@ class TestRequireTailscale:
 
         assert response.status_code == 200
 
-    def test_just_outside_tailscale_range(self) -> None:
+    def test_just_outside_tailscale_range(self: "TestRequireTailscale") -> None:
         """100.128.0.0 is just outside 100.64.0.0/10 — should be denied."""
         from supervaizer.access import tailscale as ts_module
 
@@ -104,7 +104,7 @@ class TestRequireTailscale:
 
         assert response.status_code == 403
 
-    def test_denial_logs_reason(self) -> None:
+    def test_denial_logs_reason(self: "TestRequireTailscale") -> None:
         """Denied request should log with reason 'not in tailscale range'."""
         from supervaizer.access import tailscale as ts_module
 
