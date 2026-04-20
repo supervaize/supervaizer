@@ -7,8 +7,6 @@ All notable changes to this project will be documented in this file.
 ## TODO
 
 - Fix CICD
-  - Version bump : rebuild documentation after version bump in CI-CD
-  - Update Released / Package / Tag
 - Review and test feature/data-persistance
 - Complete feature/smartinstall implementation
 - Fix receive_human_input
@@ -18,6 +16,10 @@ All notable changes to this project will be documented in this file.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
 ## [Unreleased]
+
+### Fixed
+
+- **`TemplateResponse` Starlette 0.50 compatibility** — Updated `routers/public.py` and `routes.py` to use the new `TemplateResponse(request, name, context)` API. The old two-argument form `TemplateResponse(name, context)` was removed in Starlette 0.50.0, causing a `TypeError: unhashable type: 'dict'` crash on every `GET /` request.
 
 ## [0.15.0] - 2026-04-20
 
