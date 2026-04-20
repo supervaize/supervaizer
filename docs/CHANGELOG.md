@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-04-20
+
 ### Fixed
 
 - **`TemplateResponse` Starlette 0.50 compatibility** — Updated `routers/public.py` and `routes.py` to use the new `TemplateResponse(request, name, context)` API. The old two-argument form `TemplateResponse(name, context)` was removed in Starlette 0.50.0, causing a `TypeError: unhashable type: 'dict'` crash on every `GET /` request.
