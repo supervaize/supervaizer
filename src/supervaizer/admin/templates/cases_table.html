@@ -74,7 +74,7 @@
                         View
                     </button>
                     <button
-                        hx-delete="/admin/api/cases/{{ case.id }}"
+                        hx-delete="/manage/api/cases/{{ case.id }}"
                         hx-confirm="Are you sure you want to delete this case?"
                         hx-trigger="click"
                         hx-on::after-request="if(event.detail.successful) { window.showToast('Case deleted successfully', 'success'); htmx.trigger('#cases-table-container', 'refresh'); }"
@@ -110,7 +110,7 @@
             <div class="flex space-x-2">
                 {% if has_prev %}
                 <button
-                    hx-get="/admin/api/cases?skip={{ skip - limit }}&limit={{ limit }}"
+                    hx-get="/manage/api/cases?skip={{ skip - limit }}&limit={{ limit }}"
                     hx-target="#cases-table-container"
                     class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                 >
@@ -120,7 +120,7 @@
 
                 {% if has_next %}
                 <button
-                    hx-get="/admin/api/cases?skip={{ skip + limit }}&limit={{ limit }}"
+                    hx-get="/manage/api/cases?skip={{ skip + limit }}&limit={{ limit }}"
                     hx-target="#cases-table-container"
                     class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                 >

@@ -14,7 +14,7 @@
         </div>
         <div class="mt-4 flex md:mt-0">
             <button
-                hx-get="/admin/api/jobs"
+                hx-get="/manage/api/jobs"
                 hx-target="#jobs-table-container"
                 hx-indicator="#refresh-indicator"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -47,7 +47,7 @@
 
         <div x-show="filtersOpen" x-cloak class="px-6 py-4 border-b border-gray-200">
             <form
-                hx-get="/admin/api/jobs"
+                hx-get="/manage/api/jobs"
                 hx-target="#jobs-table-container"
                 hx-trigger="change, submit"
                 class="grid grid-cols-1 gap-4 sm:grid-cols-4"
@@ -139,11 +139,11 @@
     // Auto-load jobs on page load
     document.addEventListener('DOMContentLoaded', function() {
         // Load jobs immediately
-        htmx.ajax('GET', '/admin/api/jobs', {target: '#jobs-table-container'});
+        htmx.ajax('GET', '/manage/api/jobs', {target: '#jobs-table-container'});
 
         // Set up auto-refresh interval for jobs every 30 seconds
         setInterval(function() {
-            htmx.ajax('GET', '/admin/api/jobs', {target: '#jobs-table-container'});
+            htmx.ajax('GET', '/manage/api/jobs', {target: '#jobs-table-container'});
         }, 30000); // Refresh every 30 seconds
     });
 
@@ -169,12 +169,12 @@
 
     // Global function to show job details
     window.showJobDetails = function(jobId) {
-        htmx.ajax('GET', `/admin/api/jobs/${jobId}`, {target: '#job-modal-content'});
+        htmx.ajax('GET', `/manage/api/jobs/${jobId}`, {target: '#job-modal-content'});
     };
 
     // Global function to show case details
     window.showCaseDetails = function(caseId) {
-        htmx.ajax('GET', `/admin/api/cases/${caseId}`, {target: '#case-modal-content'});
+        htmx.ajax('GET', `/manage/api/cases/${caseId}`, {target: '#case-modal-content'});
     };
 </script>
 {% endblock %}

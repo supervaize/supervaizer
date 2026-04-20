@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -22,9 +28,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Body, HTTPException, Query, Security
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+)  # <-- MODIFIED: removed Security, added Depends
 from fastapi.responses import JSONResponse
 
+from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.common import log
 from supervaizer.data_resource import DataResource
 
@@ -38,7 +51,9 @@ def create_agent_data_routes(server: "Server", agent: "Agent") -> APIRouter:
     router = APIRouter(prefix=agent.path, tags=["Data Resources"])
     agent_slug = agent.slug
     for resource in agent.data_resources:
-        _add_resource_routes(router, resource, server, agent_slug)
+        _add_resource_routes(
+            router, resource, agent_slug
+        )  # <-- MODIFIED: removed server arg
     return router
 
 
@@ -50,7 +65,9 @@ def _data_resource_operation_id(
 
 
 def _add_resource_routes(
-    router: APIRouter, resource: DataResource, server: "Server", agent_slug: str
+    router: APIRouter,
+    resource: DataResource,
+    agent_slug: str,  # <-- MODIFIED: removed server arg
 ) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
@@ -61,7 +78,7 @@ def _add_resource_routes(
             f"{prefix}/",
             _make_list_handler(resource, prefix),
             methods=["GET"],
-            dependencies=[Security(server.verify_api_key)],
+            # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"List {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -73,7 +90,7 @@ def _add_resource_routes(
             f"{prefix}/{{item_id}}",
             _make_get_handler(resource, prefix),
             methods=["GET"],
-            dependencies=[Security(server.verify_api_key)],
+            # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"Get {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -85,7 +102,9 @@ def _add_resource_routes(
             f"{prefix}/",
             _make_create_handler(resource, prefix),
             methods=["POST"],
-            dependencies=[Security(server.verify_api_key)],
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Create {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -97,7 +116,9 @@ def _add_resource_routes(
             f"{prefix}/{{item_id}}",
             _make_update_handler(resource, prefix),
             methods=["PUT"],
-            dependencies=[Security(server.verify_api_key)],
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Update {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -109,7 +130,9 @@ def _add_resource_routes(
             f"{prefix}/{{item_id}}",
             _make_delete_handler(resource, prefix),
             methods=["DELETE"],
-            dependencies=[Security(server.verify_api_key)],
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Delete {resource.display_name_resolved}",
             operation_id=op_id,
             name=op_id,
@@ -121,7 +144,9 @@ def _add_resource_routes(
             f"{prefix}/import/",
             _make_import_handler(resource, prefix),
             methods=["POST"],
-            dependencies=[Security(server.verify_api_key)],
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
             summary=f"Import {resource.display_name_resolved} (bulk)",
             operation_id=op_id,
             name=op_id,

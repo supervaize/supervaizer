@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -623,7 +629,7 @@ class AgentAbstract(SvBaseModel):
     )
     custom_routes: Any | None = Field(
         default=None,
-        description="Optional FastAPI APIRouter with custom routes for this agent",
+        description="Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/...",
         exclude=True,
     )
     dynamic_choices_callback: Any | None = Field(

@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -101,18 +107,18 @@ def test_get_job_status_endpoint(
 
     # Use the API key from the server fixture
     headers = {"X-API-Key": server_fixture.api_key or ""}
-    response = client.get(f"/supervaizer/jobs/{job_fixture.id}", headers=headers)
+    response = client.get(f"/api/supervaizer/jobs/{job_fixture.id}", headers=headers)
     assert response.status_code == 200
     assert response.json()["job_id"] == job_fixture.id
 
     # Test unauthorized access (missing API key)
-    response = client.get("/supervaizer/jobs/test-job-id")
+    response = client.get("/api/supervaizer/jobs/test-job-id")
     assert response.status_code == 401
-    assert "Not authenticated" in response.json()["detail"]
+    assert "API key" in response.json()["detail"]
 
     # Test job not found case with valid API key
     mock_jobs_instance.get_job.return_value = None
-    response = client.get("/supervaizer/jobs/non-existent-job-id", headers=headers)
+    response = client.get("/api/supervaizer/jobs/non-existent-job-id", headers=headers)
     assert response.status_code == 404
     assert "detail" in response.json()
 
@@ -180,7 +186,7 @@ async def test_get_all_jobs_endpoint(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL and add status filter if provided
-    url = "/supervaizer/jobs"
+    url = "/api/supervaizer/jobs"
     if status_filter:
         url += f"?status={status_filter.value}"
 
@@ -200,20 +206,23 @@ async def test_get_all_jobs_endpoint(
         # Verify unauthorized access
         unauth_response = client.get(url)
         assert unauth_response.status_code == 401
-        assert "Not authenticated" in unauth_response.json()["detail"]
+        assert "API key" in unauth_response.json()["detail"]
 
 
 def test_utils_routes(server_fixture: Server) -> None:
     """Test the utils routes"""
     client = TestClient(server_fixture.app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
 
-    # Test get_public_key endpoint - note that utils endpoints are not secured
-    response = client.get("/supervaizer/utils/public_key")
+    # Test get_public_key endpoint — all /api routes require API key
+    response = client.get("/api/supervaizer/utils/public_key", headers=headers)
     assert response.status_code == 200
     assert "BEGIN PUBLIC KEY" in response.text
 
     # Test encrypt endpoint
-    response = client.post("/supervaizer/utils/encrypt", json="test_string")
+    response = client.post(
+        "/api/supervaizer/utils/encrypt", headers=headers, json="test_string"
+    )
     assert response.status_code == 200
     encrypted = response.json()
     assert isinstance(encrypted, str)
@@ -299,7 +308,7 @@ async def test_start_job_endpoint(
     # Set up client with API key
     client = TestClient(server_fixture.app)
     headers: dict[str, Any] = {"X-API-Key": server_fixture.api_key}
-    url = f"/supervaizer{agent_fixture.path}/jobs"
+    url = f"/api/supervaizer{agent_fixture.path}/jobs"
 
     # Always make the API request regardless of exception case
     data = {
@@ -399,7 +408,7 @@ async def test_get_agent_jobs_endpoint(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL and add status filter if provided
-    url = f"/supervaizer/agents/{agent_fixture.slug}/jobs"
+    url = f"/api/supervaizer/agents/{agent_fixture.slug}/jobs"
     if status_filter:
         url += f"?status={status_filter.value}"
 
@@ -501,7 +510,7 @@ async def test_get_job_status_for_agent(
     headers = {"X-API-Key": server_fixture.api_key}
 
     # Create test URL - try different formats
-    url = f"/supervaizer{agent_fixture.path}/jobs/{job_fixture.id}"
+    url = f"/api/supervaizer{agent_fixture.path}/jobs/{job_fixture.id}"
 
     # Make the API call
     response = client.get(url, headers=headers)
@@ -678,7 +687,7 @@ class TestServerLocalMode:
                 api_key="test-key",
             )
             client = TestClient(server.app)
-            response = client.get(f"/supervaizer{agent_fixture.path}/")
+            response = client.get(f"/api/supervaizer{agent_fixture.path}/")
             assert response.status_code != 404
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]
@@ -697,7 +706,7 @@ class TestServerLocalMode:
             )
             assert len(server.agents) == 0
             client = TestClient(server.app)
-            response = client.get("/admin/", headers={"X-API-Key": "test-key"})
+            response = client.get("/manage/")
             assert response.status_code != 404
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]

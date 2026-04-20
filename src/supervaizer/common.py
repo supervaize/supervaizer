@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -209,6 +215,19 @@ class ApiError(ApiResult):
         if self.exception:
             result["exception"] = exception_dict
         return result
+
+
+def log_access_denied_tailscale(ip: str, path: str, reason: str) -> None:  # <-- ADDED
+    """Log a Tailscale access denial with structured fields."""
+    log.warning(f"[access:tailscale] denied ip={ip!r} path={path!r} reason={reason!r}")
+
+
+def log_access_denied_api(key: str | None, path: str, reason: str) -> None:  # <-- ADDED
+    """Log an API-key access denial; key is truncated to avoid leaking secrets."""
+    key_preview = (key[:6] + "…") if key and len(key) > 6 else (key or "<none>")
+    log.warning(
+        f"[access:api] denied key={key_preview!r} path={path!r} reason={reason!r}"
+    )
 
 
 def singleton(cls: type[T]) -> Callable[..., T]:

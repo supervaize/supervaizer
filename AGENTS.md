@@ -23,6 +23,8 @@ Reference specific personas when requesting work:
 
 ## Learned Workspace Facts
 
+- `supervaizer start --reload` (or `SUPERVAIZER_RELOAD=true`) enables Uvicorn’s `reload` (file watching, dev-only; leave off in production).
+- If agent data-resource routes are mounted twice (e.g. both inside `create_agents_routes` and again from `Server` startup), OpenAPI sees duplicate routes and `operationId` uniqueness tests fail.
 - Compliance for this repo expects explicit type annotations, including return types, on functions in new or modified Python files (including tests), for mypy-clean CI.
 - `ADMIN_ALLOWED_IPS` restricts `/admin` when set (comma-separated IPs/CIDR); unset or empty allows all client IPs.
 - In `9agents/agent_interviewer`, empty `MANAGE_ALLOWED_IPS` still requires `MANAGE_AUTH_TOKEN` when that env is set; supervaizer’s admin IP middleware has no equivalent token fallback when the allowlist is empty.

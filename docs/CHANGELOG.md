@@ -19,6 +19,52 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`supervaizer.access` module** — New package with three focused sub-modules for centralized access control:
+  - `client_ip.py` — `_extract_client_ip(scope)` extracts the real client IP from ASGI scope, honoring `TRUSTED_PROXIES` (env var, comma-separated CIDRs) to safely parse `X-Forwarded-For`; returns `""` on any parse error (fail-closed).
+  - `tailscale.py` — `require_tailscale` FastAPI dependency enforces that requests originate from the Tailscale CGNAT range `100.64.0.0/10`; raises HTTP 403 or `WebSocketException(1008)` on denial; logs via `log_access_denied_tailscale`.
+  - `api_auth.py` — `require_api_key` / `require_scope` FastAPI dependencies for machine-to-machine auth with a hierarchical scope model (`write` implies `read`). `API_KEYS` registry is empty by default; `SUPERVAIZER_API_KEY` env var is pre-loaded as a `write`-scope entry at import time.
+
+- **`supervaizer.routers` module** — Three router factories that replace scattered per-route `Security(...)` calls:
+  - `public_router` — unauthenticated surface for home page (`/`) and A2A discovery (`/.well-known/*`).
+  - `private_router` (prefix `/manage`) — admin UI and workbench WebSocket, gated by `require_tailscale` at router level.
+  - `api_router` (prefix `/api`) — machine-to-machine surface (`/api/supervaizer/…`, `/api/agents/{slug}/…`), gated by `require_api_key`; write-mutating endpoints additionally enforce `require_scope("write")`.
+
+- **`log_access_denied_tailscale` and `log_access_denied_api` helpers** in `supervaizer.common` — structured `WARNING` log entries for every denied request, including IP, path, reason, and a truncated key preview (never the raw key value).
+
+### Changed
+
+- **Admin UI moved from `/admin` to `/manage`** — All admin routes, workbench, and HTML template links updated. `private_router` (prefix `/manage`) gates the surface with Tailscale-only access instead of the previous `AdminIPAllowlistMiddleware` + API-key combo.
+
+- **API routes moved from `/supervaizer/…` to `/api/supervaizer/…`** — All machine-to-machine endpoints now live under the `/api` prefix provided by `api_router`. Clients must update base paths accordingly.
+
+- **`AdminIPAllowlistMiddleware` removed** — Replaced by `require_tailscale` at router level. The `admin/ip_allowlist.py` module is deleted.
+
+- **Per-route `Security(server.verify_api_key)` removed** from `routes.py` and `data_routes.py` — Authentication is now enforced once at the `api_router` level.
+
+- **Admin auth simplified to Tailscale-only** — `verify_admin_access`, `?key=` query-param handling, and console-token generation/validation are removed from `admin/routes.py` and `admin/workbench_routes.py`.
+
+### Security
+
+- **Removed hard-coded default API keys** — `API_KEYS` is now empty at startup; no credentials ship with the package. Only `SUPERVAIZER_API_KEY` (operator-supplied env var) populates the registry.
+
+### Tests
+
+- New: `tests/test_access_client_ip.py`, `tests/test_access_tailscale.py`, `tests/test_access_api_auth.py` covering the new access layer.
+- Updated: `test_routes.py`, `test_routes_case_update.py`, `test_data_resource.py` — paths prefixed with `/api`.
+- Updated: `test_admin_routes.py`, `test_workbench_routes.py` — prefix `/admin` → `/manage`; Tailscale gate bypassed via `dependency_overrides`.
+- Deleted: `test_admin_ip_allowlist.py` — coverage moved to new access tests.
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 505   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 01:07 |
+
 ## [0.14.2] - 2026-04-16
 
 ### Added
@@ -124,7 +170,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Custom routes** — Agents can mount their own FastAPI `APIRouter` via the new `custom_routes` field on `Agent`. Supervaizer mounts them at `/agents/{slug}/api/` without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
+- **Custom routes** — Agents can mount their own FastAPI `APIRouter` via the new `custom_routes` field on `Agent`. Supervaizer mounts them under the API router at `/api/agents/{slug}/...` (paths defined on the nested router append after that prefix) without inspecting or managing the routes. Enables agents to expose tool endpoints, webhooks, or any HTTP API alongside the workbench.
 
 - **Scheduled steps** — `CaseNodeUpdate` gains `scheduled_at`, `scheduled_method`, `scheduled_params`, `scheduled_status` fields. Steps with `scheduled_at` are deferred until the scheduled time. A background executor polls every 60 seconds and calls the agent method automatically. The workbench shows countdown, "Execute now", and "Cancel" controls on pending scheduled steps. Enables time-based orchestration (call scheduling, retries with backoff, follow-up actions).
   - Model: `CaseNodeUpdate.scheduled_at / scheduled_method / scheduled_params / scheduled_status`
