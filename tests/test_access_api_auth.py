@@ -103,7 +103,9 @@ class TestRequireApiKey:
 class TestRequireScope:
     """Tests for require_scope — hierarchical scope model."""
 
-    def test_unknown_required_scope_raises_at_creation(self: "TestRequireScope") -> None:
+    def test_unknown_required_scope_raises_at_creation(
+        self: "TestRequireScope",
+    ) -> None:
         """Typos or invalid scope names must fail when wiring the dependency, not at runtime as 'read'."""
         from supervaizer.access.api_auth import require_scope
 
