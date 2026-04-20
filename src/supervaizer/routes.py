@@ -461,9 +461,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     directory=str(instructions_path.parent)
                 )
                 return custom_templates.TemplateResponse(
+                    request,
                     instructions_path.name,
                     {
-                        "request": request,
                         "registration_info": registration_info,
                     },
                 )

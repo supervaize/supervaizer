@@ -54,9 +54,9 @@ def create_public_router(
             return HTMLResponse(content=root_index.read_text(encoding="utf-8"))
         base = server.public_url or f"{server.scheme}://{server.host}:{server.port}"
         return _home_templates.TemplateResponse(
+            request,
             "index.html",
             {
-                "request": request,
                 "base": base,
                 "version": VERSION,
                 "api_version": API_VERSION,
