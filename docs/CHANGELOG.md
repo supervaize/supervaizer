@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-04-20
+
 ### Added
 
 - **`supervaizer.access` module** — New package with three focused sub-modules for centralized access control:
