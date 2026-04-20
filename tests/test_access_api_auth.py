@@ -15,6 +15,7 @@
 import os
 from unittest.mock import patch
 
+import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
@@ -101,6 +102,15 @@ class TestRequireApiKey:
 
 class TestRequireScope:
     """Tests for require_scope — hierarchical scope model."""
+
+    def test_unknown_required_scope_raises_at_creation(
+        self: "TestRequireScope",
+    ) -> None:
+        """Typos or invalid scope names must fail when wiring the dependency, not at runtime as 'read'."""
+        from supervaizer.access.api_auth import require_scope
+
+        with pytest.raises(ValueError, match="Unknown required_scope"):
+            require_scope("admin")
 
     def test_read_key_on_read_scope_passes(self: "TestRequireScope") -> None:
         with patch.dict("supervaizer.access.api_auth.API_KEYS", _TEST_KEYS):

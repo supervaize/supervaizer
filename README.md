@@ -156,7 +156,7 @@ For detailed instructions on customizing your controller, see the [Controller Se
 - **Agent Management**: Register, update, and control agents
 - **Job Control**: Create, track, and manage jobs
 - **Event Handling**: Process and respond to system events
-- **Custom Routes**: Agents can mount their own FastAPI routers at `/agents/{slug}/api/` for tool endpoints, webhooks, or custom APIs
+- **Custom Routes**: Agents can mount their own FastAPI routers under `/api/agents/{slug}/...` for tool endpoints, webhooks, or custom APIs
 - **Scheduled Steps**: Defer step execution to a future time with automatic background polling and workbench controls (execute now, cancel, reschedule)
 - **Human-in-the-Loop (HITL)**: Form-based and dialog-based interactive content review with chat interface
 - **Agent Workbench**: Built-in testing interface with real-time monitoring, job control, HITL forms, and live console

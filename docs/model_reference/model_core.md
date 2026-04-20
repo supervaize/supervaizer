@@ -127,7 +127,7 @@ _No additional fields beyond parent class._
 | `max_execution_time` | `int` | 3600 | Maximum execution time in seconds, defaults to 1 hour |
 | `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
 | `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
-| `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter with custom routes for this agent |
+| `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter; mounted at `/api/agents/{slug}/...` on the API surface |
 | `dynamic_choices_callback` | `Any` | `None` | Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]] |
 
 ### `agent.AgentMethod`
