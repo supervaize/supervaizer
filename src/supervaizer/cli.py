@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -195,9 +201,9 @@ def start(
         api_key_display = os.environ.get("SUPERVAIZER_API_KEY") or "local-dev"
         base = public_url
         console.print(
-            f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/admin/"
+            f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/manage/"
         )
-        console.print(f"[dim]API key for /admin: {api_key_display}[/]")
+        console.print(f"[dim]API key for /manage: {api_key_display}[/]")
     else:
         # Non-local mode: resolve public_url from env var if not explicitly provided
         if not user_provided_public_url:

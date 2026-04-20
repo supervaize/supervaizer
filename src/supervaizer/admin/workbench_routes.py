@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -47,7 +53,7 @@ def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
         "message": message,
     })
     # Only bump version for meaningful logs (not HTTP access logs from admin endpoints)
-    if "/admin/" not in message and "HTTP/1.1" not in message:
+    if "/manage/" not in message and "HTTP/1.1" not in message:
         _workbench_log_version += 1
 
 

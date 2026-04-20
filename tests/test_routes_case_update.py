@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -84,7 +90,7 @@ def test_update_case_with_answer_success(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         headers=headers,  # type: ignore
         json=request_data,
     )
@@ -138,7 +144,7 @@ def test_update_case_with_casestep_index_patches_step(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         headers=headers,  # type: ignore
         json=request_data,
     )
@@ -165,7 +171,7 @@ def test_update_case_job_not_found(server_fixture: Server) -> None:
     }
 
     response = client.post(
-        "/supervaizer/jobs/nonexistent-job/cases/test-case/update",
+        "/api/supervaizer/jobs/nonexistent-job/cases/test-case/update",
         headers=headers,
         json=request_data,
     )
@@ -188,7 +194,7 @@ def test_update_case_case_not_found(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/nonexistent-case/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/nonexistent-case/update",
         headers=headers,
         json=request_data,
     )
@@ -221,7 +227,7 @@ def test_update_case_not_awaiting_input(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         headers=headers,
         json=request_data,
     )
@@ -251,12 +257,14 @@ def test_update_case_unauthorized(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         json=request_data,
     )
 
     assert response.status_code == 401
-    assert "Not authenticated" in response.json()["detail"]
+    assert (
+        "API key" in response.json()["detail"]
+    )  # <-- MODIFIED: require_api_key message
 
 
 def test_human_answer_uses_workbench_style_params_and_strips_casestep_index(
@@ -305,7 +313,7 @@ def test_human_answer_uses_workbench_style_params_and_strips_casestep_index(
     }
 
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         headers=headers,
         json=request_data,
     )
@@ -422,7 +430,7 @@ def test_human_answer_only_owning_agent_executed(
     client = TestClient(server.app)
     headers = {"X-API-Key": server.api_key}
     response = client.post(
-        f"/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_fixture.id}/cases/{test_case.id}/update",
         headers=headers,
         json={"answer": {"a": 1}},
     )
@@ -465,7 +473,7 @@ def test_human_answer_skipped_when_job_agent_not_on_server(
     client = TestClient(server_fixture.app)
     headers = {"X-API-Key": server_fixture.api_key}
     response = client.post(
-        f"/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
+        f"/api/supervaizer/jobs/{job_on_server.id}/cases/{test_case.id}/update",
         headers=headers,
         json={"answer": {"x": 1}},
     )

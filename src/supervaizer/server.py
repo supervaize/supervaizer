@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 # Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
@@ -10,8 +16,7 @@ import secrets
 import sys
 import time
 import uuid
-from pathlib import Path
-from datetime import datetime
+from datetime import datetime  # <-- REMOVED: Path (no longer needed)
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
 from urllib.parse import urlunparse
 
@@ -21,17 +26,18 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
 from fastapi.security import APIKeyHeader
-from fastapi.templating import Jinja2Templates
+
+# <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import API_VERSION, VERSION
 from supervaizer.account import Account
-from supervaizer.admin.ip_allowlist import AdminIPAllowlistMiddleware
-from supervaizer.admin.routes import create_admin_routes
-from supervaizer.agent import Agent
+from supervaizer.agent import (
+    Agent,
+)  # <-- MODIFIED: removed AdminIPAllowlistMiddleware, create_admin_routes imports
 from supervaizer.common import (
     ApiResult,
     ApiSuccess,
@@ -42,13 +48,12 @@ from supervaizer.common import (
     log,
 )
 from supervaizer.instructions import display_instructions
-from supervaizer.protocol.a2a import create_routes as create_a2a_routes
-from supervaizer.routes import (
-    create_agents_routes,
-    create_default_routes,
-    create_utils_routes,
-    get_server,
-)
+from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
+from supervaizer.routers import (
+    create_api_router,
+    create_private_router,
+    create_public_router,
+)  # <-- ADDED
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 insp = inspect
@@ -517,72 +522,38 @@ class Server(ServerAbstract):
 
         log.info(f"[Server launch] Server ID: {self.server_id}")
 
-        # Create routes
+        # Store server instance on app state before building routers
+        self.app.state.server = self  # <-- MOVED earlier (was after route mount)
+
+        # Activate API + A2A routes when supervisor account or local mode is set
         if self.supervisor_account or local_mode:
             log.info(
-                "[Server launch] 🚀 Deploy Supervaizer routes"
-                + (" (local mode)" if local_mode else " - also activates A2A routes")
+                "[Server launch] 🚀 Deploy API routes (/api)"
+                + (" (local mode)" if local_mode else "")
             )
-            self.app.include_router(create_default_routes(self))
-            self.app.include_router(create_utils_routes(self))
-            self.app.include_router(create_agents_routes(self))
             self.a2a_endpoints = True
-        if self.a2a_endpoints:
-            log.info("[Server launch] 📢 Deploy A2A routes  ")
-            self.app.include_router(create_a2a_routes(self))
+            self.app.include_router(create_api_router(self))  # <-- ADDED: /api surface
 
-        # Mount agent custom routes
-        for agent in self.agents:
-            if agent.custom_routes:
-                self.app.include_router(
-                    agent.custom_routes,
-                    prefix=f"/agents/{agent.slug}/api",
-                )
+        # Public surface: home page + A2A discovery  # <-- ADDED
+        self.app.include_router(
+            create_public_router(self, admin_interface=admin_interface)
+        )
+        log.info("[Server launch] 🌐 Deploy public routes (/)")
 
-        # Mount data resource routes at root level (no /supervaizer prefix)
-        # so Studio can reach them at /agents/{slug}/data/{resource}/
-        from supervaizer.data_routes import create_agent_data_routes
-
-        for agent in self.agents:
-            if agent.data_resources:
-                self.app.include_router(create_agent_data_routes(self, agent))
-
-        # Store server instance on app state for admin routes to access
-        self.app.state.server = self
-
-        # Deploy admin routes if API key is available
+        # Private surface: admin UI + workbench (Tailscale-only)  # <-- ADDED
         if self.api_key and admin_interface:
-            self.app.add_middleware(AdminIPAllowlistMiddleware)
             log.info(
-                f"[Server launch] 💼 Deploy Admin interface @ {self.public_url}/admin"
+                f"[Server launch] 💼 Deploy admin interface @ {self.public_url}/manage"
             )
-            self.app.include_router(create_admin_routes(), prefix="/admin")
+            self.app.include_router(
+                create_private_router()
+            )  # <-- ADDED: /manage surface
+            # <-- REMOVED: AdminIPAllowlistMiddleware (replaced by require_tailscale)
+            # <-- REMOVED: create_admin_routes() prefix="/admin" (now inside private_router)
 
             # Save server info to storage for admin interface
             save_server_info_to_storage(self)
-
-        # Home page (template in admin/templates)
-        _home_templates = Jinja2Templates(
-            directory=str(Path(__file__).parent / "admin" / "templates")
-        )
-
-        @self.app.get("/", response_class=HTMLResponse)
-        async def home_page(request: Request) -> HTMLResponse:
-            root_index = Path.cwd() / "index.html"
-            if root_index.is_file():
-                return HTMLResponse(content=root_index.read_text(encoding="utf-8"))
-            base = self.public_url or f"{self.scheme}://{self.host}:{self.port}"
-            return _home_templates.TemplateResponse(
-                "index.html",
-                {
-                    "request": request,
-                    "base": base,
-                    "version": VERSION,
-                    "api_version": API_VERSION,
-                    "show_admin": bool(self.api_key and admin_interface),
-                    "server_id": self.server_id,
-                },
-            )
+        # <-- REMOVED: inline home_page handler (moved to routers/public.py)
 
         # Load running entities from storage into memory
         try:

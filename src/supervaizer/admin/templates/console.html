@@ -104,18 +104,9 @@
 
         updateConnectionStatus('connecting');
 
-        // Connect to the log stream endpoint with console token
-        const consoleToken = '{{ console_token }}';
+        // Connect to the log stream endpoint (Tailscale enforces access at router level) <!-- <-- MODIFIED -->
         const cacheBuster = Date.now();
-
-        // Better validation and error handling
-        if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
-            addLogMessage('ERROR', 'No console token available. Please refresh the page.', 'red');
-            updateConnectionStatus('error');
-            return;
-        }
-
-        const streamUrl = `/admin/log-stream?token=${encodeURIComponent(consoleToken)}&_t=${cacheBuster}`;
+        const streamUrl = `/manage/log-stream?_t=${cacheBuster}`;
 
         try {
             eventSource = new EventSource(streamUrl);
@@ -316,13 +307,8 @@
     async function sendCommandToServer(command) {
         const consoleToken = '{{ console_token }}';
 
-        if (!consoleToken || consoleToken === 'undefined' || consoleToken === '') {
-            addLogMessage('ERROR', 'No console token available. Cannot execute command.', 'red');
-            return;
-        }
-
         try {
-            const response = await fetch(`/admin/api/console/execute?token=${encodeURIComponent(consoleToken)}`, {
+            const response = await fetch(`/manage/api/console/execute`, {  // <!-- <-- MODIFIED: removed token param -->
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
