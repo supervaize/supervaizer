@@ -629,7 +629,7 @@ class AgentAbstract(SvBaseModel):
     )
     custom_routes: Any | None = Field(
         default=None,
-        description="Optional FastAPI APIRouter with custom routes for this agent",
+        description="Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/...",
         exclude=True,
     )
     dynamic_choices_callback: Any | None = Field(

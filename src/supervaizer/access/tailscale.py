@@ -19,7 +19,6 @@ import os
 
 from fastapi import HTTPException
 from starlette.requests import HTTPConnection
-from starlette.websockets import WebSocketState
 
 from supervaizer.access.client_ip import _extract_client_ip
 from supervaizer.common import log_access_denied_tailscale
@@ -36,8 +35,9 @@ def require_tailscale(conn: HTTPConnection) -> None:  # <-- ADDED
     In local mode (SUPERVAIZER_LOCAL_MODE=true), loopback addresses are also
     allowed so the admin UI works without a Tailscale connection.
 
-    Raises HTTP 403 for plain HTTP connections and closes WebSocket connections
-    with code 1008 when the client IP is outside 100.64.0.0/10.
+    Raises HTTP 403 when the client IP is outside 100.64.0.0/10, including for
+    WebSocket upgrade requests (the handshake is rejected before the connection
+    is established).
     """
     path = conn.scope.get("path", "")
     ip = _extract_client_ip(conn.scope)
@@ -53,20 +53,6 @@ def require_tailscale(conn: HTTPConnection) -> None:  # <-- ADDED
 
     if not allowed:
         log_access_denied_tailscale(ip, path, "not in tailscale range")
-        if conn.scope.get("type") == "websocket":
-            # For WebSocket connections, close with policy violation code
-            # We need to check if the connection is still in a connectable state
-            ws = conn  # conn IS the WebSocket for ws scope
-            if (
-                hasattr(ws, "client_state")
-                and ws.client_state == WebSocketState.CONNECTING
-            ):
-                raise HTTPException(
-                    status_code=403, detail="Forbidden: Tailscale network required"
-                )
-            raise HTTPException(
-                status_code=403, detail="Forbidden: Tailscale network required"
-            )
         raise HTTPException(
             status_code=403, detail="Forbidden: Tailscale network required"
         )

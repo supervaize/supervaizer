@@ -72,6 +72,11 @@ def require_scope(required_scope: str) -> Callable[..., dict[str, str]]:  # <-- 
 
     Scope is hierarchical: 'write' satisfies 'read' (but not the reverse).
     """
+    if required_scope not in _SCOPE_RANK:
+        raise ValueError(
+            f"Unknown required_scope {required_scope!r}; "
+            f"must be one of {tuple(_SCOPE_RANK)}"
+        )
 
     def _check(
         meta: Annotated[dict[str, str], Depends(require_api_key)],
@@ -79,7 +84,7 @@ def require_scope(required_scope: str) -> Callable[..., dict[str, str]]:  # <-- 
     ) -> dict[str, str]:
         key_scope = meta.get("scope", "")
         key_rank = _SCOPE_RANK.get(key_scope, -1)
-        req_rank = _SCOPE_RANK.get(required_scope, 0)
+        req_rank = _SCOPE_RANK[required_scope]
         if key_rank < req_rank:
             path = request.scope.get("path", "")
             log_access_denied_api(None, path, "insufficient scope")

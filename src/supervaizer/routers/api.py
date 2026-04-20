@@ -52,7 +52,7 @@ def create_api_router(server: "Server") -> APIRouter:  # <-- ADDED
         if agent.data_resources:
             api_router.include_router(create_agent_data_routes(server, agent))
 
-    # Agent custom routes
+    # Agent custom routes (full path: /api/agents/{slug}/... plus each route on the nested router)
     for agent in server.agents:
         if agent.custom_routes:
             api_router.include_router(
