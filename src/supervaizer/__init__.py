@@ -34,6 +34,7 @@ from supervaizer.case import (
 from supervaizer.common import ApiError, ApiResult, ApiSuccess
 from supervaizer.data_resource import (
     DataResource,
+    DataResourceContext,
     DataResourceField,
     Editable,
     FieldType,
@@ -82,6 +83,7 @@ __all__ = [
     "CaseUpdateEvent",
     "create_error_response",
     "DataResource",
+    "DataResourceContext",
     "DataResourceField",
     "Editable",
     "FieldType",

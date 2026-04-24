@@ -201,6 +201,33 @@ class CaseNodes(SvBaseModel):
     def get(self, name: str) -> CaseNode | None:
         return next((node for node in self.nodes if node.name == name), None)
 
+    def node_index(self, name: str, *, start: int = 1) -> int:
+        """Return the stable 1-based index for a named case node."""
+        for offset, node in enumerate(self.nodes):
+            if node.name == name:
+                return start + offset
+        raise ValueError(f"Case node {name!r} not found")
+
+    def make_update(
+        self,
+        name: str,
+        *,
+        payload: Dict[str, Any] | None = None,
+        cost: float = 0.0,
+        is_final: bool = False,
+        upsert_to: str | None = None,
+    ) -> CaseNodeUpdate:
+        """Build a CaseNodeUpdate with an index derived from this node set."""
+        target_name = upsert_to or name
+        return CaseNodeUpdate(
+            name=name,
+            cost=cost,
+            payload=payload or {},
+            is_final=is_final,
+            index=self.node_index(target_name),
+            upsert=upsert_to is not None,
+        )
+
     @property
     def registration_info(self) -> Dict[str, Any]:
         """Returns registration info for the case nodes"""

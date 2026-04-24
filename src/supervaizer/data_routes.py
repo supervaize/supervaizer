@@ -26,6 +26,7 @@ Uses factory functions per resource to avoid Python closure-in-loop capture bugs
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Any
 
 from fastapi import (
@@ -34,12 +35,13 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
 )  # <-- MODIFIED: removed Security, added Depends
 from fastapi.responses import JSONResponse
 
 from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.common import log
-from supervaizer.data_resource import DataResource
+from supervaizer.data_resource import DataResource, DataResourceContext
 
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
@@ -76,7 +78,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "list")
         router.add_api_route(
             f"{prefix}/",
-            _make_list_handler(resource, prefix),
+            _make_list_handler(resource, prefix, agent_slug),
             methods=["GET"],
             # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"List {resource.display_name_resolved}",
@@ -88,7 +90,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "get")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_get_handler(resource, prefix),
+            _make_get_handler(resource, prefix, agent_slug),
             methods=["GET"],
             # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"Get {resource.display_name_resolved}",
@@ -100,7 +102,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "create")
         router.add_api_route(
             f"{prefix}/",
-            _make_create_handler(resource, prefix),
+            _make_create_handler(resource, prefix, agent_slug),
             methods=["POST"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -114,7 +116,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "update")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_update_handler(resource, prefix),
+            _make_update_handler(resource, prefix, agent_slug),
             methods=["PUT"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -128,7 +130,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "delete")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_delete_handler(resource, prefix),
+            _make_delete_handler(resource, prefix, agent_slug),
             methods=["DELETE"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -142,7 +144,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "import")
         router.add_api_route(
             f"{prefix}/import/",
-            _make_import_handler(resource, prefix),
+            _make_import_handler(resource, prefix, agent_slug),
             methods=["POST"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -153,22 +155,30 @@ def _add_resource_routes(
         )
 
 
-def _make_list_handler(r: DataResource, prefix: str) -> Any:
+def _make_list_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     async def _handler(
+        request: Request,
         skip: int = Query(default=0, ge=0),
         limit: int = Query(default=100, ge=1, le=1000),
     ) -> list[dict[str, Any]]:
         log.info(f"📥 GET {prefix}/ [DataResource list: {r.name}]")
-        result = r.on_list()  # type: ignore[misc]
+        result = _call_with_context(
+            r.on_list,
+            _context_from_request(request, agent_slug),
+        )
         return result[skip : skip + limit]
 
     return _handler
 
 
-def _make_get_handler(r: DataResource, prefix: str) -> Any:
-    async def _handler(item_id: str) -> dict[str, Any]:
+def _make_get_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+    async def _handler(request: Request, item_id: str) -> dict[str, Any]:
         log.info(f"📥 GET {prefix}/{item_id} [DataResource get: {r.name}]")
-        result = r.on_get(item_id)  # type: ignore[misc]
+        result = _call_with_context(
+            r.on_get,
+            _context_from_request(request, agent_slug),
+            item_id,
+        )
         if result is None:
             raise HTTPException(
                 status_code=404, detail=f"{r.name} '{item_id}' not found"
@@ -178,10 +188,16 @@ def _make_get_handler(r: DataResource, prefix: str) -> Any:
     return _handler
 
 
-def _make_create_handler(r: DataResource, prefix: str) -> Any:
-    async def _handler(data: dict[str, Any] = Body(...)) -> JSONResponse:
+def _make_create_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+    async def _handler(
+        request: Request, data: dict[str, Any] = Body(...)
+    ) -> JSONResponse:
         log.info(f"📥 POST {prefix}/ [DataResource create: {r.name}]")
-        result = r.on_create(data)  # type: ignore[misc]
+        result = _call_with_context(
+            r.on_create,
+            _context_from_request(request, agent_slug),
+            data,
+        )
         if not isinstance(result, dict) or "id" not in result:
             raise HTTPException(
                 status_code=500,
@@ -192,15 +208,20 @@ def _make_create_handler(r: DataResource, prefix: str) -> Any:
     return _handler
 
 
-def _make_update_handler(r: DataResource, prefix: str) -> Any:
+def _make_update_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     on_update = r.on_update
     assert on_update is not None  # route registered only when on_update is set
 
     async def _handler(
-        item_id: str, data: dict[str, Any] = Body(...)
+        request: Request, item_id: str, data: dict[str, Any] = Body(...)
     ) -> dict[str, Any]:
         log.info(f"📥 PUT {prefix}/{item_id} [DataResource update: {r.name}]")
-        result = on_update(item_id, data)
+        result = _call_with_context(
+            on_update,
+            _context_from_request(request, agent_slug),
+            item_id,
+            data,
+        )
         if result is None:
             raise HTTPException(
                 status_code=404, detail=f"{r.name} '{item_id}' not found"
@@ -210,10 +231,14 @@ def _make_update_handler(r: DataResource, prefix: str) -> Any:
     return _handler
 
 
-def _make_delete_handler(r: DataResource, prefix: str) -> Any:
-    async def _handler(item_id: str) -> JSONResponse:
+def _make_delete_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+    async def _handler(request: Request, item_id: str) -> JSONResponse:
         log.info(f"📥 DELETE {prefix}/{item_id} [DataResource delete: {r.name}]")
-        success = r.on_delete(item_id)  # type: ignore[misc]
+        success = _call_with_context(
+            r.on_delete,
+            _context_from_request(request, agent_slug),
+            item_id,
+        )
         if not success:
             raise HTTPException(
                 status_code=404, detail=f"{r.name} '{item_id}' not found"
@@ -223,9 +248,48 @@ def _make_delete_handler(r: DataResource, prefix: str) -> Any:
     return _handler
 
 
-def _make_import_handler(r: DataResource, prefix: str) -> Any:
-    async def _handler(records: list[dict[str, Any]] = Body(...)) -> dict[str, Any]:
+def _make_import_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+    async def _handler(
+        request: Request, records: list[dict[str, Any]] = Body(...)
+    ) -> dict[str, Any]:
         log.info(f"📥 POST {prefix}/import/ [DataResource import: {r.name}]")
-        return r.on_import(records)  # type: ignore[misc]
+        return _call_with_context(
+            r.on_import,
+            _context_from_request(request, agent_slug),
+            records,
+        )
 
     return _handler
+
+
+def _context_from_request(request: Request, agent_slug: str) -> DataResourceContext:
+    return DataResourceContext(
+        workspace_id=request.headers.get("X-Supervaize-Workspace-Id"),
+        workspace_slug=request.headers.get("X-Supervaize-Workspace-Slug"),
+        mission_id=request.headers.get("X-Supervaize-Mission-Id"),
+        agent_slug=agent_slug,
+        request_id=request.headers.get("X-Supervaize-Request-Id"),
+    )
+
+
+def _accepts_context(callback: Any) -> bool:
+    try:
+        signature = inspect.signature(callback)
+    except (TypeError, ValueError):
+        return False
+    return "context" in signature.parameters
+
+
+def _call_with_context(
+    callback: Any,
+    context: DataResourceContext,
+    *args: Any,
+) -> Any:
+    if callback is None:
+        raise HTTPException(status_code=501, detail="DataResource callback not configured")
+    try:
+        if _accepts_context(callback):
+            return callback(*args, context=context)
+        return callback(*args)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc

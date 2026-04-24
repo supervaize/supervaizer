@@ -51,6 +51,16 @@ class Editable(StrEnum):
     NEVER = "never"  # Agent-controlled; never shown in a form input
 
 
+class DataResourceContext(SvBaseModel):
+    """Studio request context passed to DataResource callbacks."""
+
+    workspace_id: str | None = None
+    workspace_slug: str | None = None
+    mission_id: str | None = None
+    agent_slug: str
+    request_id: str | None = None
+
+
 class DataResourceField(SvBaseModel):
     """Describes a single field in a DataResource for Studio rendering."""
 
@@ -74,6 +84,10 @@ class DataResourceField(SvBaseModel):
     related_resource: str | None = Field(
         default=None,
         description="Name of another DataResource this field FK-references",
+    )
+    sensitive: bool = Field(
+        default=False,
+        description="True when Studio should mask this field for non-manager users",
     )
 
     @property
@@ -120,20 +134,20 @@ class DataResource(SvBaseModel):
     read_only: bool = Field(default=False)
     importable: bool = Field(default=False, description="Enables CSV bulk import route")
     # Callbacks — excluded from model serialization
-    on_list: Callable[[], list[dict[str, Any]]] | None = Field(
+    on_list: Callable[..., list[dict[str, Any]]] | None = Field(
         default=None, exclude=True
     )
-    on_get: Callable[[str], dict[str, Any] | None] | None = Field(
+    on_get: Callable[..., dict[str, Any] | None] | None = Field(
         default=None, exclude=True
     )
-    on_create: Callable[[dict[str, Any]], dict[str, Any]] | None = Field(
+    on_create: Callable[..., dict[str, Any]] | None = Field(
         default=None, exclude=True
     )
-    on_update: Callable[[str, dict[str, Any]], dict[str, Any] | None] | None = Field(
+    on_update: Callable[..., dict[str, Any] | None] | None = Field(
         default=None, exclude=True
     )
-    on_delete: Callable[[str], bool] | None = Field(default=None, exclude=True)
-    on_import: Callable[[list[dict[str, Any]]], dict[str, Any]] | None = Field(
+    on_delete: Callable[..., bool] | None = Field(default=None, exclude=True)
+    on_import: Callable[..., dict[str, Any]] | None = Field(
         default=None, exclude=True
     )
 

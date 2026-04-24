@@ -47,6 +47,7 @@ from supervaizer.common import (
     is_local_mode,
     log,
 )
+from supervaizer.contracts import controller_contract_info
 from supervaizer.instructions import display_instructions
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.routers import (
@@ -630,11 +631,13 @@ class Server(ServerAbstract):
     def registration_info(self) -> Dict[str, Any]:
         """Get registration info for the server."""
         assert self.public_key is not None, "Public key not initialized"
+        contract = controller_contract_info()
         return {
             "server_id": self.server_id,
             "url": self.public_url,
             "uri": self.uri,
             "api_version": API_VERSION,
+            **contract,
             "environment": self.environment,
             "public_key": str(
                 self.public_key.public_bytes(
