@@ -29,9 +29,11 @@ All notable changes to this project will be documented in this file.
 
 ### Tests
 
-- New:
-- Updated:
-- Deleted:
+- New: `tests/test_contracts.py` for contract endpoint templates, schema export, import safety, resolver behavior, and DataResource context headers.
+- New: `tests/test_case.py` coverage for `CaseNodes.node_index()` and `CaseNodes.make_update()`.
+- Updated: `tests/test_routes.py` to verify DataResource callbacks receive `DataResourceContext` from forwarded `X-Supervaize-*` headers.
+- Updated: `tests/test_server.py` to assert registration info and `/api/supervaizer/contract` expose matching `/api` contract metadata.
+- Deleted: none.
 
 `just test`
 
