@@ -243,16 +243,22 @@ def test_service_job_finished(server_fixture: "Server", mocker: MockerFixture) -
 def test_service_job_finished_without_account(
     server_fixture: "Server", mocker: MockerFixture
 ) -> None:
-    """Test service_job_finished raises assertion error when no account is defined."""
+    """Test service_job_finished is a no-op when no account is defined."""
     # Create a mock job
     mock_job = mocker.MagicMock(spec=Job)
+    mock_job.id = str(uuid.uuid4())
+    mock_event_class = mocker.patch("supervaizer.job_service.JobFinishedEvent")
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event", return_value=None
+    )
 
     # Remove supervisor account
     server_fixture.supervisor_account = None
 
-    # Should raise AssertionError
-    with pytest.raises(AssertionError, match="No account defined"):
-        service_job_finished(job=mock_job, server=server_fixture)
+    service_job_finished(job=mock_job, server=server_fixture)
+
+    mock_event_class.assert_not_called()
+    mock_send_event.assert_not_called()
 
 
 @pytest.mark.asyncio

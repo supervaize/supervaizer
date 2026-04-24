@@ -931,11 +931,11 @@ class Agent(AgentAbstract):
                 if job_response.payload:
                     job.metadata = job_response.payload
                 # Send confirmation event now that metadata is populated
-                event = JobStartConfirmationEvent(
-                    job=job,
-                    account=server.supervisor_account,
-                )
                 if server.supervisor_account is not None:
+                    event = JobStartConfirmationEvent(
+                        job=job,
+                        account=server.supervisor_account,
+                    )
                     server.supervisor_account.send_event(sender=job, event=event)
                 else:
                     log.warning(
