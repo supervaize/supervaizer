@@ -27,6 +27,21 @@ All notable changes to this project will be documented in this file.
 
 - **DataResource fields can be marked sensitive** — `DataResourceField.sensitive` is included in registration payloads for Studio masking.
 
+### Tests
+
+- New:
+- Updated:
+- Deleted:
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 514   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 01:03 |
+
 ## [0.15.1] - 2026-04-20
 
 ### Fixed
