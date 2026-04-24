@@ -547,3 +547,13 @@ class Cases:
     def __contains__(self, case_id: str) -> bool:
         """Check if case exists in any job's registry"""
         return any(case_id in cases for cases in self.cases_by_job.values())
+
+
+def rebuild_case_model_forward_refs() -> None:
+    """Resolve runtime-only forward references used by Case models."""
+    from supervaizer.account import Account
+
+    Case.model_rebuild(_types_namespace={"Account": Account})
+
+
+rebuild_case_model_forward_refs()
