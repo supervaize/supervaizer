@@ -286,7 +286,9 @@ def _call_with_context(
     *args: Any,
 ) -> Any:
     if callback is None:
-        raise HTTPException(status_code=501, detail="DataResource callback not configured")
+        raise HTTPException(
+            status_code=501, detail="DataResource callback not configured"
+        )
     try:
         if _accepts_context(callback):
             return callback(*args, context=context)

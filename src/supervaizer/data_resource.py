@@ -140,16 +140,12 @@ class DataResource(SvBaseModel):
     on_get: Callable[..., dict[str, Any] | None] | None = Field(
         default=None, exclude=True
     )
-    on_create: Callable[..., dict[str, Any]] | None = Field(
-        default=None, exclude=True
-    )
+    on_create: Callable[..., dict[str, Any]] | None = Field(default=None, exclude=True)
     on_update: Callable[..., dict[str, Any] | None] | None = Field(
         default=None, exclude=True
     )
     on_delete: Callable[..., bool] | None = Field(default=None, exclude=True)
-    on_import: Callable[..., dict[str, Any]] | None = Field(
-        default=None, exclude=True
-    )
+    on_import: Callable[..., dict[str, Any]] | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def check_callbacks(self) -> "DataResource":
