@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-04-25
+
 ### Added
 
 - **Controller contract metadata for Studio** — `server.register` now advertises `controller_contract_version`, `/api` base path, and canonical endpoint templates so Studio can route without hardcoded Supervaizer paths. The same contract is available at `GET /api/supervaizer/contract`.
