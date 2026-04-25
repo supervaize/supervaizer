@@ -290,6 +290,28 @@ def test_case_nodes_get_method_with_empty_list() -> None:
     assert node is None
 
 
+def test_case_nodes_node_index(case_nodes_all_steps: CaseNodes) -> None:
+    assert case_nodes_all_steps.node_index("confirm_call") == 1
+    assert case_nodes_all_steps.node_index("start_call", start=2) == 3
+
+
+def test_case_nodes_make_update(case_nodes_all_steps: CaseNodes) -> None:
+    update = case_nodes_all_steps.make_update(
+        "call_completed",
+        payload={"status": "done"},
+        cost=1.5,
+        is_final=True,
+        upsert_to="start_call",
+    )
+
+    assert update.name == "call_completed"
+    assert update.payload == {"status": "done"}
+    assert update.cost == 1.5
+    assert update.is_final is True
+    assert update.index == case_nodes_all_steps.node_index("start_call")
+    assert update.upsert is True
+
+
 def test_case_node_different_types() -> None:
     """Test CaseNode instantiation with all different CaseNodeType values."""
     types_to_test = [

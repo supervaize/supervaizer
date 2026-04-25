@@ -43,6 +43,7 @@ from supervaizer.agent import (
 )
 from supervaizer.case import CaseNodeUpdate, Cases
 from supervaizer.common import SvBaseModel, log
+from supervaizer.contracts import controller_contract_info
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.job_service import service_job_custom, service_job_start
 from supervaizer.lifecycle import EntityStatus
@@ -128,6 +129,11 @@ async def get_server() -> "Server":
 def create_default_routes(server: "Server") -> APIRouter:
     """Create default routes for the server."""
     router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
+
+    @router.get("/contract", response_model=dict[str, Any])
+    async def get_controller_contract() -> dict[str, Any]:
+        """Return the controller contract Studio should use for route resolution."""
+        return controller_contract_info()
 
     @router.get(
         "/jobs/{job_id}",
