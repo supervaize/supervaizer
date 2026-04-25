@@ -17,6 +17,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Controller contract metadata for Studio** — `server.register` now advertises `controller_contract_version`, `/api` base path, and canonical endpoint templates so Studio can route without hardcoded Supervaizer paths. The same contract is available at `GET /api/supervaizer/contract`.
+- **DataResource request context** — DataResource callbacks can opt into a `context` keyword with workspace, mission, agent, and request identifiers while legacy callbacks continue to work unchanged.
+- **CaseNodes update helpers** — `CaseNodes.node_index()` and `CaseNodes.make_update()` derive step indexes from the declared node set instead of requiring consumers to maintain a separate index map.
+
+### Changed
+
+- **DataResource fields can be marked sensitive** — `DataResourceField.sensitive` is included in registration payloads for Studio masking.
+
+### Tests
+
+- New: `tests/test_contracts.py` for contract endpoint templates, schema export, import safety, resolver behavior, and DataResource context headers.
+- New: `tests/test_case.py` coverage for `CaseNodes.node_index()` and `CaseNodes.make_update()`.
+- Updated: `tests/test_routes.py` to verify DataResource callbacks receive `DataResourceContext` from forwarded `X-Supervaize-*` headers.
+- Updated: `tests/test_server.py` to assert registration info and `/api/supervaizer/contract` expose matching `/api` contract metadata.
+- Deleted: none.
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 514   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 01:03 |
+
 ## [0.15.1] - 2026-04-20
 
 ### Fixed

@@ -555,6 +555,11 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert "agents" in registration_info
     assert "url" in registration_info
     assert "server_id" in registration_info
+    assert registration_info["controller_contract_version"] == "1.0"
+    assert registration_info["api_base_path"] == "/api"
+    assert registration_info["endpoints"]["POST_AGENT_JOB_START"].startswith(
+        "/api/supervaizer/"
+    )
 
     # Check values match the fixture
     assert registration_info.pop("public_key").startswith("-----BEGIN PUBLIC KEY")
@@ -575,6 +580,9 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert registration_info == {
         "uri": "server:E2-AC-ED-22-BF-B2",
         "api_version": "v1",
+        "controller_contract_version": "1.0",
+        "api_base_path": "/api",
+        "endpoints": registration_info["endpoints"],
         "environment": "test",
         "api_key": "test-api-key",
     }

@@ -23,7 +23,7 @@ from supervaizer import (
     Job,
     Server,
 )
-from supervaizer.data_resource import DataResource
+from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.parameter import ParametersSetup
 from supervaizer.routes import (
     create_agents_routes,
@@ -363,3 +363,63 @@ def test_data_resource_openapi_operation_ids_unique_per_agent(
     assert len(set(list_ids)) == 2
     assert f"{agent_a.slug}_items_list" in list_ids
     assert f"{agent_b.slug}_items_list" in list_ids
+
+
+def test_data_resource_callbacks_receive_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    captured: dict[str, DataResourceContext] = {}
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        captured["context"] = context
+        return [{"id": "1"}]
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    methods = AgentMethods(job_start=agent_method_fixture)
+    agent = Agent(
+        name="Context Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        data_resources=[resource],
+    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server = Server(
+        scheme="http",
+        host="localhost",
+        port=8001,
+        environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
+        debug=True,
+        agent_timeout=10,
+        private_key=private_key,
+        a2a_endpoints=False,
+        supervisor_account=account_fixture,
+        agents=[agent],
+        api_key="test-api-key",
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={
+            "X-API-Key": "test-api-key",
+            "X-Supervaize-Workspace-Id": "team-1",
+            "X-Supervaize-Workspace-Slug": "team-slug",
+            "X-Supervaize-Mission-Id": "mission-1",
+            "X-Supervaize-Request-Id": "request-1",
+        },
+    )
+
+    assert response.status_code == 200
+    context = captured["context"]
+    assert context.agent_slug == agent.slug
+    assert context.workspace_id == "team-1"
+    assert context.workspace_slug == "team-slug"
+    assert context.mission_id == "mission-1"
+    assert context.request_id == "request-1"

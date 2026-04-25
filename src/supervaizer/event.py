@@ -10,11 +10,11 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Dict
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
+from supervaizer.contracts import EventType
 from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
@@ -22,24 +22,6 @@ if TYPE_CHECKING:
     from supervaizer.case import Case, CaseNodeUpdate
     from supervaizer.job import Job
     from supervaizer.server import Server
-
-
-class EventType(str, Enum):
-    AGENT_REGISTER = "agent.register"
-    SERVER_REGISTER = "server.register"
-    AGENT_WAKEUP = "agent.wakeup"
-    AGENT_SEND_ANOMALY = "agent.anomaly"
-    INTERMEDIARY = "agent.intermediary"
-    JOB_START_CONFIRMATION = "agent.job.start.confirmation"
-    JOB_END = "agent.job.end"
-    JOB_STATUS = "agent.job.status"
-    JOB_RESULT = "agent.job.result"
-    JOB_ERROR = "agent.job.error"
-    CASE_START = "agent.case.start"
-    CASE_END = "agent.case.end"
-    CASE_STATUS = "agent.case.status"
-    CASE_RESULT = "agent.case.result"
-    CASE_UPDATE = "agent.case.update"
 
 
 class AbstractEvent(SvBaseModel):

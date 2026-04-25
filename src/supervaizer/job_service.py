@@ -89,7 +89,13 @@ def service_job_finished(job: Job, server: "Server") -> None:
 
     Tested in tests/test_job_service.py
     """
-    assert server.supervisor_account is not None, "No account defined"
+    if server.supervisor_account is None:
+        log.warning(
+            "[service_job_finished] No supervisor account defined for server, "
+            "skipping finished event for job {}",
+            job.id,
+        )
+        return
     account = server.supervisor_account
     event = JobFinishedEvent(
         job=job,
