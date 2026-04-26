@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-04-26
+
 ### Changed
 
 - **Async control-event HTTP client** — `account_service.send_event`, `Account` event helpers, and case event-reporting methods now use `httpx.AsyncClient` and must be awaited in async agents. Explicit `_sync` shims remain for CLI, startup, and synchronous controller methods. See [RFC: async-control-event-http-client](/docs/rfc/async-control-event-http-client.md) for details.
