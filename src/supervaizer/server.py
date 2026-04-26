@@ -15,6 +15,7 @@ import os
 import secrets
 import sys
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 import uuid
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
@@ -458,7 +459,7 @@ class Server(ServerAbstract):
         openapi_url = "/openapi.json"
 
         @asynccontextmanager
-        async def _lifespan(app: FastAPI):
+        async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             asyncio.create_task(_run_scheduled_step_loop(self))
             yield
 
