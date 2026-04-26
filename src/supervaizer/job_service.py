@@ -101,7 +101,7 @@ def service_job_finished(job: Job, server: "Server") -> None:
         job=job,
         account=account,
     )
-    account.send_event(sender=job, event=event)
+    account.send_event_sync(sender=job, event=event)
 
 
 async def service_job_custom(

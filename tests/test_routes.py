@@ -423,3 +423,140 @@ def test_data_resource_callbacks_receive_context(
     assert context.workspace_slug == "team-slug"
     assert context.mission_id == "mission-1"
     assert context.request_id == "request-1"
+
+
+def _make_data_resource_server(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    resource: DataResource,
+) -> tuple[Server, Agent]:
+    methods = AgentMethods(job_start=agent_method_fixture)
+    agent = Agent(
+        name="Data Routes Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        data_resources=[resource],
+    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server = Server(
+        scheme="http",
+        host="localhost",
+        port=8001,
+        environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
+        debug=True,
+        agent_timeout=10,
+        private_key=private_key,
+        a2a_endpoints=False,
+        supervisor_account=account_fixture,
+        agents=[agent],
+        api_key="test-api-key",
+    )
+    return server, agent
+
+
+def test_data_resource_create_requires_id_in_callback_result(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=lambda: [],
+        on_create=lambda data: {"name": data["name"]},
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={"X-API-Key": "test-api-key"},
+        json={"name": "No ID"},
+    )
+
+    assert response.status_code == 500
+    assert "must return a dict with 'id'" in response.json()["detail"]
+
+
+def test_data_resource_update_returns_404_when_callback_returns_none(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=lambda: [],
+        on_create=lambda data: {**data, "id": "1"},
+        on_update=lambda item_id, data: None,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    client = TestClient(server.app)
+
+    response = client.put(
+        f"/api/agents/{agent.slug}/data/items/missing",
+        headers={"X-API-Key": "test-api-key"},
+        json={"name": "Missing"},
+    )
+
+    assert response.status_code == 404
+    assert "missing" in response.json()["detail"]
+
+
+def test_data_resource_delete_returns_404_when_callback_is_false(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=lambda: [],
+        on_create=lambda data: {**data, "id": "1"},
+        on_delete=lambda item_id: False,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    client = TestClient(server.app)
+
+    response = client.delete(
+        f"/api/agents/{agent.slug}/data/items/missing",
+        headers={"X-API-Key": "test-api-key"},
+    )
+
+    assert response.status_code == 404
+    assert "missing" in response.json()["detail"]
+
+
+def test_data_resource_permission_error_becomes_403(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    def on_list() -> list[dict[str, Any]]:
+        raise PermissionError("workspace denied")
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={"X-API-Key": "test-api-key"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "workspace denied"

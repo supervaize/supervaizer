@@ -170,7 +170,7 @@ class Account(AccountAbstract):
 
         return pattern.format(**url_params)
 
-    def send_event(
+    async def send_event(
         self,
         sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
         event: "Event",
@@ -189,9 +189,19 @@ class Account(AccountAbstract):
         # Import here to avoid circular imports
         from supervaizer.account_service import send_event as service_send_event
 
+        return await service_send_event(self, sender, event)
+
+    def send_event_sync(
+        self,
+        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
+        event: "Event",
+    ) -> ApiResult:
+        """Send an event from sync-only contexts."""
+        from supervaizer.account_service import send_event_sync as service_send_event
+
         return service_send_event(self, sender, event)
 
-    def register_server(self, server: "Server") -> ApiResult:
+    async def register_server(self, server: "Server") -> ApiResult:
         """Register a server with the Supervaize Control API.
 
         Args:
@@ -208,7 +218,18 @@ class Account(AccountAbstract):
         from supervaizer.event import ServerRegisterEvent
 
         event = ServerRegisterEvent(server=server, account=self)
-        result = self.send_event(sender=server, event=event)
+        result = await self.send_event(sender=server, event=event)
+        return self._log_registration_result(result)
+
+    def register_server_sync(self, server: "Server") -> ApiResult:
+        """Register a server from sync-only startup code."""
+        from supervaizer.event import ServerRegisterEvent
+
+        event = ServerRegisterEvent(server=server, account=self)
+        result = self.send_event_sync(sender=server, event=event)
+        return self._log_registration_result(result)
+
+    def _log_registration_result(self, result: ApiResult) -> ApiResult:
         if isinstance(result, ApiSuccess):
             log.success(result.message)
             # TODO: Update server with the server ID from the response. store this ID in env variable.
@@ -266,7 +287,7 @@ class Account(AccountAbstract):
                 exception=e,
             )
 
-    def register_agent(self, agent: "Agent", polling: bool = True) -> ApiResult:
+    async def register_agent(self, agent: "Agent", polling: bool = True) -> ApiResult:
         """Send a registration event to the Supervaize Control API.
             This will be used for polling, when the agent is registered without a server.
         Args:
@@ -281,16 +302,31 @@ class Account(AccountAbstract):
         from supervaizer.event import AgentRegisterEvent
 
         event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
-        return self.send_event(agent, event)
+        return await self.send_event(agent, event)
 
-    def send_start_case(self, case: "Case") -> ApiResult:
+    def register_agent_sync(self, agent: "Agent", polling: bool = True) -> ApiResult:
+        """Send a registration event from sync-only contexts."""
+        from supervaizer.event import AgentRegisterEvent
+
+        event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
+        return self.send_event_sync(agent, event)
+
+    async def send_start_case(self, case: "Case") -> ApiResult:
         # Import here to avoid circular imports
         from supervaizer.event import CaseStartEvent
 
         event = CaseStartEvent(case=case, account=self)
-        return self.send_event(case, event)
+        return await self.send_event(case, event)
 
-    def send_update_case(self, case: "Case", update: "CaseNodeUpdate") -> ApiResult:
+    def send_start_case_sync(self, case: "Case") -> ApiResult:
+        from supervaizer.event import CaseStartEvent
+
+        event = CaseStartEvent(case=case, account=self)
+        return self.send_event_sync(case, event)
+
+    async def send_update_case(
+        self, case: "Case", update: "CaseNodeUpdate"
+    ) -> ApiResult:
         # Import here to avoid circular imports
         log.debug(f"[send_update_case] CaseRef {case} with update {update}")
         log.debug(f"[send_update_case] {type(case)}")
@@ -298,7 +334,18 @@ class Account(AccountAbstract):
         from supervaizer.event import CaseUpdateEvent
 
         event = CaseUpdateEvent(case=case, update=update, account=self)
-        return self.send_event(update, event)
+        return await self.send_event(update, event)
+
+    def send_update_case_sync(
+        self, case: "Case", update: "CaseNodeUpdate"
+    ) -> ApiResult:
+        log.debug(f"[send_update_case] CaseRef {case} with update {update}")
+        log.debug(f"[send_update_case] {type(case)}")
+        log.debug(f"[send_update_case] {type(update)}")
+        from supervaizer.event import CaseUpdateEvent
+
+        event = CaseUpdateEvent(case=case, update=update, account=self)
+        return self.send_event_sync(update, event)
 
     def send_telemetry(self, telemetry: Telemetry) -> ApiResult:
         """Send telemetry data to the Supervaize Control API.
