@@ -34,8 +34,6 @@ All notable changes to this project will be documented in this file.
 
 ### Coverage
 
-## Name Stmts Miss Cover
-
 src/supervaizer/**init**.py 23 3 87%
 src/supervaizer/**version**.py 3 0 100%
 src/supervaizer/access/**init**.py 4 0 100%
@@ -98,7 +96,10 @@ src/supervaizer/utils/version_check.py 27 6 78%
 ---
 
 TOTAL 6133 1831 70%
-Coverage HTML written to dir htmlcov
+
+---
+
+TOTAL 6133 1831 70%
 
 ## [0.16.0] - 2026-04-25
 
