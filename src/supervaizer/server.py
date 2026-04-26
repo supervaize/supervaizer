@@ -700,7 +700,7 @@ class Server(ServerAbstract):
         if self.supervisor_account:
             # Register the server with the supervisor account
             server_registration_result: ApiResult = (
-                self.supervisor_account.register_server(server=self)
+                self.supervisor_account.register_server_sync(server=self)
             )
             # log.debug(f"[Server launch] Server registration result: {server_registration_result}")
             # inspect(server_registration_result)

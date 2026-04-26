@@ -224,7 +224,7 @@ def test_service_job_finished(server_fixture: "Server", mocker: MockerFixture) -
 
     # Mock account send_event to avoid actual API calls
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event_sync", return_value=None
     )
 
     # Call the function
@@ -249,7 +249,7 @@ def test_service_job_finished_without_account(
     mock_job.id = str(uuid.uuid4())
     mock_event_class = mocker.patch("supervaizer.job_service.JobFinishedEvent")
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event_sync", return_value=None
     )
 
     # Remove supervisor account

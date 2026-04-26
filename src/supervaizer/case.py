@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import shortuuid
 from pydantic import ConfigDict, Field
-from supervaizer.common import SvBaseModel, log, singleton
+from supervaizer.common import ApiResult, SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
 
@@ -277,23 +277,34 @@ class Case(CaseAbstractModel):
     def calculated_cost(self) -> float:
         return sum(update.cost or 0.0 for update in self.updates)
 
-    def update(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
-        updateCaseNode.index = len(self.updates) + 1
-        if updateCaseNode.error:
+    def _prepare_update(self, update: CaseNodeUpdate) -> None:
+        update.index = len(self.updates) + 1
+        if update.error:
             success, error = PersistentEntityLifecycle.handle_event(
                 self, EntityEvents.ERROR_ENCOUNTERED
             )
             log.warning(
-                f"[Case update] CaseRef {self.case_ref} has error {updateCaseNode.error}"
+                f"[Case update] CaseRef {self.case_ref} has error {update.error}"
             )
             assert self.status == EntityStatus.FAILED  # Just to be sure
-        self.account.send_update_case(self, updateCaseNode)
-        self.updates.append(updateCaseNode)
 
+    def _persist(self) -> None:
         storage = StorageManager()
         storage.save_object("Case", self.to_dict)
 
-    def patch_step(self, index: int, updateCaseNode: CaseNodeUpdate) -> None:
+    async def update(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
+        self._prepare_update(updateCaseNode)
+        await self.account.send_update_case(self, updateCaseNode)
+        self.updates.append(updateCaseNode)
+        self._persist()
+
+    def update_sync(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
+        self._prepare_update(updateCaseNode)
+        self.account.send_update_case_sync(self, updateCaseNode)
+        self.updates.append(updateCaseNode)
+        self._persist()
+
+    async def patch_step(self, index: int, updateCaseNode: CaseNodeUpdate) -> None:
         """Update an existing step at the given index instead of appending a new one.
 
         Sets upsert=True so Studio performs an update_or_create on the step at that index.
@@ -302,52 +313,76 @@ class Case(CaseAbstractModel):
         """
         updateCaseNode.index = index
         updateCaseNode.upsert = True
-        self.account.send_update_case(self, updateCaseNode)
+        await self.account.send_update_case(self, updateCaseNode)
         # Update the matching entry in the in-memory registry
         for i, existing in enumerate(self.updates):
             if existing.index == index:
                 self.updates[i] = updateCaseNode
                 break
-        storage = StorageManager()
-        storage.save_object("Case", self.to_dict)
+        self._persist()
 
-    def request_human_input(
+    def patch_step_sync(self, index: int, updateCaseNode: CaseNodeUpdate) -> None:
+        """Sync entry point for updating an existing step."""
+        updateCaseNode.index = index
+        updateCaseNode.upsert = True
+        self.account.send_update_case_sync(self, updateCaseNode)
+        for i, existing in enumerate(self.updates):
+            if existing.index == index:
+                self.updates[i] = updateCaseNode
+                break
+        self._persist()
+
+    async def request_human_input(
         self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
     ) -> None:
         updateCaseNode.index = len(self.updates) + 1
         log.info(
             f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
         )
-        self.account.send_update_case(self, updateCaseNode)
+        await self.account.send_update_case(self, updateCaseNode)
         from supervaizer.storage import PersistentEntityLifecycle
 
         PersistentEntityLifecycle.handle_event(self, EntityEvents.AWAITING_ON_INPUT)
         self.updates.append(updateCaseNode)
+        self._persist()
 
-        # Persist updated case to storage (for the updates list change)
+    def request_human_input_sync(
+        self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
+    ) -> None:
+        updateCaseNode.index = len(self.updates) + 1
+        log.info(
+            f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
+        )
+        self.account.send_update_case_sync(self, updateCaseNode)
+        from supervaizer.storage import PersistentEntityLifecycle
 
-        storage = StorageManager()
-        storage.save_object("Case", self.to_dict)
+        PersistentEntityLifecycle.handle_event(self, EntityEvents.AWAITING_ON_INPUT)
+        self.updates.append(updateCaseNode)
+        self._persist()
 
-    def receive_human_input(
+    async def receive_human_input(
         self, updateCaseNode: CaseNodeUpdate, **kwargs: Any
     ) -> None:
         # Add the update to the case (this handles index, send_update_case, and persistence)
-        self.update(updateCaseNode)
+        await self.update(updateCaseNode)
         # Transition from AWAITING to IN_PROGRESS
         from supervaizer.storage import PersistentEntityLifecycle
 
         PersistentEntityLifecycle.handle_event(self, EntityEvents.INPUT_RECEIVED)
 
-    def close(
+    def receive_human_input_sync(
+        self, updateCaseNode: CaseNodeUpdate, **kwargs: Any
+    ) -> None:
+        self.update_sync(updateCaseNode)
+        from supervaizer.storage import PersistentEntityLifecycle
+
+        PersistentEntityLifecycle.handle_event(self, EntityEvents.INPUT_RECEIVED)
+
+    def _prepare_close(
         self,
         case_result: Dict[str, Any],
         final_cost: Optional[float] = None,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Close the case and send the final update to the account.
-        """
+    ) -> CaseNodeUpdate:
         if final_cost:
             self.total_cost = final_cost
         else:
@@ -368,13 +403,31 @@ class Case(CaseAbstractModel):
 
         self.final_delivery = case_result
         self.finished_at = datetime.now()
-        self.account.send_update_case(self, update)
+        return update
 
-        # Persist updated case to storage
-        from supervaizer.storage import StorageManager
+    async def close(
+        self,
+        case_result: Dict[str, Any],
+        final_cost: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Close the case and send the final update to the account.
+        """
+        update = self._prepare_close(case_result, final_cost)
+        await self.account.send_update_case(self, update)
+        self._persist()
 
-        storage = StorageManager()
-        storage.save_object("Case", self.to_dict)
+    def close_sync(
+        self,
+        case_result: Dict[str, Any],
+        final_cost: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        update = self._prepare_close(case_result, final_cost)
+        self.account.send_update_case_sync(self, update)
+        self._persist()
+
 
     def cancel_scheduled_steps(self) -> None:
         """Cancel all pending scheduled steps for this case."""
@@ -402,7 +455,7 @@ class Case(CaseAbstractModel):
         }
 
     @classmethod
-    def start(
+    def _create_started_case(
         cls,
         job_id: str,
         name: str,
@@ -411,20 +464,6 @@ class Case(CaseAbstractModel):
         case_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "Case":
-        """
-        Start a new case
-
-        Args:
-            case_id (str): The id of the case - should be unique for the job. If not provided, a shortuuid will be generated.
-            job_id (str): The id of the job
-            name (str): The name of the case
-            account (Account): The account
-            description (str): The description of the case
-
-        Returns:
-            Case: The case
-        """
-
         case = cls(
             id=case_id or shortuuid.uuid(),
             job_id=job_id,
@@ -446,9 +485,10 @@ class Case(CaseAbstractModel):
         # Transition from STOPPED to IN_PROGRESS
 
         PersistentEntityLifecycle.handle_event(case, EntityEvents.START_WORK)
+        return case
 
-        # Send case start event to Supervaize SaaS.
-        result = account.send_start_case(case=case)
+    @staticmethod
+    def _log_start_result(case: "Case", result: ApiResult | None) -> None:
         if result:
             log.debug(
                 f"[Case start] Case {case.id} send to Supervaize with result {result}"
@@ -458,6 +498,54 @@ class Case(CaseAbstractModel):
                 f"[Case start] §SCCS01 Case {case.id} failed to send to Supervaize"
             )
 
+    @classmethod
+    async def start(
+        cls,
+        job_id: str,
+        name: str,
+        account: "Account",
+        description: str,
+        case_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> "Case":
+        """
+        Start a new case.
+        """
+        case = cls._create_started_case(
+            job_id=job_id,
+            name=name,
+            account=account,
+            description=description,
+            case_id=case_id,
+            metadata=metadata,
+        )
+        # Send case start event to Supervaize SaaS.
+        result = await account.send_start_case(case=case)
+        cls._log_start_result(case, result)
+
+        return case
+
+    @classmethod
+    def start_sync(
+        cls,
+        job_id: str,
+        name: str,
+        account: "Account",
+        description: str,
+        case_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> "Case":
+        """Start a new case from sync-only contexts."""
+        case = cls._create_started_case(
+            job_id=job_id,
+            name=name,
+            account=account,
+            description=description,
+            case_id=case_id,
+            metadata=metadata,
+        )
+        result = account.send_start_case_sync(case=case)
+        cls._log_start_result(case, result)
         return case
 
 

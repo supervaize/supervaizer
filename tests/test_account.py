@@ -191,16 +191,23 @@ def test_get_agent_by_no_params(account_fixture: Account) -> None:
         account_fixture.get_agent_by()
 
 
-def test_register_agent(account_fixture: Account, mocker: MockerFixture) -> None:
+@pytest.mark.asyncio
+async def test_register_agent(
+    account_fixture: Account, mocker: MockerFixture
+) -> None:
     """Test register_agent method."""
     # Mock the agent
     mock_agent = mocker.Mock()
     mock_agent.name = "test-agent"
 
     # Mock the account_service.send_event function instead of patching the instance method
-    mock_send_event = mocker.patch("supervaizer.account_service.send_event")
-    mock_send_event.return_value = ApiSuccess(
-        message="Agent registered", detail={"status": "registered"}
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(
+            return_value=ApiSuccess(
+                message="Agent registered", detail={"status": "registered"}
+            )
+        ),
     )
 
     # Mock the AgentRegisterEvent
@@ -209,7 +216,7 @@ def test_register_agent(account_fixture: Account, mocker: MockerFixture) -> None
     mock_event_class.return_value = mock_event
 
     # Test with default polling=True
-    result = account_fixture.register_agent(mock_agent)
+    result = await account_fixture.register_agent(mock_agent)
 
     assert isinstance(result, ApiSuccess)
     mock_event_class.assert_called_once_with(
@@ -221,21 +228,28 @@ def test_register_agent(account_fixture: Account, mocker: MockerFixture) -> None
     mock_send_event.reset_mock()
     mock_event_class.reset_mock()
 
-    account_fixture.register_agent(mock_agent, polling=False)
+    await account_fixture.register_agent(mock_agent, polling=False)
     mock_event_class.assert_called_once_with(
         agent=mock_agent, account=account_fixture, polling=False
     )
 
 
-def test_send_start_case(account_fixture: Account, mocker: MockerFixture) -> None:
+@pytest.mark.asyncio
+async def test_send_start_case(
+    account_fixture: Account, mocker: MockerFixture
+) -> None:
     """Test send_start_case method."""
     # Mock the case
     mock_case = mocker.Mock()
 
     # Mock the account_service.send_event function instead of patching the instance method
-    mock_send_event = mocker.patch("supervaizer.account_service.send_event")
-    mock_send_event.return_value = ApiSuccess(
-        message="Case started", detail={"status": "started"}
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(
+            return_value=ApiSuccess(
+                message="Case started", detail={"status": "started"}
+            )
+        ),
     )
 
     # Mock the CaseStartEvent
@@ -243,23 +257,30 @@ def test_send_start_case(account_fixture: Account, mocker: MockerFixture) -> Non
     mock_event = mocker.Mock()
     mock_event_class.return_value = mock_event
 
-    result = account_fixture.send_start_case(mock_case)
+    result = await account_fixture.send_start_case(mock_case)
 
     assert isinstance(result, ApiSuccess)
     mock_event_class.assert_called_once_with(case=mock_case, account=account_fixture)
     mock_send_event.assert_called_once_with(account_fixture, mock_case, mock_event)
 
 
-def test_send_update_case(account_fixture: Account, mocker: MockerFixture) -> None:
+@pytest.mark.asyncio
+async def test_send_update_case(
+    account_fixture: Account, mocker: MockerFixture
+) -> None:
     """Test send_update_case method."""
     # Mock the case and update
     mock_case = mocker.Mock()
     mock_update = mocker.Mock()
 
     # Mock the account_service.send_event function instead of patching the instance method
-    mock_send_event = mocker.patch("supervaizer.account_service.send_event")
-    mock_send_event.return_value = ApiSuccess(
-        message="Case updated", detail={"status": "updated"}
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(
+            return_value=ApiSuccess(
+                message="Case updated", detail={"status": "updated"}
+            )
+        ),
     )
 
     # Mock the CaseUpdateEvent
@@ -267,7 +288,7 @@ def test_send_update_case(account_fixture: Account, mocker: MockerFixture) -> No
     mock_event = mocker.Mock()
     mock_event_class.return_value = mock_event
 
-    result = account_fixture.send_update_case(mock_case, mock_update)
+    result = await account_fixture.send_update_case(mock_case, mock_update)
 
     assert isinstance(result, ApiSuccess)
     mock_event_class.assert_called_once_with(
@@ -343,42 +364,50 @@ def test_send_telemetry_http_error(
     )
 
 
-def test_account_send_event_delegation(
+@pytest.mark.asyncio
+async def test_account_send_event_delegation(
     account_fixture: Account,
     event_fixture: Event,
     server_fixture: Server,
     mocker: MockerFixture,
 ) -> None:
     # Mock the account_service.send_event function
-    mock_service_send_event = mocker.patch("supervaizer.account_service.send_event")
-    mock_service_send_event.return_value = ApiSuccess(
+    mock_success = ApiSuccess(
         message="Event sent",
         detail={"id": "01JPZ7414FX3JHPNA8N1JXDADX", "response": "success"},
     )
+    mock_service_send_event = mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=mock_success),
+    )
 
     # Call the account.send_event method
-    result = account_fixture.send_event(sender=server_fixture, event=event_fixture)
+    result = await account_fixture.send_event(sender=server_fixture, event=event_fixture)
 
     # Verify that the account_service.send_event was called with correct parameters
     mock_service_send_event.assert_called_once_with(
         account_fixture, server_fixture, event_fixture
     )
-    assert result == mock_service_send_event.return_value
+    assert result == mock_success
 
 
-def test_account_register_server_success(
+@pytest.mark.asyncio
+async def test_account_register_server_success(
     account_fixture: Account, server_fixture: Server, mocker: MockerFixture
 ) -> None:
     # Mock the send_event method
-    mock_send_event = mocker.patch("supervaizer.account_service.send_event")
-    # Use a dictionary instead of SERVER_REGISTER_RESPONSE to avoid JSON decoding issues
     detail = {"id": "01JPZ7414FX3JHPNA8N1JXDADX", "response": "success"}
-    mock_send_event.return_value = ApiSuccess(
-        message="Event SERVER_REGISTER sent",
-        detail=detail,
+    mock_send_event = mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(
+            return_value=ApiSuccess(
+                message="Event SERVER_REGISTER sent",
+                detail=detail,
+            )
+        ),
     )
 
-    result = account_fixture.register_server(server_fixture)
+    result = await account_fixture.register_server(server_fixture)
     assert isinstance(result, ApiSuccess)
     assert result.message == "Event SERVER_REGISTER sent"
     # Verify that send_event was called

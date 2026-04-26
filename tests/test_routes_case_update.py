@@ -80,7 +80,8 @@ def test_update_case_with_answer_success(
 
     # Mock the account service's send_event method to prevent actual API calls
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
 
     # Test data
@@ -135,7 +136,8 @@ def test_update_case_with_casestep_index_patches_step(
     headers = {"X-API-Key": server_fixture.api_key}
 
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
 
     request_data = {
@@ -303,7 +305,10 @@ def test_human_answer_uses_workbench_style_params_and_strips_casestep_index(
         name="Test Case",
         description="Test",
     )
-    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
+    )
 
     client = TestClient(server_fixture.app)
     headers = {"X-API-Key": server_fixture.api_key}
@@ -406,7 +411,10 @@ def test_human_answer_only_owning_agent_executed(
         name="c",
         description="c",
     )
-    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
+    )
 
     mock_owner = mocker.patch.object(
         owner,
@@ -458,7 +466,10 @@ def test_human_answer_skipped_when_job_agent_not_on_server(
         name="c",
         description="c",
     )
-    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
+    )
 
     spy = mocker.patch.object(
         server_fixture.agents[0],

@@ -20,11 +20,13 @@
 from typing import Any
 
 import pytest
+from httpx import ConnectError
 from pytest_mock import MockerFixture
 
 from supervaizer import Account, CaseNode, CaseNodeType, CaseNodes
 from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.storage import StorageManager
 
 
 def test_case(
@@ -36,7 +38,8 @@ def test_case(
     assert case_fixture.description == "Test Case Description"
 
 
-def test_case_start(
+@pytest.mark.asyncio
+async def test_case_start(
     account_fixture: Account,
     respx_mock: Any,
     mocker: MockerFixture,
@@ -74,10 +77,11 @@ def test_case_start(
 
     # Mock the account service's send_event method and verify it was called
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
 
-    new_case = Case.start(
+    new_case = await Case.start(
         job_id="job123",
         account=account_fixture,
         name="New Case",
@@ -88,7 +92,8 @@ def test_case_start(
     assert mock_send_event.call_count == 1
 
 
-def test_case_close(
+@pytest.mark.asyncio
+async def test_case_close(
     account_fixture: Account,
     respx_mock: Any,
     case_fixture: Case,
@@ -111,10 +116,11 @@ def test_case_close(
 
     # Mock the account's send_event method to prevent actual API calls
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
     # Execute
-    case.close(case_result=case_result, final_cost=final_cost)
+    await case.close(case_result=case_result, final_cost=final_cost)
 
     # Assert
     assert case.status == EntityStatus.COMPLETED
@@ -153,11 +159,12 @@ async def test_case_close_without_final_cost(
 
     # Mock the account's send_event method to prevent actual API calls
     mock_send_event = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
 
     # Execute
-    case.close(case_result=case_result, final_cost=None)
+    await case.close(case_result=case_result, final_cost=None)
 
     # Assert
     assert case.status == EntityStatus.COMPLETED
@@ -165,6 +172,36 @@ async def test_case_close_without_final_cost(
     assert case.final_delivery == case_result
 
     assert mock_send_event.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_case_update_failure_does_not_append_or_persist(
+    storage_manager: StorageManager,
+    account_fixture: Account,
+    mocker: MockerFixture,
+) -> None:
+    case = Case(
+        id="case-update-failure",
+        job_id="job-update-failure",
+        account=account_fixture,
+        status=EntityStatus.IN_PROGRESS,
+        name="Failure Test Case",
+        description="Test failed update persistence",
+    )
+    original_update_count = len(case.updates)
+    update = CaseNodeUpdate(name="Will fail", payload={"status": "pending"})
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(side_effect=ConnectError("network down")),
+    )
+
+    with pytest.raises(ConnectError, match="network down"):
+        await case.update(update)
+
+    stored_case = storage_manager.get_object_by_id("Case", case.id)
+    assert len(case.updates) == original_update_count
+    assert stored_case is not None
+    assert stored_case["updates"] == []
 
 
 def test_case_node_instantiation(
@@ -379,11 +416,15 @@ def test_case_node_update_registration_info_includes_upsert() -> None:
     assert u.registration_info["upsert"] is True
 
 
-def test_case_patch_step_replaces_in_memory_step_and_sets_upsert(
+@pytest.mark.asyncio
+async def test_case_patch_step_replaces_in_memory_step_and_sets_upsert(
     case_fixture: Case,
     mocker: MockerFixture,
 ) -> None:
-    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
+    )
     prior = CaseNodeUpdate(name="Prior", payload={"original": True})
     prior.index = 2
     case_fixture.updates = [prior]
@@ -392,7 +433,7 @@ def test_case_patch_step_replaces_in_memory_step_and_sets_upsert(
         name="Human Input Response",
         payload={"answer": {"x": 1}, "message": "m", "response_type": "human_input"},
     )
-    case_fixture.patch_step(2, new_u)
+    await case_fixture.patch_step(2, new_u)
 
     assert len(case_fixture.updates) == 1
     assert case_fixture.updates[0] is new_u
@@ -400,20 +441,22 @@ def test_case_patch_step_replaces_in_memory_step_and_sets_upsert(
     assert new_u.upsert is True
 
 
-def test_case_patch_step_no_index_match_still_sends_but_keeps_registry_unchanged(
+@pytest.mark.asyncio
+async def test_case_patch_step_no_index_match_still_sends_but_keeps_registry_unchanged(
     case_fixture: Case,
     mocker: MockerFixture,
 ) -> None:
     """Studio still receives the upsert; only the local updates list is left as-is if no index matches."""
     mock_send = mocker.patch(
-        "supervaizer.account_service.send_event", return_value=None
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
     )
     prior = CaseNodeUpdate(name="Only", payload={})
     prior.index = 1
     case_fixture.updates = [prior]
 
     orphan = CaseNodeUpdate(name="Patch", payload={"p": 1})
-    case_fixture.patch_step(99, orphan)
+    await case_fixture.patch_step(99, orphan)
 
     assert mock_send.call_count == 1
     assert len(case_fixture.updates) == 1
@@ -444,14 +487,18 @@ def test_case_registration_info_includes_metadata(account_fixture: Account) -> N
     assert info["metadata"] == {"contact_email": "a@b.com", "language": "en"}
 
 
-def test_case_start_accepts_metadata(
+@pytest.mark.asyncio
+async def test_case_start_accepts_metadata(
     account_fixture: Account,
     mocker: MockerFixture,
 ) -> None:
     """Case.start() passes metadata through to the Case instance."""
-    mocker.patch("supervaizer.account_service.send_event", return_value=None)
+    mocker.patch(
+        "supervaizer.account_service.send_event",
+        new=mocker.AsyncMock(return_value=None),
+    )
     meta = {"contact_email": "test@example.com", "language": "fr"}
-    case = Case.start(
+    case = await Case.start(
         job_id="job-start-meta",
         name="Test Contact",
         account=account_fixture,

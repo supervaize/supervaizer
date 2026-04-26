@@ -515,7 +515,7 @@ def create_workbench_routes() -> APIRouter:
         if isinstance(answer_with_label, dict):
             answer_with_label["_hitl_label"] = hitl_label
         update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
-        case.receive_human_input(update)
+        await case.receive_human_input(update)
 
         # Step 2: Invoke agent's human_answer method if defined
         if agent.methods:
