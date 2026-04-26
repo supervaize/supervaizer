@@ -29,7 +29,7 @@ jobs:
       contents: write  # required for committing version bump
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -81,3 +81,16 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/gh-release-latest-tag.sh supervaize/supervaizer
+
+      - name: Merge main back into develop
+        run: |
+          git fetch origin main develop
+          git checkout develop
+          git pull --ff-only origin develop
+          git merge --no-ff origin/main -m "chore: sync main back to develop"
+          git push origin develop

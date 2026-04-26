@@ -17,6 +17,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`publish-pypi.yml` — post-publish release automation** — After PyPI publish, CI now runs the same GitHub release flow as `just gh-release` (`tools/gh-release-latest-tag.sh`) to create/update and mark the latest release from the newest `origin/main` tag.
+- **`publish-pypi.yml` — branch reconciliation in CI** — Added an automatic `main -> develop` merge-back step after publish/release so long-lived branch history stays synchronized without manual follow-up.
+
+### Fixed
+
+- **GitHub Actions Node 20 deprecation warnings** — Upgraded workflow action majors across CI/release/publish pipelines: `actions/checkout@v5`, `actions/setup-python@v6`, and `astral-sh/setup-uv@v7` to avoid Node 20 runtime deprecation warnings and align with Node 24 transition.
+
 ## [0.17.1] - 2026-04-26
 
 ### Fixed
