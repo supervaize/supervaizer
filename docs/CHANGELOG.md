@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-04-26
+
 ### Fixed
 
 - **`server.py` — startup lifespan migration** — Replaced deprecated `@app.on_event("startup")` with a proper `asynccontextmanager` lifespan passed to `FastAPI(lifespan=...)`. Eliminates `DeprecationWarning` from FastAPI 0.100+.
