@@ -188,9 +188,10 @@ async def close_httpx_client() -> None:
 def close_httpx_client_sync() -> None:
     """Close shared HTTP clients from sync shutdown hooks."""
     _sync_httpx_client.close()
-    if not _httpx_client.is_closed:
+    aclose = getattr(_httpx_client, "aclose", None)
+    if aclose and not _httpx_client.is_closed:
         try:
-            asyncio.run(_httpx_client.aclose())
+            asyncio.run(aclose())
         except RuntimeError:
             log.warning("[Send event] Could not close async HTTP client at exit")
 
