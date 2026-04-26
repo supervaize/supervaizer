@@ -17,6 +17,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`server.py` — startup lifespan migration** — Replaced deprecated `@app.on_event("startup")` with a proper `asynccontextmanager` lifespan passed to `FastAPI(lifespan=...)`. Eliminates `DeprecationWarning` from FastAPI 0.100+.
+- **`account_service.py` — atexit robustness** — `close_httpx_client_sync` now guards the `aclose()` call with `getattr(_httpx_client, "aclose", None)` to prevent `AttributeError` when the module-level client is a sync `httpx.Client` in older-installed environments.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 559   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 74s   |
+
 ## [0.17.0] - 2026-04-26
 
 ### Changed

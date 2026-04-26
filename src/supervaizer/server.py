@@ -15,6 +15,7 @@ import os
 import secrets
 import sys
 import time
+from contextlib import asynccontextmanager
 import uuid
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
 from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
@@ -456,7 +457,13 @@ class Server(ServerAbstract):
         redoc_url = "/redoc"  # ReDoc
         openapi_url = "/openapi.json"
 
+        @asynccontextmanager
+        async def _lifespan(app: FastAPI):
+            asyncio.create_task(_run_scheduled_step_loop(self))
+            yield
+
         app = FastAPI(
+            lifespan=_lifespan,
             debug=debug,
             title="Supervaizer API",
             description=(
@@ -581,11 +588,6 @@ class Server(ServerAbstract):
                 log.warning(f"[Server launch] Using auto-generated API key: {api_key}")
         else:
             log.info("[Server launch] API Key authentication disabled")
-
-        # Start the scheduled-step executor loop on app startup
-        @self.app.on_event("startup")
-        async def _start_scheduled_executor() -> None:
-            asyncio.create_task(_run_scheduled_step_loop(self))
 
         if not self.public_url:
             self.public_url = f"{self.scheme}://{self.host}:{self.port}"
