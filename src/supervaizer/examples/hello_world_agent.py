@@ -36,7 +36,10 @@ HITL_POLL_INTERVAL = 1.0  # seconds between polls while waiting for human input
 class _LocalAccount(Account):
     """No-op account for local mode — skips all Studio HTTP calls."""
 
-    def send_event(self, sender: Any, event: Any) -> ApiSuccess:
+    async def send_event(self, sender: Any, event: Any) -> ApiSuccess:
+        return ApiSuccess(message="local-noop", detail=None)
+
+    def send_event_sync(self, sender: Any, event: Any) -> ApiSuccess:
         return ApiSuccess(message="local-noop", detail=None)
 
 
@@ -150,7 +153,9 @@ def job_start(**kwargs: Any) -> JobResponse:
                         "message": f"Waiting for human review on case {case_idx}",
                     },
                 )
-                case.request_human_input(hitl_update, message=f"Review case {case_idx}")
+                case.request_human_input_sync(
+                    hitl_update, message=f"Review case {case_idx}"
+                )
 
                 # Poll until human answers or job is stopped
                 while case.status == EntityStatus.AWAITING:
@@ -169,7 +174,7 @@ def job_start(**kwargs: Any) -> JobResponse:
                 time.sleep(duration)
                 msg = f"The step {step_idx} ({step_name}) in case {case_idx} lasted {duration} s"
                 log.info(msg)
-                case.update(
+                case.update_sync(
                     CaseNodeUpdate(
                         name=step_name,
                         payload={"message": msg, "duration": duration},
@@ -181,7 +186,7 @@ def job_start(**kwargs: Any) -> JobResponse:
             stopped = True
             break
 
-        case.close({"result": f"Case {case_idx} completed"})
+        case.close_sync({"result": f"Case {case_idx} completed"})
         cases_done += 1
 
     if stopped:

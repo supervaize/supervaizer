@@ -17,15 +17,21 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture
 
 from supervaizer import (
+    Account,
     Agent,
     AgentMethod,
     AgentMethods,
+    Case,
+    CaseNodeUpdate,
+    EntityStatus,
     Parameter,
     ParametersSetup,
 )
 from supervaizer.agent import AgentMethodField, FieldTypeEnum
+from supervaizer.case import Cases
 
 
 @pytest.fixture
@@ -107,6 +113,92 @@ class TestWorkbenchPageRendering:
         client, _ = test_client_with_agent
         response = client.get("/manage/agents/unknown-agent/workbench")  # <-- MODIFIED
         assert response.status_code == 404
+
+
+class TestWorkbenchHitlAnswer:
+    """Test HITL answer submission through the workbench route."""
+
+    def setup_method(self) -> None:
+        Cases().reset()
+
+    def teardown_method(self) -> None:
+        Cases().reset()
+
+    def test_answer_hitl_updates_awaiting_case(
+        self,
+        test_client_with_agent: tuple[TestClient, str],
+        account_fixture: Account,
+        mocker: MockerFixture,
+    ) -> None:
+        client, agent_slug = test_client_with_agent
+        case = Case(
+            id="workbench-hitl-case",
+            job_id="workbench-job",
+            account=account_fixture,
+            status=EntityStatus.AWAITING,
+            name="Workbench HITL",
+            description="Awaiting answer",
+        )
+        case.updates = [
+            CaseNodeUpdate(
+                name="Approval Step",
+                payload={"supervaizer_form": {"question": "Approve?"}},
+            )
+        ]
+        mocker.patch(
+            "supervaizer.account_service.send_event",
+            new=mocker.AsyncMock(return_value=None),
+        )
+
+        response = client.post(
+            f"/manage/agents/{agent_slug}/workbench/jobs/{case.job_id}/cases/{case.id}/answer",
+            json={"answer": {"approved": True}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "answered"
+        assert case.status == EntityStatus.IN_PROGRESS
+        assert case.updates[-1].payload == {
+            "approved": True,
+            "_hitl_label": "Approval Step",
+        }
+
+    def test_answer_hitl_returns_409_when_case_not_awaiting(
+        self,
+        test_client_with_agent: tuple[TestClient, str],
+        account_fixture: Account,
+    ) -> None:
+        client, agent_slug = test_client_with_agent
+        case = Case(
+            id="workbench-not-awaiting-case",
+            job_id="workbench-job",
+            account=account_fixture,
+            status=EntityStatus.IN_PROGRESS,
+            name="Workbench Case",
+            description="Not awaiting",
+        )
+
+        response = client.post(
+            f"/manage/agents/{agent_slug}/workbench/jobs/{case.job_id}/cases/{case.id}/answer",
+            json={"answer": {"approved": True}},
+        )
+
+        assert response.status_code == 409
+        assert "not awaiting input" in response.json()["detail"]
+
+    def test_answer_hitl_returns_404_for_missing_case(
+        self,
+        test_client_with_agent: tuple[TestClient, str],
+    ) -> None:
+        client, agent_slug = test_client_with_agent
+
+        response = client.post(
+            f"/manage/agents/{agent_slug}/workbench/jobs/missing-job/cases/missing-case/answer",
+            json={"answer": {"approved": True}},
+        )
+
+        assert response.status_code == 404
+        assert "missing-case" in response.json()["detail"]
 
 
 class TestGetAgentBySlug:

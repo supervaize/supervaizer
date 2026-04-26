@@ -936,7 +936,7 @@ class Agent(AgentAbstract):
                         job=job,
                         account=server.supervisor_account,
                     )
-                    server.supervisor_account.send_event(sender=job, event=event)
+                    server.supervisor_account.send_event_sync(sender=job, event=event)
                 else:
                     log.warning(
                         f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"

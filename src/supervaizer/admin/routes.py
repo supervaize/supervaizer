@@ -456,7 +456,7 @@ def create_admin_routes() -> APIRouter:
                     status_code=503,
                     detail="No supervisor account configured",
                 )
-            result = server.supervisor_account.register_server(server=server)
+            result = await server.supervisor_account.register_server(server=server)
             if isinstance(result, ApiSuccess):
                 return JSONResponse(
                     status_code=200,

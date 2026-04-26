@@ -17,6 +17,87 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Async control-event HTTP client** — `account_service.send_event`, `Account` event helpers, and case event-reporting methods now use `httpx.AsyncClient` and must be awaited in async agents. Explicit `_sync` shims remain for CLI, startup, and synchronous controller methods. See [RFC: async-control-event-http-client](/docs/rfc/async-control-event-http-client.md) for details.
+
+### Tests
+
+`just test`
+
+| Status      | Count |
+| ----------- | ----- |
+| ✅ Passed   | 559   |
+| 🤔 Skipped  | 0     |
+| 🔴 Failed   | 0     |
+| ⏱️ in       |       |
+| ⏱️ with cov | 102s  |
+
+### Coverage
+
+| Name                                              | Stmts | Miss | Cover |
+| ------------------------------------------------- | ----- | ---- | ----- |
+| src/supervaizer/**init**.py                       | 23    | 3    | 87%   |
+| src/supervaizer/**version**.py                    | 3     | 0    | 100%  |
+| src/supervaizer/access/**init**.py                | 4     | 0    | 100%  |
+| src/supervaizer/access/api_auth.py                | 38    | 1    | 97%   |
+| src/supervaizer/access/client_ip.py               | 37    | 7    | 81%   |
+| src/supervaizer/access/tailscale.py               | 23    | 2    | 91%   |
+| src/supervaizer/account.py                        | 122   | 15   | 88%   |
+| src/supervaizer/account_service.py                | 80    | 2    | 98%   |
+| src/supervaizer/admin/routes.py                   | 549   | 190  | 65%   |
+| src/supervaizer/admin/workbench_routes.py         | 380   | 256  | 33%   |
+| src/supervaizer/agent.py                          | 354   | 80   | 77%   |
+| src/supervaizer/case.py                           | 267   | 64   | 76%   |
+| src/supervaizer/cli.py                            | 210   | 75   | 64%   |
+| src/supervaizer/common.py                         | 142   | 4    | 97%   |
+| src/supervaizer/contracts.py                      | 168   | 3    | 98%   |
+| src/supervaizer/data_resource.py                  | 70    | 0    | 100%  |
+| src/supervaizer/data_routes.py                    | 98    | 21   | 79%   |
+| src/supervaizer/deploy/**init**.py                | 2     | 0    | 100%  |
+| src/supervaizer/deploy/cli.py                     | 104   | 46   | 56%   |
+| src/supervaizer/deploy/commands/**init**.py       | 2     | 0    | 100%  |
+| src/supervaizer/deploy/commands/clean.py          | 158   | 17   | 89%   |
+| src/supervaizer/deploy/commands/down.py           | 61    | 12   | 80%   |
+| src/supervaizer/deploy/commands/local.py          | 214   | 15   | 93%   |
+| src/supervaizer/deploy/commands/plan.py           | 75    | 7    | 91%   |
+| src/supervaizer/deploy/commands/status.py         | 100   | 41   | 59%   |
+| src/supervaizer/deploy/commands/up.py             | 113   | 8    | 93%   |
+| src/supervaizer/deploy/docker.py                  | 186   | 23   | 88%   |
+| src/supervaizer/deploy/driver_factory.py          | 20    | 0    | 100%  |
+| src/supervaizer/deploy/drivers/**init**.py        | 13    | 4    | 69%   |
+| src/supervaizer/deploy/drivers/aws_app_runner.py  | 221   | 157  | 29%   |
+| src/supervaizer/deploy/drivers/base.py            | 82    | 8    | 90%   |
+| src/supervaizer/deploy/drivers/cloud_run.py       | 205   | 125  | 39%   |
+| src/supervaizer/deploy/drivers/do_app_platform.py | 164   | 125  | 24%   |
+| src/supervaizer/deploy/health.py                  | 161   | 12   | 93%   |
+| src/supervaizer/deploy/state.py                   | 115   | 9    | 92%   |
+| src/supervaizer/deploy/utils.py                   | 24    | 0    | 100%  |
+| src/supervaizer/event.py                          | 40    | 1    | 98%   |
+| src/supervaizer/examples/local_server.py          | 17    | 3    | 82%   |
+| src/supervaizer/instructions.py                   | 56    | 1    | 98%   |
+| src/supervaizer/job.py                            | 166   | 28   | 83%   |
+| src/supervaizer/job_service.py                    | 34    | 0    | 100%  |
+| src/supervaizer/lifecycle.py                      | 153   | 3    | 98%   |
+| src/supervaizer/parameter.py                      | 79    | 7    | 91%   |
+| src/supervaizer/protocol/**init**.py              | 2     | 0    | 100%  |
+| src/supervaizer/protocol/a2a/**init**.py          | 3     | 0    | 100%  |
+| src/supervaizer/protocol/a2a/model.py             | 37    | 5    | 86%   |
+| src/supervaizer/protocol/a2a/routes.py            | 35    | 3    | 91%   |
+| src/supervaizer/routers/**init**.py               | 4     | 0    | 100%  |
+| src/supervaizer/routers/api.py                    | 18    | 1    | 94%   |
+| src/supervaizer/routers/private.py                | 10    | 0    | 100%  |
+| src/supervaizer/routers/public.py                 | 22    | 5    | 77%   |
+| src/supervaizer/routes.py                         | 333   | 60   | 82%   |
+| src/supervaizer/server.py                         | 282   | 84   | 70%   |
+| src/supervaizer/server_utils.py                   | 25    | 0    | 100%  |
+| src/supervaizer/storage.py                        | 160   | 12   | 92%   |
+| src/supervaizer/telemetry.py                      | 40    | 0    | 100%  |
+| src/supervaizer/utils/**init**.py                 | 2     | 0    | 100%  |
+| src/supervaizer/utils/version_check.py            | 27    | 6    | 78%   |
+| ------------------------------------------------- | ----- | ---- | ----- |
+| TOTAL                                             | 6133  | 1551 | 75%   |
+
 ## [0.16.0] - 2026-04-25
 
 ### Added

@@ -20,6 +20,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from supervaizer.common import ApiError, ApiSuccess
 from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console_token, validate_console_token, verify_admin_access
     AdminStats,
     ServerConfiguration,
@@ -526,6 +527,78 @@ class TestAdminRoutesIntegration:
         response = client.get("/manage/api/server/status")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+    def test_api_server_register_success(self, mocker: "MockerFixture") -> None:
+        """Server register endpoint awaits supervisor registration and returns success."""
+        from fastapi import FastAPI
+
+        supervisor_account = Mock()
+        supervisor_account.register_server = mocker.AsyncMock(
+            return_value=ApiSuccess(
+                message="Event SERVER_REGISTER sent",
+                detail={"id": "evt-1"},
+            )
+        )
+        server = Mock()
+        server.supervisor_account = supervisor_account
+
+        app = FastAPI()
+        app.state.server = server
+        app.include_router(create_admin_routes(), prefix="/manage")
+        client = TestClient(app)
+
+        response = client.post("/manage/api/server/register")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "success": True,
+            "message": "Event SERVER_REGISTER sent",
+            "detail": {"id": "evt-1"},
+        }
+        supervisor_account.register_server.assert_awaited_once_with(server=server)
+
+    def test_api_server_register_requires_supervisor_account(self) -> None:
+        """Registration endpoint returns 503 when no supervisor account is configured."""
+        from fastapi import FastAPI
+
+        server = Mock()
+        server.supervisor_account = None
+        app = FastAPI()
+        app.state.server = server
+        app.include_router(create_admin_routes(), prefix="/manage")
+        client = TestClient(app)
+
+        response = client.post("/manage/api/server/register")
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "No supervisor account configured"
+
+    def test_api_server_register_returns_502_for_api_error(
+        self, mocker: "MockerFixture"
+    ) -> None:
+        """Registration endpoint surfaces non-success API results as 502."""
+        from fastapi import FastAPI
+
+        supervisor_account = Mock()
+        supervisor_account.register_server = mocker.AsyncMock(
+            return_value=ApiError(message="register failed", detail={"error": "bad"})
+        )
+        server = Mock()
+        server.supervisor_account = supervisor_account
+
+        app = FastAPI()
+        app.state.server = server
+        app.include_router(create_admin_routes(), prefix="/manage")
+        client = TestClient(app)
+
+        response = client.post("/manage/api/server/register")
+
+        assert response.status_code == 502
+        assert response.json() == {
+            "success": False,
+            "message": "register failed",
+            "detail": {"error": "bad"},
+        }
 
     def test_api_agents(self, client: TestClient, mocker: "MockerFixture") -> None:
         """Test API agents endpoint."""

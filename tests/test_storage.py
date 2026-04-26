@@ -460,10 +460,10 @@ class TestIntegrationWithActualEntities:
         self._clear_singletons()
 
         # Mock the send_event service to avoid HTTP calls
-        mock_send_event = mocker.patch("supervaizer.account_service.send_event")
+        mock_send_event = mocker.patch("supervaizer.account_service.send_event_sync")
         mock_send_event.return_value = mocker.MagicMock()
 
-        case = Case.start(
+        case = Case.start_sync(
             job_id="test-job-123",
             name="Test Case",
             account=account_fixture,
@@ -492,7 +492,7 @@ class TestIntegrationWithActualEntities:
         self._clear_singletons()
 
         # Mock the send_event service to avoid HTTP calls
-        mock_send_event = mocker.patch("supervaizer.account_service.send_event")
+        mock_send_event = mocker.patch("supervaizer.account_service.send_event_sync")
         mock_send_event.return_value = mocker.MagicMock()
 
         # Create job
@@ -505,7 +505,7 @@ class TestIntegrationWithActualEntities:
         )
 
         # Create case (should automatically add to job's case_ids)
-        case = Case.start(
+        case = Case.start_sync(
             job_id="test-job-123",
             name="Test Case",
             account=account_fixture,
