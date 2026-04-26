@@ -192,9 +192,7 @@ def test_get_agent_by_no_params(account_fixture: Account) -> None:
 
 
 @pytest.mark.asyncio
-async def test_register_agent(
-    account_fixture: Account, mocker: MockerFixture
-) -> None:
+async def test_register_agent(account_fixture: Account, mocker: MockerFixture) -> None:
     """Test register_agent method."""
     # Mock the agent
     mock_agent = mocker.Mock()
@@ -235,9 +233,7 @@ async def test_register_agent(
 
 
 @pytest.mark.asyncio
-async def test_send_start_case(
-    account_fixture: Account, mocker: MockerFixture
-) -> None:
+async def test_send_start_case(account_fixture: Account, mocker: MockerFixture) -> None:
     """Test send_start_case method."""
     # Mock the case
     mock_case = mocker.Mock()
@@ -382,7 +378,9 @@ async def test_account_send_event_delegation(
     )
 
     # Call the account.send_event method
-    result = await account_fixture.send_event(sender=server_fixture, event=event_fixture)
+    result = await account_fixture.send_event(
+        sender=server_fixture, event=event_fixture
+    )
 
     # Verify that the account_service.send_event was called with correct parameters
     mock_service_send_event.assert_called_once_with(

@@ -1,7 +1,7 @@
 # RFC-002: Async HTTP Client for `account_service.send_event`
 
-**Status:** Proposed  
-**Date:** 2026-04-27  
+**Status:** Proposed
+**Date:** 2026-04-27
 **Affects:** `supervaizer` SDK (published PyPI package)
 
 ---
@@ -135,4 +135,3 @@ All existing sync callers (CLI, `send_telemetry`) switch to `send_event_sync`. A
 5. All existing SDK tests pass without modification.
 6. New tests verify that `send_event` can be `await`-ed from an async test without blocking.
 7. The SDK example agents (FastAPI, Pipecat) register and report steps correctly after the change.
- 

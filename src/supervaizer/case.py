@@ -428,7 +428,6 @@ class Case(CaseAbstractModel):
         self.account.send_update_case_sync(self, update)
         self._persist()
 
-
     def cancel_scheduled_steps(self) -> None:
         """Cancel all pending scheduled steps for this case."""
         for update in self.updates:
