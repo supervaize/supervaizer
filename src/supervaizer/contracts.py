@@ -47,6 +47,9 @@ class ControllerEndpoint(StrEnum):
     DATA_RESOURCE = "DATA_RESOURCE"
     DATA_RESOURCE_ITEM = "DATA_RESOURCE_ITEM"
     DATA_RESOURCE_IMPORT = "DATA_RESOURCE_IMPORT"
+    ANALYTICS_DASHBOARDS = "ANALYTICS_DASHBOARDS"
+    ANALYTICS_DASHBOARD = "ANALYTICS_DASHBOARD"
+    ANALYTICS_DATASET = "ANALYTICS_DATASET"
     HEALTH_CHECK = "HEALTH_CHECK"
     CONTROLLER_CONTRACT = "CONTROLLER_CONTRACT"
 
@@ -70,6 +73,9 @@ CONTROLLER_ENDPOINTS: dict[ControllerEndpoint, str] = {
     ControllerEndpoint.DATA_RESOURCE: "/api/agents/{agent_slug}/data/{resource_name}/",
     ControllerEndpoint.DATA_RESOURCE_ITEM: "/api/agents/{agent_slug}/data/{resource_name}/{item_id}",
     ControllerEndpoint.DATA_RESOURCE_IMPORT: "/api/agents/{agent_slug}/data/{resource_name}/import/",
+    ControllerEndpoint.ANALYTICS_DASHBOARDS: "/api/agents/{agent_slug}/analytics/{resource_name}/dashboards/",
+    ControllerEndpoint.ANALYTICS_DASHBOARD: "/api/agents/{agent_slug}/analytics/{resource_name}/dashboards/{dashboard_id}",
+    ControllerEndpoint.ANALYTICS_DATASET: "/api/agents/{agent_slug}/analytics/{resource_name}/dashboards/{dashboard_id}/datasets/{dataset_id}",
     ControllerEndpoint.HEALTH_CHECK: ".well-known/health",
     ControllerEndpoint.CONTROLLER_CONTRACT: "/api/supervaizer/contract",
 }
@@ -133,6 +139,36 @@ class DataResourceContract(ContractModel):
     operations: dict[str, bool] = Field(default_factory=dict)
 
 
+class AnalyticsResourceContextContract(ContractModel):
+    workspace_id: str | None = None
+    workspace_slug: str | None = None
+    mission_id: str | None = None
+    job_id: str | None = None
+    agent_slug: str | None = None
+    request_id: str | None = None
+    filters: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalyticsFilterContract(ContractModel):
+    id: str
+    type: str = "enum"
+    label: str | None = None
+    default: Any = None
+    options: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AnalyticsResourceContract(ContractModel):
+    name: str
+    display_name: str
+    description: str = ""
+    dashboards: list[dict[str, Any]] = Field(default_factory=list)
+    datasets: list[dict[str, Any]] = Field(default_factory=list)
+    filters: list[AnalyticsFilterContract | dict[str, Any]] = Field(
+        default_factory=list
+    )
+    operations: dict[str, bool] = Field(default_factory=dict)
+
+
 class AgentMethodFieldContract(ContractModel):
     name: str
     type: str | None = None
@@ -187,6 +223,9 @@ class AgentRegistrationContract(ContractModel):
     methods: AgentMethodsContract | dict[str, Any] = Field(default_factory=dict)
     parameters_setup: list[dict[str, Any]] = Field(default_factory=list)
     data_resources: list[DataResourceContract | dict[str, Any]] = Field(
+        default_factory=list
+    )
+    analytics_resources: list[AnalyticsResourceContract | dict[str, Any]] = Field(
         default_factory=list
     )
 
@@ -284,6 +323,26 @@ def build_data_resource_context_headers(
         headers["X-Supervaize-Mission-Id"] = str(mission_id)
     if request_id:
         headers["X-Supervaize-Request-Id"] = str(request_id)
+    return headers
+
+
+def build_analytics_context_headers(
+    *,
+    workspace_id: str | None = None,
+    workspace_slug: str | None = None,
+    mission_id: str | None = None,
+    job_id: str | None = None,
+    request_id: str | None = None,
+) -> dict[str, str]:
+    """Build Supervaize context headers for Studio AnalyticsResource proxy calls."""
+    headers = build_data_resource_context_headers(
+        workspace_id=workspace_id,
+        workspace_slug=workspace_slug,
+        mission_id=mission_id,
+        request_id=request_id,
+    )
+    if job_id:
+        headers["X-Supervaize-Job-Id"] = str(job_id)
     return headers
 
 

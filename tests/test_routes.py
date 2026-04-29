@@ -24,6 +24,7 @@ from supervaizer import (
     JobResponse,
     Server,
 )
+from supervaizer.analytics_resource import AnalyticsResource, AnalyticsResourceContext
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
@@ -493,6 +494,297 @@ def _make_data_resource_server(
         api_key="test-api-key",
     )
     return server, agent
+
+
+def _make_analytics_resource_server(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    resource: AnalyticsResource,
+) -> tuple[Server, Agent]:
+    methods = AgentMethods(job_start=agent_method_fixture)
+    agent = Agent(
+        name="Analytics Routes Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        analytics_resources=[resource],
+    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server = Server(
+        scheme="http",
+        host="localhost",
+        port=8001,
+        environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
+        debug=True,
+        agent_timeout=10,
+        private_key=private_key,
+        a2a_endpoints=False,
+        supervisor_account=account_fixture,
+        agents=[agent],
+        api_key="test-api-key",
+    )
+    return server, agent
+
+
+def test_analytics_resource_openapi_operation_ids_unique_per_agent(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    methods = AgentMethods(job_start=agent_method_fixture)
+    resource_a = AnalyticsResource(
+        name="overview",
+        dashboards=[{"id": "main", "title": "Main"}],
+    )
+    resource_b = AnalyticsResource(
+        name="overview",
+        dashboards=[{"id": "main", "title": "Main"}],
+    )
+    agent_a = Agent(
+        name="First Analytics Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        analytics_resources=[resource_a],
+    )
+    agent_b = Agent(
+        name="Second Analytics Agent",
+        author="a",
+        developer="d",
+        version="1.0.0",
+        description="d",
+        methods=methods,
+        parameters_setup=parameters_setup_fixture,
+        analytics_resources=[resource_b],
+    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server = Server(
+        scheme="http",
+        host="localhost",
+        port=8001,
+        environment="test",
+        mac_addr="E2-AC-ED-22-BF-B2",
+        debug=True,
+        agent_timeout=10,
+        private_key=private_key,
+        a2a_endpoints=False,
+        supervisor_account=account_fixture,
+        agents=[agent_a, agent_b],
+        api_key="test-api-key",
+    )
+    client = TestClient(server.app)
+    schema = client.get("/openapi.json").json()
+    op_ids: list[str] = []
+    for path_item in schema.get("paths", {}).values():
+        for op in path_item.values():
+            if isinstance(op, dict) and "operationId" in op:
+                op_ids.append(op["operationId"])
+    list_ids = [
+        oid for oid in op_ids if oid.endswith("_overview_analytics_list_dashboards")
+    ]
+    assert len(list_ids) == 2
+    assert len(set(list_ids)) == 2
+    assert f"{agent_a.slug}_overview_analytics_list_dashboards" in list_ids
+    assert f"{agent_b.slug}_overview_analytics_list_dashboards" in list_ids
+
+
+def test_analytics_resource_callbacks_receive_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    captured: dict[str, AnalyticsResourceContext] = {}
+
+    def on_list_dashboards(
+        *,
+        context: AnalyticsResourceContext,
+    ) -> list[dict[str, Any]]:
+        captured["context"] = context
+        return [{"id": "overview", "title": "Overview"}]
+
+    resource = AnalyticsResource(
+        name="interviewer",
+        on_list_dashboards=on_list_dashboards,
+    )
+    server, agent = _make_analytics_resource_server(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        resource,
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/",
+        headers={
+            "X-API-Key": "test-api-key",
+            "X-Supervaize-Workspace-Id": "team-1",
+            "X-Supervaize-Workspace-Slug": "team-slug",
+            "X-Supervaize-Mission-Id": "mission-1",
+            "X-Supervaize-Job-Id": "job-1",
+            "X-Supervaize-Request-Id": "request-1",
+        },
+        params=[("status", "complete"), ("status", "failed"), ("range", "7d")],
+    )
+
+    assert response.status_code == 200
+    context = captured["context"]
+    assert context.agent_slug == agent.slug
+    assert context.workspace_id == "team-1"
+    assert context.workspace_slug == "team-slug"
+    assert context.mission_id == "mission-1"
+    assert context.job_id == "job-1"
+    assert context.request_id == "request-1"
+    assert context.filters == {"status": ["complete", "failed"], "range": "7d"}
+
+
+def test_analytics_resource_static_dashboard_routes(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    resource = AnalyticsResource(
+        name="interviewer",
+        dashboards=[{"id": "overview", "title": "Overview"}],
+    )
+    server, agent = _make_analytics_resource_server(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        resource,
+    )
+    client = TestClient(server.app)
+    headers = {"X-API-Key": "test-api-key"}
+
+    list_response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/",
+        headers=headers,
+    )
+    get_response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/overview",
+        headers=headers,
+    )
+    missing_response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/missing",
+        headers=headers,
+    )
+
+    assert list_response.status_code == 200
+    assert list_response.json() == [{"id": "overview", "title": "Overview"}]
+    assert get_response.status_code == 200
+    assert get_response.json() == {"id": "overview", "title": "Overview"}
+    assert missing_response.status_code == 404
+
+
+def test_analytics_resource_dataset_route(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    def on_get_dataset(
+        dashboard_id: str,
+        dataset_id: str,
+        *,
+        context: AnalyticsResourceContext,
+    ) -> dict[str, Any]:
+        return {
+            "dashboard_id": dashboard_id,
+            "dataset_id": dataset_id,
+            "workspace_slug": context.workspace_slug,
+            "values": [{"status": "complete", "count": 3}],
+        }
+
+    resource = AnalyticsResource(
+        name="interviewer",
+        dashboards=[{"id": "overview", "title": "Overview"}],
+        on_get_dataset=on_get_dataset,
+    )
+    server, agent = _make_analytics_resource_server(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        resource,
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/overview/datasets/sessions",
+        headers={
+            "X-API-Key": "test-api-key",
+            "X-Supervaize-Workspace-Slug": "team-slug",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "dashboard_id": "overview",
+        "dataset_id": "sessions",
+        "workspace_slug": "team-slug",
+        "values": [{"status": "complete", "count": 3}],
+    }
+
+
+def test_analytics_resource_dataset_route_requires_callback(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    resource = AnalyticsResource(
+        name="interviewer",
+        dashboards=[{"id": "overview", "title": "Overview"}],
+    )
+    server, agent = _make_analytics_resource_server(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        resource,
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/overview/datasets/sessions",
+        headers={"X-API-Key": "test-api-key"},
+    )
+
+    assert response.status_code == 501
+
+
+def test_analytics_resource_permission_error_returns_403(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    def on_get_dashboard(dashboard_id: str) -> dict[str, Any]:
+        raise PermissionError("workspace not allowed")
+
+    resource = AnalyticsResource(
+        name="interviewer",
+        dashboards=[{"id": "overview", "title": "Overview"}],
+        on_get_dashboard=on_get_dashboard,
+    )
+    server, agent = _make_analytics_resource_server(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        resource,
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/analytics/interviewer/dashboards/overview",
+        headers={"X-API-Key": "test-api-key"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "workspace not allowed"
 
 
 def test_data_resource_create_requires_id_in_callback_result(
