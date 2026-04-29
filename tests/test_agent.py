@@ -1107,6 +1107,7 @@ def test_agent_data_resources_default_empty() -> None:
         description="description",
     )
     assert agent.data_resources == []
+    assert agent.analytics_resources == []
 
 
 def test_agent_rejects_duplicate_data_resource_names() -> None:
@@ -1154,3 +1155,43 @@ def test_agent_registration_info_includes_data_resources() -> None:
     assert len(info["data_resources"]) == 1
     assert info["data_resources"][0]["name"] == "contacts"
     assert info["data_resources"][0]["operations"]["create"] is True
+
+
+def test_agent_rejects_duplicate_analytics_resource_names() -> None:
+    """Two AnalyticsResources with the same name on one agent are invalid."""
+    from supervaizer.analytics_resource import AnalyticsResource
+
+    dup = AnalyticsResource(name="overview", dashboards=[{"id": "main"}])
+    with pytest.raises(ValueError, match="Duplicate AnalyticsResource name"):
+        Agent(
+            name="agentName",
+            author="authorName",
+            developer="Dev",
+            version="1.0.0",
+            description="description",
+            analytics_resources=[dup, dup],
+        )
+
+
+def test_agent_registration_info_includes_analytics_resources() -> None:
+    """Agent.registration_info includes analytics_resources when declared."""
+    from supervaizer.analytics_resource import AnalyticsResource
+
+    analytics_resource = AnalyticsResource(
+        name="interviewer",
+        display_name="Interviewer Analytics",
+        dashboards=[{"id": "overview", "title": "Overview"}],
+    )
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        analytics_resources=[analytics_resource],
+    )
+    info = agent.registration_info
+    assert "analytics_resources" in info
+    assert len(info["analytics_resources"]) == 1
+    assert info["analytics_resources"][0]["name"] == "interviewer"
+    assert info["analytics_resources"][0]["operations"]["get_dashboard"] is True

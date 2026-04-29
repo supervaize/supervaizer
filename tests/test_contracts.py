@@ -15,6 +15,7 @@ from supervaizer.contracts import (
     ControllerEndpoint,
     ControllerContract,
     ServerRegistrationContract,
+    build_analytics_context_headers,
     build_data_resource_context_headers,
     controller_contract_info,
     resolve_controller_endpoint,
@@ -33,6 +34,10 @@ def test_controller_contract_endpoints_are_api_prefixed() -> None:
     assert (
         info["endpoints"]["DATA_RESOURCE"]
         == "/api/agents/{agent_slug}/data/{resource_name}/"
+    )
+    assert (
+        info["endpoints"]["ANALYTICS_DASHBOARD"]
+        == "/api/agents/{agent_slug}/analytics/{resource_name}/dashboards/{dashboard_id}"
     )
 
 
@@ -74,6 +79,17 @@ def test_resolve_controller_endpoint() -> None:
         )
         == "/api/agents/agent-interviewer/data/contacts/c1"
     )
+    assert (
+        resolve_controller_endpoint(
+            contract,
+            ControllerEndpoint.ANALYTICS_DATASET,
+            agent_slug="agent-interviewer",
+            resource_name="interviewer",
+            dashboard_id="overview",
+            dataset_id="sessions",
+        )
+        == "/api/agents/agent-interviewer/analytics/interviewer/dashboards/overview/datasets/sessions"
+    )
 
 
 def test_resolve_controller_endpoint_rejects_unknown_endpoint() -> None:
@@ -100,4 +116,22 @@ def test_data_resource_context_headers() -> None:
         "X-Supervaize-Workspace-Slug": "team-slug",
         "X-Supervaize-Mission-Id": "mission-1",
         "X-Supervaize-Request-Id": "request-1",
+    }
+
+
+def test_analytics_context_headers() -> None:
+    headers = build_analytics_context_headers(
+        workspace_id="1",
+        workspace_slug="team-slug",
+        mission_id="mission-1",
+        job_id="job-1",
+        request_id="request-1",
+    )
+
+    assert headers == {
+        "X-Supervaize-Workspace-Id": "1",
+        "X-Supervaize-Workspace-Slug": "team-slug",
+        "X-Supervaize-Mission-Id": "mission-1",
+        "X-Supervaize-Request-Id": "request-1",
+        "X-Supervaize-Job-Id": "job-1",
     }
