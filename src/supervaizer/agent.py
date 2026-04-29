@@ -36,6 +36,7 @@ from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.case import CaseNodes
+from supervaizer.analytics_resource import AnalyticsResource
 from supervaizer.data_resource import DataResource
 
 if TYPE_CHECKING:
@@ -642,6 +643,11 @@ class AgentAbstract(SvBaseModel):
         description="Data resources this agent exposes for Studio CRUD access",
         exclude=True,
     )
+    analytics_resources: list[AnalyticsResource] = Field(
+        default_factory=list,
+        description="Analytics resources this agent exposes for Studio dashboards",
+        exclude=True,
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -670,6 +676,7 @@ class Agent(AgentAbstract):
         custom_routes: Any | None = None,
         dynamic_choices_callback: Any | None = None,
         data_resources: list["DataResource"] | None = None,
+        analytics_resources: list["AnalyticsResource"] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -725,17 +732,27 @@ class Agent(AgentAbstract):
             custom_routes=custom_routes,
             dynamic_choices_callback=dynamic_choices_callback,
             data_resources=data_resources or [],
+            analytics_resources=analytics_resources or [],
             **kwargs,
         )
 
-        seen_resource_names: set[str] = set()
+        seen_data_resource_names: set[str] = set()
         for r in self.data_resources:
-            if r.name in seen_resource_names:
+            if r.name in seen_data_resource_names:
                 raise ValueError(
                     f"Duplicate DataResource name {r.name!r} on agent {self.name!r}; "
                     "each data resource must have a unique name per agent."
                 )
-            seen_resource_names.add(r.name)
+            seen_data_resource_names.add(r.name)
+
+        seen_analytics_resource_names: set[str] = set()
+        for r in self.analytics_resources:
+            if r.name in seen_analytics_resource_names:
+                raise ValueError(
+                    f"Duplicate AnalyticsResource name {r.name!r} on agent {self.name!r}; "
+                    "each analytics resource must have a unique name per agent."
+                )
+            seen_analytics_resource_names.add(r.name)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
@@ -774,6 +791,9 @@ class Agent(AgentAbstract):
             "max_execution_time": self.max_execution_time,
             "instructions_path": self.instructions_path,
             "data_resources": [r.registration_info for r in self.data_resources],
+            "analytics_resources": [
+                r.registration_info for r in self.analytics_resources
+            ],
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:

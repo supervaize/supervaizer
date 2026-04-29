@@ -35,6 +35,13 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "CaseNodeType": ("supervaizer.case", "CaseNodeType"),
     "CaseNodeUpdate": ("supervaizer.case", "CaseNodeUpdate"),
     "Cases": ("supervaizer.case", "Cases"),
+    "AnalyticsDataset": ("supervaizer.analytics_resource", "AnalyticsDataset"),
+    "AnalyticsFilter": ("supervaizer.analytics_resource", "AnalyticsFilter"),
+    "AnalyticsResource": ("supervaizer.analytics_resource", "AnalyticsResource"),
+    "AnalyticsResourceContext": (
+        "supervaizer.analytics_resource",
+        "AnalyticsResourceContext",
+    ),
     "DataResource": ("supervaizer.data_resource", "DataResource"),
     "DataResourceContext": ("supervaizer.data_resource", "DataResourceContext"),
     "DataResourceField": ("supervaizer.data_resource", "DataResourceField"),
@@ -68,6 +75,15 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "AgentMethodContract": ("supervaizer.contracts", "AgentMethodContract"),
     "AgentMethodsContract": ("supervaizer.contracts", "AgentMethodsContract"),
     "AgentRegistrationContract": ("supervaizer.contracts", "AgentRegistrationContract"),
+    "AnalyticsFilterContract": ("supervaizer.contracts", "AnalyticsFilterContract"),
+    "AnalyticsResourceContract": (
+        "supervaizer.contracts",
+        "AnalyticsResourceContract",
+    ),
+    "AnalyticsResourceContextContract": (
+        "supervaizer.contracts",
+        "AnalyticsResourceContextContract",
+    ),
     "ControllerContract": ("supervaizer.contracts", "ControllerContract"),
     "ControllerEndpoint": ("supervaizer.contracts", "ControllerEndpoint"),
     "DataResourceContract": ("supervaizer.contracts", "DataResourceContract"),
@@ -83,6 +99,10 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "build_data_resource_context_headers": (
         "supervaizer.contracts",
         "build_data_resource_context_headers",
+    ),
+    "build_analytics_context_headers": (
+        "supervaizer.contracts",
+        "build_analytics_context_headers",
     ),
     "controller_contract_info": ("supervaizer.contracts", "controller_contract_info"),
     "resolve_controller_endpoint": (
