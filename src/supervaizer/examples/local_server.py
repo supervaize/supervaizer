@@ -23,11 +23,88 @@ from supervaizer import (
     Agent,
     AgentMethod,
     AgentMethods,
+    AnalyticsDataset,
+    AnalyticsResource,
     Parameter,
     ParametersSetup,
     Server,
 )
 from supervaizer.agent import AgentMethodField
+
+
+HELLO_WORLD_ANALYTICS_VALUES = [
+    {"day": "2026-04-26", "cases": 3, "avg_duration_secs": 1.6},
+    {"day": "2026-04-27", "cases": 5, "avg_duration_secs": 2.1},
+    {"day": "2026-04-28", "cases": 2, "avg_duration_secs": 1.2},
+]
+
+
+def _hello_world_dashboard(dashboard_id: str) -> dict | None:
+    if dashboard_id != "overview":
+        return None
+    return {
+        "id": "overview",
+        "title": "Hello World Analytics",
+        "description": "Example Vega-Lite dashboard exposed through AnalyticsResource.",
+        "widgets": [
+            {
+                "id": "cases-by-day",
+                "title": "Cases by day",
+                "layout": {"w": 6},
+                "data": {"mode": "ref", "datasetId": "daily_cases"},
+                "visualization": {
+                    "type": "vega-lite",
+                    "spec": {
+                        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                        "mark": {"type": "bar", "tooltip": True},
+                        "encoding": {
+                            "x": {
+                                "field": "day",
+                                "type": "ordinal",
+                                "axis": {"title": "Day"},
+                            },
+                            "y": {
+                                "field": "cases",
+                                "type": "quantitative",
+                                "axis": {"title": "Cases"},
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                "id": "duration-by-day",
+                "title": "Average duration",
+                "layout": {"w": 6},
+                "data": {"mode": "ref", "datasetId": "daily_cases"},
+                "visualization": {
+                    "type": "vega-lite",
+                    "spec": {
+                        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                        "mark": {"type": "line", "point": True, "tooltip": True},
+                        "encoding": {
+                            "x": {
+                                "field": "day",
+                                "type": "ordinal",
+                                "axis": {"title": "Day"},
+                            },
+                            "y": {
+                                "field": "avg_duration_secs",
+                                "type": "quantitative",
+                                "axis": {"title": "Avg duration (s)"},
+                            },
+                        },
+                    },
+                },
+            },
+        ],
+    }
+
+
+def _hello_world_dataset(dashboard_id: str, dataset_id: str) -> dict | None:
+    if dashboard_id != "overview" or dataset_id != "daily_cases":
+        return None
+    return {"values": HELLO_WORLD_ANALYTICS_VALUES}
 
 
 def get_default_local_agent() -> Agent:
@@ -108,6 +185,21 @@ def get_default_local_agent() -> Agent:
             human_answer=human_answer_method,
         ),
         parameters_setup=parameters,
+        analytics_resources=[
+            AnalyticsResource(
+                name="hello_world",
+                display_name="Hello World Analytics",
+                description="Example AnalyticsResource for local Studio rendering.",
+                dashboards=[{"id": "overview", "title": "Hello World Analytics"}],
+                datasets=[
+                    AnalyticsDataset(
+                        id="daily_cases", description="Example local case metrics."
+                    )
+                ],
+                on_get_dashboard=_hello_world_dashboard,
+                on_get_dataset=_hello_world_dataset,
+            )
+        ],
     )
 
 

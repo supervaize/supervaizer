@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **AnalyticsResource SDK surface** — Agents can expose Vega-Lite analytics dashboards and datasets through `AnalyticsResource`. The SDK now includes analytics resources in agent registration metadata and serves authenticated dashboard manifests and dataset payloads under `/api/agents/{agent_slug}/analytics/...`, scoped by the Studio workspace context.
+- **Hello World analytics example** — The built-in local Hello World agent now declares an example `AnalyticsResource` with Vega-Lite widgets and a static dataset for Studio rendering.
 
 ### Changed
 
