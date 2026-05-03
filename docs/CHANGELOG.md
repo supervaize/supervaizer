@@ -17,6 +17,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`POST /api/supervaizer/agents/{agent_slug}/status`** — Controller contract adds `Controller.POST_AGENT_STATUS`; HTTP handler returns the agent's `job_status` result as a `JobResponse` (job id, status, message, payload). OpenAPI lists explicit 200 (`JobResponse`) and error responses (`ErrorResponse` for 400/404/500). Returns **404** when `job_status` yields no result.
+
+### Changed
+
+- **`routes.py` — synchronous agent hooks off the event loop** — `job_stop`, `job_status`, and the start flow's `dynamic_choices_callback` run inside `asyncio.to_thread` so blocking synchronous agent code does not stall the async server.
+- **`routes.py` / OpenAPI** — Agent `POST /status` success payload is a `JobResponse` with explicit HTTP 200 (replacing the previous `AgentResponse`-shaped merge).
+- **`case.py` — logging** — Routine case-method logs demoted from INFO to DEBUG to reduce noise under normal operation.
+- **`agent.py` — docstrings** — `Agent._execute`, `job_stop`, and `job_status` document synchronous hook behavior and that the controller invokes them from a worker thread.
+- **`AGENTS.md` / repo hygiene** — Dropped generated `AGENTS.compiled.md`; Supervaizer's in-repo agent guide is consolidated in `AGENTS.md`.
+- **`publish-pypi.yml` — post-publish release automation** — After PyPI publish, CI now runs the same GitHub release flow as `just gh-release` (`tools/gh-release-latest-tag.sh`) to create/update and mark the latest release from the newest `origin/main` tag.
+- **`publish-pypi.yml` — branch reconciliation in CI** — Added an automatic `main -> develop` merge-back step after publish/release so long-lived branch history stays synchronized without manual follow-up.
+
+### Fixed
+
+- **GitHub Actions Node 20 deprecation warnings** — Upgraded workflow action majors across CI/release/publish pipelines: `actions/checkout@v5`, `actions/setup-python@v6`, and `astral-sh/setup-uv@v7` to avoid Node 20 runtime deprecation warnings and align with Node 24 transition.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 560   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
+
 ## [0.17.1] - 2026-04-26
 
 ### Fixed

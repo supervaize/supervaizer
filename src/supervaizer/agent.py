@@ -846,8 +846,11 @@ class Agent(AgentAbstract):
             log.debug("[No encrypted parameters] for {self.name}")
 
     def _execute(self, action: str, params: Dict[str, Any] = {}) -> JobResponse:
-        """
-        Execute an agent method and return a JobResponse
+        """Execute an agent method and return a JobResponse.
+
+        Runs synchronously in the caller's thread; HTTP entrypoints typically
+        offload this via ``asyncio.to_thread`` so user code cannot block the
+        event loop.
         """
 
         module_name, func_name = action.rsplit(".", 1)
@@ -975,12 +978,14 @@ class Agent(AgentAbstract):
         return job
 
     def job_stop(self, params: Dict[str, Any] = {}) -> Any:
+        """Synchronous stop hook; controller ``POST /stop`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_stop:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
     def job_status(self, params: Dict[str, Any] = {}) -> Any:
+        """Synchronous status hook; controller ``POST /status`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_status:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_status.method

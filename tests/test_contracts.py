@@ -31,6 +31,10 @@ def test_controller_contract_endpoints_are_api_prefixed() -> None:
         == "/api/supervaizer/agents/{agent_slug}/jobs"
     )
     assert (
+        info["endpoints"]["POST_AGENT_STATUS"]
+        == "/api/supervaizer/agents/{agent_slug}/status"
+    )
+    assert (
         info["endpoints"]["DATA_RESOURCE"]
         == "/api/agents/{agent_slug}/data/{resource_name}/"
     )
@@ -63,6 +67,14 @@ def test_resolve_controller_endpoint() -> None:
             agent_slug="agent-interviewer",
         )
         == "/api/supervaizer/agents/agent-interviewer/jobs"
+    )
+    assert (
+        resolve_controller_endpoint(
+            contract,
+            ControllerEndpoint.POST_AGENT_STATUS,
+            agent_slug="agent-interviewer",
+        )
+        == "/api/supervaizer/agents/agent-interviewer/status"
     )
     assert (
         resolve_controller_endpoint(
