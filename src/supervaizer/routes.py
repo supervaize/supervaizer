@@ -884,6 +884,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         summary=f"Get the status of the agent: {agent.name}",
         description="Get the status of the agent",
         response_model=JobResponse,
+        status_code=http_status.HTTP_200_OK,
         responses={
             http_status.HTTP_200_OK: {"model": JobResponse},
             http_status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
