@@ -21,9 +21,11 @@ from supervaizer import (
     AgentMethod,
     AgentMethods,
     Job,
+    JobResponse,
     Server,
 )
 from supervaizer.data_resource import DataResource, DataResourceContext
+from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.routes import (
     create_agents_routes,
@@ -144,6 +146,39 @@ def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["choices"]["projects"] == [["P1", "Project 1"], ["P2", "Project 2"]]
+
+
+def test_agent_status_endpoint_returns_job_status_response(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """POST /status returns the agent job_status method response."""
+    agent = server_fixture.agents[0]
+    mocker.patch(
+        "supervaizer.agent.Agent.job_status",
+        return_value=JobResponse(
+            job_id="job-123",
+            status=EntityStatus.IN_PROGRESS,
+            message="Campaign: in_progress",
+            payload={"campaign": {"status": "in_progress"}},
+        ),
+    )
+
+    app = server_fixture.app
+    app.include_router(create_agents_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.post(
+        f"/supervaizer/agents/{agent.slug}/status",
+        headers=headers,
+        json={"params": {"job_id": "job-123"}},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["job_id"] == "job-123"
+    assert data["status"] == "in_progress"
+    assert data["payload"]["campaign"]["status"] == "in_progress"
 
 
 def test_dynamic_choices_endpoint_passes_workspace_slug_in_context(

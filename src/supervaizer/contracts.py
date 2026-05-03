@@ -31,6 +31,7 @@ class ContractModel(BaseModel):
 class ControllerEndpoint(StrEnum):
     POST_AGENT_JOB_START = "POST_AGENT_JOB_START"
     POST_AGENT_JOB_CUSTOM = "POST_AGENT_JOB_CUSTOM"
+    POST_AGENT_STATUS = "POST_AGENT_STATUS"
     GET_JOB_STATUS = "GET_JOB_STATUS"
     GET_AGENT_JOB_STATUS = "GET_AGENT_JOB_STATUS"
     POST_AGENT_STOP = "POST_AGENT_STOP"
@@ -53,6 +54,7 @@ class ControllerEndpoint(StrEnum):
 CONTROLLER_ENDPOINTS: dict[ControllerEndpoint, str] = {
     ControllerEndpoint.POST_AGENT_JOB_START: "/api/supervaizer/agents/{agent_slug}/jobs",
     ControllerEndpoint.POST_AGENT_JOB_CUSTOM: "/api/supervaizer/agents/{agent_slug}/custom/{method_name}",
+    ControllerEndpoint.POST_AGENT_STATUS: "/api/supervaizer/agents/{agent_slug}/status",
     ControllerEndpoint.GET_JOB_STATUS: "/api/supervaizer/jobs/{job_id}",
     ControllerEndpoint.GET_AGENT_JOB_STATUS: "/api/supervaizer/agents/{agent_slug}/jobs/{job_id}",
     ControllerEndpoint.POST_AGENT_STOP: "/api/supervaizer/agents/{agent_slug}/stop",

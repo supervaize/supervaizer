@@ -336,7 +336,7 @@ class Case(CaseAbstractModel):
         self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
     ) -> None:
         updateCaseNode.index = len(self.updates) + 1
-        log.info(
+        log.debug(
             f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
         )
         await self.account.send_update_case(self, updateCaseNode)
@@ -350,7 +350,7 @@ class Case(CaseAbstractModel):
         self, updateCaseNode: CaseNodeUpdate, message: str, **kwargs: Any
     ) -> None:
         updateCaseNode.index = len(self.updates) + 1
-        log.info(
+        log.debug(
             f"[Update case human_input] CaseRef {self.case_ref} with update {updateCaseNode}"
         )
         self.account.send_update_case_sync(self, updateCaseNode)

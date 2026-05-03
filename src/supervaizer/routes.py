@@ -705,7 +705,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             "mission_id": body_params.get("mission_id"),
         }
 
-        choices = agent.dynamic_choices_callback("start", context)
+        choices = await asyncio.to_thread(
+            agent.dynamic_choices_callback, "start", context
+        )
 
         log.info(f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}")
         return {"choices": choices}
@@ -866,7 +868,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         log.info(f"📥  POST /stop [Stop agent] {agent.name} with params {params}")
         # Pass job_context as 'context' parameter to match agent method expectations
         job_context = params.get("job_context", {})
-        result = agent.job_stop({"context": job_context})
+        result = await asyncio.to_thread(agent.job_stop, {"context": job_context})
         res_info = result.registration_info if result else {}
         return AgentResponse(
             name=agent.name,
@@ -881,8 +883,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/status",
         summary=f"Get the status of the agent: {agent.name}",
         description="Get the status of the agent",
+        response_model=JobResponse,
+        status_code=http_status.HTTP_200_OK,
         responses={
-            http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
+            http_status.HTTP_200_OK: {"model": JobResponse},
+            http_status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+            http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
         },
         dependencies=[
             Depends(require_scope("write"))
@@ -891,17 +898,15 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def status_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
-    ) -> AgentResponse:
+    ) -> JobResponse:
         log.info(f"📥  POST /status [Status agent] {agent.name} with params {params}")
-        result = agent.job_status(params.params)
-        return AgentResponse(
-            name=agent.name,
-            id=agent.id,
-            version=agent.version,
-            api_path=agent.path,
-            description=agent.description,
-            **result if result else {},
-        )
+        result = await asyncio.to_thread(agent.job_status, params.params)
+        if result is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Agent {agent.name} did not return a job status",
+            )
+        return result
 
     @router.post(
         "/parameters",
