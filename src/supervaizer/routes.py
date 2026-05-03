@@ -881,8 +881,9 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         "/status",
         summary=f"Get the status of the agent: {agent.name}",
         description="Get the status of the agent",
+        response_model=JobResponse,
         responses={
-            http_status.HTTP_202_ACCEPTED: {"model": AgentResponse},
+            http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
         },
         dependencies=[
             Depends(require_scope("write"))
@@ -891,17 +892,15 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     @handle_route_errors()
     async def status_agent(
         params: AgentMethodParams, agent: Agent = Depends(get_agent)
-    ) -> AgentResponse:
+    ) -> JobResponse:
         log.info(f"📥  POST /status [Status agent] {agent.name} with params {params}")
         result = agent.job_status(params.params)
-        return AgentResponse(
-            name=agent.name,
-            id=agent.id,
-            version=agent.version,
-            api_path=agent.path,
-            description=agent.description,
-            **result if result else {},
-        )
+        if result is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Agent {agent.name} did not return a job status",
+            )
+        return result
 
     @router.post(
         "/parameters",
