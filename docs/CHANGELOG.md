@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-05-03
+
 ### Added
 
 - **`POST /api/supervaizer/agents/{agent_slug}/status`** — Controller contract adds `Controller.POST_AGENT_STATUS`; HTTP handler returns the agent's `job_status` result as a `JobResponse` (job id, status, message, payload). OpenAPI lists explicit 200 (`JobResponse`) and error responses (`ErrorResponse` for 400/404/500). Returns **404** when `job_status` yields no result.
