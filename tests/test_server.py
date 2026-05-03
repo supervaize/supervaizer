@@ -604,6 +604,7 @@ class TestServerLocalMode:
             )
             assert len(server.agents) == 2
             assert server.agents[0].name == "Hello World AI Agent"
+            assert server.agents[0].analytics_resources[0].name == "hello_world"
             assert server.agents[1].name == agent_fixture.name
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]

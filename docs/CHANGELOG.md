@@ -17,6 +17,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **AnalyticsResource SDK surface** — Agents can expose Vega-Lite analytics dashboards and datasets through `AnalyticsResource`. The SDK now includes analytics resources in agent registration metadata and serves authenticated dashboard manifests and dataset payloads under `/api/agents/{agent_slug}/analytics/...`, scoped by the Studio workspace context.
+- **Hello World analytics example** — The built-in local Hello World agent now declares an example `AnalyticsResource` with Vega-Lite widgets and a static dataset for Studio rendering.
+
 ### Changed
 
 - **`publish-pypi.yml` — post-publish release automation** — After PyPI publish, CI now runs the same GitHub release flow as `just gh-release` (`tools/gh-release-latest-tag.sh`) to create/update and mark the latest release from the newest `origin/main` tag.
@@ -25,6 +30,17 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - **GitHub Actions Node 20 deprecation warnings** — Upgraded workflow action majors across CI/release/publish pipelines: `actions/checkout@v5`, `actions/setup-python@v6`, and `astral-sh/setup-uv@v7` to avoid Node 20 runtime deprecation warnings and align with Node 24 transition.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 574   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
 
 ## [0.17.1] - 2026-04-26
 

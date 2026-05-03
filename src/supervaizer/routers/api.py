@@ -30,6 +30,7 @@ def create_api_router(server: "Server") -> APIRouter:  # <-- ADDED
     Router-level ``require_api_key`` covers every sub-route.
     Scope-specific routes add ``Depends(require_scope(...))`` themselves.
     """
+    from supervaizer.analytics_routes import create_agent_analytics_routes
     from supervaizer.data_routes import create_agent_data_routes
     from supervaizer.routes import (
         create_agents_routes,
@@ -51,6 +52,8 @@ def create_api_router(server: "Server") -> APIRouter:  # <-- ADDED
     for agent in server.agents:
         if agent.data_resources:
             api_router.include_router(create_agent_data_routes(server, agent))
+        if agent.analytics_resources:
+            api_router.include_router(create_agent_analytics_routes(server, agent))
 
     # Agent custom routes (full path: /api/agents/{slug}/... plus each route on the nested router)
     for agent in server.agents:
