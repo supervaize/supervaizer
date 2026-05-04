@@ -10,6 +10,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from io import StringIO
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -27,10 +28,12 @@ from supervaizer import (
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
+from supervaizer.common import log
 from supervaizer.routes import (
     create_agents_routes,
     create_default_routes,
     create_utils_routes,
+    get_server,
 )
 
 
@@ -114,6 +117,85 @@ def test_get_agents_and_agent_details(
     resp = client.get("/supervaizer/agent/doesnotexist", headers=headers)
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
+
+
+def test_registration_refresh_endpoint_re_registers_server(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """POST /registration/refresh schedules the canonical server registration."""
+    register_server = mocker.patch.object(
+        Account, "register_server", new=mocker.AsyncMock(return_value={"valid": True})
+    )
+
+    async def get_current_server() -> Server:
+        return server_fixture
+
+    app = server_fixture.app
+    app.dependency_overrides[get_server] = get_current_server
+    app.include_router(create_default_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+    log_output = StringIO()
+    log_sink_id = log.add(log_output, format="{message}", level="INFO")
+
+    try:
+        resp = client.post(
+            "/supervaizer/registration/refresh",
+            headers=headers,
+            json={"reason": "manual", "requested_at": "2026-05-04T12:00:00Z"},
+        )
+    finally:
+        log.remove(log_sink_id)
+
+    assert resp.status_code == 202
+    assert resp.json() == {"status": "accepted", "reason": "manual"}
+    register_server.assert_awaited_once_with(server=server_fixture)
+    assert (
+        "Registration refresh completed with result=dict reason=manual "
+        "requested_at=2026-05-04T12:00:00Z"
+    ) in log_output.getvalue()
+    assert "result=%s reason=%s requested_at=%s" not in log_output.getvalue()
+
+
+def test_registration_refresh_endpoint_requires_api_key(server_fixture: Server) -> None:
+    """POST /registration/refresh is protected by API key authentication."""
+
+    async def get_current_server() -> Server:
+        return server_fixture
+
+    app = server_fixture.app
+    app.dependency_overrides[get_server] = get_current_server
+    app.include_router(create_default_routes(server_fixture))
+    client = TestClient(app)
+
+    resp = client.post("/supervaizer/registration/refresh", json={})
+
+    assert resp.status_code == 401
+
+
+def test_registration_refresh_endpoint_requires_supervisor_account(
+    server_fixture: Server,
+) -> None:
+    """A controller that cannot reach Studio rejects refresh requests explicitly."""
+
+    async def get_current_server() -> Server:
+        return server_fixture
+
+    server_fixture.supervisor_account = None
+    app = server_fixture.app
+    app.dependency_overrides[get_server] = get_current_server
+    app.include_router(create_default_routes(server_fixture))
+    client = TestClient(app)
+    headers = {"X-API-Key": server_fixture.api_key or ""}
+
+    resp = client.post(
+        "/supervaizer/registration/refresh",
+        headers=headers,
+        json={"reason": "manual"},
+    )
+
+    assert resp.status_code == 503
+    assert resp.json()["detail"] == "No supervisor account configured"
 
 
 def test_dynamic_choices_endpoint(server_fixture: Server) -> None:

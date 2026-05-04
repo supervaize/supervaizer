@@ -64,6 +64,13 @@ class CaseUpdateRequest(SvBaseModel):
     message: str | None = None
 
 
+class RegistrationRefreshRequest(SvBaseModel):
+    """Request model for re-sending the server registration event."""
+
+    reason: str | None = None
+    requested_at: str | None = None
+
+
 def handle_route_errors(
     job_conflict_check: bool = False,
 ) -> Callable[
@@ -126,6 +133,22 @@ async def get_server() -> "Server":
     raise NotImplementedError("This function should be overridden by the server")
 
 
+async def _send_registration_refresh(
+    server: "Server", request_data: RegistrationRefreshRequest
+) -> None:
+    """Ask the configured supervisor account to process normal server registration."""
+    if not getattr(server, "supervisor_account", None):
+        log.warning("Registration refresh requested but no supervisor account is configured")
+        return
+    result = await server.supervisor_account.register_server(server=server)
+    log.info(
+        "Registration refresh completed with result={} reason={} requested_at={}",
+        result.__class__.__name__,
+        request_data.reason,
+        request_data.requested_at,
+    )
+
+
 def create_default_routes(server: "Server") -> APIRouter:
     """Create default routes for the server."""
     router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
@@ -134,6 +157,27 @@ def create_default_routes(server: "Server") -> APIRouter:
     async def get_controller_contract() -> dict[str, Any]:
         """Return the controller contract Studio should use for route resolution."""
         return controller_contract_info()
+
+    @router.post(
+        "/registration/refresh",
+        status_code=http_status.HTTP_202_ACCEPTED,
+        response_model=dict[str, Any],
+        dependencies=[Depends(require_scope("write"))],
+    )
+    async def refresh_controller_registration(
+        background_tasks: BackgroundTasks,
+        request_data: RegistrationRefreshRequest | None = Body(default=None),
+        server: "Server" = Depends(get_server),
+    ) -> dict[str, Any]:
+        """Accept a Studio request to re-send the canonical server.register event."""
+        if not getattr(server, "supervisor_account", None):
+            raise HTTPException(
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No supervisor account configured",
+            )
+        request_data = request_data or RegistrationRefreshRequest()
+        background_tasks.add_task(_send_registration_refresh, server, request_data)
+        return {"status": "accepted", "reason": request_data.reason}
 
     @router.get(
         "/jobs/{job_id}",
