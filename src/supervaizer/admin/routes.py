@@ -14,9 +14,10 @@ import asyncio
 import json
 import os
 import time
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any
 
 import psutil
 from fastapi import (
@@ -40,10 +41,10 @@ from supervaizer.storage import (
 )
 
 # Global log queue for streaming
-log_queue: asyncio.Queue[Dict[str, str]] = asyncio.Queue()
+log_queue: asyncio.Queue[dict[str, str]] = asyncio.Queue()
 
 # Log listeners — callables notified on every log entry
-_log_listeners: List[Any] = []
+_log_listeners: list[Any] = []
 
 
 def register_log_listener(listener: Any) -> None:
@@ -82,8 +83,8 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 class AdminStats(BaseModel):
     """Statistics for admin dashboard."""
 
-    jobs: Dict[str, int]
-    cases: Dict[str, int]
+    jobs: dict[str, int]
+    cases: dict[str, int]
     collections: int
 
 
@@ -115,21 +116,21 @@ class ServerConfiguration(BaseModel):
     environment: str
     database_type: str
     storage_path: str
-    agents: List[Dict[str, str]]
+    agents: list[dict[str, str]]
 
 
 class EntityFilter(BaseModel):
     """Filter parameters for entity queries."""
 
-    status: Optional[str] = None
-    agent_name: Optional[str] = None
-    search: Optional[str] = None
+    status: str | None = None
+    agent_name: str | None = None
+    search: str | None = None
     sort: str = "-created_at"
     limit: int = 50
     skip: int = 0
 
 
-def _get_admin_api_key(request: Request) -> Optional[str]:
+def _get_admin_api_key(request: Request) -> str | None:
     """API key for admin: live server's key (e.g. local-dev) or env."""
     live = getattr(request.app.state, "server", None)
     if live is not None and getattr(live, "api_key", None):
@@ -162,7 +163,7 @@ def format_uptime(seconds: int) -> str:
         return f"{minutes}m"
 
 
-def _get_server_info(request: Optional[Request]) -> Optional[Any]:
+def _get_server_info(request: Request | None) -> Any | None:
     """Get server info from storage, or from live server (app.state.server) when no persistence."""
     from supervaizer.server import (
         get_server_info_from_live,
@@ -179,7 +180,7 @@ def _get_server_info(request: Optional[Request]) -> Optional[Any]:
     return None
 
 
-def get_server_status(request: Optional[Request] = None) -> ServerStatus:
+def get_server_status(request: Request | None = None) -> ServerStatus:
     """Get current server status and metrics."""
     server_info = _get_server_info(request)
     if not server_info:
@@ -226,7 +227,7 @@ def get_server_status(request: Optional[Request] = None) -> ServerStatus:
 
 
 def get_server_configuration(
-    storage: StorageManager, request: Optional[Request] = None
+    storage: StorageManager, request: Request | None = None
 ) -> ServerConfiguration:
     """Get server configuration details."""
     server_info = _get_server_info(request)
@@ -484,9 +485,9 @@ def create_admin_routes() -> APIRouter:
     @router.get("/api/agents")
     async def get_agents_api(
         request: Request,
-        status: Optional[str] = Query(None),
-        agent_type: Optional[str] = Query(None),
-        search: Optional[str] = Query(None),
+        status: str | None = Query(None),
+        agent_type: str | None = Query(None),
+        search: str | None = Query(None),
         sort: str = Query("-created_at"),
     ) -> Response:
         """Get agents with filtering for HTMX refresh."""
@@ -595,9 +596,9 @@ def create_admin_routes() -> APIRouter:
     @router.get("/api/jobs")
     async def get_jobs_api(
         request: Request,
-        status: Optional[str] = Query(None),
-        agent_name: Optional[str] = Query(None),
-        search: Optional[str] = Query(None),
+        status: str | None = Query(None),
+        agent_name: str | None = Query(None),
+        search: str | None = Query(None),
         sort: str = Query("-created_at"),
         limit: int = Query(50, le=100),
         skip: int = Query(0, ge=0),
@@ -709,9 +710,9 @@ def create_admin_routes() -> APIRouter:
     @router.get("/api/cases")
     async def get_cases_api(
         request: Request,
-        status: Optional[str] = Query(None),
-        job_id: Optional[str] = Query(None),
-        search: Optional[str] = Query(None),
+        status: str | None = Query(None),
+        job_id: str | None = Query(None),
+        search: str | None = Query(None),
         sort: str = Query("-created_at"),
         limit: int = Query(50, le=100),
         skip: int = Query(0, ge=0),
@@ -831,8 +832,8 @@ def create_admin_routes() -> APIRouter:
     @router.post("/api/jobs/{job_id}/status")
     async def update_job_status(
         job_id: str,
-        status_data: Dict[str, str],
-    ) -> Dict[str, str]:
+        status_data: dict[str, str],
+    ) -> dict[str, str]:
         """Update job status."""
         try:
             new_status = status_data.get("status")
@@ -861,8 +862,8 @@ def create_admin_routes() -> APIRouter:
     @router.post("/api/cases/{case_id}/status")
     async def update_case_status(
         case_id: str,
-        status_data: Dict[str, str],
-    ) -> Dict[str, str]:
+        status_data: dict[str, str],
+    ) -> dict[str, str]:
         """Update case status."""
         try:
             new_status = status_data.get("status")
@@ -889,7 +890,7 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.delete("/api/jobs/{job_id}")
-    async def delete_job(job_id: str) -> Dict[str, str]:
+    async def delete_job(job_id: str) -> dict[str, str]:
         """Delete a job and its related cases."""
         try:
             # Delete related cases first
@@ -911,7 +912,7 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.delete("/api/cases/{case_id}")
-    async def delete_case(case_id: str) -> Dict[str, str]:
+    async def delete_case(case_id: str) -> dict[str, str]:
         """Delete a case."""
         try:
             deleted = storage.delete_object("Case", case_id)
@@ -1030,7 +1031,7 @@ def create_admin_routes() -> APIRouter:
                                 fallback_message, ensure_ascii=False
                             )
                             yield f"data: {event_data}\n\n"
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Send keep-alive message
                         keepalive_message = {
                             "timestamp": datetime.now().isoformat(),
@@ -1049,7 +1050,7 @@ def create_admin_routes() -> APIRouter:
                         {
                             "timestamp": datetime.now().isoformat(),
                             "level": "ERROR",
-                            "message": f"Log stream error: {str(e)}",
+                            "message": f"Log stream error: {e!s}",
                         },
                         ensure_ascii=False,
                     )
@@ -1061,7 +1062,7 @@ def create_admin_routes() -> APIRouter:
         return EventSourceResponse(generate_log_events())
 
     @router.get("/test-log")
-    async def test_log() -> Dict[str, str]:
+    async def test_log() -> dict[str, str]:
         """Test endpoint to generate a log message."""
         test_message = f"Test log message generated at {datetime.now().isoformat()}"
         add_log_to_queue(
@@ -1076,7 +1077,7 @@ def create_admin_routes() -> APIRouter:
     # <-- REMOVED: debug-tokens endpoint (console tokens removed)
 
     @router.get("/test-loguru")
-    async def test_loguru() -> Dict[str, str]:
+    async def test_loguru() -> dict[str, str]:
         """Test endpoint to generate loguru messages."""
         log.info("Testing loguru INFO message")
         log.warning("Testing loguru WARNING message")
@@ -1084,7 +1085,7 @@ def create_admin_routes() -> APIRouter:
         return {"message": "Loguru test messages sent"}
 
     @router.get("/debug-queue")
-    async def debug_queue() -> Dict[str, Any]:
+    async def debug_queue() -> dict[str, Any]:
         """Debug endpoint to check log queue status."""
         queue_size = log_queue.qsize()
 
@@ -1104,8 +1105,8 @@ def create_admin_routes() -> APIRouter:
     @router.post("/api/console/execute")
     async def execute_console_command(
         request: Request,
-        command_data: Dict[str, str],
-    ) -> Dict[str, str]:
+        command_data: dict[str, str],
+    ) -> dict[str, str]:
         """Execute a console command — access enforced by Tailscale at router level."""
         # <-- MODIFIED: removed token parameter; Tailscale is the gate
 
@@ -1132,7 +1133,7 @@ def create_admin_routes() -> APIRouter:
             add_log_to_queue(
                 timestamp=datetime.now().isoformat(),
                 level="ERROR",
-                message=f"Command execution failed: {str(e)}",
+                message=f"Command execution failed: {e!s}",
             )
             return {"status": "error", "message": str(e)}
 
@@ -1201,7 +1202,7 @@ def get_dashboard_stats(storage: StorageManager) -> AdminStats:
         )
 
 
-async def process_console_command(command: str) -> Dict[str, str]:
+async def process_console_command(command: str) -> dict[str, str]:
     """Process a console command and return the result."""
     cmd = command.lower().strip()
 
@@ -1264,7 +1265,7 @@ async def process_console_command(command: str) -> Dict[str, str]:
             }
 
     except Exception as e:
-        return {"level": "ERROR", "message": f"Command processing error: {str(e)}"}
+        return {"level": "ERROR", "message": f"Command processing error: {e!s}"}
 
 
 # <-- REMOVED: generate_console_token, validate_console_token, cleanup_expired_tokens

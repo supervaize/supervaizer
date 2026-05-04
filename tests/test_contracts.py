@@ -38,6 +38,10 @@ def test_controller_contract_endpoints_are_api_prefixed() -> None:
         info["endpoints"]["DATA_RESOURCE"]
         == "/api/agents/{agent_slug}/data/{resource_name}/"
     )
+    assert (
+        info["endpoints"]["POST_CONTROLLER_REGISTRATION_REFRESH"]
+        == "/api/supervaizer/registration/refresh"
+    )
 
 
 def test_contract_models_export_json_schema() -> None:
