@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-05-04
+
 ### Added
 
 - **`POST /api/supervaizer/registration/refresh`** — Adds an authenticated controller endpoint that lets Studio request asynchronous re-registration. The route requires write-scope API-key access, reuses the existing supervisor account registration flow, and is advertised through the controller contract as `Controller.POST_CONTROLLER_REGISTRATION_REFRESH`.
