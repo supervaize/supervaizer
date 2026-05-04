@@ -86,11 +86,3 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash tools/gh-release-latest-tag.sh supervaize/supervaizer
-
-      - name: Merge main back into develop
-        run: |
-          git fetch origin main develop
-          git checkout develop
-          git pull --ff-only origin develop
-          git merge --no-ff origin/main -m "chore: sync main back to develop"
-          git push origin develop
