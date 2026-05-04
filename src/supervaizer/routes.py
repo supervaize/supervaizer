@@ -137,10 +137,21 @@ async def _send_registration_refresh(
     server: "Server", request_data: RegistrationRefreshRequest
 ) -> None:
     """Ask the configured supervisor account to process normal server registration."""
-    if not getattr(server, "supervisor_account", None):
-        log.warning("Registration refresh requested but no supervisor account is configured")
+    supervisor_account = getattr(server, "supervisor_account", None)
+    if not supervisor_account:
+        log.warning(
+            "Registration refresh requested but no supervisor account is configured"
+        )
         return
-    result = await server.supervisor_account.register_server(server=server)
+    try:
+        result = await supervisor_account.register_server(server=server)
+    except Exception:
+        log.exception(
+            "Registration refresh failed reason={} requested_at={}",
+            request_data.reason,
+            request_data.requested_at,
+        )
+        return
     log.info(
         "Registration refresh completed with result={} reason={} requested_at={}",
         result.__class__.__name__,

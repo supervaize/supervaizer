@@ -10,9 +10,11 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import asyncio
 from io import StringIO
 from typing import Any
 
+import httpx
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
@@ -30,6 +32,8 @@ from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.common import log
 from supervaizer.routes import (
+    RegistrationRefreshRequest,
+    _send_registration_refresh,
     create_agents_routes,
     create_default_routes,
     create_utils_routes,
@@ -155,6 +159,36 @@ def test_registration_refresh_endpoint_re_registers_server(
         "requested_at=2026-05-04T12:00:00Z"
     ) in log_output.getvalue()
     assert "result=%s reason=%s requested_at=%s" not in log_output.getvalue()
+
+
+def test_send_registration_refresh_logs_exception_on_register_failure(
+    server_fixture: Server, mocker: Any
+) -> None:
+    """Background registration refresh must not propagate httpx/HTTP errors."""
+    mocker.patch.object(
+        Account,
+        "register_server",
+        new=mocker.AsyncMock(side_effect=httpx.ConnectError("unreachable")),
+    )
+    log_output = StringIO()
+    log_sink_id = log.add(log_output, format="{message}", level="ERROR")
+    try:
+        asyncio.run(
+            _send_registration_refresh(
+                server_fixture,
+                RegistrationRefreshRequest(
+                    reason="studio_push", requested_at="2026-05-04T12:00:00Z"
+                ),
+            )
+        )
+    finally:
+        log.remove(log_sink_id)
+
+    text = log_output.getvalue()
+    assert (
+        "Registration refresh failed reason=studio_push "
+        "requested_at=2026-05-04T12:00:00Z"
+    ) in text
 
 
 def test_registration_refresh_endpoint_requires_api_key(server_fixture: Server) -> None:
