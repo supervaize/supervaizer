@@ -49,6 +49,7 @@ class ControllerEndpoint(StrEnum):
     DATA_RESOURCE_IMPORT = "DATA_RESOURCE_IMPORT"
     HEALTH_CHECK = "HEALTH_CHECK"
     CONTROLLER_CONTRACT = "CONTROLLER_CONTRACT"
+    POST_CONTROLLER_REGISTRATION_REFRESH = "POST_CONTROLLER_REGISTRATION_REFRESH"
 
 
 CONTROLLER_ENDPOINTS: dict[ControllerEndpoint, str] = {
@@ -72,6 +73,7 @@ CONTROLLER_ENDPOINTS: dict[ControllerEndpoint, str] = {
     ControllerEndpoint.DATA_RESOURCE_IMPORT: "/api/agents/{agent_slug}/data/{resource_name}/import/",
     ControllerEndpoint.HEALTH_CHECK: ".well-known/health",
     ControllerEndpoint.CONTROLLER_CONTRACT: "/api/supervaizer/contract",
+    ControllerEndpoint.POST_CONTROLLER_REGISTRATION_REFRESH: "/api/supervaizer/registration/refresh",
 }
 
 
