@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`agent.cases.batch` event** — New event type `EventType.CASES_BATCH` lets agents send a collection of cases (with their full step history) as a single block. Adds `CasesBatchEvent` (in `supervaizer.event`), `Account.send_cases_batch` / `send_cases_batch_sync` helpers, and the `CasesBatchEventDetails` / `CaseBatchItemContract` / `CaseStepContract` contract models for Studio. Studio integration spec lives at `docs/CASES_BATCH_EVENT.md`.
+
 ## [0.18.0] - 2026-05-04
 
 ## [0.17.3] - 2026-05-04

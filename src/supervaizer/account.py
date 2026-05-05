@@ -11,7 +11,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Union, cast
 
 import httpx
 from pydantic import ConfigDict, Field, field_validator
@@ -346,6 +346,49 @@ class Account(AccountAbstract):
 
         event = CaseUpdateEvent(case=case, update=update, account=self)
         return self.send_event_sync(update, event)
+
+    async def send_cases_batch(
+        self,
+        cases: Sequence["Case"],
+        job_id: Optional[str] = None,
+    ) -> ApiResult:
+        """Send a batch of cases (with their existing steps) to Supervaize Studio.
+
+        Bundles N cases — each with its full ``updates`` (steps) history — into
+        a single ``EventType.CASES_BATCH`` event. Useful for backfilling cases
+        produced offline or for bulk-importing cases.
+
+        Args:
+            cases: The cases to send. Each case's ``registration_info`` (which
+                includes its updates/steps) is embedded into the batch payload.
+            job_id: Optional job_id when the batch belongs to a single job. If
+                omitted and all cases share the same ``job_id``, it is inferred.
+
+        Returns:
+            ApiResult: ApiSuccess with response details if successful,
+                       ApiError with error details if request fails.
+        """
+        from supervaizer.event import CasesBatchEvent
+
+        cases_list = list(cases)
+        if not cases_list:
+            raise ValueError("send_cases_batch requires at least one case")
+        event = CasesBatchEvent(cases=cases_list, account=self, job_id=job_id)
+        return await self.send_event(sender=cases_list[0], event=event)
+
+    def send_cases_batch_sync(
+        self,
+        cases: Sequence["Case"],
+        job_id: Optional[str] = None,
+    ) -> ApiResult:
+        """Sync entry point for :meth:`send_cases_batch`."""
+        from supervaizer.event import CasesBatchEvent
+
+        cases_list = list(cases)
+        if not cases_list:
+            raise ValueError("send_cases_batch requires at least one case")
+        event = CasesBatchEvent(cases=cases_list, account=self, job_id=job_id)
+        return self.send_event_sync(sender=cases_list[0], event=event)
 
     def send_telemetry(self, telemetry: Telemetry) -> ApiResult:
         """Send telemetry data to the Supervaize Control API.

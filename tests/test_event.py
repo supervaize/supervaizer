@@ -20,6 +20,7 @@ from supervaizer import (
     AgentRegisterEvent,
     Case,
     CaseNodeUpdate,
+    CasesBatchEvent,
     CaseStartEvent,
     CaseUpdateEvent,
     Event,
@@ -128,6 +129,73 @@ def test_job_finished_event(job_fixture: Job, account_fixture: Account) -> None:
         account=account_fixture,
     )
     assert isinstance(job_finished_event, JobFinishedEvent)
+
+
+def test_cases_batch_event_single_job(
+    case_fixture: Case,
+    account_fixture: Account,
+    case_node_update_fixture: CaseNodeUpdate,
+) -> None:
+    # Pre-populate the case with one step so the batch carries existing history.
+    case_fixture.updates = [case_node_update_fixture]
+
+    second_case = Case(
+        id=str(uuid4()),
+        job_id=case_fixture.job_id,
+        account=account_fixture,
+        status=case_fixture.status,
+        name="Second Case",
+        description="Second Case Description",
+    )
+
+    batch = CasesBatchEvent(
+        cases=[case_fixture, second_case],
+        account=account_fixture,
+    )
+
+    assert batch.type == EventType.CASES_BATCH
+    assert batch.object_type == "cases_batch"
+    # job_id is inferred when all cases share one
+    assert batch.source == {"job": case_fixture.job_id, "batch_size": 2}
+    assert batch.details["job_id"] == case_fixture.job_id
+    assert batch.details["count"] == 2
+    assert len(batch.details["cases"]) == 2
+    assert batch.details["cases"][0]["case_id"] == case_fixture.id
+    assert batch.details["cases"][0]["updates"][0]["index"] == 1
+    # Payload is JSON-encodable for httpx
+    json.dumps(batch.payload)
+
+
+def test_cases_batch_event_explicit_job_id(
+    case_fixture: Case,
+    account_fixture: Account,
+) -> None:
+    other_job_case = Case(
+        id=str(uuid4()),
+        job_id="another-job",
+        account=account_fixture,
+        status=case_fixture.status,
+        name="Other Job Case",
+        description="Different job",
+    )
+
+    # Mixed jobs => job_id is not inferred unless explicitly provided.
+    batch_no_id = CasesBatchEvent(
+        cases=[case_fixture, other_job_case],
+        account=account_fixture,
+    )
+    assert batch_no_id.details["job_id"] is None
+    assert "job" not in batch_no_id.source
+    assert batch_no_id.source["batch_size"] == 2
+
+    # Explicit job_id wins.
+    batch_explicit = CasesBatchEvent(
+        cases=[case_fixture, other_job_case],
+        account=account_fixture,
+        job_id="explicit-job",
+    )
+    assert batch_explicit.details["job_id"] == "explicit-job"
+    assert batch_explicit.source["job"] == "explicit-job"
 
 
 def test_event_payload_json_encodable_with_metadata_datetime(

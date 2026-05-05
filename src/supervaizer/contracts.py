@@ -100,6 +100,7 @@ class EventType(StrEnum):
     CASE_RESULT = "agent.case.result"
     CASE_UPDATE = "agent.case.update"
     CASE_ERROR = "agent.case.error"
+    CASES_BATCH = "agent.cases.batch"
 
 
 class DataResourceContextContract(ContractModel):
@@ -231,6 +232,55 @@ class CaseUpdateEvent(ContractModel):
 class CaseUpdateRequest(ContractModel):
     answer: dict[str, Any]
     message: str | None = None
+
+
+class CaseStepContract(ContractModel):
+    """A single case step (a.k.a. CaseNodeUpdate) inside a batch payload."""
+
+    index: int | None = None
+    name: str | None = None
+    payload: dict[str, Any] | None = None
+    cost: float | None = 0.0
+    is_final: bool = False
+    upsert: bool = False
+    error: str | None = None
+    scheduled_at: str | None = None
+    scheduled_method: str | None = None
+    scheduled_status: str | None = None
+
+
+class CaseBatchItemContract(ContractModel):
+    """A single case (with its full step history) inside a batch payload.
+
+    Mirrors ``Case.registration_info`` so Studio can ingest a case + all its
+    steps in one shot. Studio MUST treat this as an upsert keyed by
+    ``(job_id, case_id)`` and replace/merge steps using their ``index``.
+    """
+
+    case_id: str
+    job_id: str
+    case_ref: str | None = None
+    name: str
+    description: str = ""
+    status: str
+    updates: list[CaseStepContract] = Field(default_factory=list)
+    total_cost: float = 0.0
+    final_delivery: dict[str, Any] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CasesBatchEventDetails(ContractModel):
+    """``details`` payload for ``EventType.CASES_BATCH`` events.
+
+    Wire shape advertised by the controller for Studio. The full event envelope
+    is the standard ``Event`` shape: ``{source, workspace, event_type,
+    object_type, details}`` where ``object_type == "cases_batch"`` and
+    ``details`` matches this model.
+    """
+
+    job_id: str | None = None
+    count: int = 0
+    cases: list[CaseBatchItemContract] = Field(default_factory=list)
 
 
 class DataResourceListResponse(ContractModel):

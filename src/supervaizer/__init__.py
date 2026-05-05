@@ -43,6 +43,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "AgentRegisterEvent": ("supervaizer.event", "AgentRegisterEvent"),
     "CaseStartEvent": ("supervaizer.event", "CaseStartEvent"),
     "CaseUpdateEvent": ("supervaizer.event", "CaseUpdateEvent"),
+    "CasesBatchEvent": ("supervaizer.event", "CasesBatchEvent"),
     "Event": ("supervaizer.event", "Event"),
     "JobFinishedEvent": ("supervaizer.event", "JobFinishedEvent"),
     "JobStartConfirmationEvent": ("supervaizer.event", "JobStartConfirmationEvent"),
@@ -75,6 +76,9 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "DynamicChoicesRequest": ("supervaizer.contracts", "DynamicChoicesRequest"),
     "DynamicChoicesResponse": ("supervaizer.contracts", "DynamicChoicesResponse"),
     "EventType": ("supervaizer.contracts", "EventType"),
+    "CaseStepContract": ("supervaizer.contracts", "CaseStepContract"),
+    "CaseBatchItemContract": ("supervaizer.contracts", "CaseBatchItemContract"),
+    "CasesBatchEventDetails": ("supervaizer.contracts", "CasesBatchEventDetails"),
     "JobStartRequest": ("supervaizer.contracts", "JobStartRequest"),
     "ServerRegistrationContract": (
         "supervaizer.contracts",

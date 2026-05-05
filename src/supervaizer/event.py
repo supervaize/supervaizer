@@ -10,7 +10,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Sequence
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
@@ -166,4 +166,68 @@ class CaseUpdateEvent(Event):
             source={"job": case.job_id, "case": case.id},
             object_type="case",
             details=update.registration_info,
+        )
+
+
+class CasesBatchEvent(Event):
+    """Event carrying a collection of cases (with their existing steps) as a single block.
+
+    Use this to send several cases — each with its full step history — to Studio
+    in one request, instead of emitting one ``CaseStartEvent`` plus N
+    ``CaseUpdateEvent`` per case. Typical use cases:
+
+      - Backfilling cases produced offline or before the agent was connected.
+      - Bulk-importing cases from another system.
+      - Re-syncing local cases after a network interruption.
+
+    Studio MUST treat each case in the batch as an upsert keyed by
+    ``(job_id, case_id)`` and reconcile its steps by ``index`` (creating
+    missing steps, updating those marked ``upsert=True``).
+
+    The event payload follows the standard Supervaizer Event envelope:
+
+        {
+            "source":      {"job": <job_id_or_None>, "batch_size": <int>},
+            "workspace":   "<workspace_id>",
+            "event_type":  "agent.cases.batch",
+            "object_type": "cases_batch",
+            "details": {
+                "job_id": <job_id_or_None>,   # set when all cases share a job
+                "count":  <int>,
+                "cases":  [<case.registration_info>, ...]
+            }
+        }
+
+    Tests in tests/test_event.py.
+    """
+
+    def __init__(
+        self,
+        cases: Sequence["Case"],
+        account: Any,  # Use Any to avoid type resolution issues
+        job_id: str | None = None,
+    ) -> None:
+        cases_list = list(cases)
+        # Prefer the explicit job_id; otherwise infer it when all cases share one.
+        resolved_job_id: str | None = job_id
+        if resolved_job_id is None and cases_list:
+            unique_job_ids = {c.job_id for c in cases_list}
+            if len(unique_job_ids) == 1:
+                resolved_job_id = next(iter(unique_job_ids))
+
+        details: Dict[str, Any] = {
+            "job_id": resolved_job_id,
+            "count": len(cases_list),
+            "cases": [c.registration_info for c in cases_list],
+        }
+        source: Dict[str, Any] = {"batch_size": len(cases_list)}
+        if resolved_job_id is not None:
+            source["job"] = resolved_job_id
+
+        super().__init__(
+            type=EventType.CASES_BATCH,
+            account=account,
+            source=source,
+            object_type="cases_batch",
+            details=details,
         )
