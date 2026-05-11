@@ -17,6 +17,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Agent method timeout metadata** — `AgentMethod` and the registration contract now expose `is_async` and `timeout` metadata for Studio. `timeout` defaults to 600 seconds and can be `null` for controller jobs that should run until Studio stops them manually.
+
+### Tests
+
+- `uv run pytest tests/test_agent.py tests/test_contracts.py`
+
 ## [0.18.0] - 2026-05-04
 
 ## [0.17.3] - 2026-05-04
