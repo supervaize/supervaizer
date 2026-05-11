@@ -59,7 +59,6 @@ deploy = [
 dev = [
     "boto3>=1.42.73",
     "docker>=7.0.0",
-    "black>=25.9.0",
     "hatch>=1.16.5",
     "jsonschema>=4.26.0",
     "mypy>=2.1.0",
@@ -116,22 +115,6 @@ force-wrap-aliases = true
 [tool.ruff.format]
 # Match Cursor style: keep opening brace on same line as call, e.g. append({ ... })
 preview = true
-
-[tool.black]
-line-length = 88
-target-version = ["py312", "py313"]
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.mypy_cache
-  | \.pytest_cache
-  | \.ruff_cache
-  | \.venv
-  | dist
-  | htmlcov
-)/
-'''
 
 [tool.commitizen]
 name = "cz_gitmoji"

@@ -900,9 +900,15 @@ class Agent(AgentAbstract):
         """
         if not self.methods:
             raise ValueError("Agent methods not defined")
-        log.debug(
-            f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
-        )
+
+        if method_name == "job_start":
+            action = self.methods.job_start
+        else:
+            if not self.methods.custom:
+                raise ValueError(f"Custom method {method_name} not found")
+            action = self.methods.custom[method_name]
+
+        log.debug(f"[Agent job_start] Run <{action.method}> - Job <{job.id}>")
         # Mark job as in progress when execution starts
         job.add_response(
             JobResponse(
@@ -914,13 +920,6 @@ class Agent(AgentAbstract):
         )
 
         # Execute the method
-        if method_name == "job_start":
-            action = self.methods.job_start
-        else:
-            if not self.methods.custom:
-                raise ValueError(f"Custom method {method_name} not found")
-            action = self.methods.custom[method_name]
-
         action_method = action.method
         method_params = action.params or {}
         params = (
@@ -933,7 +932,7 @@ class Agent(AgentAbstract):
             f"[Agent job_start] action_method : {action_method} - params : {params}"
         )
         try:
-            if self.methods.job_start.is_async:
+            if action.is_async:
                 # TODO: Implement async job execution & test
                 raise NotImplementedError(
                     "[Agent job_start] Async job execution is not implemented"
