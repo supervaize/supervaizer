@@ -61,6 +61,14 @@ def test_contract_module_import_does_not_load_controller_runtime() -> None:
     assert "supervaizer.routes" not in sys.modules
 
 
+def test_agent_method_contract_exports_timeout_metadata() -> None:
+    server_schema = ServerRegistrationContract.model_json_schema()
+    method_schema = server_schema["$defs"]["AgentMethodContract"]
+
+    assert method_schema["properties"]["is_async"]["default"] is False
+    assert method_schema["properties"]["timeout"]["default"] == 600
+
+
 def test_resolve_controller_endpoint() -> None:
     contract = ControllerContract()
 

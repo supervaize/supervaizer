@@ -216,6 +216,13 @@ class AgentMethodAbstract(BaseModel):
     is_async: bool = Field(
         default=False, description="Whether the method is asynchronous"
     )
+    timeout: int | None = Field(
+        default=600,
+        description=(
+            "Maximum automatic job duration in seconds. Use None for jobs that "
+            "must run until Studio stops them manually."
+        ),
+    )
 
     model_config = cast(
         ConfigDict,
@@ -454,6 +461,8 @@ class AgentMethod(AgentMethodAbstract):
             "params": self.params,
             "fields": self.fields_definitions,
             "description": self.description,
+            "is_async": self.is_async,
+            "timeout": self.timeout,
             "nodes": self.nodes.registration_info if self.nodes else None,
         }
 

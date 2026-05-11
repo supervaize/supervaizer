@@ -76,6 +76,26 @@ def test_agent_custom_methods_names(agent_fixture: Agent) -> None:
     assert agent_fixture.custom_methods_names == ["method1", "method2"]
 
 
+def test_agent_method_registration_info_includes_execution_timeout() -> None:
+    method = AgentMethod(
+        name="start",
+        method="control.start",
+        is_async=True,
+        timeout=None,
+    )
+
+    info = method.registration_info
+
+    assert info["is_async"] is True
+    assert info["timeout"] is None
+
+
+def test_agent_method_registration_info_defaults_timeout_to_600() -> None:
+    method = AgentMethod(name="start", method="control.start")
+
+    assert method.registration_info["timeout"] == 600
+
+
 def test_agent_method_validate_method_fields_no_fields() -> None:
     """Test validate_method_fields when method has no field definitions."""
     method = AgentMethod(name="test_method", method="test.method", fields=None)

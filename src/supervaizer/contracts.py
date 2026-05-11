@@ -153,6 +153,8 @@ class AgentMethodContract(ContractModel):
     params: dict[str, Any] | None = None
     fields: list[AgentMethodFieldContract | dict[str, Any]] | None = None
     description: str | None = None
+    is_async: bool = False
+    timeout: int | None = 600
     nodes: dict[str, Any] | None = None
 
 
