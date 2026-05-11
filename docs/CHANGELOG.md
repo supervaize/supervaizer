@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-05-11
+
 ### Added
 
 - **Agent method timeout metadata** — `AgentMethod` and the registration contract now expose `is_async` and `timeout` metadata for Studio. `timeout` defaults to 600 seconds and can be `null` for controller jobs that should run until Studio stops them manually.
