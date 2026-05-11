@@ -36,7 +36,7 @@ just test-no-cov
 
 ### Development Conventions
 
-*   **Code Style:** The project uses `ruff` for linting and `black` for formatting. The configuration for these tools can be found in the `pyproject.toml` file.
+*   **Code Style:** The project uses `ruff` for linting and formatting. The configuration for these tools can be found in the `pyproject.toml` file.
 *   **Type Hinting:** The project uses type hinting extensively. The `mypy` tool is used for static type checking.
 *   **Commit Messages:** The project uses the `cz_gitmoji` convention for commit messages.
 *   **Pre-commit Hooks:** The project uses pre-commit hooks to enforce code style and run tests before committing code. The configuration for the pre-commit hooks can be found in the `.pre-commit-config.yaml` file.

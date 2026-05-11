@@ -21,7 +21,8 @@ from pydantic import BaseModel, ValidationError
 
 from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
 from supervaizer.agent import AgentMethodField, AgentMethodsAbstract, FieldTypeEnum
-from supervaizer.job import Job, JobContext
+from supervaizer.job import Job, JobContext, JobResponse
+from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from tests.mock_api_responses import GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL
 
@@ -74,6 +75,26 @@ def test_agent_custom_methods(agent_fixture: Agent) -> None:
 def test_agent_custom_methods_names(agent_fixture: Agent) -> None:
     """Test custom methods names property."""
     assert agent_fixture.custom_methods_names == ["method1", "method2"]
+
+
+def test_agent_method_registration_info_includes_execution_timeout() -> None:
+    method = AgentMethod(
+        name="start",
+        method="control.start",
+        is_async=True,
+        timeout=None,
+    )
+
+    info = method.registration_info
+
+    assert info["is_async"] is True
+    assert info["timeout"] is None
+
+
+def test_agent_method_registration_info_defaults_timeout_to_600() -> None:
+    method = AgentMethod(name="start", method="control.start")
+
+    assert method.registration_info["timeout"] == 600
 
 
 def test_agent_method_validate_method_fields_no_fields() -> None:
@@ -642,6 +663,119 @@ def test_agent_update_agent_from_server(
         agent_fixture.update_agent_from_server(server_fixture)
 
 
+def test_job_start_custom_async_uses_action_is_async(
+    server_fixture: Server,
+    context_fixture: JobContext,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    """Custom method ``is_async`` gates the async branch, not ``job_start.is_async``."""
+    sync_job_start = AgentMethod(
+        name="start",
+        method="supervaizer.examples.hello_world_agent.job_start",
+        is_async=False,
+    )
+    custom_async = AgentMethod(
+        name="custom-async",
+        method="this.module.path.must.not.be.imported",
+        is_async=True,
+    )
+    agent = Agent(
+        id="LMKyPAS2Q8sKWBY34DS37a",
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        methods=AgentMethods(
+            job_start=sync_job_start,
+            job_stop=sync_job_start,
+            job_status=sync_job_start,
+            chat=None,
+            custom={"custom-async": custom_async},
+        ),
+        parameters_setup=parameters_setup_fixture,
+    )
+    job = Job.new(
+        job_context=context_fixture,
+        agent_name=agent.name,
+        agent_parameters=None,
+    )
+    with pytest.raises(
+        NotImplementedError, match="Async job execution is not implemented"
+    ):
+        agent.job_start(
+            job,
+            {},
+            context_fixture,
+            server_fixture,
+            method_name="custom-async",
+        )
+
+
+def test_job_start_custom_sync_ignores_job_start_is_async(
+    server_fixture: Server,
+    context_fixture: JobContext,
+    parameters_setup_fixture: ParametersSetup,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When ``job_start`` is marked async but the invoked custom method is sync, run sync."""
+    async_job_start = AgentMethod(
+        name="start",
+        method="supervaizer.examples.hello_world_agent.job_start",
+        is_async=True,
+    )
+    custom_sync = AgentMethod(
+        name="custom-sync",
+        method="supervaizer.examples.hello_world_agent.job_start",
+        is_async=False,
+    )
+    agent = Agent(
+        id="LMKyPAS2Q8sKWBY34DS37a",
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        methods=AgentMethods(
+            job_start=async_job_start,
+            job_stop=custom_sync,
+            job_status=custom_sync,
+            chat=None,
+            custom={"custom-sync": custom_sync},
+        ),
+        parameters_setup=parameters_setup_fixture,
+    )
+    job = Job.new(
+        job_context=context_fixture,
+        agent_name=agent.name,
+        agent_parameters=None,
+    )
+
+    done = JobResponse(
+        job_id=job.id,
+        status=EntityStatus.COMPLETED,
+        message="ok",
+        payload=None,
+    )
+    monkeypatch.setattr(agent, "_execute", lambda action, params={}: done)
+    monkeypatch.setattr(
+        "supervaizer.account_service.send_event_sync",
+        lambda account, sender, event: ApiSuccess(message="ok", detail={}, code=200),
+    )
+    monkeypatch.setattr(
+        "supervaizer.agent.service_job_finished",
+        lambda job_arg, server=None: None,
+    )
+
+    agent.job_start(
+        job,
+        {},
+        context_fixture,
+        server_fixture,
+        method_name="custom-sync",
+    )
+
+
 def test_agent_job_context(agent_fixture: Agent) -> None:
     """Test agent job context"""
     # Create a job context
@@ -1154,3 +1288,20 @@ def test_agent_registration_info_includes_data_resources() -> None:
     assert len(info["data_resources"]) == 1
     assert info["data_resources"][0]["name"] == "contacts"
     assert info["data_resources"][0]["operations"]["create"] is True
+
+
+def test_agent_registration_info_includes_release_notes_url() -> None:
+    """Agent.registration_info includes the optional release notes URL."""
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        release_notes_url="https://example.com/releases/1.0.0",
+        description="description",
+    )
+
+    info = agent.registration_info
+
+    assert info["version"] == "1.0.0"
+    assert info["release_notes_url"] == "https://example.com/releases/1.0.0"

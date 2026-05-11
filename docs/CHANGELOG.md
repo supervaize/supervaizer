@@ -17,6 +17,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Agent method timeout metadata** — `AgentMethod` and the registration contract now expose `is_async` and `timeout` metadata for Studio. `timeout` defaults to 600 seconds and can be `null` for controller jobs that should run until Studio stops them manually.
+
+### Changed
+
+- **`pyproject.toml` (since v0.18.0)** — Runtime lower bounds: FastAPI, orjson, packaging, Pydantic, python-slugify, Rich, sse-starlette, TinyDB, Typer, Uvicorn. **`deploy` extra:** boto3 and Google Cloud libraries (Artifact Registry, Cloud Run, Secret Manager). **`dev` extra:** add `boto3`, `docker`, and `black` so `uv sync --extra dev` matches deploy/docker-heavy tests and Black in CI; add `yamllint`; bump mypy, pre-commit, pytest, respx, ruff. **`[tool.black]`:** explicit Black config (line length 88, Python 3.12–3.13 targets, excludes for caches/venv/dist).
+
+### Tests
+
+- `uv run pytest tests/test_agent.py tests/test_contracts.py`
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 570   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
+
 ## [0.18.0] - 2026-05-04
 
 ## [0.17.3] - 2026-05-04

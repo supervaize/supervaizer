@@ -28,6 +28,13 @@ jobs:
         env:
           # Commit-message hooks check `git log` HEAD — not meaningful in CI
           SKIP: conventional-gitmoji,commitizen
+      - name: Check Ruff formatting
+        run: uv run ruff format --check --force-exclude .
+      - name: Check YAML formatting
+        run: >-
+          uv run yamllint -d "{extends: default, rules: {line-length: disable,
+          document-start: disable, truthy: disable, comments: disable}}"
+          .github/workflows
 
   build:
     runs-on: ubuntu-latest
