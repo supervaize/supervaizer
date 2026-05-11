@@ -188,6 +188,7 @@ class AgentRegistrationContract(ContractModel):
     slug: str
     name: str
     api_path: str
+    release_notes_url: str | None = None
     methods: AgentMethodsContract | dict[str, Any] = Field(default_factory=dict)
     parameters_setup: list[dict[str, Any]] = Field(default_factory=list)
     data_resources: list[DataResourceContract | dict[str, Any]] = Field(

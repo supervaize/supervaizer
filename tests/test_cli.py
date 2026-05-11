@@ -19,9 +19,18 @@ from typing import Generator
 from unittest.mock import Mock, patch
 
 import pytest
+from pytest_mock import MockerFixture
+from rich.console import Console
 from typer.testing import CliRunner
 
 from supervaizer.cli import app
+
+
+@pytest.fixture(autouse=True)
+def _cli_console_no_color(mocker: MockerFixture) -> None:
+    """Rich marks up output unless Console is non-TTY; match plain-text assertions."""
+    plain = Console(force_terminal=False, color_system=None, width=120)
+    mocker.patch("supervaizer.cli.console", plain)
 
 
 @pytest.fixture

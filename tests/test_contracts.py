@@ -50,6 +50,8 @@ def test_contract_models_export_json_schema() -> None:
 
     assert controller_schema["properties"]["endpoints"]["type"] == "object"
     assert server_schema["properties"]["agents"]["type"] == "array"
+    agent_schema = server_schema["$defs"]["AgentRegistrationContract"]
+    assert "release_notes_url" in agent_schema["properties"]
 
 
 def test_contract_module_import_does_not_load_controller_runtime() -> None:

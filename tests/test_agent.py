@@ -1174,3 +1174,20 @@ def test_agent_registration_info_includes_data_resources() -> None:
     assert len(info["data_resources"]) == 1
     assert info["data_resources"][0]["name"] == "contacts"
     assert info["data_resources"][0]["operations"]["create"] is True
+
+
+def test_agent_registration_info_includes_release_notes_url() -> None:
+    """Agent.registration_info includes the optional release notes URL."""
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        release_notes_url="https://example.com/releases/1.0.0",
+        description="description",
+    )
+
+    info = agent.registration_info
+
+    assert info["version"] == "1.0.0"
+    assert info["release_notes_url"] == "https://example.com/releases/1.0.0"
