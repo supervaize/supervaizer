@@ -153,6 +153,8 @@ class AgentMethodContract(ContractModel):
     params: dict[str, Any] | None = None
     fields: list[AgentMethodFieldContract | dict[str, Any]] | None = None
     description: str | None = None
+    is_async: bool = False
+    timeout: int | None = 600
     nodes: dict[str, Any] | None = None
 
 
@@ -186,6 +188,7 @@ class AgentRegistrationContract(ContractModel):
     slug: str
     name: str
     api_path: str
+    release_notes_url: str | None = None
     methods: AgentMethodsContract | dict[str, Any] = Field(default_factory=dict)
     parameters_setup: list[dict[str, Any]] = Field(default_factory=list)
     data_resources: list[DataResourceContract | dict[str, Any]] = Field(

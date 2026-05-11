@@ -216,6 +216,13 @@ class AgentMethodAbstract(BaseModel):
     is_async: bool = Field(
         default=False, description="Whether the method is asynchronous"
     )
+    timeout: int | None = Field(
+        default=600,
+        description=(
+            "Maximum automatic job duration in seconds. Use None for jobs that "
+            "must run until Studio stops them manually."
+        ),
+    )
 
     model_config = cast(
         ConfigDict,
@@ -454,6 +461,8 @@ class AgentMethod(AgentMethodAbstract):
             "params": self.params,
             "fields": self.fields_definitions,
             "description": self.description,
+            "is_async": self.is_async,
+            "timeout": self.timeout,
             "nodes": self.nodes.registration_info if self.nodes else None,
         }
 
@@ -590,6 +599,10 @@ class AgentAbstract(SvBaseModel):
         default=None, description="Editor (usually a company)"
     )
     version: str = Field(default="", description="Version string")
+    release_notes_url: str | None = Field(
+        default=None,
+        description="URL for release notes matching this agent version",
+    )
     description: str = Field(
         default="", description="Description of what the agent does"
     )
@@ -658,6 +671,7 @@ class Agent(AgentAbstract):
         maintainer: Optional[str] = None,
         editor: Optional[str] = None,
         version: str = "",
+        release_notes_url: str | None = None,
         description: str = "",
         tags: list[str] | None = None,
         methods: AgentMethods | None = None,
@@ -687,6 +701,7 @@ class Agent(AgentAbstract):
             maintainer (str, optional): Current maintainer
             editor (str, optional): Current editor
             version (str): Version string
+            release_notes_url (str, optional): URL for this version's release notes
             description (str): Description of what the agent does
             tags (list[str], optional): Tags for categorizing the agent
             methods (AgentMethods): Methods supported by this agent
@@ -713,6 +728,7 @@ class Agent(AgentAbstract):
             maintainer=maintainer,
             editor=editor,
             version=version,
+            release_notes_url=release_notes_url,
             description=description,
             tags=tags,
             methods=methods,
@@ -759,6 +775,7 @@ class Agent(AgentAbstract):
             "maintainer": self.maintainer,
             "editor": self.editor,
             "version": self.version,
+            "release_notes_url": self.release_notes_url,
             "description": self.description,
             "api_path": self.path,
             "slug": self.slug,
@@ -883,9 +900,15 @@ class Agent(AgentAbstract):
         """
         if not self.methods:
             raise ValueError("Agent methods not defined")
-        log.debug(
-            f"[Agent job_start] Run <{self.methods.job_start.method}> - Job <{job.id}>"
-        )
+
+        if method_name == "job_start":
+            action = self.methods.job_start
+        else:
+            if not self.methods.custom:
+                raise ValueError(f"Custom method {method_name} not found")
+            action = self.methods.custom[method_name]
+
+        log.debug(f"[Agent job_start] Run <{action.method}> - Job <{job.id}>")
         # Mark job as in progress when execution starts
         job.add_response(
             JobResponse(
@@ -897,13 +920,6 @@ class Agent(AgentAbstract):
         )
 
         # Execute the method
-        if method_name == "job_start":
-            action = self.methods.job_start
-        else:
-            if not self.methods.custom:
-                raise ValueError(f"Custom method {method_name} not found")
-            action = self.methods.custom[method_name]
-
         action_method = action.method
         method_params = action.params or {}
         params = (
@@ -916,7 +932,7 @@ class Agent(AgentAbstract):
             f"[Agent job_start] action_method : {action_method} - params : {params}"
         )
         try:
-            if self.methods.job_start.is_async:
+            if action.is_async:
                 # TODO: Implement async job execution & test
                 raise NotImplementedError(
                     "[Agent job_start] Async job execution is not implemented"
@@ -1015,6 +1031,7 @@ class AgentResponse(BaseModel):
     maintainer: Optional[str] = None
     editor: Optional[str] = None
     version: str
+    release_notes_url: Optional[str] = None
     api_path: str
     description: str
     tags: Optional[list[str]] = None
