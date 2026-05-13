@@ -29,6 +29,8 @@ Reference specific personas when requesting work:
 
 ## Learned User Preferences
 
+- When preparing a merge to `main` or a release, keep `docs/CHANGELOG.md` **Unreleased** accurate; on request, align listed dependency or tooling changes with the delta since the previous git tag (including `pyproject.toml`).
+
 ## Learned Workspace Facts
 
 - `supervaizer start --reload` (or `SUPERVAIZER_RELOAD=true`) enables Uvicorn’s `reload` (file watching, dev-only; leave off in production).
@@ -36,6 +38,8 @@ Reference specific personas when requesting work:
 - Compliance for this repo expects explicit type annotations, including return types, on functions in new or modified Python files (including tests), for mypy-clean CI.
 - `ADMIN_ALLOWED_IPS` restricts `/admin` when set (comma-separated IPs/CIDR); unset or empty allows all client IPs.
 - In `9agents/agent_interviewer`, empty `MANAGE_ALLOWED_IPS` still requires `MANAGE_AUTH_TOKEN` when that env is set; supervaizer’s admin IP middleware has no equivalent token fallback when the allowlist is empty.
+- CI (`python-package` workflow): the pre-commit job checks **Ruff** formatting (`ruff format --check`) and **YAML** in `.github/workflows` via `yamllint` (not Black).
+- In the matrix **build** job, `astral-sh/setup-uv` sets `cache-suffix: py-${{ matrix.python-version }}` so parallel Python versions do not race on the same GitHub Actions cache reservation.
 
 ## Security and Supply-Chain Rules
 
