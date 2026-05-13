@@ -32,6 +32,17 @@ All notable changes to this project will be documented in this file.
 - **`SECURITY.md`** — added; documents the responsible disclosure process (GitHub private advisories) and the repository's supply-chain posture.
 - **`AGENTS.md` security rules** — mandatory rules added for coding agents: no direct pushes to `main`, no manual lockfile edits, no workflow modifications without approval, no local `hatch publish`.
 
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 570   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
+
 ## [0.19.0] - 2026-05-11
 
 ### Added
