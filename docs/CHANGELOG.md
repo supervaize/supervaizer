@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-05-13
+
 ### Security
 
 - **`uv.lock`** — Refreshed transitive versions to address open Dependabot / GHSA advisories on the default branch graph: **urllib3** (redirect and decompression-chain issues), **requests** (`extract_zipped_paths` temp reuse), **protobuf** (JSON recursion depth), **pyasn1** (decoder / recursion DoS), **pygments** (ReDoS in GUID lexer), and **uv** (ZIP / tar / RECORD handling; dev dependency via hatch).
