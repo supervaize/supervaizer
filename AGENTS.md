@@ -37,6 +37,39 @@ Reference specific personas when requesting work:
 - `ADMIN_ALLOWED_IPS` restricts `/admin` when set (comma-separated IPs/CIDR); unset or empty allows all client IPs.
 - In `9agents/agent_interviewer`, empty `MANAGE_ALLOWED_IPS` still requires `MANAGE_AUTH_TOKEN` when that env is set; supervaizer’s admin IP middleware has no equivalent token fallback when the allowlist is empty.
 
+## Security and Supply-Chain Rules
+
+These rules are mandatory. Violating them defeats the repo's security controls.
+
+### Branch and commit rules
+- Never push directly to `main`. Always work on a branch and open a PR.
+- Never force-push to a shared branch.
+- Never bypass branch protection or rulesets, even with admin access.
+- Always check `git status` before committing — never include `.env`, `*.key`, or credential files.
+
+### Dependency rules
+- Never edit `uv.lock` by hand.
+- To add a dependency: use `uv add <pkg>`, not direct edits to `pyproject.toml`.
+- Never run `uv lock --upgrade` without explicit user approval. Upgrading all deps at once is the exact vector for supply-chain malware.
+- To upgrade a single package: `uv lock --upgrade-package <name>`.
+
+### Workflow file rules
+- Never modify files in `.github/workflows/` without explicit user approval.
+- Never change `permissions:` blocks in workflows.
+- Never add `pull_request_target` triggers.
+- Never replace a pinned action SHA with a tag. New actions must be pinned to a commit SHA with the version in a comment.
+
+### Secret rules
+- Never echo, log, or print environment variables.
+- Never read `.env`, `~/.aws/credentials`, `~/.ssh/`, or `~/.pypirc`.
+
+### Publishing rules
+- Never run `hatch publish` or any publish command locally. Publishing happens through CI only.
+- Never create or modify the `pypi` GitHub environment.
+
+### When in doubt
+Ask. Refusing to act is always safer than taking an action that bypasses these rules.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
