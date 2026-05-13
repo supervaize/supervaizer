@@ -17,6 +17,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- **Secret scanning + push protection** — enabled on the repository; credentials pushed by mistake are now blocked at the source.
+- **Dependabot alerts + automated security updates** — enabled; known-CVE dependency updates are now proposed automatically.
+- **Private vulnerability reporting** — enabled; researchers can report issues privately via GitHub Security Advisories instead of public issues.
+- **Branch ruleset on `main`** — replaces classic branch protection; requires all CI checks (`pre-commit`, `build 3.10–3.13`) to pass before merge, enforced on admins. Classic protection had no required checks and did not enforce on admins.
+- **Tag ruleset** — `v*` release tags are now immutable; they cannot be moved or deleted.
+- **`pypi` environment protection** — required reviewer approval added; a push to `main` no longer publishes to PyPI without a human gate.
+- **SHA-pinned GitHub Actions** — all third-party actions pinned to commit SHAs (`trufflehog`, `setup-uv`, `gh-action-pypi-publish`, `action-gh-release`). Previously `trufflesecurity/trufflehog@main` was a floating branch reference — a critical supply-chain risk.
+- **`uv sync --frozen`** — enforced in CI; the lockfile can no longer silently change during a build.
+- **OSV-Scanner** (`google/osv-scanner-action`) — added as a daily scheduled scan and on every PR targeting `main` or `develop`, against the OSV.dev malicious package index.
+- **Dependabot configuration** (`.github/dependabot.yml`) — weekly updates for `pip` and `github-actions` ecosystems with a 5-day cooldown window to mitigate supply-chain worm attacks; all PRs routed to `develop`.
+- **`SECURITY.md`** — added; documents the responsible disclosure process (GitHub private advisories) and the repository's supply-chain posture.
+- **`AGENTS.md` security rules** — mandatory rules added for coding agents: no direct pushes to `main`, no manual lockfile edits, no workflow modifications without approval, no local `hatch publish`.
+
 ## [0.19.0] - 2026-05-11
 
 ### Added
