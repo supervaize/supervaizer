@@ -256,3 +256,4 @@ uv.lock
 /
 but/
 .gitnexus
+.claude/scheduled_tasks.lock
