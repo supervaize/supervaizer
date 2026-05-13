@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-05-13
+
 ### Security
 
 - **Secret scanning + push protection** — enabled on the repository; credentials pushed by mistake are now blocked at the source.
