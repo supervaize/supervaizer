@@ -154,19 +154,37 @@ release:
     just gh-release
     @echo "✅ Release complete! Main branch and tags pushed to remote"
 
-# Ship to production: precommit, merge develop→main, push (CI does the version bump)
-# Embed bump type token ([MINOR]/[PATCH]/[MAJOR]) so CI picks up the right part.
+# Ship to production: precommit, create a release PR merging develop→main (CI does the version bump).
+# Embed bump type token ([MINOR]/[PATCH]/[MAJOR]) so CI picks up the right part after the PR merges.
 # Run "ready-to-go" to ensure the documentation commit happens in the active stack only.
 # Usage: just ship [patch|minor|major]
 ship part="minor":
     #!/usr/bin/env bash
     set -euo pipefail
     just precommit
+    case "{{part}}" in
+      patch|minor|major) ;;
+      *)
+        echo "Invalid ship part '{{part}}'. Use patch, minor, or major."
+        exit 1
+        ;;
+    esac
     BUMP_TOKEN=$(echo "{{part}}" | tr '[:lower:]' '[:upper:]')
-    git checkout main
-    git pull origin main
-    git merge develop --no-ff -m "[${BUMP_TOKEN}] chore: merge develop to main"
-    git push origin main
+    RELEASE_BRANCH="release/{{part}}-$(date +%Y%m%d-%H%M%S)"
+    RELEASE_TITLE="[${BUMP_TOKEN}] chore: merge develop to main"
+    git fetch origin main develop
+    git switch -c "$RELEASE_BRANCH" origin/main
+    git merge origin/develop --no-ff -m "$RELEASE_TITLE"
+    git push -u origin "$RELEASE_BRANCH"
+    if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+      gh pr create \
+        --base main \
+        --head "$RELEASE_BRANCH" \
+        --title "$RELEASE_TITLE" \
+        --body "Release PR created by \`just ship {{part}}\`. Merge this PR after required checks pass; the publish workflow will bump the {{part}} version from the merge commit token."
+    else
+      echo "Create a PR to main from $RELEASE_BRANCH after required checks pass."
+    fi
 
 # Create or update GitHub release for the latest tag on origin/main
 gh-release:

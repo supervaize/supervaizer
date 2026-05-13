@@ -28,6 +28,6 @@ This repository implements the following controls:
 - Trusted Publishing (OIDC) for PyPI releases — no long-lived publish tokens
 - Required reviewer approval on the `pypi` environment before publish secrets are exposed
 - Third-party GitHub Actions pinned to commit SHAs
-- OSV-Scanner in CI (daily + on every PR) against the OSV.dev malicious package index
+- OSV-Scanner in CI (daily + on every PR targeting `main` or `develop`) against the OSV.dev malicious package index
 
 If you observe a deviation from this posture, please report it via the private channel above.
