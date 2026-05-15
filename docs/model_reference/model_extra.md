@@ -68,7 +68,6 @@ A base class for creating Pydantic models.
 | `job_start` | `AgentMethod` | **required** |  |
 | `job_stop` | `AgentMethod` | `None` |  |
 | `job_status` | `AgentMethod` | `None` |  |
-| `job_poll` | `AgentMethod` | `None` |  |
 | `human_answer` | `AgentMethod` | `None` |  |
 | `chat` | `AgentMethod` | `None` |  |
 | `custom` | `dict[str, supervaizer.agent.AgentMethod]` | `None` |  |
@@ -335,7 +334,6 @@ Returns:
 | `job_start` | `AgentMethodContract` | **required** |  |
 | `job_stop` | `AgentMethodContract` | `None` |  |
 | `job_status` | `AgentMethodContract` | `None` |  |
-| `job_poll` | `AgentMethodContract` | `None` |  |
 | `human_answer` | `AgentMethodContract` | `None` |  |
 | `chat` | `AgentMethodContract` | `None` |  |
 | `custom` | `dict[str, supervaizer.contracts.AgentMethodContract]` | `None` |  |
@@ -1234,7 +1232,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 5, 15, 19, 28, 48, 205222) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 5, 15, 20, 25, 31, 892520) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1279,4 +1277,4 @@ A base class for creating Pydantic models.
 | `details` | `Dict[str, Any]` | **required** |  |
 
 
-*Uploaded on 2026-05-15 19:28:48*
+*Uploaded on 2026-05-15 20:25:31*

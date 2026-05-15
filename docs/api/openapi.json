@@ -3089,57 +3089,6 @@
         }
       }
     },
-    "/manage/agents/{slug}/workbench/jobs/{job_id}/poll": {
-      "post": {
-        "tags": [
-          "admin",
-          "workbench"
-        ],
-        "summary": "Workbench Poll Job",
-        "description": "Trigger manual poll for external updates on a job.",
-        "operationId": "workbench_poll_job_manage_agents__slug__workbench_jobs__job_id__poll_post",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          },
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/manage/agents/{slug}/workbench/jobs/{job_id}/status": {
       "get": {
         "tags": [
@@ -3835,16 +3784,6 @@
               }
             ]
           },
-          "job_poll": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AgentMethod"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "human_answer": {
             "anyOf": [
               {
@@ -4213,7 +4152,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-05-15T19:28:48.909572"
+            "default": "2026-05-15T20:25:32.352375"
           },
           "status_code": {
             "type": "integer",
