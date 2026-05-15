@@ -349,6 +349,7 @@ class V2DatasetDefinition(ContractModel):
     id: str
     label: str
     auto_surface: bool = False
+    display: V2ResourceDisplayDefinition | None = None
 
 
 class SupervaizerV2AgentRegistrationContract(ContractModel):

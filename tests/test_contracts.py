@@ -278,6 +278,7 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
                 "id": "campaign_progress",
                 "label": "Campaign Progress",
                 "auto_surface": True,
+                "display": {"columns": ["campaign_name", "completion_pct"]},
             }
         ],
         case_lanes=[{"id": "work", "label": "Work", "default": True}],
@@ -303,6 +304,11 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "job.sync",
     ]
     assert registration.resources[0].fields[0].id == "email"
+    assert registration.datasets[0].display is not None
+    assert registration.datasets[0].display.columns == [
+        "campaign_name",
+        "completion_pct",
+    ]
     assert registration.capabilities.case_lanes[0].default is True
 
 

@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **Supervaizer v2 job source target metadata** — `V2JobSource` now includes an optional `target_type` so external sources can declare the business object Studio should use for dedupe and catch-up.
 - **Supervaizer v2 resource form fields** — `V2ResourceDefinition` now carries typed `fields` metadata so Studio can render simple agent-owned resource create/edit forms without callback-style dynamic field logic.
 - **Supervaizer v2 resource option sources** — Resource fields can now declare typed resource-backed `options_source` metadata so Studio can render relationship selectors without callback-style dynamic choices.
+- **Supervaizer v2 dataset display metadata** — `V2DatasetDefinition` now carries typed display columns so Studio can render generic dataset surfaces from the registration contract.
 - **Supervaizer v2 registration builder** — Added `build_v2_agent_registration()` to derive validated v2 registration payloads from public SDK primitives, including generated resource/dataset surfaces and actions.
 - **Legacy dynamic choices removed** — Removed the v1 `dynamic_choices` field metadata, `dynamic_choices_callback`, `/start/dynamic_choices` route, and related contract exports; dynamic options now belong to v2 resource `options_source` metadata or typed A2A actions.
 - **Legacy job poll removed** — Removed `job_poll` from the public v1 method contract and the local workbench poll route/button; v2 status convergence is represented by the typed `job.sync` action.
