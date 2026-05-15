@@ -28,6 +28,8 @@
     "capabilities": {
       "surfaces": [
         "mission.agent.resource.campaigns",
+        "mission.agent.resource.contacts",
+        "mission.agent.surface.contact_import",
         "mission.agent.surface.prompt_editor",
         "job.start",
         "case.step.awaiting",
@@ -39,6 +41,7 @@
         "job.start",
         "job.sync",
         "campaigns.sync",
+        "resource.contacts.import",
         "step.awaiting.submit"
       ],
       "case_lanes": [
@@ -112,6 +115,24 @@
             "label": "Name",
             "type": "string",
             "required": true
+          }
+        ]
+      },
+      {
+        "id": "contacts",
+        "label": "Contacts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update",
+          "import"
+        ],
+        "mounted_views": [
+          {
+            "view": "import",
+            "surface": "mission.agent.surface.contact_import"
           }
         ]
       },
