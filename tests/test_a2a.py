@@ -35,6 +35,11 @@ from supervaizer.protocol.a2a.controller import (
     register_v2_action_handler,
     register_v2_surface_handler,
 )
+from supervaizer.protocol.a2a.events import (
+    A2A_EFFECT_EVENT,
+    subscribe_v2_events,
+    unsubscribe_v2_events,
+)
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:
@@ -311,6 +316,45 @@ def test_a2a_controller_dispatches_registered_v2_action(
     assert payload["result"]["effects"] == [
         {"type": "job.created", "job_id": "job-123"}
     ]
+
+
+def test_a2a_controller_publishes_v2_action_effects(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+    queue = subscribe_v2_events(server_fixture)
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        return V2ActionResult(
+            status="ok",
+            effects=[V2Effect(type="job.started", job_id="job-123")],
+        )
+
+    try:
+        register_v2_action_handler(server_fixture, "job.start", start_job)
+        client = TestClient(server_fixture.app)
+
+        response = client.post(
+            "/a2a",
+            json={
+                "jsonrpc": "2.0",
+                "id": "rpc-event-1",
+                "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+                "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+            },
+        )
+
+        assert response.status_code == 200
+        event = queue.get_nowait()
+        assert event["event"] == A2A_EFFECT_EVENT
+        assert event["data"] == {
+            "agent_slug": agent_slug,
+            "action": "job.start",
+            "request_id": "request-1",
+            "effects": [{"type": "job.started", "job_id": "job-123"}],
+        }
+    finally:
+        unsubscribe_v2_events(server_fixture, queue)
 
 
 def test_a2a_controller_dispatches_registered_v2_surface(

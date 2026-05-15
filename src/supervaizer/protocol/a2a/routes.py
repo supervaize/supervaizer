@@ -12,10 +12,12 @@
 
 from typing import TYPE_CHECKING, Any, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from sse_starlette.sse import EventSourceResponse
 
 from supervaizer.common import log
 from supervaizer.protocol.a2a.controller import dispatch_json_rpc
+from supervaizer.protocol.a2a.events import stream_v2_events
 from supervaizer.protocol.a2a.model import (
     create_agent_card,
     create_agents_list,
@@ -121,5 +123,15 @@ def create_controller_routes(server: "Server") -> APIRouter:
         log.info("[A2A] POST /a2a [JSON-RPC controller]")
         response = await dispatch_json_rpc(server, body)
         return response.model_dump(mode="json", exclude_none=True)
+
+    @router.get(
+        "/a2a/events",
+        summary="A2A SSE Event Stream",
+        description="Streams Supervaizer v2 controller effects over Server-Sent Events.",
+    )
+    @handle_route_errors()
+    async def get_a2a_events(request: Request) -> EventSourceResponse:
+        log.info("[A2A] GET /a2a/events [SSE event stream]")
+        return EventSourceResponse(stream_v2_events(server, request=request))
 
     return router

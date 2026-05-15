@@ -21,6 +21,7 @@ from supervaizer.contracts import (
     V2SurfaceRequest,
     V2SurfaceResult,
 )
+from supervaizer.protocol.a2a.events import A2A_EFFECT_EVENT, publish_v2_event
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -150,6 +151,16 @@ async def _dispatch_action(
         if isawaitable(handler_result):
             handler_result = await handler_result
         result = V2ActionResult.model_validate(handler_result)
+        publish_v2_event(
+            server,
+            A2A_EFFECT_EVENT,
+            {
+                "agent_slug": action_request.agent_slug,
+                "action": action_request.action,
+                "request_id": action_request.request_id,
+                "effects": [effect.model_dump(mode="json") for effect in result.effects],
+            },
+        )
     except Exception as exc:
         return _json_rpc_error(
             request_id=request.id,
