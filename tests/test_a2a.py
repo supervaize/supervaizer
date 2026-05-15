@@ -279,6 +279,33 @@ def test_a2a_controller_dispatches_registered_v2_action(
     ]
 
 
+def test_server_v2_action_decorator_registers_handler(server_fixture: Server) -> None:
+    @server_fixture.v2_action("job.start.preview")
+    def preview_job_start(request: V2ActionRequest) -> dict[str, object]:
+        assert request.action == "job.start.preview"
+        return {"status": "ok", "effects": [{"type": "job.start.previewed"}]}
+
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-4",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start.preview"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-4"
+    assert payload["result"] == {
+        "status": "ok",
+        "effects": [{"type": "job.start.previewed"}],
+    }
+
+
 def _v2_action_payload(action: str) -> dict[str, object]:
     return {
         "request_id": "request-1",

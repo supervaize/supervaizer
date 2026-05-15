@@ -15,7 +15,7 @@ import os
 import secrets
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 import uuid
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
@@ -51,6 +51,10 @@ from supervaizer.common import (
 )
 from supervaizer.contracts import controller_contract_info
 from supervaizer.instructions import display_instructions
+from supervaizer.protocol.a2a.controller import (
+    ActionHandler,
+    register_v2_action_handler,
+)
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.routers import (
     create_api_router,
@@ -745,3 +749,16 @@ class Server(ServerAbstract):
         if result is None:
             raise ValueError("Failed to encrypt parameters")
         return result
+
+    def register_v2_action(self, action: str, handler: ActionHandler) -> ActionHandler:
+        """Register a Supervaizer v2 action handler on this server."""
+        register_v2_action_handler(self, action, handler)
+        return handler
+
+    def v2_action(self, action: str) -> Callable[[ActionHandler], ActionHandler]:
+        """Decorator form of register_v2_action for SDK users."""
+
+        def decorator(handler: ActionHandler) -> ActionHandler:
+            return self.register_v2_action(action, handler)
+
+        return decorator
