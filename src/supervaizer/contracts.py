@@ -405,10 +405,18 @@ class V2ArtifactRef(ContractModel):
     media_type: str | None = None
 
 
+class V2AwaitingFieldDefinition(ContractModel):
+    id: str
+    label: str
+    type: str = "boolean"
+    required: bool = False
+
+
 class V2AwaitingState(ContractModel):
     reason: str
     surface: str
     action: str
+    fields: list[V2AwaitingFieldDefinition] = Field(default_factory=list)
 
 
 class V2StepSnapshot(ContractModel):

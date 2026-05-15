@@ -21,6 +21,7 @@ from supervaizer.contracts import (
     SupervaizerV2AgentRegistrationContract,
     V2ActionRequest,
     V2ActionResult,
+    V2AwaitingState,
     V2JobStateSnapshot,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
@@ -204,6 +205,26 @@ def test_v2_resource_field_options_source_is_typed() -> None:
     assert field.options_source.label_field == "email"
 
 
+def test_v2_awaiting_state_declares_typed_form_fields() -> None:
+    awaiting = V2AwaitingState.model_validate({
+        "reason": "Review campaign setup",
+        "surface": "case.step.awaiting",
+        "action": "step.awaiting.submit",
+        "fields": [
+            {
+                "id": "approve_scenario",
+                "label": "Approve scenario",
+                "type": "boolean",
+                "required": True,
+            }
+        ],
+    })
+
+    assert awaiting.fields[0].id == "approve_scenario"
+    assert awaiting.fields[0].type == "boolean"
+    assert awaiting.fields[0].required is True
+
+
 def test_v2_action_request_and_result_fixture() -> None:
     fixture = load_v2_fixture("agent_interviewer_mvp.json")
 
@@ -266,6 +287,9 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2ActionRequest is V2ActionRequest
     assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
+    assert supervaizer.V2AwaitingFieldDefinition.__name__ == (
+        "V2AwaitingFieldDefinition"
+    )
     assert supervaizer.V2ResourceFieldDefinition.__name__ == (
         "V2ResourceFieldDefinition"
     )

@@ -106,6 +106,10 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "supervaizer.contracts",
         "V2ArtifactTypeDefinition",
     ),
+    "V2AwaitingFieldDefinition": (
+        "supervaizer.contracts",
+        "V2AwaitingFieldDefinition",
+    ),
     "V2AwaitingState": ("supervaizer.contracts", "V2AwaitingState"),
     "V2CaseLaneDefinition": ("supervaizer.contracts", "V2CaseLaneDefinition"),
     "V2CaseSnapshot": ("supervaizer.contracts", "V2CaseSnapshot"),
