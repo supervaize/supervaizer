@@ -24,10 +24,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
 
-from supervaizer.__version__ import API_VERSION
 from supervaizer.agent import Agent
 from supervaizer.case import Cases, CaseNodeUpdate
 from supervaizer.common import log
+from supervaizer.contracts import API_VERSION
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 

@@ -19,6 +19,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 CONTROLLER_CONTRACT_VERSION = "1.0"
+API_VERSION = "v1"
 API_BASE_PATH = "/api"
 SUPERVAIZER_V2_CONTRACT_VERSION: Literal[2] = 2
 SUPERVAIZER_V2_A2UI_VERSION = "v0.8"

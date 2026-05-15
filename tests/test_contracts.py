@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from supervaizer.contracts import (
+    API_VERSION,
     ControllerEndpoint,
     ControllerContract,
     ServerRegistrationContract,
@@ -39,6 +40,7 @@ def load_v2_fixture(name: str) -> dict:
 def test_controller_contract_endpoints_are_api_prefixed() -> None:
     info = controller_contract_info()
 
+    assert API_VERSION == "v1"
     assert info["controller_contract_version"] == "1.0"
     assert info["api_base_path"] == "/api"
     assert (
@@ -76,6 +78,14 @@ def test_contract_module_import_does_not_load_controller_runtime() -> None:
 
     assert "supervaizer.server" not in sys.modules
     assert "supervaizer.routes" not in sys.modules
+
+
+def test_version_module_is_package_version_only() -> None:
+    version_info = importlib.import_module("supervaizer.__version__")
+
+    assert version_info.__version__ == version_info.VERSION
+    assert not hasattr(version_info, "API_VERSION")
+    assert not hasattr(version_info, "TELEMETRY_VERSION")
 
 
 def test_agent_method_contract_exports_timeout_metadata() -> None:

@@ -21,7 +21,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.__version__ import VERSION
+from supervaizer.contracts import API_VERSION
 
 if TYPE_CHECKING:
     from supervaizer.server import Server

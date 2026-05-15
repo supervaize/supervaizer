@@ -35,7 +35,7 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rich import inspect
 
-from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.__version__ import VERSION
 from supervaizer.account import Account
 from supervaizer.agent import (
     Agent,
@@ -49,7 +49,7 @@ from supervaizer.common import (
     is_local_mode,
     log,
 )
-from supervaizer.contracts import controller_contract_info
+from supervaizer.contracts import API_VERSION, controller_contract_info
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a.controller import (
     ActionHandler,

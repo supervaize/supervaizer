@@ -31,8 +31,9 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.__version__ import VERSION
 from supervaizer.common import log
+from supervaizer.contracts import API_VERSION
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import (
     StorageManager,

@@ -65,6 +65,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "TelemetryCategory": ("supervaizer.telemetry", "TelemetryCategory"),
     "TelemetrySeverity": ("supervaizer.telemetry", "TelemetrySeverity"),
     "TelemetryType": ("supervaizer.telemetry", "TelemetryType"),
+    "API_VERSION": ("supervaizer.contracts", "API_VERSION"),
     "SUPERVAIZER_V2_A2A_VERSION": (
         "supervaizer.contracts",
         "SUPERVAIZER_V2_A2A_VERSION",
