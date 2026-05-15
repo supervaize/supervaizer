@@ -187,6 +187,9 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert registration.job_policy.sync is not None
     assert registration.job_policy.sync.action == "job.sync"
     assert "mission.agent.overview" in registration.capabilities.surfaces
+    assert (
+        "mission.agent.resource.campaign_contacts" in registration.capabilities.surfaces
+    )
     assert "job.start" in registration.capabilities.surfaces
     assert "mission.agent.surface.contact_import" in registration.capabilities.surfaces
     assert "mission.agent.surface.prompt_editor" in registration.capabilities.surfaces
@@ -194,6 +197,8 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
         "mission.agent.surface.scenario_builder" in registration.capabilities.surfaces
     )
     assert "campaigns.sync" in registration.capabilities.actions
+    assert "resource.campaign_contacts.create" in registration.capabilities.actions
+    assert "resource.campaign_contacts.delete" in registration.capabilities.actions
     assert "resource.contacts.import" in registration.capabilities.actions
     assert "resource.scenarios.update" in registration.capabilities.actions
     assert any(
@@ -203,9 +208,24 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert {resource.id for resource in registration.resources} >= {
         "campaigns",
         "contacts",
+        "campaign_contacts",
         "prompts",
         "scenarios",
     }
+    campaign_contacts = next(
+        resource
+        for resource in registration.resources
+        if resource.id == "campaign_contacts"
+    )
+    assert set(campaign_contacts.operations) >= {"list", "create", "delete"}
+    assert [field.id for field in campaign_contacts.fields] == [
+        "campaign_id",
+        "contact_id",
+    ]
+    assert campaign_contacts.fields[0].options_source is not None
+    assert campaign_contacts.fields[0].options_source.resource == "campaigns"
+    assert campaign_contacts.fields[1].options_source is not None
+    assert campaign_contacts.fields[1].options_source.resource == "contacts"
     campaigns = next(
         resource for resource in registration.resources if resource.id == "campaigns"
     )

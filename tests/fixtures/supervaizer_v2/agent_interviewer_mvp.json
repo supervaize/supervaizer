@@ -30,6 +30,9 @@
         "mission.agent.overview",
         "mission.agent.resource.campaigns",
         "mission.agent.resource.contacts",
+        "mission.agent.resource.prompts",
+        "mission.agent.resource.scenarios",
+        "mission.agent.resource.campaign_contacts",
         "mission.agent.surface.contact_import",
         "mission.agent.surface.prompt_editor",
         "mission.agent.surface.scenario_builder",
@@ -41,10 +44,26 @@
       "actions": [
         "job.start.preview",
         "job.start",
+        "job.stop",
         "job.sync",
         "campaigns.sync",
+        "artifact.get",
+        "resource.campaigns.list",
+        "resource.campaigns.create",
+        "resource.campaigns.update",
+        "resource.contacts.list",
+        "resource.contacts.create",
+        "resource.contacts.update",
         "resource.contacts.import",
+        "resource.prompts.list",
+        "resource.prompts.update",
+        "resource.scenarios.list",
         "resource.scenarios.update",
+        "resource.campaign_contacts.list",
+        "resource.campaign_contacts.create",
+        "resource.campaign_contacts.delete",
+        "dataset.campaign_progress.query",
+        "dataset.session_metrics.query",
         "step.awaiting.submit"
       ],
       "case_lanes": [
@@ -132,6 +151,39 @@
           "update",
           "import"
         ],
+        "display": {
+          "title_field": "email",
+          "columns": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ],
+          "search_fields": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ]
+        },
+        "fields": [
+          {
+            "id": "first_name",
+            "label": "First name",
+            "type": "string"
+          },
+          {
+            "id": "last_name",
+            "label": "Last name",
+            "type": "string"
+          },
+          {
+            "id": "email",
+            "label": "Email",
+            "type": "email",
+            "required": true
+          }
+        ],
         "mounted_views": [
           {
             "view": "import",
@@ -146,8 +198,22 @@
         "operations": [
           "list",
           "get",
-          "create",
           "update"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "content",
+            "label": "Content",
+            "type": "text",
+            "required": true,
+            "multiline": true
+          }
         ],
         "mounted_views": [
           {
@@ -171,12 +237,65 @@
             "surface": "mission.agent.surface.scenario_builder"
           }
         ]
+      },
+      {
+        "id": "campaign_contacts",
+        "label": "Campaign Contacts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "create",
+          "delete"
+        ],
+        "display": {
+          "title_field": "contact_id",
+          "columns": [
+            "contact_id",
+            "interview_status",
+            "is_inactive"
+          ],
+          "search_fields": [
+            "contact_id",
+            "interview_status"
+          ]
+        },
+        "fields": [
+          {
+            "id": "campaign_id",
+            "label": "Campaign",
+            "type": "resource_ref",
+            "required": true,
+            "options_source": {
+              "type": "resource",
+              "resource": "campaigns",
+              "value_field": "id",
+              "label_field": "name"
+            }
+          },
+          {
+            "id": "contact_id",
+            "label": "Contact",
+            "type": "resource_ref",
+            "required": true,
+            "options_source": {
+              "type": "resource",
+              "resource": "contacts",
+              "value_field": "id",
+              "label_field": "email"
+            }
+          }
+        ]
       }
     ],
     "datasets": [
       {
         "id": "campaign_progress",
         "label": "Campaign Progress",
+        "auto_surface": true
+      },
+      {
+        "id": "session_metrics",
+        "label": "Session Metrics",
         "auto_surface": true
       }
     ]
