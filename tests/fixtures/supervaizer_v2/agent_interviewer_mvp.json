@@ -15,11 +15,11 @@
     "a2a": {
       "agent_card_url": "https://agent.example.com/.well-known/agent-card.json",
       "controller_url": "https://agent.example.com/a2a",
-      "transport": {
-        "json_rpc": true,
-        "sse": true,
-        "push_notifications": true
-      },
+        "transport": {
+          "json_rpc": true,
+          "sse": true,
+          "push_notifications": false
+        },
       "external_interop": {
         "inbound_tasks": false,
         "outbound_delegation": false

@@ -262,7 +262,7 @@ class V2ProtocolVersions(ContractModel):
 class V2A2ATransport(ContractModel):
     json_rpc: bool = True
     sse: bool = True
-    push_notifications: bool = True
+    push_notifications: bool = False
 
 
 class V2A2AExternalInterop(ContractModel):

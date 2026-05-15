@@ -168,6 +168,9 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert registration.supervaizer_contract_version == 2
     assert registration.versions.a2ui_version == "v0.8"
     assert registration.versions.a2a_version == "0.2.6"
+    assert registration.a2a.transport.json_rpc is True
+    assert registration.a2a.transport.sse is True
+    assert registration.a2a.transport.push_notifications is False
     assert registration.job_policy.sync is not None
     assert registration.job_policy.sync.action == "job.sync"
     assert "job.start" in registration.capabilities.surfaces
