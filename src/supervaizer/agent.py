@@ -36,6 +36,7 @@ from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.case import CaseNodes
+from supervaizer.contracts import SupervaizerV2AgentRegistrationContract
 from supervaizer.data_resource import DataResource
 
 if TYPE_CHECKING:
@@ -655,6 +656,10 @@ class AgentAbstract(SvBaseModel):
         description="Data resources this agent exposes for Studio CRUD access",
         exclude=True,
     )
+    supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract | None = Field(
+        default=None,
+        description="Optional Supervaizer v2 registration contract for A2A/A2UI Studio integrations",
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -684,6 +689,9 @@ class Agent(AgentAbstract):
         custom_routes: Any | None = None,
         dynamic_choices_callback: Any | None = None,
         data_resources: list["DataResource"] | None = None,
+        supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract
+        | dict[str, Any]
+        | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -741,6 +749,7 @@ class Agent(AgentAbstract):
             custom_routes=custom_routes,
             dynamic_choices_callback=dynamic_choices_callback,
             data_resources=data_resources or [],
+            supervaizer_v2_registration=supervaizer_v2_registration,
             **kwargs,
         )
 
@@ -791,6 +800,9 @@ class Agent(AgentAbstract):
             "max_execution_time": self.max_execution_time,
             "instructions_path": self.instructions_path,
             "data_resources": [r.registration_info for r in self.data_resources],
+            "supervaizer_v2": self.supervaizer_v2_registration.model_dump(mode="json")
+            if self.supervaizer_v2_registration
+            else None,
         }
 
     def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:

@@ -91,6 +91,37 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert "changelog_url" in card["version_info"]
 
 
+def test_create_agent_card_includes_supervaizer_v2_extension() -> None:
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+        },
+    )
+
+    card = create_agent_card(agent, "https://agent.example.com")
+
+    assert card["supervaizer"]["v2"]["supervaizer_contract_version"] == 2
+    assert card["supervaizer"]["v2"]["a2a"]["controller_url"] == "/a2a"
+
+
 def test_create_agents_list(agent_fixture: Agent) -> None:
     """Test the create_agents_list function."""
     base_url = "http://test.example.com"

@@ -130,6 +130,10 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
         "tools": tools,
         "authentication": authentication,
     }
+    if agent.supervaizer_v2_registration is not None:
+        agent_card["supervaizer"] = {
+            "v2": agent.supervaizer_v2_registration.model_dump(mode="json")
+        }
 
     return agent_card
 

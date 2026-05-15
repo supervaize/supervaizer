@@ -1305,3 +1305,35 @@ def test_agent_registration_info_includes_release_notes_url() -> None:
 
     assert info["version"] == "1.0.0"
     assert info["release_notes_url"] == "https://example.com/releases/1.0.0"
+
+
+def test_agent_registration_info_includes_supervaizer_v2_contract() -> None:
+    """Agent.registration_info includes the optional Supervaizer v2 contract."""
+    agent = Agent(
+        name="agentName",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+        },
+    )
+
+    info = agent.registration_info
+
+    assert info["supervaizer_v2"]["supervaizer_contract_version"] == 2
+    assert info["supervaizer_v2"]["versions"]["a2ui_version"] == "v0.8"
