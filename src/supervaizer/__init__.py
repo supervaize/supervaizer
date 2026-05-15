@@ -122,6 +122,10 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "V2ReplaySafetyMetadata",
     ),
     "V2ResourceDefinition": ("supervaizer.contracts", "V2ResourceDefinition"),
+    "V2ResourceFieldDefinition": (
+        "supervaizer.contracts",
+        "V2ResourceFieldDefinition",
+    ),
     "V2StepSnapshot": ("supervaizer.contracts", "V2StepSnapshot"),
     "V2WorkspaceContext": ("supervaizer.contracts", "V2WorkspaceContext"),
     "build_data_resource_context_headers": (

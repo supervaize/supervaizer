@@ -176,6 +176,11 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
         "campaigns",
         "prompts",
     }
+    campaigns = next(
+        resource for resource in registration.resources if resource.id == "campaigns"
+    )
+    assert [field.id for field in campaigns.fields] == ["name"]
+    assert campaigns.fields[0].required is True
 
 
 def test_v2_action_request_and_result_fixture() -> None:
@@ -240,3 +245,6 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2ActionRequest is V2ActionRequest
     assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
+    assert supervaizer.V2ResourceFieldDefinition.__name__ == (
+        "V2ResourceFieldDefinition"
+    )

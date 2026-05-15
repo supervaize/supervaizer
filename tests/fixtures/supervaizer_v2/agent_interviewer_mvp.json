@@ -104,7 +104,15 @@
           "search_fields": [
             "name"
           ]
-        }
+        },
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true
+          }
+        ]
       },
       {
         "id": "prompts",

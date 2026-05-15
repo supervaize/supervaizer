@@ -314,6 +314,15 @@ class V2ResourceDisplayDefinition(ContractModel):
     search_fields: list[str] = Field(default_factory=list)
 
 
+class V2ResourceFieldDefinition(ContractModel):
+    id: str
+    label: str
+    type: str = "string"
+    required: bool = False
+    read_only: bool = False
+    multiline: bool = False
+
+
 class V2MountedResourceViewDefinition(ContractModel):
     view: str
     surface: str
@@ -325,6 +334,7 @@ class V2ResourceDefinition(ContractModel):
     auto_surface: bool = False
     operations: list[str] = Field(default_factory=list)
     display: V2ResourceDisplayDefinition | None = None
+    fields: list[V2ResourceFieldDefinition] = Field(default_factory=list)
     mounted_views: list[V2MountedResourceViewDefinition] = Field(default_factory=list)
 
 
