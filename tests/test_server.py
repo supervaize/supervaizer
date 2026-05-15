@@ -633,8 +633,10 @@ class TestServerLocalMode:
             )
             capabilities = card_response.json()["supervaizer"]["v2"]["capabilities"]
             assert "case.step.awaiting" in capabilities["surfaces"]
+            assert "mission.agent.resource.hello_messages" in capabilities["surfaces"]
             assert "job.sync" in capabilities["actions"]
             assert "step.awaiting.submit" in capabilities["actions"]
+            assert "resource.hello_messages.list" in capabilities["actions"]
 
             surface_response = client.post(
                 "/a2a",
@@ -683,6 +685,29 @@ class TestServerLocalMode:
                 action_response.json()["result"]["effects"][0]["type"]
                 == "job.start.previewed"
             )
+
+            resource_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "resource-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "resource-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "mission.agent.resource.hello_messages",
+                        "action": "resource.hello_messages.list",
+                        "input": {},
+                    },
+                },
+            )
+            assert resource_response.status_code == 200
+            resource_result = resource_response.json()["result"]
+            assert resource_result["effects"][0]["type"] == "resource.listed"
+            assert resource_result["effects"][0]["resource"] == "hello_messages"
 
             start_response = client.post(
                 "/a2a",

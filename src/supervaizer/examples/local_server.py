@@ -30,9 +30,8 @@ from supervaizer import (
 )
 from supervaizer.agent import AgentMethodField
 from supervaizer.contracts import (
-    SUPERVAIZER_V2_A2A_VERSION,
-    SUPERVAIZER_V2_A2UI_VERSION,
-    SUPERVAIZER_V2_CONTRACT_VERSION,
+    V2ResourceDefinition,
+    build_v2_agent_registration,
 )
 
 HELLO_WORLD_AGENT_NAME = "Hello World AI Agent"
@@ -47,37 +46,31 @@ def build_default_local_v2_registration(
     agent_version: str = HELLO_WORLD_AGENT_VERSION,
 ) -> dict[str, Any]:
     """Return the minimal Supervaizer v2 contract for the built-in local agent."""
-    return {
-        "supervaizer_contract_version": SUPERVAIZER_V2_CONTRACT_VERSION,
-        "agent": {
-            "id": agent_slug,
-            "slug": agent_slug,
-            "display_name": HELLO_WORLD_AGENT_NAME,
-        },
-        "versions": {
-            "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
-            "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
-            "a2a_version": SUPERVAIZER_V2_A2A_VERSION,
-            "ag_ui_version": None,
-        },
-        "a2a": {
-            "agent_card_url": f"/.well-known/agents/v{agent_version}/{agent_slug}_agent.json",
-            "controller_url": "/a2a",
-        },
-        "capabilities": {
-            "surfaces": ["job.start", "case.step.awaiting"],
-            "actions": [
-                "job.start.preview",
-                "job.start",
-                "job.sync",
-                "step.awaiting.submit",
-            ],
-            "case_lanes": [{"id": "work", "label": "Work", "default": True}],
-            "artifact_types": [],
-        },
-        "resources": [],
-        "datasets": [],
-    }
+    registration = build_v2_agent_registration(
+        agent_id=agent_slug,
+        agent_slug=agent_slug,
+        display_name=HELLO_WORLD_AGENT_NAME,
+        agent_card_url=f"/.well-known/agents/v{agent_version}/{agent_slug}_agent.json",
+        controller_url="/a2a",
+        a2ui_catalog_version=HELLO_WORLD_A2UI_CATALOG_VERSION,
+        surfaces=["job.start", "case.step.awaiting"],
+        actions=[
+            "job.start.preview",
+            "job.start",
+            "step.awaiting.submit",
+        ],
+        case_lanes=[{"id": "work", "label": "Work", "default": True}],
+        job_policy={"sync": {"action": "job.sync"}},
+        resources=[
+            V2ResourceDefinition(
+                id="hello_messages",
+                label="Hello Messages",
+                auto_surface=True,
+                operations=["list"],
+            )
+        ],
+    )
+    return registration.model_dump(mode="json")
 
 
 def register_default_local_v2_handlers(
@@ -96,7 +89,12 @@ def register_default_local_v2_handlers(
     server.register_v2_action(
         "job.start.preview", handle_v2_action, agent_slug=agent_slug
     )
-    for action in ("job.start", "job.sync", "step.awaiting.submit"):
+    for action in (
+        "job.start",
+        "job.sync",
+        "step.awaiting.submit",
+        "resource.hello_messages.list",
+    ):
         server.register_v2_action(action, handle_v2_action, agent_slug=agent_slug)
 
 

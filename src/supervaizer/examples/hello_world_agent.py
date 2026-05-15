@@ -299,6 +299,8 @@ def handle_v2_action(action_request: Any) -> dict[str, Any]:
         return _job_sync_result(request)
     if action == "step.awaiting.submit":
         return _awaiting_submit_result(request)
+    if action == "resource.hello_messages.list":
+        return _hello_messages_result()
     return {
         "status": "error",
         "effects": [{"type": "action.unsupported", "action": action}],
@@ -399,6 +401,24 @@ def _awaiting_submit_result(request: dict[str, Any]) -> dict[str, Any]:
             }
         ],
         "job_state": _completed_review_job_state(request),
+    }
+
+
+def _hello_messages_result() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "resource.listed",
+                "resource": "hello_messages",
+                "items": [
+                    {
+                        "id": "hello-1",
+                        "message": "Hello from Supervaizer v2",
+                    }
+                ],
+            }
+        ],
     }
 
 

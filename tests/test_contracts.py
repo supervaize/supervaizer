@@ -33,6 +33,7 @@ from supervaizer.contracts import (
     V2SurfaceRequest,
     V2SurfaceResult,
     build_data_resource_context_headers,
+    build_v2_agent_registration,
     controller_contract_info,
     resolve_controller_endpoint,
 )
@@ -253,6 +254,58 @@ def test_v2_resource_field_options_source_is_typed() -> None:
     assert field.options_source.label_field == "email"
 
 
+def test_build_v2_agent_registration_derives_capabilities() -> None:
+    registration = build_v2_agent_registration(
+        agent_id="hello",
+        agent_slug="hello-world",
+        display_name="Hello World",
+        agent_card_url="/.well-known/agents/v1/hello-world_agent.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        surfaces=["job.start", "case.step.awaiting", "job.start"],
+        actions=["job.start", "step.awaiting.submit"],
+        resources=[
+            {
+                "id": "contacts",
+                "label": "Contacts",
+                "auto_surface": True,
+                "operations": ["list", "create"],
+                "fields": [{"id": "email", "label": "Email", "required": True}],
+            }
+        ],
+        datasets=[
+            {
+                "id": "campaign_progress",
+                "label": "Campaign Progress",
+                "auto_surface": True,
+            }
+        ],
+        case_lanes=[{"id": "work", "label": "Work", "default": True}],
+        job_policy={"sync": {"action": "job.sync"}},
+    )
+
+    assert registration.versions.a2ui_version == "v0.8"
+    assert registration.versions.a2a_version == "0.2.6"
+    assert registration.a2a.controller_url == "/a2a"
+    assert registration.a2a.transport.push_notifications is False
+    assert registration.capabilities.surfaces == [
+        "job.start",
+        "case.step.awaiting",
+        "mission.agent.resource.contacts",
+        "mission.agent.dataset.campaign_progress",
+    ]
+    assert registration.capabilities.actions == [
+        "job.start",
+        "step.awaiting.submit",
+        "resource.contacts.list",
+        "resource.contacts.create",
+        "dataset.campaign_progress.query",
+        "job.sync",
+    ]
+    assert registration.resources[0].fields[0].id == "email"
+    assert registration.capabilities.case_lanes[0].default is True
+
+
 def test_v2_awaiting_state_declares_typed_form_fields() -> None:
     awaiting = V2AwaitingState.model_validate({
         "reason": "Review campaign setup",
@@ -369,3 +422,4 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2SurfaceRequest is V2SurfaceRequest
     assert supervaizer.V2SurfaceResult is V2SurfaceResult
+    assert supervaizer.build_v2_agent_registration is build_v2_agent_registration

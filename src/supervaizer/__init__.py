@@ -140,6 +140,10 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "supervaizer.contracts",
         "build_data_resource_context_headers",
     ),
+    "build_v2_agent_registration": (
+        "supervaizer.contracts",
+        "build_v2_agent_registration",
+    ),
     "controller_contract_info": ("supervaizer.contracts", "controller_contract_info"),
     "resolve_controller_endpoint": (
         "supervaizer.contracts",

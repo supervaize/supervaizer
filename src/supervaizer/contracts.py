@@ -13,8 +13,9 @@ the Supervaizer server/runtime surface.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -30,6 +31,9 @@ class ContractModel(BaseModel):
     """Base class for SDK-owned wire contract models."""
 
     model_config = {"use_enum_values": True, "extra": "allow"}
+
+
+ContractModelT = TypeVar("ContractModelT", bound=ContractModel)
 
 
 class ControllerEndpoint(StrEnum):
@@ -356,6 +360,145 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
     job_policy: V2JobPolicy = Field(default_factory=V2JobPolicy)
     resources: list[V2ResourceDefinition] = Field(default_factory=list)
     datasets: list[V2DatasetDefinition] = Field(default_factory=list)
+
+
+def build_v2_agent_registration(
+    *,
+    agent_id: str,
+    agent_slug: str,
+    display_name: str,
+    agent_card_url: str,
+    controller_url: str,
+    a2ui_catalog_version: str,
+    surfaces: Iterable[str] = (),
+    actions: Iterable[str] = (),
+    resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
+    datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
+    case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
+    artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
+    job_policy: V2JobPolicy | dict[str, Any] | None = None,
+    a2ui_version: str = SUPERVAIZER_V2_A2UI_VERSION,
+    a2a_version: str = SUPERVAIZER_V2_A2A_VERSION,
+    ag_ui_version: str | None = None,
+    a2a_transport: V2A2ATransport | dict[str, Any] | None = None,
+    a2a_external_interop: V2A2AExternalInterop | dict[str, Any] | None = None,
+) -> SupervaizerV2AgentRegistrationContract:
+    """Build and validate a Supervaizer v2 registration from SDK primitives."""
+    resource_definitions = _contract_list(resources, V2ResourceDefinition)
+    dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
+    sync_policy = _job_policy(job_policy)
+
+    capability_surfaces = _unique_strings([
+        *surfaces,
+        *_auto_resource_surface_ids(resource_definitions),
+        *_auto_dataset_surface_ids(dataset_definitions),
+    ])
+    capability_actions = _unique_strings([
+        *actions,
+        *_resource_action_ids(resource_definitions),
+        *_dataset_action_ids(dataset_definitions),
+        *(_job_sync_actions(sync_policy)),
+    ])
+
+    return SupervaizerV2AgentRegistrationContract(
+        agent=V2AgentIdentity(
+            id=agent_id,
+            slug=agent_slug,
+            display_name=display_name,
+        ),
+        versions=V2ProtocolVersions(
+            a2ui_version=a2ui_version,
+            a2ui_catalog_version=a2ui_catalog_version,
+            a2a_version=a2a_version,
+            ag_ui_version=ag_ui_version,
+        ),
+        a2a=V2A2AController(
+            agent_card_url=agent_card_url,
+            controller_url=controller_url,
+            transport=_contract_or_default(a2a_transport, V2A2ATransport),
+            external_interop=_contract_or_default(
+                a2a_external_interop,
+                V2A2AExternalInterop,
+            ),
+        ),
+        capabilities=V2AgentCapabilities(
+            surfaces=capability_surfaces,
+            actions=capability_actions,
+            case_lanes=_contract_list(case_lanes, V2CaseLaneDefinition),
+            artifact_types=_contract_list(artifact_types, V2ArtifactTypeDefinition),
+        ),
+        job_policy=sync_policy,
+        resources=resource_definitions,
+        datasets=dataset_definitions,
+    )
+
+
+def _contract_list(
+    values: Iterable[ContractModelT | dict[str, Any]],
+    model: type[ContractModelT],
+) -> list[ContractModelT]:
+    return [
+        value if isinstance(value, model) else model.model_validate(value)
+        for value in values
+    ]
+
+
+def _contract_or_default(
+    value: ContractModelT | dict[str, Any] | None,
+    model: type[ContractModelT],
+) -> ContractModelT:
+    if value is None:
+        return model()
+    return value if isinstance(value, model) else model.model_validate(value)
+
+
+def _job_policy(value: V2JobPolicy | dict[str, Any] | None) -> V2JobPolicy:
+    return _contract_or_default(value, V2JobPolicy)
+
+
+def _unique_strings(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def _auto_resource_surface_ids(resources: Iterable[V2ResourceDefinition]) -> list[str]:
+    return [
+        f"mission.agent.resource.{resource.id}"
+        for resource in resources
+        if resource.auto_surface
+    ]
+
+
+def _auto_dataset_surface_ids(datasets: Iterable[V2DatasetDefinition]) -> list[str]:
+    return [
+        f"mission.agent.dataset.{dataset.id}"
+        for dataset in datasets
+        if dataset.auto_surface
+    ]
+
+
+def _resource_action_ids(resources: Iterable[V2ResourceDefinition]) -> list[str]:
+    return [
+        f"resource.{resource.id}.{operation}"
+        for resource in resources
+        for operation in resource.operations
+    ]
+
+
+def _dataset_action_ids(datasets: Iterable[V2DatasetDefinition]) -> list[str]:
+    return [f"dataset.{dataset.id}.query" for dataset in datasets]
+
+
+def _job_sync_actions(job_policy: V2JobPolicy) -> list[str]:
+    if job_policy.sync is None:
+        return []
+    return [job_policy.sync.action]
 
 
 class V2ActorContext(ContractModel):
