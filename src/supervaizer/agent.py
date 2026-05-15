@@ -753,6 +753,8 @@ class Agent(AgentAbstract):
             **kwargs,
         )
 
+        self._validate_supervaizer_v2_identity()
+
         seen_resource_names: set[str] = set()
         for r in self.data_resources:
             if r.name in seen_resource_names:
@@ -764,6 +766,18 @@ class Agent(AgentAbstract):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
+
+    def _validate_supervaizer_v2_identity(self) -> None:
+        registration = self.supervaizer_v2_registration
+        if registration is None:
+            return
+
+        declared_slug = registration.agent.slug
+        if declared_slug != self.slug:
+            raise ValueError(
+                "Supervaizer v2 registration agent.slug must match Agent.slug: "
+                f"{declared_slug!r} != {self.slug!r}"
+            )
 
     @property
     def slug(self) -> str:

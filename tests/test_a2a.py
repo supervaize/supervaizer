@@ -93,7 +93,7 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
 
 def test_create_agent_card_includes_supervaizer_v2_extension() -> None:
     agent = Agent(
-        name="agentName",
+        name="Agent Name",
         author="authorName",
         developer="Dev",
         version="1.0.0",
