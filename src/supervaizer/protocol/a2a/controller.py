@@ -30,6 +30,7 @@ ActionHandler = Callable[
     [V2ActionRequest],
     V2ActionResult | dict[str, Any] | Awaitable[V2ActionResult | dict[str, Any]],
 ]
+ActionHandlerKey = tuple[str, str]
 
 
 class JsonRpcRequest(ContractModel):
@@ -53,11 +54,17 @@ class JsonRpcResponse(ContractModel):
 
 
 def register_v2_action_handler(
-    server: "Server", action: str, handler: ActionHandler
+    server: "Server",
+    action: str,
+    handler: ActionHandler,
+    *,
+    agent_slug: str | None = None,
 ) -> None:
     """Register a Supervaizer v2 action handler for the current server process."""
     handlers = _get_action_handlers(server)
-    handlers[action] = handler
+    handlers[_action_handler_key(_resolve_agent_slug(server, agent_slug), action)] = (
+        handler
+    )
 
 
 async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcResponse:
@@ -95,13 +102,18 @@ async def _dispatch_action(
             data={"errors": exc.errors()},
         )
 
-    handler = _get_action_handlers(server).get(action_request.action)
+    handler = _get_action_handlers(server).get(
+        _action_handler_key(action_request.agent_slug, action_request.action)
+    )
     if handler is None:
         return _json_rpc_error(
             request_id=request.id,
             code=JSON_RPC_ACTION_NOT_REGISTERED,
             message=f"Action handler not registered: {action_request.action}",
-            data={"action": action_request.action},
+            data={
+                "agent_slug": action_request.agent_slug,
+                "action": action_request.action,
+            },
         )
 
     try:
@@ -125,13 +137,28 @@ def _validate_action_request(params: dict[str, Any]) -> V2ActionRequest:
     return V2ActionRequest.model_validate(action_payload)
 
 
-def _get_action_handlers(server: "Server") -> dict[str, ActionHandler]:
+def _get_action_handlers(server: "Server") -> dict[ActionHandlerKey, ActionHandler]:
     state = server.app.state
     handlers = getattr(state, "supervaizer_v2_action_handlers", None)
     if handlers is None:
         handlers = {}
         state.supervaizer_v2_action_handlers = handlers
     return handlers
+
+
+def _resolve_agent_slug(server: "Server", agent_slug: str | None) -> str:
+    agent_slugs = {agent.slug for agent in server.agents}
+    if agent_slug:
+        if agent_slug not in agent_slugs:
+            raise ValueError(f"Unknown agent_slug for v2 action handler: {agent_slug}")
+        return agent_slug
+    if len(agent_slugs) == 1:
+        return next(iter(agent_slugs))
+    raise ValueError("agent_slug is required for multi-agent v2 action handlers")
+
+
+def _action_handler_key(agent_slug: str, action: str) -> ActionHandlerKey:
+    return (agent_slug, action)
 
 
 def _json_rpc_error(

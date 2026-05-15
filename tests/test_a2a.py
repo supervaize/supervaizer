@@ -244,12 +244,15 @@ def test_a2a_controller_rejects_unregistered_v2_action(
     payload = response.json()
     assert payload["id"] == "rpc-2"
     assert payload["error"]["code"] == JSON_RPC_ACTION_NOT_REGISTERED
+    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
     assert payload["error"]["data"]["action"] == "job.start"
 
 
 def test_a2a_controller_dispatches_registered_v2_action(
     server_fixture: Server,
 ) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
     def start_job(request: V2ActionRequest) -> V2ActionResult:
         assert request.action == "job.start"
         return V2ActionResult(
@@ -266,7 +269,7 @@ def test_a2a_controller_dispatches_registered_v2_action(
             "jsonrpc": "2.0",
             "id": "rpc-3",
             "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
-            "params": _v2_action_payload(action="job.start"),
+            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
         },
     )
 
@@ -280,6 +283,8 @@ def test_a2a_controller_dispatches_registered_v2_action(
 
 
 def test_server_v2_action_decorator_registers_handler(server_fixture: Server) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
     @server_fixture.v2_action("job.start.preview")
     def preview_job_start(request: V2ActionRequest) -> dict[str, object]:
         assert request.action == "job.start.preview"
@@ -293,7 +298,9 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
             "jsonrpc": "2.0",
             "id": "rpc-4",
             "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
-            "params": _v2_action_payload(action="job.start.preview"),
+            "params": _v2_action_payload(
+                action="job.start.preview", agent_slug=agent_slug
+            ),
         },
     )
 
@@ -306,13 +313,85 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
     }
 
 
-def _v2_action_payload(action: str) -> dict[str, object]:
+def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> None:
+    first_slug = server_fixture.agents[0].slug
+    second_agent = Agent(
+        name="Second Agent",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+    )
+    server_fixture.agents.append(second_agent)
+
+    register_v2_action_handler(
+        server_fixture,
+        "job.start",
+        lambda _request: {"status": "ok", "effects": [{"type": "first-agent"}]},
+        agent_slug=first_slug,
+    )
+    register_v2_action_handler(
+        server_fixture,
+        "job.start",
+        lambda _request: {"status": "ok", "effects": [{"type": "second-agent"}]},
+        agent_slug=second_agent.slug,
+    )
+    client = TestClient(server_fixture.app)
+
+    first_response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-5",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=first_slug),
+        },
+    )
+    second_response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-6",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(
+                action="job.start", agent_slug=second_agent.slug
+            ),
+        },
+    )
+
+    assert first_response.json()["result"]["effects"] == [{"type": "first-agent"}]
+    assert second_response.json()["result"]["effects"] == [{"type": "second-agent"}]
+
+
+def test_v2_action_registration_requires_agent_slug_for_multi_agent_server(
+    server_fixture: Server,
+) -> None:
+    server_fixture.agents.append(
+        Agent(
+            name="Second Agent",
+            author="authorName",
+            developer="Dev",
+            version="1.0.0",
+            description="description",
+        )
+    )
+
+    with pytest.raises(ValueError, match="agent_slug is required"):
+        server_fixture.register_v2_action(
+            "job.start",
+            lambda _request: V2ActionResult(status="ok"),
+        )
+
+
+def _v2_action_payload(
+    action: str, agent_slug: str = "agent-interviewer"
+) -> dict[str, object]:
     return {
         "request_id": "request-1",
         "actor": {"user_id": "user-1"},
         "workspace": {"id": "workspace-1", "slug": "workspace"},
         "mission_id": "mission-1",
-        "agent_slug": "agent-interviewer",
+        "agent_slug": agent_slug,
         "surface": "job.start",
         "action": action,
         "input": {"campaign_id": "campaign-1"},

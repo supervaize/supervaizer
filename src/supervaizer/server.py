@@ -750,15 +750,19 @@ class Server(ServerAbstract):
             raise ValueError("Failed to encrypt parameters")
         return result
 
-    def register_v2_action(self, action: str, handler: ActionHandler) -> ActionHandler:
+    def register_v2_action(
+        self, action: str, handler: ActionHandler, *, agent_slug: str | None = None
+    ) -> ActionHandler:
         """Register a Supervaizer v2 action handler on this server."""
-        register_v2_action_handler(self, action, handler)
+        register_v2_action_handler(self, action, handler, agent_slug=agent_slug)
         return handler
 
-    def v2_action(self, action: str) -> Callable[[ActionHandler], ActionHandler]:
+    def v2_action(
+        self, action: str, *, agent_slug: str | None = None
+    ) -> Callable[[ActionHandler], ActionHandler]:
         """Decorator form of register_v2_action for SDK users."""
 
         def decorator(handler: ActionHandler) -> ActionHandler:
-            return self.register_v2_action(action, handler)
+            return self.register_v2_action(action, handler, agent_slug=agent_slug)
 
         return decorator
