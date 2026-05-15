@@ -135,6 +135,8 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "V2ResourceFieldOptionsSource",
     ),
     "V2StepSnapshot": ("supervaizer.contracts", "V2StepSnapshot"),
+    "V2SurfaceRequest": ("supervaizer.contracts", "V2SurfaceRequest"),
+    "V2SurfaceResult": ("supervaizer.contracts", "V2SurfaceResult"),
     "V2WorkspaceContext": ("supervaizer.contracts", "V2WorkspaceContext"),
     "build_data_resource_context_headers": (
         "supervaizer.contracts",

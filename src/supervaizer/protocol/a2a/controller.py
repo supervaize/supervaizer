@@ -14,23 +14,36 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, ValidationError
 
-from supervaizer.contracts import ContractModel, V2ActionRequest, V2ActionResult
+from supervaizer.contracts import (
+    ContractModel,
+    V2ActionRequest,
+    V2ActionResult,
+    V2SurfaceRequest,
+    V2SurfaceResult,
+)
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
 
 SUPERVAIZER_ACTION_INVOKE_METHOD = "supervaizer/action.invoke"
+SUPERVAIZER_SURFACE_LOAD_METHOD = "supervaizer/surface.load"
 
 JSON_RPC_METHOD_NOT_FOUND = -32601
 JSON_RPC_INVALID_PARAMS = -32602
 JSON_RPC_ACTION_NOT_REGISTERED = -32010
+JSON_RPC_SURFACE_NOT_REGISTERED = -32011
 JSON_RPC_INTERNAL_ERROR = -32603
 
 ActionHandler = Callable[
     [V2ActionRequest],
     V2ActionResult | dict[str, Any] | Awaitable[V2ActionResult | dict[str, Any]],
 ]
+SurfaceHandler = Callable[
+    [V2SurfaceRequest],
+    V2SurfaceResult | dict[str, Any] | Awaitable[V2SurfaceResult | dict[str, Any]],
+]
 ActionHandlerKey = tuple[str, str]
+SurfaceHandlerKey = tuple[str, str]
 
 
 class JsonRpcRequest(ContractModel):
@@ -67,6 +80,20 @@ def register_v2_action_handler(
     )
 
 
+def register_v2_surface_handler(
+    server: "Server",
+    surface: str,
+    handler: SurfaceHandler,
+    *,
+    agent_slug: str | None = None,
+) -> None:
+    """Register a Supervaizer v2 A2UI surface handler for the current server process."""
+    handlers = _get_surface_handlers(server)
+    handlers[_surface_handler_key(_resolve_agent_slug(server, agent_slug), surface)] = (
+        handler
+    )
+
+
 async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcResponse:
     """Dispatch one A2A JSON-RPC request."""
     try:
@@ -79,14 +106,16 @@ async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcRe
             data={"errors": exc.errors()},
         )
 
-    if request.method != SUPERVAIZER_ACTION_INVOKE_METHOD:
-        return _json_rpc_error(
-            request_id=request.id,
-            code=JSON_RPC_METHOD_NOT_FOUND,
-            message=f"Method not found: {request.method}",
-        )
+    if request.method == SUPERVAIZER_ACTION_INVOKE_METHOD:
+        return await _dispatch_action(server, request)
+    if request.method == SUPERVAIZER_SURFACE_LOAD_METHOD:
+        return await _dispatch_surface(server, request)
 
-    return await _dispatch_action(server, request)
+    return _json_rpc_error(
+        request_id=request.id,
+        code=JSON_RPC_METHOD_NOT_FOUND,
+        message=f"Method not found: {request.method}",
+    )
 
 
 async def _dispatch_action(
@@ -132,9 +161,57 @@ async def _dispatch_action(
     return JsonRpcResponse(id=request.id, result=result.model_dump(mode="json"))
 
 
+async def _dispatch_surface(
+    server: "Server", request: JsonRpcRequest
+) -> JsonRpcResponse:
+    try:
+        surface_request = _validate_surface_request(request.params)
+    except ValidationError as exc:
+        return _json_rpc_error(
+            request_id=request.id,
+            code=JSON_RPC_INVALID_PARAMS,
+            message="Invalid Supervaizer v2 surface request",
+            data={"errors": exc.errors()},
+        )
+
+    handler = _get_surface_handlers(server).get(
+        _surface_handler_key(surface_request.agent_slug, surface_request.surface)
+    )
+    if handler is None:
+        return _json_rpc_error(
+            request_id=request.id,
+            code=JSON_RPC_SURFACE_NOT_REGISTERED,
+            message=f"Surface handler not registered: {surface_request.surface}",
+            data={
+                "agent_slug": surface_request.agent_slug,
+                "surface": surface_request.surface,
+            },
+        )
+
+    try:
+        handler_result = handler(surface_request)
+        if isawaitable(handler_result):
+            handler_result = await handler_result
+        result = V2SurfaceResult.model_validate(handler_result)
+    except Exception as exc:
+        return _json_rpc_error(
+            request_id=request.id,
+            code=JSON_RPC_INTERNAL_ERROR,
+            message="Surface handler failed",
+            data={"surface": surface_request.surface, "error": str(exc)},
+        )
+
+    return JsonRpcResponse(id=request.id, result=result.model_dump(mode="json"))
+
+
 def _validate_action_request(params: dict[str, Any]) -> V2ActionRequest:
     action_payload = params.get("action_request", params)
     return V2ActionRequest.model_validate(action_payload)
+
+
+def _validate_surface_request(params: dict[str, Any]) -> V2SurfaceRequest:
+    surface_payload = params.get("surface_request", params)
+    return V2SurfaceRequest.model_validate(surface_payload)
 
 
 def _get_action_handlers(server: "Server") -> dict[ActionHandlerKey, ActionHandler]:
@@ -143,6 +220,17 @@ def _get_action_handlers(server: "Server") -> dict[ActionHandlerKey, ActionHandl
     if handlers is None:
         handlers = {}
         state.supervaizer_v2_action_handlers = handlers
+    return handlers
+
+
+def _get_surface_handlers(
+    server: "Server",
+) -> dict[SurfaceHandlerKey, SurfaceHandler]:
+    state = server.app.state
+    handlers = getattr(state, "supervaizer_v2_surface_handlers", None)
+    if handlers is None:
+        handlers = {}
+        state.supervaizer_v2_surface_handlers = handlers
     return handlers
 
 
@@ -159,6 +247,10 @@ def _resolve_agent_slug(server: "Server", agent_slug: str | None) -> str:
 
 def _action_handler_key(agent_slug: str, action: str) -> ActionHandlerKey:
     return (agent_slug, action)
+
+
+def _surface_handler_key(agent_slug: str, surface: str) -> SurfaceHandlerKey:
+    return (agent_slug, surface)
 
 
 def _json_rpc_error(

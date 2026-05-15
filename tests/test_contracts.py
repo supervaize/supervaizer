@@ -26,6 +26,8 @@ from supervaizer.contracts import (
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
     V2ResourceFieldDefinition,
+    V2SurfaceRequest,
+    V2SurfaceResult,
     build_data_resource_context_headers,
     controller_contract_info,
     resolve_controller_endpoint,
@@ -241,6 +243,29 @@ def test_v2_action_request_and_result_fixture() -> None:
     ]
 
 
+def test_v2_surface_request_and_result_models() -> None:
+    request = V2SurfaceRequest.model_validate({
+        "request_id": "surface-request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": "agent-interviewer",
+        "surface": "job.start",
+        "draft_session_id": "draft-1",
+        "input": {"campaign_id": "campaign-1"},
+    })
+    result = V2SurfaceResult.model_validate({
+        "surface": "job.start",
+        "a2ui_version": "v0.8",
+        "document": {"type": "Form", "submit": {"action": "job.start"}},
+    })
+
+    assert request.surface == "job.start"
+    assert request.draft_session_id == "draft-1"
+    assert result.a2ui_version == "v0.8"
+    assert result.document["submit"] == {"action": "job.start"}
+
+
 def test_v2_job_state_snapshot_fixture() -> None:
     fixture = load_v2_fixture("agent_interviewer_mvp.json")
 
@@ -296,3 +321,5 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     assert supervaizer.V2ResourceFieldOptionsSource.__name__ == (
         "V2ResourceFieldOptionsSource"
     )
+    assert supervaizer.V2SurfaceRequest is V2SurfaceRequest
+    assert supervaizer.V2SurfaceResult is V2SurfaceResult

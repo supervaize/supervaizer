@@ -15,7 +15,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Server
-from supervaizer.contracts import V2ActionRequest, V2ActionResult, V2Effect
+from supervaizer.contracts import (
+    V2ActionRequest,
+    V2ActionResult,
+    V2Effect,
+    V2SurfaceRequest,
+)
 from supervaizer.protocol.a2a import (
     create_agent_card,
     create_agents_list,
@@ -24,8 +29,11 @@ from supervaizer.protocol.a2a import (
 from supervaizer.protocol.a2a.controller import (
     JSON_RPC_ACTION_NOT_REGISTERED,
     JSON_RPC_METHOD_NOT_FOUND,
+    JSON_RPC_SURFACE_NOT_REGISTERED,
     SUPERVAIZER_ACTION_INVOKE_METHOD,
+    SUPERVAIZER_SURFACE_LOAD_METHOD,
     register_v2_action_handler,
+    register_v2_surface_handler,
 )
 
 
@@ -248,6 +256,29 @@ def test_a2a_controller_rejects_unregistered_v2_action(
     assert payload["error"]["data"]["action"] == "job.start"
 
 
+def test_a2a_controller_rejects_unregistered_v2_surface(
+    server_fixture: Server,
+) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-1",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-1"
+    assert payload["error"]["code"] == JSON_RPC_SURFACE_NOT_REGISTERED
+    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
+    assert payload["error"]["data"]["surface"] == "job.start"
+
+
 def test_a2a_controller_dispatches_registered_v2_action(
     server_fixture: Server,
 ) -> None:
@@ -282,6 +313,43 @@ def test_a2a_controller_dispatches_registered_v2_action(
     ]
 
 
+def test_a2a_controller_dispatches_registered_v2_surface(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.surface == "job.start"
+        return {
+            "surface": "job.start",
+            "a2ui_version": "v0.8",
+            "document": {"type": "Form", "fields": []},
+        }
+
+    register_v2_surface_handler(server_fixture, "job.start", load_job_start)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-2",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-2"
+    assert payload["result"] == {
+        "surface": "job.start",
+        "a2ui_version": "v0.8",
+        "a2ui_catalog_version": None,
+        "document": {"type": "Form", "fields": []},
+    }
+
+
 def test_server_v2_action_decorator_registers_handler(server_fixture: Server) -> None:
     agent_slug = server_fixture.agents[0].slug
 
@@ -311,6 +379,36 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
         "status": "ok",
         "effects": [{"type": "job.start.previewed"}],
     }
+
+
+def test_server_v2_surface_decorator_registers_handler(server_fixture: Server) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    @server_fixture.v2_surface("job.start")
+    def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.surface == "job.start"
+        return {
+            "surface": "job.start",
+            "document": {"type": "Form", "submit": {"action": "job.start"}},
+        }
+
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-3",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-3"
+    assert payload["result"]["surface"] == "job.start"
+    assert payload["result"]["document"]["submit"] == {"action": "job.start"}
 
 
 def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> None:
@@ -394,6 +492,21 @@ def _v2_action_payload(
         "agent_slug": agent_slug,
         "surface": "job.start",
         "action": action,
+        "input": {"campaign_id": "campaign-1"},
+        "draft_session_id": "draft-1",
+    }
+
+
+def _v2_surface_payload(
+    surface: str, agent_slug: str = "agent-interviewer"
+) -> dict[str, object]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": agent_slug,
+        "surface": surface,
         "input": {"campaign_id": "campaign-1"},
         "draft_session_id": "draft-1",
     }

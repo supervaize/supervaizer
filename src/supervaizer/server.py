@@ -53,7 +53,9 @@ from supervaizer.contracts import API_VERSION, controller_contract_info
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a.controller import (
     ActionHandler,
+    SurfaceHandler,
     register_v2_action_handler,
+    register_v2_surface_handler,
 )
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.routers import (
@@ -764,5 +766,22 @@ class Server(ServerAbstract):
 
         def decorator(handler: ActionHandler) -> ActionHandler:
             return self.register_v2_action(action, handler, agent_slug=agent_slug)
+
+        return decorator
+
+    def register_v2_surface(
+        self, surface: str, handler: SurfaceHandler, *, agent_slug: str | None = None
+    ) -> SurfaceHandler:
+        """Register a Supervaizer v2 A2UI surface handler on this server."""
+        register_v2_surface_handler(self, surface, handler, agent_slug=agent_slug)
+        return handler
+
+    def v2_surface(
+        self, surface: str, *, agent_slug: str | None = None
+    ) -> Callable[[SurfaceHandler], SurfaceHandler]:
+        """Decorator form of register_v2_surface for SDK users."""
+
+        def decorator(handler: SurfaceHandler) -> SurfaceHandler:
+            return self.register_v2_surface(surface, handler, agent_slug=agent_slug)
 
         return decorator

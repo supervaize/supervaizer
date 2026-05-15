@@ -388,6 +388,20 @@ class V2ActionRequest(ContractModel):
     step_id: str | None = None
 
 
+class V2SurfaceRequest(ContractModel):
+    request_id: str
+    actor: V2ActorContext
+    workspace: V2WorkspaceContext
+    mission_id: str
+    agent_slug: str
+    surface: str
+    input: dict[str, Any] = Field(default_factory=dict)
+    draft_session_id: str | None = None
+    job_id: str | None = None
+    case_id: str | None = None
+    step_id: str | None = None
+
+
 class V2Effect(ContractModel):
     type: str
 
@@ -395,6 +409,13 @@ class V2Effect(ContractModel):
 class V2ActionResult(ContractModel):
     status: Literal["ok", "error"]
     effects: list[V2Effect] = Field(default_factory=list)
+
+
+class V2SurfaceResult(ContractModel):
+    surface: str
+    a2ui_version: str | None = None
+    a2ui_catalog_version: str | None = None
+    document: dict[str, Any] = Field(default_factory=dict)
 
 
 class V2ArtifactRef(ContractModel):
