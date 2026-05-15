@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - **Supervaizer v2 contract primitives** — Added typed SDK models for the v2 registration and action contract, including pinned A2UI/A2A versions, resources, datasets, case lanes, artifact declarations, job snapshots, sync metadata, and replay-safety metadata.
 - **A2A JSON-RPC action runtime** — Added the `/a2a` `supervaizer/action.invoke` dispatcher, v2 Agent Card extension payloads, and public SDK helpers for registering typed v2 actions through `Server.register_v2_action()` and `@server.v2_action(...)`.
 - **Supervaizer v2 agent identity guard** — `Agent` now rejects v2 registration payloads whose declared `agent.slug` differs from the runtime SDK slug, preventing A2A action handlers from registering under one slug while Studio invokes another.
+- **Supervaizer v2 job sync state** — `V2JobSyncResult` now carries an optional `job_state` snapshot so agents can return convergent Job/Case/Step/Artifact state through `job.sync`.
 
 ### Tests
 

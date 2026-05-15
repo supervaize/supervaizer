@@ -436,6 +436,7 @@ class V2JobSyncResult(V2ActionResult):
     external_version: str | None = None
     sync_cursor: str | None = None
     observed_at: str | None = None
+    job_state: V2JobStateSnapshot | None = None
 
 
 class V2ReplaySafetyMetadata(ContractModel):

@@ -221,6 +221,11 @@ def test_v2_job_sync_result_is_convergent_not_strictly_idempotent() -> None:
     assert sync_result.status == "ok"
     assert sync_result.external_version == "campaign_123:rev_42"
     assert sync_result.sync_cursor == "rev_42"
+    assert sync_result.job_state is not None
+    assert (
+        sync_result.job_state.cases[0].steps[0].outputs[0].type
+        == "agent_interviewer.transcript"
+    )
     assert replay_safety.convergent is True
     assert replay_safety.strictly_idempotent_response is False
 

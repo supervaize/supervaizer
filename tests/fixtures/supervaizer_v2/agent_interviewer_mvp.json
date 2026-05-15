@@ -230,6 +230,57 @@
     "external_version": "campaign_123:rev_42",
     "sync_cursor": "rev_42",
     "observed_at": "2026-05-15T10:00:00Z",
+    "job_state": {
+      "job": {
+        "id": "job_123",
+        "agent_slug": "agent_interviewer",
+        "mission_id": "mission_123",
+        "status": "active",
+        "source": {
+          "type": "fresh_start",
+          "external_ref": "campaign_123"
+        }
+      },
+      "cases": [
+        {
+          "id": "case_session_abc",
+          "external_id": "campaign_123:session:session_abc",
+          "lane": "work",
+          "title": "Interview session for alex@example.com",
+          "status": "awaiting",
+          "steps": [
+            {
+              "id": "step_session_review",
+              "external_id": "session_abc:human_review",
+              "activity": "operation",
+              "status": "awaiting",
+              "title": "Review session synthesis",
+              "awaiting": {
+                "reason": "human_input",
+                "surface": "case.step.awaiting",
+                "action": "step.awaiting.submit"
+              },
+              "outputs": [
+                {
+                  "id": "artifact_transcript_session_abc",
+                  "external_id": "session_abc:transcript",
+                  "type": "agent_interviewer.transcript",
+                  "title": "Transcript",
+                  "media_type": "text/markdown"
+                },
+                {
+                  "id": "artifact_synthesis_session_abc",
+                  "external_id": "session_abc:synthesis",
+                  "type": "agent_interviewer.synthesis",
+                  "title": "Synthesis",
+                  "media_type": "application/json"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
     "effects": [
       {
         "type": "step.updated",
