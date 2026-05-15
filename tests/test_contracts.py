@@ -186,6 +186,7 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert registration.a2a.transport.push_notifications is False
     assert registration.job_policy.sync is not None
     assert registration.job_policy.sync.action == "job.sync"
+    assert "mission.agent.overview" in registration.capabilities.surfaces
     assert "job.start" in registration.capabilities.surfaces
     assert "mission.agent.surface.contact_import" in registration.capabilities.surfaces
     assert "mission.agent.surface.prompt_editor" in registration.capabilities.surfaces
