@@ -65,8 +65,13 @@ def build_default_local_v2_registration(
             "controller_url": "/a2a",
         },
         "capabilities": {
-            "surfaces": ["job.start"],
-            "actions": ["job.start.preview", "job.start"],
+            "surfaces": ["job.start", "case.step.awaiting"],
+            "actions": [
+                "job.start.preview",
+                "job.start",
+                "job.sync",
+                "step.awaiting.submit",
+            ],
             "case_lanes": [{"id": "work", "label": "Work", "default": True}],
             "artifact_types": [],
         },
@@ -86,11 +91,13 @@ def register_default_local_v2_handlers(
         handle_v2_surface,
     )
 
-    server.register_v2_surface("job.start", handle_v2_surface, agent_slug=agent_slug)
+    for surface in ("job.start", "case.step.awaiting"):
+        server.register_v2_surface(surface, handle_v2_surface, agent_slug=agent_slug)
     server.register_v2_action(
         "job.start.preview", handle_v2_action, agent_slug=agent_slug
     )
-    server.register_v2_action("job.start", handle_v2_action, agent_slug=agent_slug)
+    for action in ("job.start", "job.sync", "step.awaiting.submit"):
+        server.register_v2_action(action, handle_v2_action, agent_slug=agent_slug)
 
 
 def get_default_local_agent() -> Agent:

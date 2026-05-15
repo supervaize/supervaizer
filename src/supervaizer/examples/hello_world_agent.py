@@ -244,9 +244,18 @@ def job_status(**kwargs: Any) -> JobResponse:
 
 
 def handle_v2_surface(surface_request: Any) -> dict[str, Any]:
-    """Return the local Hello World job.start A2UI document."""
+    """Return local Hello World A2UI documents."""
     request = _request_dict(surface_request)
     surface = str(request.get("surface") or "").strip()
+    if surface == "case.step.awaiting":
+        return _awaiting_surface(request)
+    if surface != "job.start":
+        return {
+            "surface": surface,
+            "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+            "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+            "document": {"type": "UnsupportedSurface", "surface": surface},
+        }
     return {
         "surface": surface,
         "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
@@ -284,41 +293,255 @@ def handle_v2_action(action_request: Any) -> dict[str, Any]:
     action = str(request.get("action") or "").strip()
     if action == "job.start.preview":
         return _ok_result("job.start.previewed", request_id=request.get("request_id"))
-    if action != "job.start":
+    if action == "job.start":
+        return _job_start_result(request)
+    if action == "job.sync":
+        return _job_sync_result(request)
+    if action == "step.awaiting.submit":
+        return _awaiting_submit_result(request)
+    return {
+        "status": "error",
+        "effects": [{"type": "action.unsupported", "action": action}],
+    }
+
+
+def _awaiting_surface(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "surface": "case.step.awaiting",
+        "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+        "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+        "document": {
+            "type": "Form",
+            "id": "supervaizer.local.hello_world.case.step.awaiting",
+            "title": "Human Review",
+            "fields": _human_review_fields(),
+            "submit": {"action": "step.awaiting.submit", "label": "Submit"},
+            "state": {
+                "job_id": request.get("job_id"),
+                "case_id": request.get("case_id"),
+                "step_id": request.get("step_id"),
+            },
+        },
+    }
+
+
+def _job_start_result(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    job_id = str(request.get("job_id") or "local-v2-job")
+    if _human_review_enabled(action_input):
         return {
-            "status": "error",
-            "effects": [{"type": "action.unsupported", "action": action}],
+            "status": "ok",
+            "effects": [
+                {
+                    "type": "job.started",
+                    "job_id": job_id,
+                    "status": "awaiting",
+                    "message": "Awaiting human review",
+                }
+            ],
+            "job_state": _awaiting_job_state(request),
         }
 
-    response = job_start(
-        fields=_legacy_job_start_fields(_action_input(request)),
-        context={"job_id": request.get("job_id") or "local-v2-job"},
-    )
+    count = _bounded_count(action_input)
     return {
         "status": "ok",
         "effects": [
             {
                 "type": "job.started",
-                "job_id": response.job_id,
-                "status": _status_value(response.status),
-                "message": response.message,
-                "payload": response.payload,
+                "job_id": job_id,
+                "status": "completed",
+                "message": f"Completed {count} cases",
             }
         ],
+        "job_state": _completed_job_state(request),
     }
 
 
-def _legacy_job_start_fields(action_input: dict[str, Any]) -> dict[str, Any]:
+def _job_sync_result(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    if _human_review_enabled(action_input):
+        return {
+            "status": "ok",
+            "effects": [
+                {
+                    "type": "job.synced",
+                    "job_id": request.get("job_id"),
+                    "status": "awaiting",
+                    "message": "Awaiting human review",
+                }
+            ],
+            "job_state": _awaiting_job_state(request),
+        }
     return {
-        "How many times to say hello": action_input.get(
-            "count",
-            action_input.get("How many times to say hello", 1),
-        ),
-        "Enable human review": action_input.get(
-            "enable_human_review",
-            action_input.get("Enable human review", False),
-        ),
+        "status": "ok",
+        "effects": [
+            {
+                "type": "job.synced",
+                "job_id": request.get("job_id"),
+                "status": "completed",
+                "message": "Completed",
+            }
+        ],
+        "job_state": _completed_job_state(request),
     }
+
+
+def _awaiting_submit_result(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "step.awaiting.submitted",
+                "job_id": request.get("job_id"),
+                "case_id": request.get("case_id"),
+                "step_id": request.get("step_id"),
+                "status": "completed",
+            }
+        ],
+        "job_state": _completed_review_job_state(request),
+    }
+
+
+def _human_review_enabled(action_input: dict[str, Any]) -> bool:
+    value = action_input.get(
+        "enable_human_review",
+        action_input.get("Enable human review", False),
+    )
+    return str(value).lower() in ("true", "on", "1", "yes")
+
+
+def _bounded_count(action_input: dict[str, Any]) -> int:
+    value = action_input.get(
+        "count", action_input.get("How many times to say hello", 1)
+    )
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = 1
+    return max(0, min(count, 100))
+
+
+def _awaiting_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    return _job_state(
+        request,
+        status="awaiting",
+        cases=[
+            {
+                "id": "hello-review-1",
+                "lane": "work",
+                "title": "Hello review",
+                "status": "awaiting",
+                "steps": [
+                    {
+                        "id": "human-review",
+                        "activity": "operation",
+                        "status": "awaiting",
+                        "title": "Human Review",
+                        "awaiting": {
+                            "reason": "human_input",
+                            "surface": "case.step.awaiting",
+                            "action": "step.awaiting.submit",
+                            "fields": _human_review_fields(),
+                        },
+                        "outputs": [],
+                    }
+                ],
+            }
+        ],
+    )
+
+
+def _completed_review_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    return _job_state(
+        request,
+        status="completed",
+        cases=[
+            {
+                "id": request.get("case_id") or "hello-review-1",
+                "lane": "work",
+                "title": "Hello review",
+                "status": "completed",
+                "steps": [
+                    {
+                        "id": request.get("step_id") or "human-review",
+                        "activity": "operation",
+                        "status": "completed",
+                        "title": "Human Review",
+                        "outputs": [
+                            {
+                                "id": "review-decision",
+                                "type": "decision",
+                                "title": "Review decision",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+
+def _completed_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    cases = []
+    for index in range(1, _bounded_count(action_input) + 1):
+        cases.append({
+            "id": f"hello-case-{index}",
+            "lane": "work",
+            "title": f"Hello case {index}",
+            "status": "completed",
+            "steps": [
+                {
+                    "id": f"hello-case-{index}-complete",
+                    "activity": "operation",
+                    "status": "completed",
+                    "title": "Say hello",
+                    "outputs": [
+                        {
+                            "id": f"hello-case-{index}-message",
+                            "type": "message",
+                            "title": f"Hello case {index}",
+                        }
+                    ],
+                }
+            ],
+        })
+    return _job_state(request, status="completed", cases=cases)
+
+
+def _job_state(
+    request: dict[str, Any],
+    *,
+    status: str,
+    cases: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "job": {
+            "id": str(request.get("job_id") or "local-v2-job"),
+            "agent_slug": str(request.get("agent_slug") or "hello-world-ai-agent"),
+            "mission_id": str(request.get("mission_id") or "local-mission"),
+            "status": status,
+            "source": {"type": "fresh_start"},
+        },
+        "cases": cases,
+    }
+
+
+def _human_review_fields() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "approved",
+            "label": "Approve this case",
+            "type": "boolean",
+            "required": True,
+        },
+        {
+            "id": "comment",
+            "label": "Comment",
+            "type": "string",
+            "required": False,
+        },
+    ]
 
 
 def _ok_result(effect_type: str, **effect: Any) -> dict[str, Any]:
@@ -339,7 +562,3 @@ def _request_dict(request: Any) -> dict[str, Any]:
     if hasattr(request, "model_dump"):
         return request.model_dump(mode="python")
     raise TypeError(f"Unsupported request type: {type(request).__name__}")
-
-
-def _status_value(status: Any) -> str:
-    return str(getattr(status, "value", status))

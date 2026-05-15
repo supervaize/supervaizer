@@ -631,6 +631,10 @@ class TestServerLocalMode:
                 card_response.json()["supervaizer"]["v2"]["a2a"]["controller_url"]
                 == "/a2a"
             )
+            capabilities = card_response.json()["supervaizer"]["v2"]["capabilities"]
+            assert "case.step.awaiting" in capabilities["surfaces"]
+            assert "job.sync" in capabilities["actions"]
+            assert "step.awaiting.submit" in capabilities["actions"]
 
             surface_response = client.post(
                 "/a2a",
@@ -679,6 +683,86 @@ class TestServerLocalMode:
                 action_response.json()["result"]["effects"][0]["type"]
                 == "job.start.previewed"
             )
+
+            start_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "start-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "start-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "action": "job.start",
+                        "input": {"count": 1, "enable_human_review": True},
+                        "job_id": "job-1",
+                    },
+                },
+            )
+            assert start_response.status_code == 200
+            start_result = start_response.json()["result"]
+            assert start_result["effects"][0]["status"] == "awaiting"
+            step = start_result["job_state"]["cases"][0]["steps"][0]
+            assert step["status"] == "awaiting"
+            assert step["awaiting"]["surface"] == "case.step.awaiting"
+
+            awaiting_surface_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "awaiting-surface-1",
+                    "method": "supervaizer/surface.load",
+                    "params": {
+                        "request_id": "awaiting-surface-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "case.step.awaiting",
+                        "input": {},
+                        "job_id": "job-1",
+                        "case_id": "hello-review-1",
+                        "step_id": "human-review",
+                    },
+                },
+            )
+            assert awaiting_surface_response.status_code == 200
+            assert (
+                awaiting_surface_response.json()["result"]["document"]["submit"][
+                    "action"
+                ]
+                == "step.awaiting.submit"
+            )
+
+            submit_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "submit-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "submit-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "case.step.awaiting",
+                        "action": "step.awaiting.submit",
+                        "input": {"response_data": {"approved": True}},
+                        "job_id": "job-1",
+                        "case_id": "hello-review-1",
+                        "step_id": "human-review",
+                    },
+                },
+            )
+            assert submit_response.status_code == 200
+            submit_result = submit_response.json()["result"]
+            assert submit_result["effects"][0]["type"] == "step.awaiting.submitted"
+            assert submit_result["job_state"]["job"]["status"] == "completed"
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]
 
