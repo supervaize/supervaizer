@@ -189,8 +189,12 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert "job.start" in registration.capabilities.surfaces
     assert "mission.agent.surface.contact_import" in registration.capabilities.surfaces
     assert "mission.agent.surface.prompt_editor" in registration.capabilities.surfaces
+    assert (
+        "mission.agent.surface.scenario_builder" in registration.capabilities.surfaces
+    )
     assert "campaigns.sync" in registration.capabilities.actions
     assert "resource.contacts.import" in registration.capabilities.actions
+    assert "resource.scenarios.update" in registration.capabilities.actions
     assert any(
         lane.id == "work" and lane.default
         for lane in registration.capabilities.case_lanes
@@ -199,6 +203,7 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
         "campaigns",
         "contacts",
         "prompts",
+        "scenarios",
     }
     campaigns = next(
         resource for resource in registration.resources if resource.id == "campaigns"

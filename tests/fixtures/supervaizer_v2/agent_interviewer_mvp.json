@@ -31,6 +31,7 @@
         "mission.agent.resource.contacts",
         "mission.agent.surface.contact_import",
         "mission.agent.surface.prompt_editor",
+        "mission.agent.surface.scenario_builder",
         "job.start",
         "case.step.awaiting",
         "case.step.detail",
@@ -42,6 +43,7 @@
         "job.sync",
         "campaigns.sync",
         "resource.contacts.import",
+        "resource.scenarios.update",
         "step.awaiting.submit"
       ],
       "case_lanes": [
@@ -150,6 +152,22 @@
           {
             "view": "edit",
             "surface": "mission.agent.surface.prompt_editor"
+          }
+        ]
+      },
+      {
+        "id": "scenarios",
+        "label": "Scenarios",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "update"
+        ],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.scenario_builder"
           }
         ]
       }
