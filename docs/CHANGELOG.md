@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - **A2A JSON-RPC surface runtime** — Added `supervaizer/surface.load`, typed `V2SurfaceRequest`/`V2SurfaceResult` models, and public SDK helpers for registering A2UI surface handlers through `Server.register_v2_surface()` and `@server.v2_surface(...)`.
 - **Supervaizer v2 agent identity guard** — `Agent` now rejects v2 registration payloads whose declared `agent.slug` differs from the runtime SDK slug, preventing A2A action handlers from registering under one slug while Studio invokes another.
 - **Supervaizer v2 job sync state** — `V2JobSyncResult` now carries an optional `job_state` snapshot so agents can return convergent Job/Case/Step/Artifact state through `job.sync`.
+- **Supervaizer v2 job source target metadata** — `V2JobSource` now includes an optional `target_type` so external sources can declare the business object Studio should use for dedupe and catch-up.
 - **Supervaizer v2 resource form fields** — `V2ResourceDefinition` now carries typed `fields` metadata so Studio can render simple agent-owned resource create/edit forms without callback-style dynamic field logic.
 - **Supervaizer v2 resource option sources** — Resource fields can now declare typed resource-backed `options_source` metadata so Studio can render relationship selectors without callback-style dynamic choices.
 - **Supervaizer v2 awaiting form fields** — Step awaiting state can now declare typed form fields so Studio can submit HITL actions through `step.awaiting.submit`.

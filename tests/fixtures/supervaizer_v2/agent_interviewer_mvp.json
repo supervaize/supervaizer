@@ -189,7 +189,8 @@
       "status": "active",
       "source": {
         "type": "fresh_start",
-        "external_ref": "campaign_123"
+        "external_ref": "campaign_123",
+        "target_type": "campaign"
       }
     },
     "cases": [
@@ -246,7 +247,8 @@
         "status": "active",
         "source": {
           "type": "fresh_start",
-          "external_ref": "campaign_123"
+          "external_ref": "campaign_123",
+          "target_type": "campaign"
         }
       },
       "cases": [

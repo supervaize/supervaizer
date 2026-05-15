@@ -463,6 +463,7 @@ class V2JobSource(ContractModel):
     type: Literal["fresh_start", "external"]
     external_ref: str | None = None
     previous_job_id: str | None = None
+    target_type: str | None = None
 
 
 class V2JobSnapshot(ContractModel):
