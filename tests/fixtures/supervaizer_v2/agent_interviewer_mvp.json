@@ -28,6 +28,7 @@
     "capabilities": {
       "surfaces": [
         "mission.agent.resource.campaigns",
+        "mission.agent.surface.prompt_editor",
         "job.start",
         "case.step.awaiting",
         "case.step.detail",

@@ -187,6 +187,7 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert registration.job_policy.sync is not None
     assert registration.job_policy.sync.action == "job.sync"
     assert "job.start" in registration.capabilities.surfaces
+    assert "mission.agent.surface.prompt_editor" in registration.capabilities.surfaces
     assert "campaigns.sync" in registration.capabilities.actions
     assert any(
         lane.id == "work" and lane.default
