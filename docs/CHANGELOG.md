@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
 
 ### Tests
 
+- `uv run pytest tests/test_a2a.py tests/test_contracts.py -q`
+
 `just test`
 
 | Status     | Count |
@@ -36,10 +38,6 @@ All notable changes to this project will be documented in this file.
 ### Security
 
 - **`uv.lock`** — Refreshed transitive versions to address open Dependabot / GHSA advisories on the default branch graph: **urllib3** (redirect and decompression-chain issues), **requests** (`extract_zipped_paths` temp reuse), **protobuf** (JSON recursion depth), **pyasn1** (decoder / recursion DoS), **pygments** (ReDoS in GUID lexer), and **uv** (ZIP / tar / RECORD handling; dev dependency via hatch).
-
-### Tests
-
-- `uv run pytest tests/test_a2a.py tests/test_contracts.py -q`
 
 ## [0.20.0] - 2026-05-13
 
