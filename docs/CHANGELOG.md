@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **Supervaizer v2 job source target metadata** — `V2JobSource` now includes an optional `target_type` so external sources can declare the business object Studio should use for dedupe and catch-up.
 - **Supervaizer v2 resource form fields** — `V2ResourceDefinition` now carries typed `fields` metadata so Studio can render simple agent-owned resource create/edit forms without callback-style dynamic field logic.
 - **Supervaizer v2 resource option sources** — Resource fields can now declare typed resource-backed `options_source` metadata so Studio can render relationship selectors without callback-style dynamic choices.
+- **Legacy dynamic choices removed** — Removed the v1 `dynamic_choices` field metadata, `dynamic_choices_callback`, `/start/dynamic_choices` route, and related contract exports; dynamic options now belong to v2 resource `options_source` metadata or typed A2A actions.
 - **Supervaizer v2 awaiting form fields** — Step awaiting state can now declare typed form fields so Studio can submit HITL actions through `step.awaiting.submit`.
 - **Local Hello World v2 contract** — The built-in local Hello World agent now declares a minimal Supervaizer v2 registration and registers `job.start` A2UI/action handlers for local Studio and SDK smoke tests.
 

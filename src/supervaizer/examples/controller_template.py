@@ -42,18 +42,6 @@ DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
 PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
 
 
-def get_dynamic_choices(
-    method_name: str, context: dict
-) -> dict[str, list[tuple[str, str]]]:
-    if method_name == "start":
-        return {
-            "projects": [("P1", "Project 1"), ("P2", "Project 2"), ("P3", "Project 3")],
-        }
-    return {
-        "projects": [("P1", "Project 1"), ("P2", "Project 2"), ("P3", "Project 3")],
-    }
-
-
 # Define the parameters and secrets expected by the agent
 agent_parameters: ParametersSetup | None = ParametersSetup.from_list([
     Parameter(
@@ -115,7 +103,7 @@ job_start_method: AgentMethod = AgentMethod(
             name="List of projects",
             type=str,
             field_type="ChoiceField",
-            dynamic_choices="projects",
+            choices=[("P1", "Project 1"), ("P2", "Project 2"), ("P3", "Project 3")],
             required=True,
         ),
         AgentMethodField(
@@ -200,7 +188,6 @@ agent: Agent = Agent(
     ),
     parameters_setup=agent_parameters,
     instructions_path="supervaize_instructions.html",  # Path where instructions page is served
-    dynamic_choices_callback=get_dynamic_choices,
 )
 
 # For export purposes, use dummy values if environment variables are not set

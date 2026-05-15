@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 0.13.0
+**Version:** 0.20.1
 
 ### `account.Account`
 
@@ -116,6 +116,7 @@ _No additional fields beyond parent class._
 | `maintainer` | `str` | `None` | Maintainer of the integration |
 | `editor` | `str` | `None` | Editor (usually a company) |
 | `version` | `str` | '' | Version string |
+| `release_notes_url` | `str` | `None` | URL for release notes matching this agent version |
 | `description` | `str` | '' | Description of what the agent does |
 | `tags` | `list[str]` | `None` | Tags for categorizing the agent |
 | `methods` | `AgentMethods` | `None` | Methods supported by this agent |
@@ -127,8 +128,9 @@ _No additional fields beyond parent class._
 | `max_execution_time` | `int` | 3600 | Maximum execution time in seconds, defaults to 1 hour |
 | `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
 | `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
-| `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter; mounted at `/api/agents/{slug}/...` on the API surface |
-| `dynamic_choices_callback` | `Any` | `None` | Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]] |
+| `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/... |
+| `data_resources` | `list[data_resource.DataResource]` | — | Data resources this agent exposes for Studio CRUD access |
+| `supervaizer_v2_registration` | `SupervaizerV2AgentRegistrationContract` | `None` | Optional Supervaizer v2 registration contract for A2A/A2UI Studio integrations |
 
 ### `agent.AgentMethod`
 
@@ -185,6 +187,7 @@ Attributes:
 | `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
 | `description` | `str` | `None` | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
+| `timeout` | `int` | 600 | Maximum automatic job duration in seconds. Use None for jobs that must run until Studio stops them manually. |
 | `nodes` | `CaseNodes` | `None` | The definition of the Case Nodes (=steps) for this method |
 
 #### Example
@@ -242,7 +245,6 @@ field definitions for consistency.
 | `default` | `Any` | `None` | Default value for the field - displayed in the UI |
 | `widget` | `str` | `None` | UI widget to use (e.g. RadioSelect, TextInput) - as a django widget name |
 | `required` | `bool` | False | Whether field is required for form submission |
-| `dynamic_choices` | `str` | `None` | Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'. |
 
 #### Examples
 
@@ -440,4 +442,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-04-09 00:25:26*
+*Uploaded on 2026-05-15 19:28:48*

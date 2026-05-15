@@ -85,8 +85,6 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "ControllerEndpoint": ("supervaizer.contracts", "ControllerEndpoint"),
     "DataResourceContract": ("supervaizer.contracts", "DataResourceContract"),
     "DataResourceFieldContract": ("supervaizer.contracts", "DataResourceFieldContract"),
-    "DynamicChoicesRequest": ("supervaizer.contracts", "DynamicChoicesRequest"),
-    "DynamicChoicesResponse": ("supervaizer.contracts", "DynamicChoicesResponse"),
     "EventType": ("supervaizer.contracts", "EventType"),
     "JobStartRequest": ("supervaizer.contracts", "JobStartRequest"),
     "ServerRegistrationContract": (

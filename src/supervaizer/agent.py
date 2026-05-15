@@ -107,19 +107,16 @@ class AgentMethodField(BaseModel):
     required: bool = Field(
         default=False, description="Whether field is required for form submission"
     )
-    dynamic_choices: str | None = Field(
-        default=None,
-        description="Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'.",
-    )
 
-    @model_validator(mode="after")
-    def validate_choices_mutual_exclusion(self) -> "AgentMethodField":
-        if self.choices is not None and self.dynamic_choices is not None:
+    @model_validator(mode="before")
+    @classmethod
+    def reject_dynamic_choices(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "dynamic_choices" in data:
             raise ValueError(
-                "'choices' and 'dynamic_choices' are mutually exclusive. "
-                "Use 'choices' for static options or 'dynamic_choices' for runtime-resolved options."
+                "dynamic_choices was removed in Supervaizer v2. "
+                "Use v2 resource option_sources or typed A2A actions for dynamic options."
             )
-        return self
+        return data
 
     model_config = cast(
         ConfigDict,
@@ -646,11 +643,6 @@ class AgentAbstract(SvBaseModel):
         description="Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/...",
         exclude=True,
     )
-    dynamic_choices_callback: Any | None = Field(
-        default=None,
-        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]. Context includes workspace_id, workspace_slug, mission_id from the dynamic_choices request body.",
-        exclude=True,
-    )
     data_resources: list[DataResource] = Field(
         default_factory=list,
         description="Data resources this agent exposes for Studio CRUD access",
@@ -687,7 +679,6 @@ class Agent(AgentAbstract):
         server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
-        dynamic_choices_callback: Any | None = None,
         data_resources: list["DataResource"] | None = None,
         supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract
         | dict[str, Any]
@@ -722,6 +713,12 @@ class Agent(AgentAbstract):
 
         Tested in tests/test_agent.py
         """
+        if "dynamic_choices_callback" in kwargs:
+            raise ValueError(
+                "dynamic_choices_callback was removed in Supervaizer v2. "
+                "Use v2 resource option_sources or typed A2A actions for dynamic options."
+            )
+
         # Validate or generate agent ID
         agent_id = id or shortuuid.uuid(name=name)
         if id is not None and id != shortuuid.uuid(name=name):
@@ -747,7 +744,6 @@ class Agent(AgentAbstract):
             server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
-            dynamic_choices_callback=dynamic_choices_callback,
             data_resources=data_resources or [],
             supervaizer_v2_registration=supervaizer_v2_registration,
             **kwargs,

@@ -232,19 +232,9 @@ def test_registration_refresh_endpoint_requires_supervisor_account(
     assert resp.json()["detail"] == "No supervisor account configured"
 
 
-def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
-    """Test POST /supervaizer/agents/{slug}/start/dynamic_choices returns choices."""
-
-    def mock_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        if method_name == "start":
-            return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
-        return {}
-
+def test_dynamic_choices_endpoint_is_removed(server_fixture: Server) -> None:
+    """V1 dynamic choices were removed in favor of v2 resource/action option sources."""
     agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = mock_dynamic_choices
-
     app = server_fixture.app
     app.include_router(create_agents_routes(server_fixture))
     client = TestClient(app)
@@ -259,9 +249,8 @@ def test_dynamic_choices_endpoint(server_fixture: Server) -> None:
             "mission_id": "m-1",
         },
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["choices"]["projects"] == [["P1", "Project 1"], ["P2", "Project 2"]]
+
+    assert resp.status_code == 404
 
 
 def test_agent_status_endpoint_returns_job_status_response(
@@ -295,161 +284,6 @@ def test_agent_status_endpoint_returns_job_status_response(
     assert data["job_id"] == "job-123"
     assert data["status"] == "in_progress"
     assert data["payload"]["campaign"]["status"] == "in_progress"
-
-
-def test_dynamic_choices_endpoint_passes_workspace_slug_in_context(
-    server_fixture: Server,
-) -> None:
-    """Callback context includes workspace_slug from the request body."""
-
-    captured: dict[str, Any] = {}
-
-    def mock_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        captured["context"] = dict(context)
-        return {"projects": [("P1", "Project 1")]}
-
-    agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = mock_dynamic_choices
-
-    app = server_fixture.app
-    app.include_router(create_agents_routes(server_fixture))
-    client = TestClient(app)
-    headers = {"X-API-Key": server_fixture.api_key or ""}
-
-    resp = client.post(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
-        headers=headers,
-        json={
-            "workspace_id": 23,
-            "workspace_slug": "adl",
-            "mission_id": "01KNPPT249HFSSW662KW9R477N",
-        },
-    )
-    assert resp.status_code == 200
-    assert captured["context"] == {
-        "workspace_id": 23,
-        "workspace_slug": "adl",
-        "mission_id": "01KNPPT249HFSSW662KW9R477N",
-    }
-
-
-def test_dynamic_choices_endpoint_multiple_keys(
-    server_fixture: Server,
-) -> None:
-    """Test endpoint returns multiple choice keys."""
-
-    def mock_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        return {
-            "projects": [("P1", "Project 1")],
-            "teams": [("T1", "Team Alpha")],
-        }
-
-    agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = mock_dynamic_choices
-
-    app = server_fixture.app
-    app.include_router(create_agents_routes(server_fixture))
-    client = TestClient(app)
-    headers = {"X-API-Key": server_fixture.api_key or ""}
-
-    resp = client.post(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
-        headers=headers,
-        json={
-            "workspace_id": "ws-1",
-            "workspace_slug": "slug-1",
-            "mission_id": "m-1",
-        },
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["choices"]["projects"] == [["P1", "Project 1"]]
-    assert data["choices"]["teams"] == [["T1", "Team Alpha"]]
-
-
-def test_dynamic_choices_endpoint_empty_result(
-    server_fixture: Server,
-) -> None:
-    """Test endpoint returns empty choices when callback returns empty dict."""
-
-    def mock_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        return {}
-
-    agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = mock_dynamic_choices
-
-    app = server_fixture.app
-    app.include_router(create_agents_routes(server_fixture))
-    client = TestClient(app)
-    headers = {"X-API-Key": server_fixture.api_key or ""}
-
-    resp = client.post(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
-        headers=headers,
-        json={
-            "workspace_id": "ws-1",
-            "workspace_slug": "slug-1",
-            "mission_id": "m-1",
-        },
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["choices"] == {}
-
-
-def test_dynamic_choices_endpoint_requires_api_key(
-    server_fixture: Server,
-) -> None:
-    """Test that the dynamic choices endpoint requires API key authentication."""
-
-    def mock_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        return {"projects": [("P1", "Project 1")]}
-
-    agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = mock_dynamic_choices
-
-    app = server_fixture.app
-    app.include_router(create_agents_routes(server_fixture))
-    client = TestClient(app)
-
-    # No API key header
-    resp = client.post(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
-        json={},
-    )
-    assert resp.status_code == 401
-
-
-def test_dynamic_choices_endpoint_no_callback(
-    server_fixture: Server,
-) -> None:
-    """Test that endpoint returns 404 when no callback is registered."""
-    agent = server_fixture.agents[0]
-    agent.dynamic_choices_callback = None
-
-    app = server_fixture.app
-    app.include_router(create_agents_routes(server_fixture))
-    client = TestClient(app)
-    headers = {"X-API-Key": server_fixture.api_key or ""}
-
-    resp = client.post(
-        f"/supervaizer/agents/{agent.slug}/start/dynamic_choices",
-        headers=headers,
-        json={
-            "workspace_id": "ws-1",
-            "workspace_slug": "slug-1",
-            "mission_id": "m-1",
-        },
-    )
-    assert resp.status_code == 404
 
 
 def test_data_resource_openapi_operation_ids_unique_per_agent(

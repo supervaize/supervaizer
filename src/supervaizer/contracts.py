@@ -47,7 +47,6 @@ class ControllerEndpoint(StrEnum):
     POST_AGENT_CASE_UPDATE = "POST_AGENT_CASE_UPDATE"
     POST_AGENT_PARAMETER_VALIDATION = "POST_AGENT_PARAMETER_VALIDATION"
     POST_AGENT_METHOD_FIELD_VALIDATION = "POST_AGENT_METHOD_FIELD_VALIDATION"
-    POST_AGENT_JOB_START_DYNAMIC_CHOICES = "POST_AGENT_JOB_START_DYNAMIC_CHOICES"
     DATA_RESOURCE = "DATA_RESOURCE"
     DATA_RESOURCE_ITEM = "DATA_RESOURCE_ITEM"
     DATA_RESOURCE_IMPORT = "DATA_RESOURCE_IMPORT"
@@ -71,7 +70,6 @@ CONTROLLER_ENDPOINTS: dict[ControllerEndpoint, str] = {
     ControllerEndpoint.POST_AGENT_CASE_UPDATE: "/api/supervaizer/jobs/{job_id}/cases/{case_id}/update",
     ControllerEndpoint.POST_AGENT_PARAMETER_VALIDATION: "/api/supervaizer/agents/{agent_slug}/validate-agent-parameters",
     ControllerEndpoint.POST_AGENT_METHOD_FIELD_VALIDATION: "/api/supervaizer/agents/{agent_slug}/validate-method-fields",
-    ControllerEndpoint.POST_AGENT_JOB_START_DYNAMIC_CHOICES: "/api/supervaizer/agents/{agent_slug}/start/dynamic_choices",
     ControllerEndpoint.DATA_RESOURCE: "/api/agents/{agent_slug}/data/{resource_name}/",
     ControllerEndpoint.DATA_RESOURCE_ITEM: "/api/agents/{agent_slug}/data/{resource_name}/{item_id}",
     ControllerEndpoint.DATA_RESOURCE_IMPORT: "/api/agents/{agent_slug}/data/{resource_name}/import/",
@@ -148,7 +146,6 @@ class AgentMethodFieldContract(ContractModel):
     default: Any = None
     widget: str | None = None
     required: bool = False
-    dynamic_choices: str | None = None
 
 
 class AgentMethodContract(ContractModel):
@@ -215,16 +212,6 @@ class JobStartRequest(ContractModel):
     job_context: dict[str, Any]
     job_fields: dict[str, Any] = Field(default_factory=dict)
     encrypted_agent_parameters: str | None = None
-
-
-class DynamicChoicesRequest(ContractModel):
-    workspace_id: str
-    mission_id: str
-    workspace_slug: str | None = None
-
-
-class DynamicChoicesResponse(ContractModel):
-    choices: dict[str, list[Any]] = Field(default_factory=dict)
 
 
 class CaseUpdateEvent(ContractModel):

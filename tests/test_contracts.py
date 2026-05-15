@@ -63,6 +63,7 @@ def test_controller_contract_endpoints_are_api_prefixed() -> None:
         info["endpoints"]["POST_CONTROLLER_REGISTRATION_REFRESH"]
         == "/api/supervaizer/registration/refresh"
     )
+    assert "POST_AGENT_JOB_START_DYNAMIC_CHOICES" not in info["endpoints"]
 
 
 def test_contract_models_export_json_schema() -> None:
