@@ -24,6 +24,7 @@ from supervaizer.contracts import (
     V2JobStateSnapshot,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
+    V2ResourceFieldDefinition,
     build_data_resource_context_headers,
     controller_contract_info,
     resolve_controller_endpoint,
@@ -183,6 +184,26 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert campaigns.fields[0].required is True
 
 
+def test_v2_resource_field_options_source_is_typed() -> None:
+    field = V2ResourceFieldDefinition.model_validate({
+        "id": "contact_id",
+        "label": "Contact",
+        "type": "resource_ref",
+        "required": True,
+        "options_source": {
+            "type": "resource",
+            "resource": "contacts",
+            "value_field": "id",
+            "label_field": "email",
+        },
+    })
+
+    assert field.options_source is not None
+    assert field.options_source.resource == "contacts"
+    assert field.options_source.value_field == "id"
+    assert field.options_source.label_field == "email"
+
+
 def test_v2_action_request_and_result_fixture() -> None:
     fixture = load_v2_fixture("agent_interviewer_mvp.json")
 
@@ -247,4 +268,7 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
     assert supervaizer.V2ResourceFieldDefinition.__name__ == (
         "V2ResourceFieldDefinition"
+    )
+    assert supervaizer.V2ResourceFieldOptionsSource.__name__ == (
+        "V2ResourceFieldOptionsSource"
     )

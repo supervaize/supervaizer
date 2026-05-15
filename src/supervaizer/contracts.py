@@ -314,6 +314,13 @@ class V2ResourceDisplayDefinition(ContractModel):
     search_fields: list[str] = Field(default_factory=list)
 
 
+class V2ResourceFieldOptionsSource(ContractModel):
+    type: Literal["resource"] = "resource"
+    resource: str
+    value_field: str = "id"
+    label_field: str | None = None
+
+
 class V2ResourceFieldDefinition(ContractModel):
     id: str
     label: str
@@ -321,6 +328,7 @@ class V2ResourceFieldDefinition(ContractModel):
     required: bool = False
     read_only: bool = False
     multiline: bool = False
+    options_source: V2ResourceFieldOptionsSource | None = None
 
 
 class V2MountedResourceViewDefinition(ContractModel):
