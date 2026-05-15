@@ -15,11 +15,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Supervaizer v2 2️⃣
+
+- **Supervaizer v2 contract primitives** — Added typed SDK models for the v2 registration and action contract, including pinned A2UI/A2A versions, resources, datasets, case lanes, artifact declarations, job snapshots, sync metadata, and replay-safety metadata.
+- **A2A JSON-RPC action runtime** — Added the `/a2a` `supervaizer/action.invoke` dispatcher, v2 Agent Card extension payloads, and public SDK helpers for registering typed v2 actions through `Server.register_v2_action()` and `@server.v2_action(...)`.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 581   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
+
 ## [0.20.1] - 2026-05-13
 
 ### Security
 
 - **`uv.lock`** — Refreshed transitive versions to address open Dependabot / GHSA advisories on the default branch graph: **urllib3** (redirect and decompression-chain issues), **requests** (`extract_zipped_paths` temp reuse), **protobuf** (JSON recursion depth), **pyasn1** (decoder / recursion DoS), **pygments** (ReDoS in GUID lexer), and **uv** (ZIP / tar / RECORD handling; dev dependency via hatch).
+
+### Tests
+
+- `uv run pytest tests/test_a2a.py tests/test_contracts.py -q`
 
 ## [0.20.0] - 2026-05-13
 
