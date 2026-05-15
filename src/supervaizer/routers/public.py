@@ -43,7 +43,10 @@ def create_public_router(
     * ``GET /`` — home page
     * ``/.well-known/*`` — A2A discovery (no auth)
     """
-    from supervaizer.protocol.a2a.routes import create_routes as create_a2a_routes
+    from supervaizer.protocol.a2a.routes import (
+        create_controller_routes,
+        create_routes as create_a2a_routes,
+    )
 
     router = APIRouter(tags=["Public"])
 
@@ -67,5 +70,6 @@ def create_public_router(
 
     if server.a2a_endpoints:
         router.include_router(create_a2a_routes(server))
+        router.include_router(create_controller_routes(server))
 
     return router

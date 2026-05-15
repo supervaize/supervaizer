@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Dict
 from fastapi import APIRouter
 
 from supervaizer.common import log
+from supervaizer.protocol.a2a.controller import dispatch_json_rpc
 from supervaizer.protocol.a2a.model import (
     create_agent_card,
     create_agents_list,
@@ -101,5 +102,24 @@ def create_routes(server: "Server") -> APIRouter:
         # Call the closure function with the current agent
         create_agent_route_versioned(agent)
         create_agent_route_legacy(agent)
+
+    return router
+
+
+def create_controller_routes(server: "Server") -> APIRouter:
+    """Create A2A JSON-RPC controller routes for Supervaizer v2."""
+    router = APIRouter(tags=["Protocol A2A"])
+
+    @router.post(
+        "/a2a",
+        summary="A2A JSON-RPC Controller",
+        description="Dispatches Supervaizer v2 controller methods over A2A JSON-RPC.",
+        response_model=Dict[str, Any],
+    )
+    @handle_route_errors()
+    async def post_a2a_controller(body: Dict[str, Any]) -> Dict[str, Any]:
+        log.info("[A2A] POST /a2a [JSON-RPC controller]")
+        response = await dispatch_json_rpc(server, body)
+        return response.model_dump(mode="json", exclude_none=True)
 
     return router

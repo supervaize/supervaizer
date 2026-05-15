@@ -15,10 +15,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Server
+from supervaizer.contracts import V2ActionRequest, V2ActionResult, V2Effect
 from supervaizer.protocol.a2a import (
     create_agent_card,
     create_agents_list,
     create_health_data,
+)
+from supervaizer.protocol.a2a.controller import (
+    JSON_RPC_ACTION_NOT_REGISTERED,
+    JSON_RPC_METHOD_NOT_FOUND,
+    SUPERVAIZER_ACTION_INVOKE_METHOD,
+    register_v2_action_handler,
 )
 
 
@@ -171,6 +178,88 @@ def test_a2a_route_endpoints(server_fixture: Server) -> None:
     # Test 404 for non-existent agent
     response = client.get("/.well-known/agents/nonexistent_agent.json")
     assert response.status_code == 404
+
+
+def test_a2a_controller_rejects_unknown_method(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={"jsonrpc": "2.0", "id": "rpc-1", "method": "missing.method"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-1"
+    assert payload["error"]["code"] == JSON_RPC_METHOD_NOT_FOUND
+
+
+def test_a2a_controller_rejects_unregistered_v2_action(
+    server_fixture: Server,
+) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-2",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-2"
+    assert payload["error"]["code"] == JSON_RPC_ACTION_NOT_REGISTERED
+    assert payload["error"]["data"]["action"] == "job.start"
+
+
+def test_a2a_controller_dispatches_registered_v2_action(
+    server_fixture: Server,
+) -> None:
+    def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.action == "job.start"
+        return V2ActionResult(
+            status="ok",
+            effects=[V2Effect(type="job.created", job_id="job-123")],
+        )
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-3",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-3"
+    assert payload["result"]["status"] == "ok"
+    assert payload["result"]["effects"] == [
+        {"type": "job.created", "job_id": "job-123"}
+    ]
+
+
+def _v2_action_payload(action: str) -> dict[str, object]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": "agent-interviewer",
+        "surface": "job.start",
+        "action": action,
+        "input": {"campaign_id": "campaign-1"},
+        "draft_session_id": "draft-1",
+    }
 
 
 def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
