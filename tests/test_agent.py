@@ -913,6 +913,15 @@ def test_custom_method_key_validation_none_value() -> None:
     assert methods.custom is None
 
 
+def test_agent_methods_rejects_job_poll() -> None:
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method", is_async=False
+    )
+
+    with pytest.raises(ValidationError, match="job_poll was removed"):
+        AgentMethodsAbstract(job_start=basic_method, job_poll=basic_method)
+
+
 def test_custom_method_key_validation_empty_dict() -> None:
     """Test that validation passes when custom is an empty dict."""
 

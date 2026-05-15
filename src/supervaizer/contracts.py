@@ -16,7 +16,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 CONTROLLER_CONTRACT_VERSION = "1.0"
 API_VERSION = "v1"
@@ -163,10 +163,18 @@ class AgentMethodsContract(ContractModel):
     job_start: AgentMethodContract
     job_stop: AgentMethodContract | None = None
     job_status: AgentMethodContract | None = None
-    job_poll: AgentMethodContract | None = None
     human_answer: AgentMethodContract | None = None
     chat: AgentMethodContract | None = None
     custom: dict[str, AgentMethodContract] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_job_poll(cls, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("job_poll") is not None:
+            raise ValueError(
+                "job_poll was removed. Use Supervaizer v2 job.sync for status convergence."
+            )
+        return value
 
 
 class ControllerContract(ContractModel):

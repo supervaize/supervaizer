@@ -216,8 +216,6 @@ def create_workbench_routes() -> APIRouter:
                 "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods
                 and getattr(agent.methods, "human_answer", None) is not None,
-                "has_poll": agent.methods
-                and getattr(agent.methods, "job_poll", None) is not None,
                 "agents": [
                     {"slug": a.slug, "name": a.name}
                     for a in request.app.state.server.agents
@@ -419,30 +417,6 @@ def create_workbench_routes() -> APIRouter:
             return JSONResponse({"status": "stopped", "message": str(result.message)})
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
-
-    @router.post("/agents/{slug}/workbench/jobs/{job_id}/poll")
-    async def workbench_poll_job(request: Request, slug: str, job_id: str) -> Response:
-        """Trigger manual poll for external updates on a job."""
-        agent = get_agent_by_slug(request, slug)
-
-        if not agent.methods or not agent.methods.job_poll:
-            raise HTTPException(status_code=404, detail="Agent has no poll method")
-
-        job_poll_method = agent.methods.job_poll.method
-
-        try:
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: agent._execute(job_poll_method, {"job_id": job_id}),
-            )
-            return JSONResponse({
-                "status": result.status.value if result.status else "unknown",
-                "message": result.message or "Poll completed",
-                "payload": result.payload,
-            })
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to poll job: {e}")
 
     @router.get("/agents/{slug}/workbench/jobs/{job_id}/status")
     async def workbench_job_status(

@@ -13,8 +13,12 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from supervaizer.contracts import (
     API_VERSION,
+    AgentMethodsContract,
     ControllerEndpoint,
     ControllerContract,
     ServerRegistrationContract,
@@ -99,6 +103,14 @@ def test_agent_method_contract_exports_timeout_metadata() -> None:
 
     assert method_schema["properties"]["is_async"]["default"] is False
     assert method_schema["properties"]["timeout"]["default"] == 600
+
+
+def test_agent_methods_contract_rejects_job_poll() -> None:
+    with pytest.raises(ValidationError, match="job_poll was removed"):
+        AgentMethodsContract.model_validate({
+            "job_start": {"name": "start", "method": "agent.start"},
+            "job_poll": {"name": "poll", "method": "agent.poll"},
+        })
 
 
 def test_resolve_controller_endpoint() -> None:
