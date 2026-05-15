@@ -1,0 +1,254 @@
+{
+  "registration": {
+    "supervaizer_contract_version": 2,
+    "agent": {
+      "id": "agent_interviewer",
+      "slug": "agent_interviewer",
+      "display_name": "Agent Interviewer"
+    },
+    "versions": {
+      "a2ui_version": "v0.8",
+      "a2ui_catalog_version": "supervaizer-v2-mvp.0",
+      "a2a_version": "0.2.6",
+      "ag_ui_version": null
+    },
+    "a2a": {
+      "agent_card_url": "https://agent.example.com/.well-known/agent-card.json",
+      "controller_url": "https://agent.example.com/a2a",
+      "transport": {
+        "json_rpc": true,
+        "sse": true,
+        "push_notifications": true
+      },
+      "external_interop": {
+        "inbound_tasks": false,
+        "outbound_delegation": false
+      }
+    },
+    "capabilities": {
+      "surfaces": [
+        "mission.agent.resource.campaigns",
+        "job.start",
+        "case.step.awaiting",
+        "case.step.detail",
+        "mission.analytics"
+      ],
+      "actions": [
+        "job.start.preview",
+        "job.start",
+        "job.sync",
+        "campaigns.sync",
+        "step.awaiting.submit"
+      ],
+      "case_lanes": [
+        {
+          "id": "setup",
+          "label": "Setup"
+        },
+        {
+          "id": "work",
+          "label": "Work",
+          "default": true
+        },
+        {
+          "id": "deliverable",
+          "label": "Deliverables"
+        }
+      ],
+      "artifact_types": [
+        {
+          "type": "agent_interviewer.transcript",
+          "label": "Transcript",
+          "renderer_surface": "case.step.detail"
+        },
+        {
+          "type": "agent_interviewer.synthesis",
+          "label": "Synthesis",
+          "renderer_surface": "case.step.detail"
+        }
+      ]
+    },
+    "job_policy": {
+      "default_timeout_seconds": 3600,
+      "offline_start_policy": "block",
+      "offline_running_policy": "fail_in_studio",
+      "sync": {
+        "action": "job.sync",
+        "supported_statuses": [
+          "active",
+          "awaiting",
+          "failed",
+          "completed"
+        ]
+      }
+    },
+    "resources": [
+      {
+        "id": "campaigns",
+        "label": "Campaigns",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update"
+        ],
+        "display": {
+          "title_field": "name",
+          "columns": [
+            "name",
+            "status",
+            "contact_count",
+            "updated_at"
+          ],
+          "search_fields": [
+            "name"
+          ]
+        }
+      },
+      {
+        "id": "prompts",
+        "label": "Prompts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update"
+        ],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.prompt_editor"
+          }
+        ]
+      }
+    ],
+    "datasets": [
+      {
+        "id": "campaign_progress",
+        "label": "Campaign Progress",
+        "auto_surface": true
+      }
+    ]
+  },
+  "action_request": {
+    "request_id": "req_start_123",
+    "idempotency_key": "idem_start_campaign_123",
+    "actor": {
+      "user_id": "user_123"
+    },
+    "workspace": {
+      "id": "workspace_123",
+      "slug": "acme"
+    },
+    "mission_id": "mission_123",
+    "agent_slug": "agent_interviewer",
+    "draft_session_id": "draft_123",
+    "job_id": "job_123",
+    "surface": "job.start",
+    "action": "job.start",
+    "input": {
+      "campaign_id": "campaign_123"
+    }
+  },
+  "action_result": {
+    "status": "ok",
+    "effects": [
+      {
+        "type": "job.started",
+        "job_id": "job_123",
+        "external_ref": "campaign_123"
+      },
+      {
+        "type": "case.created",
+        "case": {
+          "id": "case_setup_123",
+          "external_id": "campaign_123:setup",
+          "job_id": "job_123",
+          "lane": "setup",
+          "title": "Campaign setup",
+          "status": "completed"
+        }
+      }
+    ]
+  },
+  "job_state": {
+    "job": {
+      "id": "job_123",
+      "agent_slug": "agent_interviewer",
+      "mission_id": "mission_123",
+      "status": "active",
+      "source": {
+        "type": "fresh_start",
+        "external_ref": "campaign_123"
+      }
+    },
+    "cases": [
+      {
+        "id": "case_session_abc",
+        "external_id": "campaign_123:session:session_abc",
+        "lane": "work",
+        "title": "Interview session for alex@example.com",
+        "status": "awaiting",
+        "steps": [
+          {
+            "id": "step_session_review",
+            "external_id": "session_abc:human_review",
+            "activity": "operation",
+            "status": "awaiting",
+            "title": "Review session synthesis",
+            "awaiting": {
+              "reason": "human_input",
+              "surface": "case.step.awaiting",
+              "action": "step.awaiting.submit"
+            },
+            "outputs": [
+              {
+                "id": "artifact_transcript_session_abc",
+                "external_id": "session_abc:transcript",
+                "type": "agent_interviewer.transcript",
+                "title": "Transcript",
+                "media_type": "text/markdown"
+              },
+              {
+                "id": "artifact_synthesis_session_abc",
+                "external_id": "session_abc:synthesis",
+                "type": "agent_interviewer.synthesis",
+                "title": "Synthesis",
+                "media_type": "application/json"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sync_result": {
+    "status": "ok",
+    "external_ref": "campaign_123",
+    "external_version": "campaign_123:rev_42",
+    "sync_cursor": "rev_42",
+    "observed_at": "2026-05-15T10:00:00Z",
+    "effects": [
+      {
+        "type": "step.updated",
+        "step": {
+          "id": "step_session_review",
+          "external_id": "session_abc:human_review",
+          "status": "completed"
+        }
+      }
+    ]
+  },
+  "replay_safety": {
+    "dedupe_keys": [
+      "job_123",
+      "campaign_123",
+      "campaign_123:rev_42"
+    ],
+    "stable_external_ids_required": true,
+    "strictly_idempotent_response": false,
+    "convergent": true
+  }
+}

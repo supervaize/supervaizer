@@ -14,12 +14,15 @@ the Supervaizer server/runtime surface.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 CONTROLLER_CONTRACT_VERSION = "1.0"
 API_BASE_PATH = "/api"
+SUPERVAIZER_V2_CONTRACT_VERSION = 2
+SUPERVAIZER_V2_A2UI_VERSION = "v0.8"
+SUPERVAIZER_V2_A2A_VERSION = "0.2.6"
 
 
 class ContractModel(BaseModel):
@@ -240,6 +243,205 @@ class DataResourceListResponse(ContractModel):
     """Structured response shape for DataResource list operations."""
 
     items: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class V2AgentIdentity(ContractModel):
+    id: str
+    slug: str
+    display_name: str
+
+
+class V2ProtocolVersions(ContractModel):
+    a2ui_version: str
+    a2ui_catalog_version: str
+    a2a_version: str
+    ag_ui_version: str | None = None
+
+
+class V2A2ATransport(ContractModel):
+    json_rpc: bool = True
+    sse: bool = True
+    push_notifications: bool = True
+
+
+class V2A2AExternalInterop(ContractModel):
+    inbound_tasks: bool = False
+    outbound_delegation: bool = False
+
+
+class V2A2AController(ContractModel):
+    agent_card_url: str
+    controller_url: str
+    transport: V2A2ATransport = Field(default_factory=V2A2ATransport)
+    external_interop: V2A2AExternalInterop = Field(default_factory=V2A2AExternalInterop)
+
+
+class V2CaseLaneDefinition(ContractModel):
+    id: str
+    label: str
+    default: bool = False
+
+
+class V2ArtifactTypeDefinition(ContractModel):
+    type: str
+    label: str
+    renderer_surface: str | None = None
+
+
+class V2AgentCapabilities(ContractModel):
+    surfaces: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+    case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
+    artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
+
+
+class V2JobSyncPolicy(ContractModel):
+    action: str = "job.sync"
+    supported_statuses: list[str] = Field(default_factory=list)
+
+
+class V2JobPolicy(ContractModel):
+    default_timeout_seconds: int | None = None
+    offline_start_policy: Literal["block"] = "block"
+    offline_running_policy: Literal["fail_in_studio"] = "fail_in_studio"
+    sync: V2JobSyncPolicy | None = None
+
+
+class V2ResourceDisplayDefinition(ContractModel):
+    title_field: str | None = None
+    columns: list[str] = Field(default_factory=list)
+    search_fields: list[str] = Field(default_factory=list)
+
+
+class V2MountedResourceViewDefinition(ContractModel):
+    view: str
+    surface: str
+
+
+class V2ResourceDefinition(ContractModel):
+    id: str
+    label: str
+    auto_surface: bool = False
+    operations: list[str] = Field(default_factory=list)
+    display: V2ResourceDisplayDefinition | None = None
+    mounted_views: list[V2MountedResourceViewDefinition] = Field(default_factory=list)
+
+
+class V2DatasetDefinition(ContractModel):
+    id: str
+    label: str
+    auto_surface: bool = False
+
+
+class SupervaizerV2AgentRegistrationContract(ContractModel):
+    supervaizer_contract_version: Literal[2] = SUPERVAIZER_V2_CONTRACT_VERSION
+    agent: V2AgentIdentity
+    versions: V2ProtocolVersions
+    a2a: V2A2AController
+    capabilities: V2AgentCapabilities = Field(default_factory=V2AgentCapabilities)
+    job_policy: V2JobPolicy = Field(default_factory=V2JobPolicy)
+    resources: list[V2ResourceDefinition] = Field(default_factory=list)
+    datasets: list[V2DatasetDefinition] = Field(default_factory=list)
+
+
+class V2ActorContext(ContractModel):
+    user_id: str
+
+
+class V2WorkspaceContext(ContractModel):
+    id: str
+    slug: str | None = None
+
+
+class V2ActionRequest(ContractModel):
+    request_id: str
+    actor: V2ActorContext
+    workspace: V2WorkspaceContext
+    mission_id: str
+    agent_slug: str
+    surface: str
+    action: str
+    input: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str | None = None
+    draft_session_id: str | None = None
+    job_id: str | None = None
+    case_id: str | None = None
+    step_id: str | None = None
+
+
+class V2Effect(ContractModel):
+    type: str
+
+
+class V2ActionResult(ContractModel):
+    status: Literal["ok", "error"]
+    effects: list[V2Effect] = Field(default_factory=list)
+
+
+class V2ArtifactRef(ContractModel):
+    id: str
+    type: str
+    title: str | None = None
+    external_id: str | None = None
+    media_type: str | None = None
+
+
+class V2AwaitingState(ContractModel):
+    reason: str
+    surface: str
+    action: str
+
+
+class V2StepSnapshot(ContractModel):
+    id: str
+    activity: Literal["operation", "delegation"]
+    status: str
+    title: str | None = None
+    external_id: str | None = None
+    awaiting: V2AwaitingState | None = None
+    outputs: list[V2ArtifactRef] = Field(default_factory=list)
+
+
+class V2CaseSnapshot(ContractModel):
+    id: str
+    lane: str = "work"
+    title: str | None = None
+    status: str | None = None
+    external_id: str | None = None
+    steps: list[V2StepSnapshot] = Field(default_factory=list)
+
+
+class V2JobSource(ContractModel):
+    type: Literal["fresh_start", "external"]
+    external_ref: str | None = None
+    previous_job_id: str | None = None
+
+
+class V2JobSnapshot(ContractModel):
+    id: str
+    agent_slug: str
+    mission_id: str
+    status: str
+    source: V2JobSource
+
+
+class V2JobStateSnapshot(ContractModel):
+    job: V2JobSnapshot
+    cases: list[V2CaseSnapshot] = Field(default_factory=list)
+
+
+class V2JobSyncResult(V2ActionResult):
+    external_ref: str | None = None
+    external_version: str | None = None
+    sync_cursor: str | None = None
+    observed_at: str | None = None
+
+
+class V2ReplaySafetyMetadata(ContractModel):
+    dedupe_keys: list[str] = Field(default_factory=list)
+    stable_external_ids_required: bool = True
+    strictly_idempotent_response: bool = False
+    convergent: bool = True
 
 
 def _endpoint_key(endpoint: ControllerEndpoint | str) -> str:

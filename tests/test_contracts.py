@@ -9,16 +9,31 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
+from pathlib import Path
 
 from supervaizer.contracts import (
     ControllerEndpoint,
     ControllerContract,
     ServerRegistrationContract,
+    SupervaizerV2AgentRegistrationContract,
+    V2ActionRequest,
+    V2ActionResult,
+    V2JobStateSnapshot,
+    V2JobSyncResult,
+    V2ReplaySafetyMetadata,
     build_data_resource_context_headers,
     controller_contract_info,
     resolve_controller_endpoint,
 )
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "supervaizer_v2"
+
+
+def load_v2_fixture(name: str) -> dict:
+    with (FIXTURE_DIR / name).open() as fixture_file:
+        return json.load(fixture_file)
 
 
 def test_controller_contract_endpoints_are_api_prefixed() -> None:
@@ -127,3 +142,86 @@ def test_data_resource_context_headers() -> None:
         "X-Supervaize-Mission-Id": "mission-1",
         "X-Supervaize-Request-Id": "request-1",
     }
+
+
+def test_v2_agent_interviewer_registration_fixture() -> None:
+    fixture = load_v2_fixture("agent_interviewer_mvp.json")
+
+    registration = SupervaizerV2AgentRegistrationContract.model_validate(
+        fixture["registration"]
+    )
+
+    assert registration.supervaizer_contract_version == 2
+    assert registration.versions.a2ui_version == "v0.8"
+    assert registration.versions.a2a_version == "0.2.6"
+    assert registration.job_policy.sync is not None
+    assert registration.job_policy.sync.action == "job.sync"
+    assert "job.start" in registration.capabilities.surfaces
+    assert "campaigns.sync" in registration.capabilities.actions
+    assert any(
+        lane.id == "work" and lane.default
+        for lane in registration.capabilities.case_lanes
+    )
+    assert {resource.id for resource in registration.resources} >= {
+        "campaigns",
+        "prompts",
+    }
+
+
+def test_v2_action_request_and_result_fixture() -> None:
+    fixture = load_v2_fixture("agent_interviewer_mvp.json")
+
+    request = V2ActionRequest.model_validate(fixture["action_request"])
+    result = V2ActionResult.model_validate(fixture["action_result"])
+
+    assert request.action == "job.start"
+    assert request.idempotency_key == "idem_start_campaign_123"
+    assert request.draft_session_id == "draft_123"
+    assert result.status == "ok"
+    assert [effect.type for effect in result.effects] == [
+        "job.started",
+        "case.created",
+    ]
+
+
+def test_v2_job_state_snapshot_fixture() -> None:
+    fixture = load_v2_fixture("agent_interviewer_mvp.json")
+
+    snapshot = V2JobStateSnapshot.model_validate(fixture["job_state"])
+    step = snapshot.cases[0].steps[0]
+
+    assert snapshot.job.source.type == "fresh_start"
+    assert snapshot.cases[0].lane == "work"
+    assert step.activity == "operation"
+    assert step.status == "awaiting"
+    assert step.awaiting is not None
+    assert step.awaiting.reason == "human_input"
+    assert {artifact.type for artifact in step.outputs} == {
+        "agent_interviewer.transcript",
+        "agent_interviewer.synthesis",
+    }
+
+
+def test_v2_job_sync_result_is_convergent_not_strictly_idempotent() -> None:
+    fixture = load_v2_fixture("agent_interviewer_mvp.json")
+
+    sync_result = V2JobSyncResult.model_validate(fixture["sync_result"])
+    replay_safety = V2ReplaySafetyMetadata.model_validate(fixture["replay_safety"])
+
+    assert sync_result.status == "ok"
+    assert sync_result.external_version == "campaign_123:rev_42"
+    assert sync_result.sync_cursor == "rev_42"
+    assert replay_safety.convergent is True
+    assert replay_safety.strictly_idempotent_response is False
+
+
+def test_v2_contract_models_are_public_sdk_exports() -> None:
+    import supervaizer
+
+    assert supervaizer.SUPERVAIZER_V2_CONTRACT_VERSION == 2
+    assert (
+        supervaizer.SupervaizerV2AgentRegistrationContract
+        is SupervaizerV2AgentRegistrationContract
+    )
+    assert supervaizer.V2ActionRequest is V2ActionRequest
+    assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
