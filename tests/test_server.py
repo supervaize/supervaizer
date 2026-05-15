@@ -605,6 +605,80 @@ class TestServerLocalMode:
             assert len(server.agents) == 2
             assert server.agents[0].name == "Hello World AI Agent"
             assert server.agents[1].name == agent_fixture.name
+            assert server.agents[0].supervaizer_v2_registration is not None
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_registers_hello_world_v2_handlers(self) -> None:
+        """The built-in Hello World agent works through the v2 A2A surface/action path."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            server = Server(
+                agents=[],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            agent_slug = server.agents[0].slug
+            client = TestClient(server.app)
+
+            card_response = client.get(
+                f"/.well-known/agents/v{server.agents[0].version}/{agent_slug}_agent.json"
+            )
+            assert card_response.status_code == 200
+            assert (
+                card_response.json()["supervaizer"]["v2"]["a2a"]["controller_url"]
+                == "/a2a"
+            )
+
+            surface_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "surface-1",
+                    "method": "supervaizer/surface.load",
+                    "params": {
+                        "request_id": "surface-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "input": {},
+                        "draft_session_id": "draft-1",
+                    },
+                },
+            )
+            assert surface_response.status_code == 200
+            assert (
+                surface_response.json()["result"]["document"]["submit"]["action"]
+                == "job.start"
+            )
+
+            action_response = client.post(
+                "/a2a",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "action-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "action-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "action": "job.start.preview",
+                        "input": {"count": 0},
+                    },
+                },
+            )
+            assert action_response.status_code == 200
+            assert (
+                action_response.json()["result"]["effects"][0]["type"]
+                == "job.start.previewed"
+            )
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]
 

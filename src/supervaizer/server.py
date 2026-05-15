@@ -410,6 +410,7 @@ class Server(ServerAbstract):
 
         # Local mode: skip Studio, inject Hello World, default api_key
         local_mode = is_local_mode()
+        local_hello_world_slug: str | None = None
         if local_mode:
             if supervisor_account is not None:
                 log.warning(
@@ -432,6 +433,7 @@ class Server(ServerAbstract):
                 existing_slugs = {a.slug for a in agents}
                 if hw_agent.slug not in existing_slugs:
                     agents = [hw_agent] + list(agents)
+                    local_hello_world_slug = hw_agent.slug
             elif not agents:
                 log.warning(
                     "[Server] Local mode with Hello World disabled and no"
@@ -534,6 +536,16 @@ class Server(ServerAbstract):
             api_key_header=api_key_header,
             **kwargs,
         )
+
+        if local_hello_world_slug:
+            from supervaizer.examples.local_server import (
+                register_default_local_v2_handlers,
+            )
+
+            register_default_local_v2_handlers(
+                self,
+                agent_slug=local_hello_world_slug,
+            )
 
         log.info(f"[Server launch] Server ID: {self.server_id}")
 

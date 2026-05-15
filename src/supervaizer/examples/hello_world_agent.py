@@ -25,12 +25,14 @@ import shortuuid
 from supervaizer.account import Account
 from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.common import ApiSuccess, log
+from supervaizer.contracts import SUPERVAIZER_V2_A2UI_VERSION
 from supervaizer.job import JobInstructions, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 
 STEPS_WITH_HITL = ["Begin", "Progress", "Human Review", "End"]
 STEPS_WITHOUT_HITL = ["Begin", "Progress", "End"]
 HITL_POLL_INTERVAL = 1.0  # seconds between polls while waiting for human input
+HELLO_WORLD_A2UI_CATALOG_VERSION = "supervaizer-v2-local.0"
 
 
 class _LocalAccount(Account):
@@ -239,3 +241,105 @@ def job_status(**kwargs: Any) -> JobResponse:
         status=EntityStatus.STOPPED,
         message="idle",
     )
+
+
+def handle_v2_surface(surface_request: Any) -> dict[str, Any]:
+    """Return the local Hello World job.start A2UI document."""
+    request = _request_dict(surface_request)
+    surface = str(request.get("surface") or "").strip()
+    return {
+        "surface": surface,
+        "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+        "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+        "document": {
+            "type": "Form",
+            "id": "supervaizer.local.hello_world.job.start",
+            "title": "Start Hello World",
+            "fields": [
+                {
+                    "id": "count",
+                    "label": "How many times to say hello",
+                    "type": "number",
+                    "required": True,
+                    "default": 3,
+                },
+                {
+                    "id": "enable_human_review",
+                    "label": "Enable human review",
+                    "type": "boolean",
+                    "required": False,
+                    "default": False,
+                },
+            ],
+            "submit": {"action": "job.start", "label": "Start"},
+            "preview": {"action": "job.start.preview"},
+            "state": {"draft_session_id": request.get("draft_session_id")},
+        },
+    }
+
+
+def handle_v2_action(action_request: Any) -> dict[str, Any]:
+    """Dispatch minimal v2 actions for the local Hello World agent."""
+    request = _request_dict(action_request)
+    action = str(request.get("action") or "").strip()
+    if action == "job.start.preview":
+        return _ok_result("job.start.previewed", request_id=request.get("request_id"))
+    if action != "job.start":
+        return {
+            "status": "error",
+            "effects": [{"type": "action.unsupported", "action": action}],
+        }
+
+    response = job_start(
+        fields=_legacy_job_start_fields(_action_input(request)),
+        context={"job_id": request.get("job_id") or "local-v2-job"},
+    )
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "job.started",
+                "job_id": response.job_id,
+                "status": _status_value(response.status),
+                "message": response.message,
+                "payload": response.payload,
+            }
+        ],
+    }
+
+
+def _legacy_job_start_fields(action_input: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "How many times to say hello": action_input.get(
+            "count",
+            action_input.get("How many times to say hello", 1),
+        ),
+        "Enable human review": action_input.get(
+            "enable_human_review",
+            action_input.get("Enable human review", False),
+        ),
+    }
+
+
+def _ok_result(effect_type: str, **effect: Any) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [{"type": effect_type, **effect}],
+    }
+
+
+def _action_input(request: dict[str, Any]) -> dict[str, Any]:
+    value = request.get("input")
+    return value if isinstance(value, dict) else {}
+
+
+def _request_dict(request: Any) -> dict[str, Any]:
+    if isinstance(request, dict):
+        return request
+    if hasattr(request, "model_dump"):
+        return request.model_dump(mode="python")
+    raise TypeError(f"Unsupported request type: {type(request).__name__}")
+
+
+def _status_value(status: Any) -> str:
+    return str(getattr(status, "value", status))
