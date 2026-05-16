@@ -21,6 +21,7 @@ from supervaizer.contracts import (
     AgentMethodsContract,
     ControllerEndpoint,
     ControllerContract,
+    EventType,
     ServerRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
     V2ActionRequest,
@@ -96,6 +97,11 @@ def test_version_module_is_package_version_only() -> None:
     assert version_info.__version__ == version_info.VERSION
     assert not hasattr(version_info, "API_VERSION")
     assert not hasattr(version_info, "TELEMETRY_VERSION")
+
+
+def test_event_type_agent_anomaly_members_are_not_aliases() -> None:
+    assert EventType.AGENT_SEND_ANOMALY is not EventType.AGENT_ANOMALY
+    assert EventType.AGENT_SEND_ANOMALY.value != EventType.AGENT_ANOMALY.value
 
 
 def test_agent_method_contract_exports_timeout_metadata() -> None:
@@ -232,6 +238,15 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     )
     assert [field.id for field in campaigns.fields] == ["name"]
     assert campaigns.fields[0].required is True
+    contacts = next(
+        resource for resource in registration.resources if resource.id == "contacts"
+    )
+    assert len(contacts.mounted_views) == 1
+    assert contacts.mounted_views[0].view == "import"
+    assert (
+        contacts.mounted_views[0].surface
+        == "mission.agent.surface.contact_import"
+    )
 
 
 def test_v2_resource_field_options_source_is_typed() -> None:

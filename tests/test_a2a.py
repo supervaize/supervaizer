@@ -26,6 +26,7 @@ from supervaizer.protocol.a2a import (
     create_agents_list,
     create_health_data,
 )
+from supervaizer.protocol.a2a.model import _agent_health_status
 from supervaizer.protocol.a2a.controller import (
     JSON_RPC_ACTION_NOT_REGISTERED,
     JSON_RPC_METHOD_NOT_FOUND,
@@ -158,6 +159,33 @@ def test_create_agents_list(agent_fixture: Agent) -> None:
     assert (
         agent_entry["agent_card_url"]
         == f"{base_url}/.well-known/agents/v{agent_fixture.version}/{agent_fixture.slug}_agent.json"
+    )
+
+
+@pytest.mark.parametrize(
+    ("total_jobs", "failed_jobs", "in_progress_jobs", "expected"),
+    [
+        (0, 0, 0, "available"),
+        (1, 1, 0, "unavailable"),
+        (2, 1, 0, "available"),
+        (3, 2, 0, "degraded"),
+        (3, 3, 0, "unavailable"),
+        (2, 0, 1, "busy"),
+    ],
+)
+def test_agent_health_status(
+    total_jobs: int,
+    failed_jobs: int,
+    in_progress_jobs: int,
+    expected: str,
+) -> None:
+    assert (
+        _agent_health_status(
+            total_jobs=total_jobs,
+            failed_jobs=failed_jobs,
+            in_progress_jobs=in_progress_jobs,
+        )
+        == expected
     )
 
 

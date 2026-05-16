@@ -423,17 +423,12 @@ def _hello_messages_result() -> dict[str, Any]:
 
 
 def _human_review_enabled(action_input: dict[str, Any]) -> bool:
-    value = action_input.get(
-        "enable_human_review",
-        action_input.get("Enable human review", False),
-    )
+    value = action_input.get("enable_human_review", False)
     return str(value).lower() in ("true", "on", "1", "yes")
 
 
 def _bounded_count(action_input: dict[str, Any]) -> int:
-    value = action_input.get(
-        "count", action_input.get("How many times to say hello", 1)
-    )
+    value = action_input.get("count", 1)
     try:
         count = int(value)
     except (TypeError, ValueError):

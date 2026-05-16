@@ -87,7 +87,7 @@ class EventType(StrEnum):
     AGENT_REGISTER = "agent.register"
     AGENT_WAKEUP = "agent.wakeup"
     AGENT_ANOMALY = "agent.anomaly"
-    AGENT_SEND_ANOMALY = "agent.anomaly"
+    AGENT_SEND_ANOMALY = "agent.send_anomaly"
     AGENT_PING = "agent.ping"
     INTERMEDIARY = "agent.intermediary"
     JOB_START = "agent.job.start"
@@ -340,8 +340,14 @@ class V2ResourceFieldDefinition(ContractModel):
 
 
 class V2MountedResourceViewDefinition(ContractModel):
-    view: str
-    surface: str
+    """Agent override that mounts an A2UI surface on a full resource view."""
+
+    view: str = Field(
+        description="Generated resource view replaced by the mount (e.g. import, edit)."
+    )
+    surface: str = Field(
+        description="Registered A2UI surface id served for this resource view."
+    )
 
 
 class V2ResourceDefinition(ContractModel):
@@ -552,11 +558,23 @@ class V2SurfaceRequest(ContractModel):
 
 class V2Effect(ContractModel):
     type: str
+    job_id: str | None = None
+    case_id: str | None = None
+    step_id: str | None = None
+    resource: str | None = None
+    dataset: str | None = None
+    artifact_id: str | None = None
+    status: str | None = None
+    message: str | None = None
+    item: dict[str, Any] | None = None
+    items: list[dict[str, Any]] | None = None
+    data: dict[str, Any] | None = None
 
 
 class V2ActionResult(ContractModel):
     status: Literal["ok", "error"]
     effects: list[V2Effect] = Field(default_factory=list)
+    job_state: V2JobStateSnapshot | None = None
 
 
 class V2SurfaceResult(ContractModel):
@@ -611,7 +629,13 @@ class V2JobSource(ContractModel):
     type: Literal["fresh_start", "external"]
     external_ref: str | None = None
     previous_job_id: str | None = None
-    target_type: str | None = None
+    target_type: str | None = Field(
+        default=None,
+        description=(
+            "Agent-declared business object type for external sources (e.g. campaign). "
+            "Open vocabulary unlike protocol-fixed fields such as step activity."
+        ),
+    )
 
 
 class V2JobSnapshot(ContractModel):
@@ -632,7 +656,6 @@ class V2JobSyncResult(V2ActionResult):
     external_version: str | None = None
     sync_cursor: str | None = None
     observed_at: str | None = None
-    job_state: V2JobStateSnapshot | None = None
 
 
 class V2ReplaySafetyMetadata(ContractModel):

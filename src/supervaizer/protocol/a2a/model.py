@@ -10,7 +10,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from supervaizer.agent import Agent
@@ -164,6 +164,27 @@ def create_agents_list(agents: list[Agent], base_url: str) -> dict[str, Any]:
     }
 
 
+# Share of tracked jobs that must fail before status becomes "degraded" (exclusive).
+_HEALTH_DEGRADED_FAILURE_RATIO = 0.5
+
+
+def _agent_health_status(
+    *,
+    total_jobs: int,
+    failed_jobs: int,
+    in_progress_jobs: int,
+) -> str:
+    if total_jobs == 0:
+        return "available"
+    if failed_jobs == total_jobs:
+        return "unavailable"
+    if failed_jobs > total_jobs * _HEALTH_DEGRADED_FAILURE_RATIO:
+        return "degraded"
+    if in_progress_jobs > 0:
+        return "busy"
+    return "available"
+
+
 def create_health_data(agents: list[Agent]) -> dict[str, Any]:
     """
     Create health data for all agents according to A2A protocol.
@@ -193,15 +214,11 @@ def create_health_data(agents: list[Agent]) -> dict[str, Any]:
             1 for j in agent_jobs.values() if j.status == EntityStatus.IN_PROGRESS
         )
 
-        # Set agent status based on health indicators
-        if total_jobs == 0:
-            status = "available"
-        elif failed_jobs > total_jobs / 2:  # If more than half are failing
-            status = "degraded"
-        elif in_progress_jobs > 0:
-            status = "busy"
-        else:
-            status = "available"
+        status = _agent_health_status(
+            total_jobs=total_jobs,
+            failed_jobs=failed_jobs,
+            in_progress_jobs=in_progress_jobs,
+        )
 
         agents_health[agent.id] = {
             "agent_id": agent.id,
@@ -223,6 +240,6 @@ def create_health_data(agents: list[Agent]) -> dict[str, Any]:
     return {
         "schema_version": "a2a_2023_v1",
         "status": "operational",
-        "timestamp": datetime.now(datetime.UTC).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "agents": agents_health,
     }

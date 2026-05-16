@@ -402,11 +402,11 @@ def test_fields_annotations_dynamic_model() -> None:
     # Test 2: Check field annotations match expected types
     assert DynamicModel.__annotations__["full_name"] is str
     assert DynamicModel.__annotations__["age"] is int
-    assert DynamicModel.__annotations__["subscribe"] is Optional[bool]
+    assert DynamicModel.__annotations__["subscribe"] == bool | None
     assert DynamicModel.__annotations__["gender"] is str
-    assert DynamicModel.__annotations__["bio"] is Optional[str]
+    assert DynamicModel.__annotations__["bio"] == str | None
     assert DynamicModel.__annotations__["country"] is str
-    assert DynamicModel.__annotations__["languages"] is Optional[list]
+    assert DynamicModel.__annotations__["languages"] == list | None
 
     # Test 3: Create a valid instance
     valid_data: dict[str, Any] = {

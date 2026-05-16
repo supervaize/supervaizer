@@ -18,14 +18,19 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Optional,
     TypeVar,
     cast,
 )
 
 import shortuuid
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from rich import inspect, print
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from slugify import slugify
 
 from supervaizer.__version__ import VERSION
@@ -41,9 +46,6 @@ from supervaizer.parameter import ParametersSetup
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
-
-insp = inspect
-prnt = print
 
 T = TypeVar("T")
 
@@ -312,7 +314,7 @@ class AgentMethod(AgentMethodAbstract):
 
             # Make field optional if not required
             field_annotations[field_name] = (
-                annotation_type if field.required else Optional[annotation_type]
+                annotation_type if field.required else annotation_type | None
             )
 
         # Create the dynamic model with proper module information
@@ -335,8 +337,8 @@ class AgentMethod(AgentMethodAbstract):
         Returns:
             Dictionary with validation results:
             - "valid": bool - whether all fields are valid
-            - "errors": List[str] - list of validation error messages
-            - "invalid_fields": Dict[str, str] - field name to error message mapping
+            - "errors": list[str] - list of validation error messages
+            - "invalid_fields": dict[str, str] - field name to error message mapping
         """
         if self.fields is None:
             return {
@@ -590,7 +592,12 @@ class AgentAbstract(SvBaseModel):
 
     supervaizer_VERSION: ClassVar[str] = VERSION
     name: str = Field(description="Display name of the agent")
-    id: str = Field(description="Unique ID generated from name")
+    id: str = Field(
+        description=(
+            "Stable ID derived from name via shortuuid.uuid(name=...). "
+            "Renaming the agent changes this value."
+        )
+    )
     author: str | None = Field(default=None, description="Author of the agent")
     developer: str | None = Field(
         default=None, description="Developer of the controller integration"
@@ -625,10 +632,6 @@ class AgentAbstract(SvBaseModel):
     server_agent_onboarding_status: str | None = Field(
         default=None, description="Onboarding status - Do not set this manually"
     )
-    server_encrypted_parameters: str | None = Field(
-        default=None,
-        description="Encrypted parameters from server - Do not set this manually",
-    )
     max_execution_time: int = Field(
         default=60 * 60,
         description="Maximum execution time in seconds, defaults to 1 hour",
@@ -662,6 +665,8 @@ class AgentAbstract(SvBaseModel):
 
 
 class Agent(AgentAbstract):
+    _server_encrypted_parameters: str | None = PrivateAttr(default=None)
+
     def __init__(
         self,
         name: str,
@@ -679,7 +684,6 @@ class Agent(AgentAbstract):
         server_agent_id: str | None = None,
         server_agent_status: str | None = None,
         server_agent_onboarding_status: str | None = None,
-        server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
         data_resources: list["DataResource"] | None = None,
@@ -693,11 +697,12 @@ class Agent(AgentAbstract):
         It contains metadata about the agent like name, version, description etc. as well as
         the methods it supports and any parameter configurations.
 
-        The agent ID is automatically generated from the name and must match.
+        The agent ID is deterministically derived from ``name`` (``shortuuid.uuid(name=name)``).
+        Pass ``id`` only when it matches that derivation; renaming changes the ID.
 
         Attributes:
             name (str): Display name of the agent
-            id (str): Unique ID generated from name
+            id (str): Stable ID derived from name; omit to auto-generate
             author (str, optional): Original author
             developer (str, optional): Current developer
             maintainer (str, optional): Current maintainer
@@ -711,7 +716,6 @@ class Agent(AgentAbstract):
             server_agent_id (str, optional): ID assigned by server
             server_agent_status (str, optional): Current status on server
             server_agent_onboarding_status (str, optional): Onboarding status
-            server_encrypted_parameters (str, optional): Encrypted parameters from server
             max_execution_time (int):  Maximum execution time in seconds, defaults to 1 hour
 
         Tested in tests/test_agent.py
@@ -722,10 +726,13 @@ class Agent(AgentAbstract):
                 "Use v2 resource option_sources or typed A2A actions for dynamic options."
             )
 
-        # Validate or generate agent ID
-        agent_id = id or shortuuid.uuid(name=name)
-        if id is not None and id != shortuuid.uuid(name=name):
-            raise ValueError("Agent ID does not match")
+        expected_id = shortuuid.uuid(name=name)
+        agent_id = id or expected_id
+        if id is not None and id != expected_id:
+            raise ValueError(
+                f"Agent id {id!r} does not match deterministic id for name {name!r} "
+                f"({expected_id!r}); omit id or use the expected value"
+            )
 
         # Initialize using Pydantic's mechanism
         super().__init__(
@@ -744,7 +751,6 @@ class Agent(AgentAbstract):
             server_agent_id=server_agent_id,
             server_agent_status=server_agent_status,
             server_agent_onboarding_status=server_agent_onboarding_status,
-            server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
             data_resources=data_resources or [],
@@ -809,7 +815,6 @@ class Agent(AgentAbstract):
             "server_agent_id": f"{self.server_agent_id}",
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
-            "server_encrypted_parameters": self.server_encrypted_parameters,
             "max_execution_time": self.max_execution_time,
             "instructions_path": self.instructions_path,
             "data_resources": [r.registration_info for r in self.data_resources],
@@ -818,7 +823,7 @@ class Agent(AgentAbstract):
             else None,
         }
 
-    def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
+    def update_agent_from_server(self, server: "Server") -> "Agent | None":
         """
         Update agent attributes and parameters from server registration information.
         Example of agent_registration data is available in mock_api_responses.py
@@ -881,7 +886,7 @@ class Agent(AgentAbstract):
         self, server: "Server", server_encrypted_parameters: str | None
     ) -> None:
         if server_encrypted_parameters and self.parameters_setup:
-            self.server_encrypted_parameters = server_encrypted_parameters
+            self._server_encrypted_parameters = server_encrypted_parameters
             decrypted = server.decrypt(server_encrypted_parameters)
             self.parameters_setup.update_values_from_server(json.loads(decrypted))
         else:
@@ -1065,4 +1070,3 @@ class AgentResponse(BaseModel):
     server_agent_id: str | None = None
     server_agent_status: str | None = None
     server_agent_onboarding_status: str | None = None
-    server_encrypted_parameters: str | None = None
