@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -14,7 +14,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional
+from typing import Any, ClassVar
 
 from pydantic import Field, field_validator
 
@@ -27,9 +27,6 @@ from supervaizer.lifecycle import (
 )
 from supervaizer.storage import storage_manager
 
-if TYPE_CHECKING:
-    pass
-
 
 @singleton
 class Jobs:
@@ -37,7 +34,7 @@ class Jobs:
 
     def __init__(self) -> None:
         # Structure: {agent_name: {job_id: Job}}
-        self.jobs_by_agent: dict[str, dict[str, "Job"]] = {}
+        self.jobs_by_agent: dict[str, dict[str, Job]] = {}
 
     def reset(self) -> None:
         self.jobs_by_agent.clear()
@@ -147,7 +144,7 @@ class JobInstructions(SvBaseModel):
         return (True, "")
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the job instructions"""
         return {
             "max_cases": self.max_cases,
@@ -166,7 +163,7 @@ class JobContext(SvBaseModel):
     mission_id: str
     mission_name: str
     mission_context: Any = None
-    job_instructions: Optional[JobInstructions] = None
+    job_instructions: JobInstructions | None = None
 
     @field_validator("workspace_id", mode="before")
     @classmethod
@@ -179,7 +176,7 @@ class JobContext(SvBaseModel):
         return v
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the job context"""
         return {
             "workspace_id": self.workspace_id,
@@ -199,17 +196,17 @@ class JobResponse(SvBaseModel):
     job_id: str
     status: EntityStatus
     message: str
-    payload: Optional[dict[str, Any]] = None
-    error_message: Optional[str] = None
-    error_traceback: Optional[str] = None
+    payload: dict[str, Any] | None = None
+    error_message: str | None = None
+    error_traceback: str | None = None
 
     def __init__(
         self,
         job_id: str,
         status: EntityStatus,
         message: str,
-        payload: Optional[dict[str, Any]] = None,
-        error: Optional[Exception] = None,
+        payload: dict[str, Any] | None = None,
+        error: Exception | None = None,
         **kwargs: Any,
     ) -> None:
         log.debug(
@@ -235,7 +232,7 @@ class JobResponse(SvBaseModel):
             log.error(self.error_traceback)
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the job response"""
         return {
             "job_id": self.job_id,
@@ -345,7 +342,7 @@ class Job(AbstractJob):
             storage_manager.save_object("Job", self.to_dict)
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the job"""
         return {
             "id": self.id,
@@ -367,9 +364,9 @@ class Job(AbstractJob):
         cls,
         job_context: "JobContext",
         agent_name: str,
-        agent_parameters: Optional[list[dict[str, Any]]] = None,
-        name: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        agent_parameters: list[dict[str, Any]] | None = None,
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> "Job":
         """Create a new job
 

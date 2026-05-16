@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -19,8 +19,9 @@ with the same API key as all other agent routes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import Field, model_validator
 
@@ -148,7 +149,7 @@ class DataResource(SvBaseModel):
     on_import: Callable[..., dict[str, Any]] | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
-    def check_callbacks(self) -> "DataResource":
+    def check_callbacks(self) -> DataResource:
         """Validate required callbacks.
 
         on_list is always required.

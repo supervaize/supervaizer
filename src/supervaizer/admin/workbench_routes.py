@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -16,7 +16,7 @@ import hashlib
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import shortuuid
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
 
 from supervaizer.agent import Agent
-from supervaizer.case import Cases, CaseNodeUpdate
+from supervaizer.case import CaseNodeUpdate, Cases
 from supervaizer.common import log
 from supervaizer.contracts import API_VERSION
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
@@ -46,7 +46,7 @@ _workbench_log_version = 0
 
 def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
     """Log listener callback — appends to workbench buffer."""
-    global _workbench_log_version  # noqa: PLW0603
+    global _workbench_log_version
     _workbench_log_buffer.append({
         "timestamp": timestamp,
         "level": level,
@@ -80,17 +80,17 @@ def get_agent_by_slug(request: Request | WebSocket, slug: str) -> Agent:
     raise HTTPException(status_code=404, detail=f"Agent '{slug}' not found")
 
 
-def get_job_cases(job: Job) -> List[Any]:
+def get_job_cases(job: Job) -> list[Any]:
     """Get all cases for a job from the Cases singleton."""
     return list(Cases().get_job_cases(job.id).values())
 
 
-def get_agent_parameters_from_env(agent: Agent) -> Dict[str, Dict[str, str | bool]]:
+def get_agent_parameters_from_env(agent: Agent) -> dict[str, dict[str, str | bool]]:
     """Pre-fill parameter values from environment variables.
 
     Returns dict of {name: {"value": str, "from_env": bool}}.
     """
-    values: Dict[str, Dict[str, str | bool]] = {}
+    values: dict[str, dict[str, str | bool]] = {}
     if agent.parameters_setup:
         for name, param in agent.parameters_setup.definitions.items():
             env_val = os.environ.get(name, "")
@@ -321,7 +321,7 @@ def create_workbench_routes() -> APIRouter:
                     JobResponse(
                         job_id=job.id,
                         status=EntityStatus.FAILED,
-                        message=f"Job failed: {str(e)}",
+                        message=f"Job failed: {e!s}",
                         error=e,
                     )
                 )
@@ -751,7 +751,7 @@ def create_workbench_ws_routes() -> APIRouter:
                     try:
                         while True:
                             await asyncio.wait_for(websocket.receive_text(), timeout=60)
-                    except (asyncio.TimeoutError, WebSocketDisconnect):
+                    except (TimeoutError, WebSocketDisconnect):
                         pass
                     break
 
@@ -762,7 +762,7 @@ def create_workbench_ws_routes() -> APIRouter:
                     )
                     if data == "ping":
                         await websocket.send_text("pong")
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
         except WebSocketDisconnect:
             pass

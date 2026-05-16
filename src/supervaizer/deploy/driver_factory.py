@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -16,16 +16,14 @@ Driver Factory
 This module provides a factory for creating deployment drivers.
 """
 
-from typing import Optional
-
+from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver
 from supervaizer.deploy.drivers.base import BaseDriver
 from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
-from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver
 from supervaizer.deploy.drivers.do_app_platform import DOAppPlatformDriver
 
 
 def create_driver(
-    platform: str, region: str, project_id: Optional[str] = None
+    platform: str, region: str, project_id: str | None = None
 ) -> BaseDriver:
     """Create a deployment driver for the specified platform."""
     platform = platform.lower()

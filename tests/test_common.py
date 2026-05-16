@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 from cryptography.hazmat.backends import default_backend
@@ -133,7 +133,7 @@ def test_api_success() -> None:
     assert success.log_message == "✅ success"
 
     """Test ApiSuccess with JSON without ID"""
-    json_detail: Dict[str, str] = {"data": "test"}
+    json_detail: dict[str, str] = {"data": "test"}
     success = ApiSuccess(message="success", detail=json_detail)
     assert success.log_message == "✅ success"
 
@@ -163,7 +163,7 @@ def test_api_error() -> None:
         def __init__(self) -> None:
             super().__init__()
             self.custom_attr = '{"key": "value"}'
-            self.response: Optional[Any] = None
+            self.response: Any | None = None
 
     exc = CustomException()
     error = ApiError(message="error", exception=exc)
@@ -287,7 +287,7 @@ def test_sv_base_model_with_type_objects() -> None:
 
     class ModelWithTypeObjects(SvBaseModel):
         name: str = Field(default="test")
-        payload: Optional[Dict[str, Any]] = Field(default=None)
+        payload: dict[str, Any] | None = Field(default=None)
 
     # Create a model with nested type objects (similar to CaseNodeUpdate)
     model = ModelWithTypeObjects(

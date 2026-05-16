@@ -4,21 +4,22 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi import Header
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from supervaizer.agent import Agent, AgentMethod, AgentMethodField, AgentMethods
 from supervaizer.parameter import Parameter, ParametersSetup
-from supervaizer.server import Server
 from supervaizer.routes import create_agent_route
+from supervaizer.server import Server
 
 
 @pytest.fixture

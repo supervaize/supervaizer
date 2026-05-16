@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -17,27 +17,26 @@ Shows what changes will be made during deployment.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
 
 from supervaizer.common import log
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.utils import get_git_sha
 from supervaizer.deploy.drivers.base import DeploymentPlan
+from supervaizer.deploy.utils import get_git_sha
 
 console = Console()
 
 
 def plan_deployment(
     platform: str,
-    name: Optional[str] = None,
+    name: str | None = None,
     env: str = "dev",
-    region: Optional[str] = None,
-    project_id: Optional[str] = None,
+    region: str | None = None,
+    project_id: str | None = None,
     verbose: bool = False,
-    source_dir: Optional[Path] = None,
+    source_dir: Path | None = None,
 ) -> None:
     """Plan deployment changes without applying them."""
     # Validate platform

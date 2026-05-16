@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -27,10 +27,10 @@ from supervaizer import (
     JobResponse,
     Server,
 )
+from supervaizer.common import log
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
-from supervaizer.common import log
 from supervaizer.routes import (
     RegistrationRefreshRequest,
     _send_registration_refresh,
@@ -299,8 +299,8 @@ def test_data_resource_openapi_operation_ids_unique_per_agent(
         chat=None,
         custom={"method1": agent_method_fixture},
     )
-    dr_a = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
-    dr_b = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    dr_a = DataResource(name="items", fields=[], on_list=list, read_only=True)
+    dr_b = DataResource(name="items", fields=[], on_list=list, read_only=True)
     agent_a = Agent(
         name="First Agent",
         author="a",
@@ -453,7 +453,7 @@ def test_data_resource_create_requires_id_in_callback_result(
     resource = DataResource(
         name="items",
         fields=[],
-        on_list=lambda: [],
+        on_list=list,
         on_create=lambda data: {"name": data["name"]},
     )
     server, agent = _make_data_resource_server(
@@ -479,7 +479,7 @@ def test_data_resource_update_returns_404_when_callback_returns_none(
     resource = DataResource(
         name="items",
         fields=[],
-        on_list=lambda: [],
+        on_list=list,
         on_create=lambda data: {**data, "id": "1"},
         on_update=lambda item_id, data: None,
     )
@@ -506,7 +506,7 @@ def test_data_resource_delete_returns_404_when_callback_is_false(
     resource = DataResource(
         name="items",
         fields=[],
-        on_list=lambda: [],
+        on_list=list,
         on_create=lambda data: {**data, "id": "1"},
         on_delete=lambda item_id: False,
     )

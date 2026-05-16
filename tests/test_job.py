@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -190,7 +190,7 @@ def test_job_status_transitions(job_fixture: Job) -> None:
     assert job_fixture.status != EntityStatus.AWAITING
 
 
-def make_job_dict(job: Job) -> Dict[str, Any]:
+def make_job_dict(job: Job) -> dict[str, Any]:
     # Helper to convert a Job to a dict for persistence simulation
     d = job.__dict__.copy()
     d["job_context"] = job.job_context.__dict__

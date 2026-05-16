@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from fastapi import status
@@ -150,10 +150,10 @@ async def test_get_all_jobs_endpoint(
     mocker: Any,
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
-    exception: Optional[Exception],
-    status_filter: Optional[EntityStatus],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
+    exception: Exception | None,
+    status_filter: EntityStatus | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
 ) -> None:
     """Test the GET /supervaizer/jobs endpoint for listing all jobs."""
     if not exception:
@@ -272,7 +272,7 @@ async def test_start_job_endpoint(
     no_response_validation: Any,
     mocker: Any,
     exception: Exception,
-    expected_error_type: Optional[ErrorType],
+    expected_error_type: ErrorType | None,
     expected_status: int,
     use_no_response_validation: bool,
 ) -> None:
@@ -363,10 +363,10 @@ async def test_get_agent_jobs_endpoint(
     mocker: Any,
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
-    exception: Optional[Exception],
-    status_filter: Optional[EntityStatus],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
+    exception: Exception | None,
+    status_filter: EntityStatus | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
 ) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     i_tested_something = False
@@ -460,10 +460,10 @@ async def test_get_job_status_for_agent(
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     job_exists: bool,
-    exception: Optional[Exception],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
-    expected_error_message: Optional[str],
+    exception: Exception | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
+    expected_error_message: str | None,
 ) -> None:
     """Test the get_job_status endpoint for a specific agent with parametrization"""
     i_tested_something = False

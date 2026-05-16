@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -13,7 +13,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 import pytest
@@ -409,7 +409,7 @@ def test_fields_annotations_dynamic_model() -> None:
     assert DynamicModel.__annotations__["languages"] is Optional[list]
 
     # Test 3: Create a valid instance
-    valid_data: Dict[str, Any] = {
+    valid_data: dict[str, Any] = {
         "full_name": "John Doe",
         "age": 30,
         "subscribe": True,
@@ -421,9 +421,9 @@ def test_fields_annotations_dynamic_model() -> None:
     model_instance = DynamicModel(**valid_data)
 
     # Verify we can access the fields
-    assert getattr(model_instance, "full_name") == "John Doe"
-    assert getattr(model_instance, "age") == 30
-    assert getattr(model_instance, "languages") == ["en", "es"]
+    assert model_instance.full_name == "John Doe"
+    assert model_instance.age == 30
+    assert model_instance.languages == ["en", "es"]
 
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
@@ -1079,7 +1079,7 @@ def test_agent_rejects_duplicate_data_resource_names() -> None:
     """Two DataResources with the same name on one agent are invalid."""
     from supervaizer.data_resource import DataResource
 
-    dup = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    dup = DataResource(name="items", fields=[], on_list=list, read_only=True)
     with pytest.raises(ValueError, match="Duplicate DataResource name"):
         Agent(
             name="agentName",
@@ -1104,7 +1104,7 @@ def test_agent_registration_info_includes_data_resources() -> None:
             ),
             DataResourceField(name="email", field_type="email", required=True),
         ],
-        on_list=lambda: [],
+        on_list=list,
         on_create=lambda d: {**d, "id": "1"},
     )
     agent = Agent(

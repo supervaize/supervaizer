@@ -4,19 +4,20 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import shortuuid
 from pydantic import ConfigDict, Field
+
 from supervaizer.common import ApiResult, SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
@@ -38,13 +39,13 @@ class CaseNodeUpdate(SvBaseModel):
     cost: float | None = None
     name: str | None = None
     # Todo: test with non-serializable objects. Make sure it works.
-    payload: Optional[Dict[str, Any]] = None
+    payload: dict[str, Any] | None = None
     is_final: bool = False
     upsert: bool = False  # if True, Studio updates the existing step at the same index instead of creating a new one
-    error: Optional[str] = None
+    error: str | None = None
     scheduled_at: datetime | None = None  # When to execute (UTC)
     scheduled_method: str | None = None  # Agent method dotted path
-    scheduled_params: Optional[Dict[str, Any]] = None  # Params for the method
+    scheduled_params: dict[str, Any] | None = None  # Params for the method
     scheduled_status: str | None = (
         None  # pending, executing, completed, failed, cancelled
     )
@@ -53,14 +54,14 @@ class CaseNodeUpdate(SvBaseModel):
         self,
         cost: float | None = None,
         name: str | None = None,
-        payload: Dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
         is_final: bool = False,
         upsert: bool = False,
         index: int | None = None,
-        error: Optional[str] = None,
+        error: str | None = None,
         scheduled_at: datetime | None = None,
         scheduled_method: str | None = None,
-        scheduled_params: Dict[str, Any] | None = None,
+        scheduled_params: dict[str, Any] | None = None,
         scheduled_status: str | None = None,
     ) -> None:
         """Initialize a CaseNodeUpdate.
@@ -123,7 +124,7 @@ class CaseNodeUpdate(SvBaseModel):
         return self.scheduled_at is not None
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the case node update"""
         # Serialize payload to convert type objects to strings for JSON serialization
         serialized_payload = (
@@ -185,7 +186,7 @@ class CaseNode(SvBaseModel):
         return self.factory(*args, **kwargs)
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the case node"""
         return {
             "name": self.name,
@@ -196,7 +197,7 @@ class CaseNode(SvBaseModel):
 
 
 class CaseNodes(SvBaseModel):
-    nodes: List[CaseNode] = []
+    nodes: list[CaseNode] = []
 
     def get(self, name: str) -> CaseNode | None:
         return next((node for node in self.nodes if node.name == name), None)
@@ -212,7 +213,7 @@ class CaseNodes(SvBaseModel):
         self,
         name: str,
         *,
-        payload: Dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
         cost: float = 0.0,
         is_final: bool = False,
         upsert_to: str | None = None,
@@ -229,7 +230,7 @@ class CaseNodes(SvBaseModel):
         )
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the case nodes"""
         return {
             "nodes": [node.registration_info for node in self.nodes],
@@ -244,11 +245,11 @@ class CaseAbstractModel(SvBaseModel):
     account: "Account"
     description: str
     status: EntityStatus
-    updates: List[CaseNodeUpdate] = []
+    updates: list[CaseNodeUpdate] = []
     total_cost: float = 0.0
-    final_delivery: Optional[Dict[str, Any]] = None
-    finished_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = Field(
+    final_delivery: dict[str, Any] | None = None
+    finished_at: datetime | None = None
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Agent-provided domain metadata (e.g. contact context)",
     )
@@ -380,8 +381,8 @@ class Case(CaseAbstractModel):
 
     def _prepare_close(
         self,
-        case_result: Dict[str, Any],
-        final_cost: Optional[float] = None,
+        case_result: dict[str, Any],
+        final_cost: float | None = None,
     ) -> CaseNodeUpdate:
         if final_cost:
             self.total_cost = final_cost
@@ -407,8 +408,8 @@ class Case(CaseAbstractModel):
 
     async def close(
         self,
-        case_result: Dict[str, Any],
-        final_cost: Optional[float] = None,
+        case_result: dict[str, Any],
+        final_cost: float | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -420,8 +421,8 @@ class Case(CaseAbstractModel):
 
     def close_sync(
         self,
-        case_result: Dict[str, Any],
-        final_cost: Optional[float] = None,
+        case_result: dict[str, Any],
+        final_cost: float | None = None,
         **kwargs: Any,
     ) -> None:
         update = self._prepare_close(case_result, final_cost)
@@ -438,7 +439,7 @@ class Case(CaseAbstractModel):
                 object.__setattr__(update, "scheduled_status", "cancelled")
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the case"""
         return {
             "case_id": self.id,
@@ -460,8 +461,8 @@ class Case(CaseAbstractModel):
         name: str,
         account: "Account",
         description: str,
-        case_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        case_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> "Case":
         case = cls(
             id=case_id or shortuuid.uuid(),
@@ -504,8 +505,8 @@ class Case(CaseAbstractModel):
         name: str,
         account: "Account",
         description: str,
-        case_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        case_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> "Case":
         """
         Start a new case.
@@ -531,8 +532,8 @@ class Case(CaseAbstractModel):
         name: str,
         account: "Account",
         description: str,
-        case_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        case_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> "Case":
         """Start a new case from sync-only contexts."""
         case = cls._create_started_case(
@@ -554,7 +555,7 @@ class Cases:
 
     def __init__(self) -> None:
         # Structure: {job_id: {case_id: Case}}
-        self.cases_by_job: dict[str, dict[str, "Case"]] = {}
+        self.cases_by_job: dict[str, dict[str, Case]] = {}
 
     def reset(self) -> None:
         self.cases_by_job.clear()
@@ -616,7 +617,7 @@ class Cases:
 
         Returns list of (case, step_index, update) tuples.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due = []
         for job_cases in self.cases_by_job.values():
             for case_id, case in job_cases.items():

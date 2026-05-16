@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -18,26 +18,26 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    List,
     Optional,
     TypeVar,
     cast,
 )
+
 import shortuuid
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from rich import inspect, print
 from slugify import slugify
+
 from supervaizer.__version__ import VERSION
+from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
+from supervaizer.contracts import SupervaizerV2AgentRegistrationContract
+from supervaizer.data_resource import DataResource
 from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
-from supervaizer.case import CaseNodes
-from supervaizer.contracts import SupervaizerV2AgentRegistrationContract
-from supervaizer.data_resource import DataResource
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -151,7 +151,7 @@ class AgentJobContextBase(BaseModel):
     """
 
     job_context: JobContext
-    job_fields: Dict[str, Any]
+    job_fields: dict[str, Any]
 
 
 class AgentMethodAbstract(BaseModel):
@@ -199,11 +199,11 @@ class AgentMethodAbstract(BaseModel):
     method: str = Field(
         description="The name of the method in the project's codebase that will be called with the provided parameters"
     )
-    params: Dict[str, Any] | None = Field(
+    params: dict[str, Any] | None = Field(
         default=None,
         description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
     )
-    fields: List[AgentMethodField] | None = Field(
+    fields: list[AgentMethodField] | None = Field(
         default=None,
         description="A list of field specifications for generating forms/UI, following the django.forms.fields definition",
     )
@@ -253,7 +253,7 @@ class AgentMethodAbstract(BaseModel):
 
 class AgentMethod(AgentMethodAbstract):
     @property
-    def fields_definitions(self) -> list[Dict[str, Any]]:
+    def fields_definitions(self) -> list[dict[str, Any]]:
         """
         Returns a list of the fields with the type key as a string
         Used for the API response.
@@ -320,15 +320,13 @@ class AgentMethod(AgentMethodAbstract):
             "__module__": "supervaizer.agent",
             "__annotations__": field_annotations,
             "to_dict": lambda self: {
-                k: getattr(self, k)
-                for k in field_annotations.keys()
-                if hasattr(self, k)
+                k: getattr(self, k) for k in field_annotations if hasattr(self, k)
             },
         }
 
         return type("DynamicFieldsModel", (BaseModel,), model_dict)
 
-    def validate_method_fields(self, job_fields: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_method_fields(self, job_fields: dict[str, Any]) -> dict[str, Any]:
         """Validate job fields against the method's field definitions.
 
         Args:
@@ -416,7 +414,7 @@ class AgentMethod(AgentMethodAbstract):
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
                 except Exception as e:
-                    error_msg = f"Field '{field_name}' validation failed: {str(e)}"
+                    error_msg = f"Field '{field_name}' validation failed: {e!s}"
                     errors.append(error_msg)
                     invalid_fields[field_name] = error_msg
 
@@ -449,7 +447,7 @@ class AgentMethod(AgentMethodAbstract):
         )
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """
         Returns a JSON-serializable dictionary representation of the AgentMethod.
         """
@@ -471,7 +469,7 @@ class AgentMethodParams(BaseModel):
 
     """
 
-    params: Dict[str, Any] = Field(
+    params: dict[str, Any] = Field(
         default_factory=dict,
         description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
     )
@@ -505,7 +503,7 @@ class AgentMethodsAbstract(BaseModel):
     ) -> dict[str, AgentMethod]:
         """Validate that custom method keys are valid slug-like values suitable for endpoints."""
         if value:
-            for key in value.keys():
+            for key in value:
                 # Check if key is a valid slug format
                 if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", key):
                     raise ValueError(
@@ -526,7 +524,7 @@ class AgentMethodsAbstract(BaseModel):
 
 class AgentMethods(AgentMethodsAbstract):
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
             "job_stop": self.job_stop.registration_info if self.job_stop else None,
@@ -593,16 +591,14 @@ class AgentAbstract(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     name: str = Field(description="Display name of the agent")
     id: str = Field(description="Unique ID generated from name")
-    author: Optional[str] = Field(default=None, description="Author of the agent")
-    developer: Optional[str] = Field(
+    author: str | None = Field(default=None, description="Author of the agent")
+    developer: str | None = Field(
         default=None, description="Developer of the controller integration"
     )
-    maintainer: Optional[str] = Field(
+    maintainer: str | None = Field(
         default=None, description="Maintainer of the integration"
     )
-    editor: Optional[str] = Field(
-        default=None, description="Editor (usually a company)"
-    )
+    editor: str | None = Field(default=None, description="Editor (usually a company)")
     version: str = Field(default="", description="Version string")
     release_notes_url: str | None = Field(
         default=None,
@@ -637,7 +633,7 @@ class AgentAbstract(SvBaseModel):
         default=60 * 60,
         description="Maximum execution time in seconds, defaults to 1 hour",
     )
-    supervaize_instructions_template_path: Optional[str] = Field(
+    supervaize_instructions_template_path: str | None = Field(
         default=None,
         description="Optional path to a custom template file for supervaize_instructions.html page",
     )
@@ -670,10 +666,10 @@ class Agent(AgentAbstract):
         self,
         name: str,
         id: str | None = None,
-        author: Optional[str] = None,
-        developer: Optional[str] = None,
-        maintainer: Optional[str] = None,
-        editor: Optional[str] = None,
+        author: str | None = None,
+        developer: str | None = None,
+        maintainer: str | None = None,
+        editor: str | None = None,
         version: str = "",
         release_notes_url: str | None = None,
         description: str = "",
@@ -791,7 +787,7 @@ class Agent(AgentAbstract):
         return f"/agents/{self.slug}"
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the agent"""
         return {
             "name": self.name,
@@ -891,7 +887,7 @@ class Agent(AgentAbstract):
         else:
             log.debug("[No encrypted parameters] for {self.name}")
 
-    def _execute(self, action: str, params: Dict[str, Any] = {}) -> JobResponse:
+    def _execute(self, action: str, params: dict[str, Any] = {}) -> JobResponse:
         """Execute an agent method and return a JobResponse.
 
         Runs synchronously in the caller's thread; HTTP entrypoints typically
@@ -913,7 +909,7 @@ class Agent(AgentAbstract):
     def job_start(
         self,
         job: Job,
-        job_fields: Dict[str, Any],
+        job_fields: dict[str, Any],
         context: JobContext,
         server: "Server",
         method_name: str = "job_start",
@@ -1009,7 +1005,7 @@ class Agent(AgentAbstract):
 
         except Exception as e:
             # Handle any execution errors
-            error_msg = f"Job execution failed: {str(e)}"
+            error_msg = f"Job execution failed: {e!s}"
             log.error(f"[Agent job_start] Job failed : {job.id} - {error_msg}")
             job_response = JobResponse(
                 job_id=job.id,
@@ -1022,14 +1018,14 @@ class Agent(AgentAbstract):
             raise
         return job
 
-    def job_stop(self, params: Dict[str, Any] = {}) -> Any:
+    def job_stop(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous stop hook; controller ``POST /stop`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_stop:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
-    def job_status(self, params: Dict[str, Any] = {}) -> Any:
+    def job_status(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous status hook; controller ``POST /status`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_status:
             raise ValueError("Agent methods not defined")
@@ -1055,18 +1051,18 @@ class AgentResponse(BaseModel):
 
     name: str
     id: str
-    author: Optional[str] = None
-    developer: Optional[str] = None
-    maintainer: Optional[str] = None
-    editor: Optional[str] = None
+    author: str | None = None
+    developer: str | None = None
+    maintainer: str | None = None
+    editor: str | None = None
     version: str
-    release_notes_url: Optional[str] = None
+    release_notes_url: str | None = None
     api_path: str
     description: str
-    tags: Optional[list[str]] = None
-    methods: Optional[AgentMethods] = None
-    parameters_setup: Optional[List[Dict[str, Any]]] = None
-    server_agent_id: Optional[str] = None
-    server_agent_status: Optional[str] = None
-    server_agent_onboarding_status: Optional[str] = None
-    server_encrypted_parameters: Optional[str] = None
+    tags: list[str] | None = None
+    methods: AgentMethods | None = None
+    parameters_setup: list[dict[str, Any]] | None = None
+    server_agent_id: str | None = None
+    server_agent_status: str | None = None
+    server_agent_onboarding_status: str | None = None
+    server_encrypted_parameters: str | None = None

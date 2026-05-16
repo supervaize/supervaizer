@@ -4,13 +4,13 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
@@ -39,10 +39,10 @@ def create_routes(server: "Server") -> APIRouter:
         "/agents.json",
         summary="A2A Agents Discovery",
         description="Returns a list of all agents according to A2A protocol specification",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
     )
     @handle_route_errors()
-    async def get_a2a_agents() -> Dict[str, Any]:
+    async def get_a2a_agents() -> dict[str, Any]:
         """Get a list of all available agents in A2A format."""
         log.info("[A2A] GET /.well-known/agents.json [Agent discovery]")
         return create_agents_list(server.agents, base_url)
@@ -52,10 +52,10 @@ def create_routes(server: "Server") -> APIRouter:
         "/health",
         summary="A2A Health Status",
         description="Returns health information about the server and agents",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
     )
     @handle_route_errors()
-    async def get_health() -> Dict[str, Any]:
+    async def get_health() -> dict[str, Any]:
         """Get health information for the server and all agents."""
         # log.debug("[A2A] GET /.well-known/health [Health status]")
         return create_health_data(server.agents)
@@ -72,10 +72,10 @@ def create_routes(server: "Server") -> APIRouter:
                 route_path,
                 summary=f"A2A Agent Card for {current_agent.name} (v1)",
                 description=f"Returns agent card for {current_agent.name} according to A2A protocol specification",
-                response_model=Dict[str, Any],
+                response_model=dict[str, Any],
             )
             @handle_route_errors()
-            async def get_agent_card() -> Dict[str, Any]:
+            async def get_agent_card() -> dict[str, Any]:
                 """Get an agent card in A2A format."""
                 log.info(
                     f"[A2A] GET /.well-known/agents/v{current_agent.version}/"
@@ -91,10 +91,10 @@ def create_routes(server: "Server") -> APIRouter:
                 route_path,
                 summary=f"A2A Agent Card for {current_agent.name} (Legacy)",
                 description=f"Legacy endpoint for {current_agent.name} agent card",
-                response_model=Dict[str, Any],
+                response_model=dict[str, Any],
             )
             @handle_route_errors()
-            async def get_agent_card_legacy() -> Dict[str, Any]:
+            async def get_agent_card_legacy() -> dict[str, Any]:
                 """Get an agent card in A2A format (legacy endpoint)."""
                 log.info(
                     f"[A2A] GET /.well-known/agents/{current_agent.slug}_agent.json [Legacy Agent card]"
@@ -116,10 +116,10 @@ def create_controller_routes(server: "Server") -> APIRouter:
         "/a2a",
         summary="A2A JSON-RPC Controller",
         description="Dispatches Supervaizer v2 controller methods over A2A JSON-RPC.",
-        response_model=Dict[str, Any],
+        response_model=dict[str, Any],
     )
     @handle_route_errors()
-    async def post_a2a_controller(body: Dict[str, Any]) -> Dict[str, Any]:
+    async def post_a2a_controller(body: dict[str, Any]) -> dict[str, Any]:
         log.info("[A2A] POST /a2a [JSON-RPC controller]")
         response = await dispatch_json_rpc(server, body)
         return response.model_dump(mode="json", exclude_none=True)

@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -15,11 +15,11 @@ import os
 import secrets
 import sys
 import time
+import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-import uuid
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
-from typing import Any, ClassVar, Dict, List, Optional, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 from urllib.parse import urlunparse
 
 from cryptography.hazmat.backends import default_backend
@@ -57,12 +57,12 @@ from supervaizer.protocol.a2a.controller import (
     register_v2_action_handler,
     register_v2_surface_handler,
 )
-from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.routers import (
     create_api_router,
     create_private_router,
     create_public_router,
 )  # <-- ADDED
+from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
 
 insp = inspect
@@ -120,7 +120,7 @@ class ServerInfo(BaseModel):
     port: int
     api_version: str
     environment: str
-    agents: List[Dict[str, str]]
+    agents: list[dict[str, str]]
     start_time: float
     created_at: str
     updated_at: str
@@ -168,7 +168,7 @@ def save_server_info_to_storage(server_instance: "Server") -> None:
         log.error(f"[Server] Failed to save server info to storage: {e}")
 
 
-def get_server_info_from_storage() -> Optional[ServerInfo]:
+def get_server_info_from_storage() -> ServerInfo | None:
     """Get server information from storage."""
     storage = StorageManager()
     server_data = storage.get_object_by_id("ServerInfo", "server_instance")
@@ -280,12 +280,12 @@ class ServerAbstract(SvBaseModel):
     environment: str = Field(description="Environment name (e.g., dev, staging, prod)")
     mac_addr: str = Field(description="MAC address to use for server identification")
     debug: bool = Field(description="Whether to enable debug mode")
-    agents: List[Agent] = Field(
+    agents: list[Agent] = Field(
         description="List of agents to register with the server"
     )
     app: FastAPI = Field(description="FastAPI application instance")
     reload: bool = Field(description="Whether to enable auto-reload")
-    supervisor_account: Optional[Account] = Field(
+    supervisor_account: Account | None = Field(
         default=None,
         description="Account of the supervisor - can be created at supervaize.com",
     )
@@ -298,15 +298,15 @@ class ServerAbstract(SvBaseModel):
     public_key: RSAPublicKey = Field(
         description="RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user"
     )
-    public_url: Optional[str] = Field(
+    public_url: str | None = Field(
         default=None,
         description="Public including scheme and port to use for inbound connections",
     )
-    api_key: Optional[str] = Field(
+    api_key: str | None = Field(
         default=None,
         description="Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated",
     )
-    api_key_header: Optional[APIKeyHeader] = Field(
+    api_key_header: APIKeyHeader | None = Field(
         default=None, description="API key header for authentication"
     )
 
@@ -349,7 +349,7 @@ class ServerAbstract(SvBaseModel):
             raise ValueError(f"Host should not include '://': {v}")
         return v
 
-    def get_agent_by_name(self, agent_name: str) -> Optional[Agent]:
+    def get_agent_by_name(self, agent_name: str) -> Agent | None:
         for agent in self.agents:
             if agent.name == agent_name:
                 return agent
@@ -359,20 +359,20 @@ class ServerAbstract(SvBaseModel):
 class Server(ServerAbstract):
     def __init__(
         self,
-        agents: List[Agent],
-        supervisor_account: Optional[Account] = None,
+        agents: list[Agent],
+        supervisor_account: Account | None = None,
         a2a_endpoints: bool = True,
         admin_interface: bool = True,
         scheme: str = "http",
-        environment: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
+        environment: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
         debug: bool = False,
         reload: bool = False,
         mac_addr: str = "",
-        private_key: Optional[RSAPrivateKey] = None,
-        public_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        private_key: RSAPrivateKey | None = None,
+        public_url: str | None = None,
+        api_key: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration.
@@ -453,12 +453,10 @@ class Server(ServerAbstract):
         log.info(f"[Server launch] Public key: {public_key}")
         log.info(
             f"[Server launch] Public key - decode:  {
-                str(
-                    public_key.public_bytes(
-                        encoding=serialization.Encoding.PEM,
-                        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                    ).decode('utf-8')
-                )
+                public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                ).decode('utf-8')!s
             },"
         )
         # Create root app to handle version prefix
@@ -649,7 +647,7 @@ class Server(ServerAbstract):
         return f"server:{self.mac_addr}"
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Get registration info for the server."""
         assert self.public_key is not None, "Public key not initialized"
         contract = controller_contract_info()
@@ -675,7 +673,7 @@ class Server(ServerAbstract):
             "agents": [agent.registration_info for agent in self.agents],
         }
 
-    def launch(self, log_level: Optional[str] = "INFO") -> None:
+    def launch(self, log_level: str | None = "INFO") -> None:
         if log_level:
             log.remove()
             log.add(

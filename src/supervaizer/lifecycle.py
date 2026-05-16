@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -13,10 +13,7 @@
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Protocol, TypeVar
-
-if TYPE_CHECKING:
-    pass
+from typing import Any, Protocol, TypeVar
 
 log = logging.getLogger(__name__)
 
@@ -146,7 +143,7 @@ class Lifecycle:
     }
 
     @classmethod
-    def get_terminal_states(cls) -> List[EntityStatus]:
+    def get_terminal_states(cls) -> list[EntityStatus]:
         """
         Identify terminal states in the state machine.
 
@@ -168,7 +165,7 @@ class Lifecycle:
         return terminal_states
 
     @classmethod
-    def get_start_states(cls) -> List[EntityStatus]:
+    def get_start_states(cls) -> list[EntityStatus]:
         """
         Identify start states in the state machine.
 
@@ -203,7 +200,7 @@ class Lifecycle:
     @classmethod
     def get_valid_transitions(
         cls, current_status: EntityStatus
-    ) -> Dict[EntityStatus, EntityEvents]:
+    ) -> dict[EntityStatus, EntityEvents]:
         """Get valid transitions from the current status."""
         result = {}
         for event, (from_status, to_status) in cls.EVENT_TRANSITIONS.items():
@@ -246,7 +243,7 @@ class Lifecycle:
     @classmethod
     def generate_valid_transitions_dict(
         cls,
-    ) -> Dict[EntityStatus, Dict[EntityStatus, EntityEvents]]:
+    ) -> dict[EntityStatus, dict[EntityStatus, EntityEvents]]:
         """
         Generate a complete dictionary of all valid transitions in the format:
         {
@@ -257,7 +254,7 @@ class Lifecycle:
         }
         """
         # Initialize the result dictionary with all statuses
-        result: Dict[EntityStatus, Dict[EntityStatus, EntityEvents]] = {
+        result: dict[EntityStatus, dict[EntityStatus, EntityEvents]] = {
             status: {} for status in EntityStatus
         }
 
@@ -386,13 +383,16 @@ class EntityLifecycle:
         entity.status = to_status
 
         # If transitioning to a terminal state, record the finished time
-        if to_status in [
-            EntityStatus.COMPLETED,
-            EntityStatus.CANCELLED,
-            EntityStatus.FAILED,
-        ]:
-            if not entity.finished_at:
-                entity.finished_at = datetime.now()
+        if (
+            to_status
+            in [
+                EntityStatus.COMPLETED,
+                EntityStatus.CANCELLED,
+                EntityStatus.FAILED,
+            ]
+            and not entity.finished_at
+        ):
+            entity.finished_at = datetime.now()
 
         return True, ""
 
