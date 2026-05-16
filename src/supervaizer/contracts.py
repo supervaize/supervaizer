@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -31,9 +31,6 @@ class ContractModel(BaseModel):
     """Base class for SDK-owned wire contract models."""
 
     model_config = {"use_enum_values": True, "extra": "allow"}
-
-
-ContractModelT = TypeVar("ContractModelT", bound=ContractModel)
 
 
 class ControllerEndpoint(StrEnum):
@@ -194,6 +191,16 @@ class ControllerContract(ContractModel):
     )
 
 
+def _default_registration_methods() -> dict[str, Any]:
+    return {}
+
+
+def _default_registration_data_resources() -> list[
+    DataResourceContract | dict[str, Any]
+]:
+    return []
+
+
 class AgentRegistrationContract(ContractModel):
     """Minimal schema for agent registration payloads consumed by Studio."""
 
@@ -202,10 +209,12 @@ class AgentRegistrationContract(ContractModel):
     name: str
     api_path: str
     release_notes_url: str | None = None
-    methods: AgentMethodsContract | dict[str, Any] = Field(default_factory=dict)
+    methods: AgentMethodsContract | dict[str, Any] = Field(
+        default_factory=_default_registration_methods
+    )
     parameters_setup: list[dict[str, Any]] = Field(default_factory=list)
     data_resources: list[DataResourceContract | dict[str, Any]] = Field(
-        default_factory=list
+        default_factory=_default_registration_data_resources
     )
 
 
@@ -434,7 +443,7 @@ def build_v2_agent_registration(
     )
 
 
-def _contract_list(
+def _contract_list[ContractModelT: ContractModel](
     values: Iterable[ContractModelT | dict[str, Any]],
     model: type[ContractModelT],
 ) -> list[ContractModelT]:
@@ -444,7 +453,7 @@ def _contract_list(
     ]
 
 
-def _contract_or_default(
+def _contract_or_default[ContractModelT: ContractModel](
     value: ContractModelT | dict[str, Any] | None,
     model: type[ContractModelT],
 ) -> ContractModelT:

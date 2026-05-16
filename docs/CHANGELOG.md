@@ -9,8 +9,8 @@ All notable changes to this project will be documented in this file.
 
 ## TODO
 
-- Review and test feature/data-persistance
-- Complete feature/smartinstall implementation
+- Review and test feature/data-persistence
+- Complete feature/smart-install implementation
 - Fix receive_human_input
 - When AgentMethodField returns its value (in the kwargs of job_start), the value should be casted in the appropriate type :
   - example: here the 'How many times to say hello' is supposed to be an 'int'.
@@ -745,7 +745,7 @@ All notable changes to this project will be documented in this file.
 ## [0.9.6]
 
 - Public release to Pypi
-- Fixed the gihut workflows
+- Fixed the github workflows
 - Improve README.md
 
 ## [0.9.5]
@@ -795,7 +795,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Paramater.to_dict : override to avoid storing secrets.
+- Parameter.to_dict : override to avoid storing secrets.
 - Removed Case Nodes
 - Improved test coverage : accounts, admin/routes,
 
