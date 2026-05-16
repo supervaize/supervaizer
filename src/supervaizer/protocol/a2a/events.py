@@ -34,7 +34,9 @@ def subscribe_v2_events(
     return queue
 
 
-def unsubscribe_v2_events(server: "Server", queue: asyncio.Queue[dict[str, Any]]) -> None:
+def unsubscribe_v2_events(
+    server: "Server", queue: asyncio.Queue[dict[str, Any]]
+) -> None:
     _event_subscribers(server).discard(queue)
 
 
@@ -74,7 +76,9 @@ def _event_subscribers(server: "Server") -> set[asyncio.Queue[dict[str, Any]]]:
     return subscribers
 
 
-def _enqueue_event(queue: asyncio.Queue[dict[str, Any]], payload: dict[str, Any]) -> None:
+def _enqueue_event(
+    queue: asyncio.Queue[dict[str, Any]], payload: dict[str, Any]
+) -> None:
     if queue.full():
         try:
             queue.get_nowait()

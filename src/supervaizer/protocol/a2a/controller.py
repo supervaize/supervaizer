@@ -158,7 +158,9 @@ async def _dispatch_action(
                 "agent_slug": action_request.agent_slug,
                 "action": action_request.action,
                 "request_id": action_request.request_id,
-                "effects": [effect.model_dump(mode="json") for effect in result.effects],
+                "effects": [
+                    effect.model_dump(mode="json") for effect in result.effects
+                ],
             },
         )
     except Exception as exc:
