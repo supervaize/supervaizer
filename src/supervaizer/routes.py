@@ -966,6 +966,15 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
     async def get_agent() -> Agent:
         return agent
 
+    def custom_job_body_params(body_params: Any) -> dict[str, Any]:
+        if body_params is None:
+            raise ValueError("body_params cannot be None")
+        if isinstance(body_params, dict):
+            return body_params
+        if isinstance(body_params, SvBaseModel):
+            return body_params.model_dump()
+        raise ValueError("body_params must be an object")
+
     # Create a route for each custom method
     for method_name, method_config in agent.methods.custom.items():
         # Create the dynamic model with the custom name for FastAPI documentation
@@ -1002,16 +1011,17 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             )
             log.info(f"body_params: {body_params}")
 
-            if body_params is None:
-                raise ValueError("body_params cannot be None")
+            body_data = custom_job_body_params(body_params)
 
-            sv_context: JobContext = body_params.job_context
-            job_fields = body_params.job_fields.to_dict()
+            job_context_data = body_data.get("job_context")
+            if job_context_data is None:
+                raise ValueError("job_context is required")
+
+            sv_context = JobContext(**job_context_data)
+            job_fields = body_data.get("job_fields", {})
 
             # Get job encrypted parameters if available
-            encrypted_agent_parameters = getattr(
-                body_params, "encrypted_agent_parameters", None
-            )
+            encrypted_agent_parameters = body_data.get("encrypted_agent_parameters")
 
             # Delegate job creation and scheduling to the service
             new_job = await service_job_custom(

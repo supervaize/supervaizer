@@ -27,6 +27,7 @@ from supervaizer.contracts import (
     V2ActionRequest,
     V2ActionResult,
     V2AwaitingState,
+    V2Effect,
     V2JobStateSnapshot,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
@@ -104,6 +105,32 @@ def test_event_type_agent_anomaly_members_are_not_aliases() -> None:
     assert EventType.AGENT_SEND_ANOMALY.value != EventType.AGENT_ANOMALY.value
 
 
+def test_v2_effect_has_typed_common_fields() -> None:
+    effect = V2Effect(
+        type="job.started",
+        job_id="job-1",
+        status="in_progress",
+        message="Started",
+    )
+
+    assert effect.job_id == "job-1"
+    assert effect.status == "in_progress"
+    assert effect.model_dump(mode="json", exclude_none=True) == {
+        "type": "job.started",
+        "job_id": "job-1",
+        "status": "in_progress",
+        "message": "Started",
+    }
+
+
+def test_v2_action_result_validates_job_state() -> None:
+    with pytest.raises(ValidationError):
+        V2ActionResult.model_validate({
+            "status": "ok",
+            "job_state": {"job": {"id": "missing-required-fields"}},
+        })
+
+
 def test_agent_method_contract_exports_timeout_metadata() -> None:
     server_schema = ServerRegistrationContract.model_json_schema()
     method_schema = server_schema["$defs"]["AgentMethodContract"]
@@ -167,6 +194,7 @@ def test_data_resource_context_headers() -> None:
         workspace_id="1",
         workspace_slug="team-slug",
         mission_id="mission-1",
+        agent_slug="agent-interviewer",
         request_id="request-1",
     )
 
@@ -174,6 +202,7 @@ def test_data_resource_context_headers() -> None:
         "X-Supervaize-Workspace-Id": "1",
         "X-Supervaize-Workspace-Slug": "team-slug",
         "X-Supervaize-Mission-Id": "mission-1",
+        "X-Supervaize-Agent-Slug": "agent-interviewer",
         "X-Supervaize-Request-Id": "request-1",
     }
 
@@ -363,6 +392,14 @@ def test_v2_action_request_and_result_fixture() -> None:
     ]
 
 
+def test_v2_action_result_validates_replay_safety() -> None:
+    with pytest.raises(ValidationError):
+        V2ActionResult.model_validate({
+            "status": "ok",
+            "replay_safety": {"dedupe_keys": ["job-1"], "convergent": "sometimes"},
+        })
+
+
 def test_v2_surface_request_and_result_models() -> None:
     request = V2SurfaceRequest.model_validate({
         "request_id": "surface-request-1",
@@ -408,7 +445,6 @@ def test_v2_job_sync_result_is_convergent_not_strictly_idempotent() -> None:
     fixture = load_v2_fixture("agent_interviewer_mvp.json")
 
     sync_result = V2JobSyncResult.model_validate(fixture["sync_result"])
-    replay_safety = V2ReplaySafetyMetadata.model_validate(fixture["replay_safety"])
 
     assert sync_result.status == "ok"
     assert sync_result.external_version == "campaign_123:rev_42"
@@ -418,8 +454,9 @@ def test_v2_job_sync_result_is_convergent_not_strictly_idempotent() -> None:
         sync_result.job_state.cases[0].steps[0].outputs[0].type
         == "agent_interviewer.transcript"
     )
-    assert replay_safety.convergent is True
-    assert replay_safety.strictly_idempotent_response is False
+    assert sync_result.replay_safety is not None
+    assert sync_result.replay_safety.convergent is True
+    assert sync_result.replay_safety.strictly_idempotent_response is False
 
 
 def test_v2_contract_models_are_public_sdk_exports() -> None:
@@ -432,6 +469,7 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2ActionRequest is V2ActionRequest
     assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
+    assert supervaizer.V2ReplaySafetyMetadata is V2ReplaySafetyMetadata
     assert supervaizer.V2AwaitingFieldDefinition.__name__ == (
         "V2AwaitingFieldDefinition"
     )

@@ -328,12 +328,59 @@ async def test_start_job_endpoint(
     i_tested_something = True
 
     assert response.status_code == expected_status
-
     if expected_error_type:
         response_data = response.json()
         assert response_data["error_type"] == expected_error_type.value
 
     assert i_tested_something, "No test was performed"
+
+
+@pytest.mark.asyncio
+async def test_custom_method_endpoint_accepts_dict_body(
+    server_fixture: Server,
+    agent_fixture: Agent,
+    job_fixture: Job,
+    context_fixture: JobContext,
+    mocker: Any,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def mock_service_job_custom(*args: Any) -> Job:
+        captured["method_name"] = args[0]
+        captured["sv_context"] = args[4]
+        captured["job_fields"] = args[5]
+        captured["encrypted_agent_parameters"] = args[6]
+        return job_fixture
+
+    mocker.patch(
+        "supervaizer.routes.service_job_custom",
+        new=mock_service_job_custom,
+    )
+
+    client = TestClient(server_fixture.app)
+    response = client.post(
+        f"/api/supervaizer{agent_fixture.path}/custom/method2",
+        json={
+            "job_context": {
+                "workspace_id": context_fixture.workspace_id,
+                "job_id": context_fixture.job_id,
+                "started_by": context_fixture.started_by,
+                "started_at": context_fixture.started_at.isoformat(),
+                "mission_id": context_fixture.mission_id,
+                "mission_name": context_fixture.mission_name,
+            },
+            "job_fields": {"answer": 42},
+            "encrypted_agent_parameters": "encrypted",
+        },
+        headers={"X-API-Key": server_fixture.api_key},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["job_id"] == job_fixture.id
+    assert captured["method_name"] == "method2"
+    assert captured["sv_context"].job_id == context_fixture.job_id
+    assert captured["job_fields"] == {"answer": 42}
+    assert captured["encrypted_agent_parameters"] == "encrypted"
 
 
 @pytest.mark.asyncio

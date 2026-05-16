@@ -460,16 +460,16 @@
           "status": "completed"
         }
       }
-    ]
-  },
-  "replay_safety": {
-    "dedupe_keys": [
-      "job_123",
-      "campaign_123",
-      "campaign_123:rev_42"
     ],
-    "stable_external_ids_required": true,
-    "strictly_idempotent_response": false,
-    "convergent": true
+    "replay_safety": {
+      "dedupe_keys": [
+        "job_123",
+        "campaign_123",
+        "campaign_123:rev_42"
+      ],
+      "stable_external_ids_required": true,
+      "strictly_idempotent_response": false,
+      "convergent": true
+    }
   }
 }

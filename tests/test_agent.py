@@ -13,7 +13,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -951,6 +951,16 @@ def test_agent_method_field_rejects_dynamic_choices() -> None:
             dynamic_choices="projects",
             required=True,
         )
+
+
+def test_agent_method_rejects_blocked_module_roots() -> None:
+    with pytest.raises(ValidationError, match="blocked module root 'os'"):
+        AgentMethod(name="danger", method="os.system")
+
+
+def test_agent_execute_rejects_undeclared_method_path(agent_fixture: Agent) -> None:
+    with pytest.raises(ValueError, match="not declared on agent"):
+        agent_fixture._execute("tests.fake_agent.start", {})
 
 
 def test_agent_rejects_dynamic_choices_callback(

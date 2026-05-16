@@ -227,6 +227,48 @@ def test_get_job_include_persisted_not_found() -> None:
         assert result is None
 
 
+def test_get_job_with_agent_name_stays_scoped(context_fixture: JobContext) -> None:
+    Jobs().reset()
+    job_id = "shared-job-id"
+    first_context = context_fixture.model_copy(update={"job_id": job_id})
+    second_context = context_fixture.model_copy(update={"job_id": job_id})
+    first_job = Job.new(job_context=first_context, agent_name="first-agent")
+    second_job = Job.new(job_context=second_context, agent_name="second-agent")
+
+    registry = Jobs()
+    registry.add_job(first_job)
+    registry.add_job(second_job)
+
+    assert registry.get_job(job_id, agent_name="first-agent") is first_job
+    assert registry.get_job(job_id, agent_name="second-agent") is second_job
+    assert registry.get_job(job_id, agent_name="missing-agent") is None
+
+
+def test_get_job_include_persisted_respects_agent_name(job_fixture: Job) -> None:
+    Jobs().reset()
+    job_dict = make_job_dict(job_fixture)
+
+    with patch("supervaizer.job.storage_manager.get_object_by_id") as mock_get:
+        mock_get.return_value = job_dict
+
+        assert (
+            Jobs().get_job(
+                job_fixture.id,
+                agent_name=job_fixture.agent_name,
+                include_persisted=True,
+            )
+            is not None
+        )
+        assert (
+            Jobs().get_job(
+                job_fixture.id,
+                agent_name="other-agent",
+                include_persisted=True,
+            )
+            is None
+        )
+
+
 def test_job_metadata_default_is_empty_dict(context_fixture: JobContext) -> None:
     """AbstractJob.metadata defaults to empty dict."""
     job = Job.new(job_context=context_fixture, agent_name="test-agent")

@@ -76,20 +76,20 @@ class Jobs:
         Returns:
             Job | None: The job if found, None otherwise
         """
-        found_job = None
-
         if agent_name:
-            # Search in specific agent's jobs
             found_job = self.jobs_by_agent.get(agent_name, {}).get(job_id)
+        else:
+            found_job = None
+            for agent_jobs in self.jobs_by_agent.values():
+                if job_id in agent_jobs:
+                    found_job = agent_jobs[job_id]
+                    break
 
-        # Search across all agents
-        for agent_jobs in self.jobs_by_agent.values():
-            if job_id in agent_jobs:
-                found_job = agent_jobs[job_id]
-
-        if include_persisted:
+        if found_job is None and include_persisted:
             job_from_storage = storage_manager.get_object_by_id("Job", job_id)
-            if job_from_storage:
+            if job_from_storage and (
+                agent_name is None or job_from_storage.get("agent_name") == agent_name
+            ):
                 found_job = Job(**job_from_storage)
         return found_job
 

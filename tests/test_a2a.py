@@ -29,6 +29,7 @@ from supervaizer.protocol.a2a import (
 from supervaizer.protocol.a2a.model import _agent_health_status
 from supervaizer.protocol.a2a.controller import (
     JSON_RPC_ACTION_NOT_REGISTERED,
+    JSON_RPC_INTERNAL_ERROR,
     JSON_RPC_METHOD_NOT_FOUND,
     JSON_RPC_SURFACE_NOT_REGISTERED,
     SUPERVAIZER_ACTION_INVOKE_METHOD,
@@ -312,6 +313,14 @@ def test_a2a_controller_rejects_unregistered_v2_surface(
     assert payload["error"]["data"]["surface"] == "job.start"
 
 
+def test_a2a_events_requires_authentication(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.get("/a2a/events")
+
+    assert response.status_code == 401
+
+
 def test_a2a_controller_dispatches_registered_v2_action(
     server_fixture: Server,
 ) -> None:
@@ -344,6 +353,74 @@ def test_a2a_controller_dispatches_registered_v2_action(
     assert payload["result"]["effects"] == [
         {"type": "job.created", "job_id": "job-123"}
     ]
+
+
+def test_a2a_controller_serializes_v2_action_replay_safety(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def sync_job(_request: V2ActionRequest) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "replay_safety": {
+                "dedupe_keys": ["job-123", "rev-1"],
+                "convergent": True,
+                "strictly_idempotent_response": False,
+            },
+        }
+
+    register_v2_action_handler(server_fixture, "job.sync", sync_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-replay-safety-1",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.sync", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["replay_safety"] == {
+        "dedupe_keys": ["job-123", "rev-1"],
+        "stable_external_ids_required": True,
+        "strictly_idempotent_response": False,
+        "convergent": True,
+    }
+
+
+def test_a2a_controller_action_errors_do_not_leak_exception_details(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        raise RuntimeError("database password secret-value leaked")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-error-1",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["error"]["code"] == JSON_RPC_INTERNAL_ERROR
+    assert payload["error"]["data"] == {
+        "agent_slug": agent_slug,
+        "action": "job.start",
+    }
+    assert "secret-value" not in response.text
 
 
 def test_a2a_controller_publishes_v2_action_effects(

@@ -4,6 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from __future__ import annotations
 
 import os
 import threading

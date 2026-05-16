@@ -37,6 +37,9 @@ All notable changes to this project will be documented in this file.
 - **Legacy job poll removed** — Removed `job_poll` from the public v1 method contract and the local workbench poll route/button; v2 status convergence is represented by the typed `job.sync` action.
 - **Supervaizer v2 awaiting form fields** — Step awaiting state can now declare typed form fields so Studio can submit HITL actions through `step.awaiting.submit`.
 - **Local Hello World v2 contract** — The built-in local Hello World agent now declares a minimal Supervaizer v2 registration through the SDK builder and registers `job.start`, `job.sync`, `case.step.awaiting`, and a generated resource handler for local Studio and SDK smoke tests.
+- **Controller correctness fixes** — Scoped `Jobs.get_job(..., agent_name=...)` to the requested agent, gave `EventType.AGENT_SEND_ANOMALY` a distinct value, and fixed custom method routes to parse normal JSON request bodies.
+- **Supervaizer v2 runtime hardening** — Added typed common fields to v2 action effects, validated `job_state` on action results, authenticated the A2A SSE event stream, sanitized A2A handler errors, and constrained legacy method execution to declared non-blocked method paths.
+- **Supervaizer v2 replay and context contracts** — Action results now validate and serialize replay-safety metadata, and DataResource context header generation includes the agent slug advertised by the contract model.
 
 ### Tests
 

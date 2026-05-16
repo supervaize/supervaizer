@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, ValidationError
 
+from supervaizer.common import log
 from supervaizer.contracts import (
     ContractModel,
     V2ActionRequest,
@@ -159,19 +160,31 @@ async def _dispatch_action(
                 "action": action_request.action,
                 "request_id": action_request.request_id,
                 "effects": [
-                    effect.model_dump(mode="json") for effect in result.effects
+                    effect.model_dump(mode="json", exclude_none=True)
+                    for effect in result.effects
                 ],
             },
         )
-    except Exception as exc:
+    except Exception:
+        log.exception(
+            "[A2A] Supervaizer v2 action handler failed: agent_slug={} action={}",
+            action_request.agent_slug,
+            action_request.action,
+        )
         return _json_rpc_error(
             request_id=request.id,
             code=JSON_RPC_INTERNAL_ERROR,
             message="Action handler failed",
-            data={"action": action_request.action, "error": str(exc)},
+            data={
+                "agent_slug": action_request.agent_slug,
+                "action": action_request.action,
+            },
         )
 
-    return JsonRpcResponse(id=request.id, result=result.model_dump(mode="json"))
+    return JsonRpcResponse(
+        id=request.id,
+        result=result.model_dump(mode="json", exclude_none=True),
+    )
 
 
 async def _dispatch_surface(
@@ -206,12 +219,20 @@ async def _dispatch_surface(
         if isawaitable(handler_result):
             handler_result = await handler_result
         result = V2SurfaceResult.model_validate(handler_result)
-    except Exception as exc:
+    except Exception:
+        log.exception(
+            "[A2A] Supervaizer v2 surface handler failed: agent_slug={} surface={}",
+            surface_request.agent_slug,
+            surface_request.surface,
+        )
         return _json_rpc_error(
             request_id=request.id,
             code=JSON_RPC_INTERNAL_ERROR,
             message="Surface handler failed",
-            data={"surface": surface_request.surface, "error": str(exc)},
+            data={
+                "agent_slug": surface_request.agent_slug,
+                "surface": surface_request.surface,
+            },
         )
 
     return JsonRpcResponse(id=request.id, result=result.model_dump(mode="json"))

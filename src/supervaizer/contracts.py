@@ -571,10 +571,18 @@ class V2Effect(ContractModel):
     data: dict[str, Any] | None = None
 
 
+class V2ReplaySafetyMetadata(ContractModel):
+    dedupe_keys: list[str] = Field(default_factory=list)
+    stable_external_ids_required: bool = True
+    strictly_idempotent_response: bool = False
+    convergent: bool = True
+
+
 class V2ActionResult(ContractModel):
     status: Literal["ok", "error"]
     effects: list[V2Effect] = Field(default_factory=list)
     job_state: V2JobStateSnapshot | None = None
+    replay_safety: V2ReplaySafetyMetadata | None = None
 
 
 class V2SurfaceResult(ContractModel):
@@ -658,13 +666,6 @@ class V2JobSyncResult(V2ActionResult):
     observed_at: str | None = None
 
 
-class V2ReplaySafetyMetadata(ContractModel):
-    dedupe_keys: list[str] = Field(default_factory=list)
-    stable_external_ids_required: bool = True
-    strictly_idempotent_response: bool = False
-    convergent: bool = True
-
-
 def _endpoint_key(endpoint: ControllerEndpoint | str) -> str:
     return endpoint.value if isinstance(endpoint, ControllerEndpoint) else endpoint
 
@@ -700,6 +701,7 @@ def build_data_resource_context_headers(
     workspace_id: str | None = None,
     workspace_slug: str | None = None,
     mission_id: str | None = None,
+    agent_slug: str | None = None,
     request_id: str | None = None,
 ) -> dict[str, str]:
     """Build Supervaize context headers for Studio DataResource proxy calls."""
@@ -710,6 +712,8 @@ def build_data_resource_context_headers(
         headers["X-Supervaize-Workspace-Slug"] = str(workspace_slug)
     if mission_id:
         headers["X-Supervaize-Mission-Id"] = str(mission_id)
+    if agent_slug:
+        headers["X-Supervaize-Agent-Slug"] = str(agent_slug)
     if request_id:
         headers["X-Supervaize-Request-Id"] = str(request_id)
     return headers

@@ -48,6 +48,15 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 T = TypeVar("T")
+BLOCKED_AGENT_METHOD_MODULE_ROOTS = frozenset({
+    "builtins",
+    "importlib",
+    "os",
+    "pathlib",
+    "shutil",
+    "subprocess",
+    "sys",
+})
 
 
 class FieldTypeEnum(str, Enum):
@@ -251,6 +260,16 @@ class AgentMethodAbstract(BaseModel):
         default=None,
         description="The definition of the Case Nodes (=steps) for this method",
     )
+
+    @field_validator("method")
+    @classmethod
+    def reject_unsafe_method_module_roots(cls, value: str) -> str:
+        root_module = value.split(".", 1)[0]
+        if root_module in BLOCKED_AGENT_METHOD_MODULE_ROOTS:
+            raise ValueError(
+                f"Agent method path '{value}' uses blocked module root '{root_module}'"
+            )
+        return value
 
 
 class AgentMethod(AgentMethodAbstract):
@@ -900,6 +919,9 @@ class Agent(AgentAbstract):
         event loop.
         """
 
+        if action not in self._declared_method_paths():
+            raise ValueError(f"Agent method path is not declared on agent: {action}")
+
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
@@ -910,6 +932,20 @@ class Agent(AgentAbstract):
                 f"Method {func_name} must return a JobResponse object, got {type(result).__name__}"
             )
         return result
+
+    def _declared_method_paths(self) -> set[str]:
+        if not self.methods:
+            return set()
+        methods = [
+            self.methods.job_start,
+            self.methods.job_stop,
+            self.methods.job_status,
+            self.methods.human_answer,
+            self.methods.chat,
+        ]
+        if self.methods.custom:
+            methods.extend(self.methods.custom.values())
+        return {method.method for method in methods if method is not None}
 
     def job_start(
         self,

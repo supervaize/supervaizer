@@ -12,9 +12,10 @@
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
 
+from supervaizer.access import require_scope
 from supervaizer.common import log
 from supervaizer.protocol.a2a.controller import dispatch_json_rpc
 from supervaizer.protocol.a2a.events import stream_v2_events
@@ -128,6 +129,7 @@ def create_controller_routes(server: "Server") -> APIRouter:
         "/a2a/events",
         summary="A2A SSE Event Stream",
         description="Streams Supervaizer v2 controller effects over Server-Sent Events.",
+        dependencies=[Depends(require_scope("read"))],
     )
     @handle_route_errors()
     async def get_a2a_events(request: Request) -> EventSourceResponse:
