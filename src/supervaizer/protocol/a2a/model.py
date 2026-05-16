@@ -11,13 +11,13 @@
 # https://mozilla.org/MPL/2.0/.
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from supervaizer.agent import Agent
 from supervaizer.job import EntityStatus, Jobs
 
 
-def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
+def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
     """
     Create an A2A agent card for the given agent.
 
@@ -138,7 +138,7 @@ def create_agent_card(agent: Agent, base_url: str) -> Dict[str, Any]:
     return agent_card
 
 
-def create_agents_list(agents: List[Agent], base_url: str) -> Dict[str, Any]:
+def create_agents_list(agents: list[Agent], base_url: str) -> dict[str, Any]:
     """
     Create an A2A agents list for all available agents.
 
@@ -164,7 +164,7 @@ def create_agents_list(agents: List[Agent], base_url: str) -> Dict[str, Any]:
     }
 
 
-def create_health_data(agents: List[Agent]) -> Dict[str, Any]:
+def create_health_data(agents: list[Agent]) -> dict[str, Any]:
     """
     Create health data for all agents according to A2A protocol.
 
@@ -223,6 +223,6 @@ def create_health_data(agents: List[Agent]) -> Dict[str, Any]:
     return {
         "schema_version": "a2a_2023_v1",
         "status": "operational",
-        "timestamp": str(datetime.now()),
+        "timestamp": datetime.now(datetime.UTC).isoformat(),
         "agents": agents_health,
     }

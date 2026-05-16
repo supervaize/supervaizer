@@ -1,5 +1,9 @@
 # Manage Hello World in Local Mode — Implementation Plan
 
+
+> **Created:** 2026-03-16
+> **Updated:** 2026-03-16
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make `supervaizer start --local` run user agents alongside the Hello World agent, with the ability to disable Hello World via env var.
@@ -8,7 +12,7 @@
 
 **Tech Stack:** Python, Typer (CLI), FastAPI (Server), pytest
 
-**Spec:** `docs/superpowers/specs/2026-03-16-manage-hello-world-design.md`
+**Spec:** `docs/superpowers/specs/2026_03_2026-03-16-manage-hello-world-design.md`
 
 ---
 

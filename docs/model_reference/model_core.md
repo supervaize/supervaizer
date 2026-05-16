@@ -1,5 +1,9 @@
 # Model Reference Core
 
+
+> **Created:** 2025-08-09
+> **Updated:** 2026-05-16
+
 **Version:** 0.20.1
 
 ### `account.Account`

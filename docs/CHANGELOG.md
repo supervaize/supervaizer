@@ -1,5 +1,8 @@
 # Supervaizer Changelog
 
+> **Created:** 2025-08-05
+> **Updated:** 2026-05-16
+
 All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -17,6 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Supervaizer v2 2️⃣
 
+- **Supervaizer v2 documentation** — Added `docs/2026_05_SUPERVAIZER_v2.md` and updated the README/protocol docs to explain the v2 A2A/A2UI layering, registration model, resources, datasets, surfaces, actions, HITL, artifacts, and `job.sync` convergence semantics.
 - **Supervaizer v2 contract primitives** — Added typed SDK models for the v2 registration and action contract, including pinned A2UI/A2A versions, resources, datasets, case lanes, artifact declarations, job snapshots, sync metadata, and replay-safety metadata.
 - **A2A JSON-RPC action runtime** — Added the `/a2a` `supervaizer/action.invoke` dispatcher, v2 Agent Card extension payloads, and public SDK helpers for registering typed v2 actions through `Server.register_v2_action()` and `@server.v2_action(...)`.
 - **A2A SSE event stream** — Added `/a2a/events` and an in-process v2 event bus so action effects returned through `supervaizer/action.invoke` can also be observed over Server-Sent Events.
@@ -590,7 +594,7 @@ All notable changes to this project will be documented in this file.
   - Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`) to enable file persistence.
   - CLI: `supervaizer start --persist` enables persistence for that run.
   - Explicit `StorageManager(db_path=...)` in code still uses file storage (e.g. tests).
-  - See [PERSISTENCE.md](PERSISTENCE.md) for configuration.
+  - See [2025_08_PERSISTENCE.md](2025_08_PERSISTENCE.md) for configuration.
 
 ### Unit Tests Results
 
@@ -620,7 +624,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **🚀 Cloud Deployment CLI** - Complete automated deployment system for Supervaizer agents
-  - Full implementation of [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md)
+  - Full implementation of [RFC-001: Cloud Deployment CLI](rfc/2025_10_001-cloud-deployment-cli.md)
   - Support for three major cloud platforms:
     - **Google Cloud Run** with Artifact Registry and Secret Manager
     - **AWS App Runner** with ECR and Secrets Manager
@@ -637,7 +641,7 @@ All notable changes to this project will be documented in this file.
   - **Health Verification**: Automatic health checks at `/.well-known/health` endpoint
   - **Idempotent Deployments**: Safe create/update operations with rollback on failure
   - **Local Testing**: Full Docker Compose environment for pre-deployment testing
-  - See [Local Testing Documentation](docs/LOCAL_TESTING.md) for details
+  - See [Local Testing Documentation](2025_10_LOCAL_TESTING.md) for details
 
 - **Agent Instructions Template** - New HTML page served by FastAPI for Supervaize integration instructions
   - Accessible at `/admin/supervaize-instructions`
@@ -676,7 +680,7 @@ All notable changes to this project will be documented in this file.
   - Added comprehensive deployment documentation
   - Updated model reference documentation
   - Improved README with deployment examples
-  - Updated PROTOCOLS.md to focus on unified A2A protocol
+  - Updated 2025_08_PROTOCOLS.md to focus on unified A2A protocol
   - Added Protocol Evolution section explaining ACP merger
 
 ### Fixed

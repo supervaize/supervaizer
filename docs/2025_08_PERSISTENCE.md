@@ -1,5 +1,9 @@
 # TinyDB Persistence Layer
 
+
+> **Created:** 2025-08-05
+> **Updated:** 2026-02-04
+
 The Supervaizer TinyDB persistence layer provides thread-safe, local storage for WorkflowEntity instances (Jobs, Cases, Missions) across sessions and processes.
 
 ## Features

@@ -1,5 +1,9 @@
 # RFC-002: Async HTTP Client for `account_service.send_event`
 
+
+> **Created:** 2026-04-27
+> **Updated:** 2026-04-27
+
 **Status:** Proposed
 **Date:** 2026-04-27
 **Affects:** `supervaizer` SDK (published PyPI package)
