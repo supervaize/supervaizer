@@ -11,6 +11,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+from hashlib import sha256
 import os
 import secrets
 import sys
@@ -80,6 +81,12 @@ def _get_or_create_server_id() -> str:
     new_id = str(uuid.uuid4())
     os.environ["SUPERVAIZER_SERVER_ID"] = new_id
     return new_id
+
+
+def _controller_key_fingerprint(api_key: str | None) -> str | None:
+    if not api_key:
+        return None
+    return sha256(api_key.encode("utf-8")).hexdigest()[:12]
 
 
 def _get_or_create_private_key() -> RSAPrivateKey:
@@ -405,11 +412,19 @@ class Server(ServerAbstract):
             port = int(os.getenv("SUPERVAIZER_PORT", "8000"))
         if public_url is None:
             public_url = os.getenv("SUPERVAIZER_PUBLIC_URL") or None
+        local_mode = is_local_mode()
+        api_key_was_generated = False
         if api_key is None:
-            api_key = os.getenv("SUPERVAIZER_API_KEY") or secrets.token_urlsafe(32)
+            api_key = os.getenv("SUPERVAIZER_API_KEY")
+            if not api_key:
+                if local_mode:
+                    api_key = "local-dev"
+                else:
+                    api_key = secrets.token_urlsafe(32)
+                    os.environ["SUPERVAIZER_API_KEY"] = api_key
+                    api_key_was_generated = True
 
         # Local mode: skip Studio, inject Hello World, default api_key
-        local_mode = is_local_mode()
         local_hello_world_slug: str | None = None
         if local_mode:
             if supervisor_account is not None:
@@ -420,8 +435,6 @@ class Server(ServerAbstract):
             supervisor_account = None
             a2a_endpoints = True
             admin_interface = True
-            if not os.environ.get("SUPERVAIZER_API_KEY"):
-                api_key = "local-dev"
 
             # Inject Hello World agent unless disabled or duplicate
             if os.environ.get("SUPERVAIZER_DISABLE_HELLO_WORLD", "").lower() != "true":
@@ -601,8 +614,11 @@ class Server(ServerAbstract):
         if api_key:
             log.info("[Server launch] API Key authentication enabled")
             # Print the API key if it was generated
-            if os.getenv("SUPERVAIZER_API_KEY") is None:
-                log.warning(f"[Server launch] Using auto-generated API key: {api_key}")
+            if api_key_was_generated:
+                log.warning(
+                    "[Server launch] Using auto-generated API key "
+                    f"fingerprint={_controller_key_fingerprint(api_key)}"
+                )
         else:
             log.info("[Server launch] API Key authentication disabled")
 
@@ -726,6 +742,7 @@ class Server(ServerAbstract):
             assert isinstance(
                 server_registration_result, ApiSuccess
             )  # If ApiError, exception should have been raised before
+            self._validate_registration_handshake(server_registration_result)
             # Get the agent details from the server
             for agent in self.agents:
                 updated_agent = agent.update_agent_from_server(self)
@@ -746,6 +763,40 @@ class Server(ServerAbstract):
         server_url = f"http://{self.host}:{self.port}"
         display_instructions(
             server_url, f"Starting server on {server_url} \n Waiting for instructions.."
+        )
+
+    def _validate_registration_handshake(self, result: ApiSuccess) -> None:
+        detail = result.detail if isinstance(result.detail, dict) else {}
+        response_object = detail.get("object")
+        if not isinstance(response_object, dict):
+            raise RuntimeError(
+                "Studio registration handshake failed: server.register response did not "
+                "include a response object. Studio-to-agent API key persistence could not "
+                "be verified."
+            )
+        handshake = response_object.get("supervaizer_handshake")
+        if not isinstance(handshake, dict):
+            response_keys = sorted(str(key) for key in response_object.keys())
+            raise RuntimeError(
+                "Studio registration handshake failed: server.register response did not "
+                "include supervaizer_handshake. Studio-to-agent API key persistence could "
+                "not be verified. Check that SUPERVAIZE_API_URL points to a Studio "
+                "instance that supports the Supervaizer v2 registration handshake. "
+                f"response_keys={response_keys}"
+            )
+        if handshake.get("controller_api_key_match") is True:
+            log.info(
+                "[Server launch] Studio registration handshake verified "
+                f"server_id={handshake.get('server_id')} "
+                f"controller_key_fingerprint={_controller_key_fingerprint(self.api_key)}"
+            )
+            return
+        raise RuntimeError(
+            "Studio registration handshake failed: Studio did not persist the controller API key "
+            f"for server_id={handshake.get('server_id')}. "
+            f"controller_key_fingerprint={_controller_key_fingerprint(self.api_key)} "
+            f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
+            f"reason={handshake.get('reason')}"
         )
 
     def decrypt(self, encrypted_parameters: str) -> str:
