@@ -24,9 +24,13 @@ from supervaizer.contracts import (
     EventType,
     ServerRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
+    V2A2UIResourceImportDocument,
     V2ActionRequest,
     V2ActionResult,
     V2AwaitingState,
+    V2DashboardWidgetDataRef,
+    V2DashboardWidgetDefinition,
+    V2DashboardWidgetVisualization,
     V2Effect,
     V2JobStateSnapshot,
     V2JobSyncResult,
@@ -107,19 +111,30 @@ def test_event_type_agent_anomaly_members_are_not_aliases() -> None:
 
 def test_v2_effect_has_typed_common_fields() -> None:
     effect = V2Effect(
-        type="job.started",
+        type="resource.imported",
         job_id="job-1",
-        status="in_progress",
-        message="Started",
+        resource="campaign_contacts",
+        count=1,
+        items=[{"email": "ada@example.com"}],
+        errors=[],
+        gaps=[],
+        summary={"enrollments_created": 1},
+        case={"lane": "setup", "title": "User enrollment"},
     )
 
     assert effect.job_id == "job-1"
-    assert effect.status == "in_progress"
+    assert effect.resource == "campaign_contacts"
+    assert effect.count == 1
     assert effect.model_dump(mode="json", exclude_none=True) == {
-        "type": "job.started",
+        "type": "resource.imported",
         "job_id": "job-1",
-        "status": "in_progress",
-        "message": "Started",
+        "resource": "campaign_contacts",
+        "count": 1,
+        "items": [{"email": "ada@example.com"}],
+        "errors": [],
+        "gaps": [],
+        "summary": {"enrollments_created": 1},
+        "case": {"lane": "setup", "title": "User enrollment"},
     }
 
 
