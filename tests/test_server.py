@@ -669,6 +669,7 @@ class TestServerLocalMode:
             )
             agent_slug = server.agents[0].slug
             client = TestClient(server.app)
+            headers = {"X-API-Key": server.api_key}
 
             card_response = client.get(
                 f"/.well-known/agents/v{server.agents[0].version}/{agent_slug}_agent.json"
@@ -687,6 +688,7 @@ class TestServerLocalMode:
 
             surface_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "surface-1",
@@ -711,6 +713,7 @@ class TestServerLocalMode:
 
             action_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "action-1",
@@ -735,6 +738,7 @@ class TestServerLocalMode:
 
             resource_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "resource-1",
@@ -758,6 +762,7 @@ class TestServerLocalMode:
 
             start_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "start-1",
@@ -784,6 +789,7 @@ class TestServerLocalMode:
 
             awaiting_surface_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "awaiting-surface-1",
@@ -812,6 +818,7 @@ class TestServerLocalMode:
 
             submit_response = client.post(
                 "/a2a",
+                headers=headers,
                 json={
                     "jsonrpc": "2.0",
                     "id": "submit-1",

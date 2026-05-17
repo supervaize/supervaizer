@@ -15,6 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Server
+from supervaizer.access import API_KEYS
 from supervaizer.contracts import (
     V2ActionRequest,
     V2ActionResult,
@@ -42,6 +43,10 @@ from supervaizer.protocol.a2a.events import (
     subscribe_v2_events,
     unsubscribe_v2_events,
 )
+
+
+def _a2a_write_headers(server: Server) -> dict[str, str]:
+    return {"X-API-Key": server.api_key or ""}
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:
@@ -258,6 +263,7 @@ def test_a2a_controller_rejects_unknown_method(server_fixture: Server) -> None:
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={"jsonrpc": "2.0", "id": "rpc-1", "method": "missing.method"},
     )
 
@@ -274,6 +280,7 @@ def test_a2a_controller_rejects_unregistered_v2_action(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-2",
@@ -297,6 +304,7 @@ def test_a2a_controller_rejects_unregistered_v2_surface(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-1",
@@ -321,6 +329,56 @@ def test_a2a_events_requires_authentication(server_fixture: Server) -> None:
     assert response.status_code == 401
 
 
+def test_a2a_discovery_and_health_remain_public(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    discovery_response = client.get("/.well-known/agents.json")
+    health_response = client.get("/.well-known/health")
+
+    assert discovery_response.status_code == 200
+    assert health_response.status_code == 200
+
+
+def test_a2a_controller_requires_authentication(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={"jsonrpc": "2.0", "id": "rpc-auth", "method": "missing.method"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_a2a_controller_requires_write_scope(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+    API_KEYS["a2a-read-key"] = {"scope": "read"}
+    try:
+        response = client.post(
+            "/a2a",
+            headers={"X-API-Key": "a2a-read-key"},
+            json={"jsonrpc": "2.0", "id": "rpc-read", "method": "missing.method"},
+        )
+    finally:
+        API_KEYS.pop("a2a-read-key", None)
+
+    assert response.status_code == 403
+
+
+def test_a2a_events_remains_read_scoped(server_fixture: Server) -> None:
+    route = next(
+        route
+        for route in server_fixture.app.routes
+        if getattr(route, "path", None) == "/a2a/events"
+    )
+    dependency = route.dependant.dependencies[0].call
+    closure_values = [
+        cell.cell_contents for cell in getattr(dependency, "__closure__", None) or ()
+    ]
+
+    assert "read" in closure_values
+
+
 def test_a2a_controller_dispatches_registered_v2_action(
     server_fixture: Server,
 ) -> None:
@@ -338,6 +396,7 @@ def test_a2a_controller_dispatches_registered_v2_action(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-3",
@@ -375,6 +434,7 @@ def test_a2a_controller_serializes_v2_action_replay_safety(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-replay-safety-1",
@@ -405,6 +465,7 @@ def test_a2a_controller_action_errors_do_not_leak_exception_details(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-error-1",
@@ -441,6 +502,7 @@ def test_a2a_controller_publishes_v2_action_effects(
 
         response = client.post(
             "/a2a",
+            headers=_a2a_write_headers(server_fixture),
             json={
                 "jsonrpc": "2.0",
                 "id": "rpc-event-1",
@@ -480,6 +542,7 @@ def test_a2a_controller_dispatches_registered_v2_surface(
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-2",
@@ -511,6 +574,7 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-4",
@@ -545,6 +609,7 @@ def test_server_v2_surface_decorator_registers_handler(server_fixture: Server) -
 
     response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-3",
@@ -587,6 +652,7 @@ def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> 
 
     first_response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-5",
@@ -596,6 +662,7 @@ def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> 
     )
     second_response = client.post(
         "/a2a",
+        headers=_a2a_write_headers(server_fixture),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-6",

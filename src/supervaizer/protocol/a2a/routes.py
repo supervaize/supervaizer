@@ -118,6 +118,7 @@ def create_controller_routes(server: "Server") -> APIRouter:
         summary="A2A JSON-RPC Controller",
         description="Dispatches Supervaizer v2 controller methods over A2A JSON-RPC.",
         response_model=dict[str, Any],
+        dependencies=[Depends(require_scope("write"))],
     )
     @handle_route_errors()
     async def post_a2a_controller(body: dict[str, Any]) -> dict[str, Any]:

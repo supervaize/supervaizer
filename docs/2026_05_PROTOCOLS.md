@@ -33,8 +33,8 @@ SUPERVAIZER implements the [Agent-to-Agent (A2A) protocol](https://a2a-protocol.
 - **Versioned Endpoints**: Support for agent versioning with backward compatibility
 - **OpenAPI Integration**: Direct links to OpenAPI specifications and documentation
 - **Version Information**: Comprehensive version tracking with changelog access
-- **JSON-RPC Controller Endpoint**: `/a2a` supports Supervaizer v2 methods including `supervaizer/action.invoke` and `supervaizer/surface.load`
-- **Server-Sent Events**: `/a2a/events` streams Supervaizer v2 action effects for observers that need a live feed
+- **JSON-RPC Controller Endpoint**: `POST /a2a` supports Supervaizer v2 methods including `supervaizer/action.invoke` and `supervaizer/surface.load`; requests require `X-API-Key` with write scope
+- **Server-Sent Events**: `GET /a2a/events` streams Supervaizer v2 action effects for observers that need a live feed; requests require `X-API-Key` with read scope
 
 ### Supervaizer v2 Agent Card Extension
 
