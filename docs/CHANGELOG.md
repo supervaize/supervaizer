@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-05-17
+
 ### Supervaizer v2 2️⃣
 
 - **Supervaizer v2 case metadata** — `V2CaseSnapshot` now carries optional public `metadata` so agents can expose case-level business context such as contact interview links without adding agent-specific fields to the protocol.
