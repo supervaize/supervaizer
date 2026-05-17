@@ -731,6 +731,7 @@ class V2CaseSnapshot(ContractModel):
     title: str | None = None
     status: str | None = None
     external_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     steps: list[V2StepSnapshot] = Field(default_factory=list)
 
 

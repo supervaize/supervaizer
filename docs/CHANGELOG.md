@@ -1,7 +1,7 @@
 # Supervaizer Changelog
 
 > **Created:** 2025-08-05
-> **Updated:** 2026-05-17
+> **Updated:** 2026-05-18
 
 All notable changes to this project will be documented in this file.
 
@@ -17,6 +17,26 @@ All notable changes to this project will be documented in this file.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
 ## [Unreleased]
+
+### Supervaizer v2 2️⃣
+
+- **Supervaizer v2 case metadata** — `V2CaseSnapshot` now carries optional public `metadata` so agents can expose case-level business context such as contact interview links without adding agent-specific fields to the protocol.
+- **Studio registration handshake validation** — After `server.register`, startup validates `supervaizer_handshake.controller_api_key_match` and fails when Studio persisted a different controller API key than the one this process is using (configured `SUPERVAIZER_API_KEY` or auto-generated key).
+- **Controller API key reload stability** — Auto-generated controller keys are written to `SUPERVAIZER_API_KEY` before registration so Uvicorn reload keeps the same key; startup logs a short SHA-256 fingerprint instead of printing the full secret.
+
+### Tests
+
+- `tests/test_contracts.py` — `V2CaseSnapshot` accepts public `metadata`.
+- `tests/test_server.py` — registration handshake accept/reject paths and generated API key export for reload.
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 616   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 78s   |
 
 ## [1.0.0] - 2026-05-17
 

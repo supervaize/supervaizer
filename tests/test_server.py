@@ -22,6 +22,7 @@ from rich import inspect
 
 from supervaizer import Server
 from supervaizer.agent import Agent
+from supervaizer.common import ApiSuccess
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
@@ -80,6 +81,77 @@ def test_server(server_fixture: Server) -> None:
     assert server_fixture.environment == "test"
     assert server_fixture.debug
     assert len(server_fixture.agents) == 1
+
+
+def test_server_registration_handshake_rejects_key_mismatch(
+    server_fixture: Server,
+) -> None:
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={
+            "object": {
+                "supervaizer_handshake": {
+                    "server_id": "server-1",
+                    "controller_api_key_match": False,
+                    "stored_controller_api_key_fingerprint": "stored-key",
+                    "reason": "stored_controller_api_key_mismatch",
+                }
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Studio registration handshake failed"):
+        server_fixture._validate_registration_handshake(result)
+
+
+def test_server_registration_handshake_accepts_key_match(
+    server_fixture: Server,
+) -> None:
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={
+            "object": {
+                "supervaizer_handshake": {
+                    "server_id": "server-1",
+                    "controller_api_key_match": True,
+                }
+            }
+        },
+    )
+
+    server_fixture._validate_registration_handshake(result)
+
+
+def test_server_registration_handshake_rejects_missing_handshake(
+    server_fixture: Server,
+) -> None:
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={"object": {}},
+    )
+
+    with pytest.raises(RuntimeError, match="did not include supervaizer_handshake"):
+        server_fixture._validate_registration_handshake(result)
+
+
+def test_server_generated_api_key_is_exported_for_reload(
+    agent_fixture: Agent,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SUPERVAIZER_API_KEY", raising=False)
+    monkeypatch.setenv("SUPERVAIZER_DISABLE_HELLO_WORLD", "true")
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
+
+    server = Server(
+        agents=[agent_fixture],
+        supervisor_account=None,
+        host="localhost",
+        port=8001,
+        environment="test",
+    )
+
+    assert server.api_key
+    assert os.environ["SUPERVAIZER_API_KEY"] == server.api_key
 
 
 def test_server_decrypt(server_fixture: Server) -> None:
