@@ -1,5 +1,9 @@
 # REST API Documentation
 
+
+> **Created:** 2025-08-06
+> **Updated:** 2025-08-06
+
 SUPERVAIZER provides multiple ways to interact with and explore the API:
 
 ## Interactive REST API Documentation

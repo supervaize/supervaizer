@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -20,7 +20,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from rich.console import Console
@@ -291,7 +291,7 @@ def _wait_for_service(url: str, timeout: int) -> bool:
     return False
 
 
-def _run_health_checks(url: str, api_key: Optional[str]) -> dict[str, Any]:
+def _run_health_checks(url: str, api_key: str | None) -> dict[str, Any]:
     """Run comprehensive health checks."""
     results: dict[str, Any] = {}
 

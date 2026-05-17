@@ -1,5 +1,9 @@
 # Design: `--local` Mode with User Agents + Hello World
 
+
+> **Created:** 2026-03-16
+> **Updated:** 2026-03-16
+
 ## Problem
 
 `supervaizer start --local` currently ignores `supervaizer_control.py` entirely and runs a separate code path with only the built-in Hello World agent. Users with existing agent setups cannot see their agents alongside Hello World in local mode.

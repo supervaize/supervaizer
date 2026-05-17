@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -17,20 +17,21 @@ This module contains the main CLI commands for the deploy subcommand.
 """
 
 import importlib.util
-import typer
 from pathlib import Path
+
+import typer
 from rich.console import Console
 
-from supervaizer.deploy.commands.plan import plan_deployment
-from supervaizer.deploy.commands.up import deploy_up
-from supervaizer.deploy.commands.down import deploy_down
-from supervaizer.deploy.commands.status import deploy_status
-from supervaizer.deploy.commands.local import local_docker
 from supervaizer.deploy.commands.clean import (
     clean_deployment,
     clean_docker_artifacts,
     clean_state_only,
 )
+from supervaizer.deploy.commands.down import deploy_down
+from supervaizer.deploy.commands.local import local_docker
+from supervaizer.deploy.commands.plan import plan_deployment
+from supervaizer.deploy.commands.status import deploy_status
+from supervaizer.deploy.commands.up import deploy_up
 
 console = Console()
 
@@ -151,7 +152,6 @@ def deploy_callback() -> None:
     """Deploy Supervaizer agents to cloud platforms."""
     # This callback is called when no subcommand is provided
     # The no_args_is_help=True will automatically show help
-    pass
 
 
 def _check_platform_required(platform: str, command_name: str) -> None:

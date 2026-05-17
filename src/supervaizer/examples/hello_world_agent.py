@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -25,12 +25,14 @@ import shortuuid
 from supervaizer.account import Account
 from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.common import ApiSuccess, log
+from supervaizer.contracts import SUPERVAIZER_V2_A2UI_VERSION
 from supervaizer.job import JobInstructions, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 
 STEPS_WITH_HITL = ["Begin", "Progress", "Human Review", "End"]
 STEPS_WITHOUT_HITL = ["Begin", "Progress", "End"]
 HITL_POLL_INTERVAL = 1.0  # seconds between polls while waiting for human input
+HELLO_WORLD_A2UI_CATALOG_VERSION = "supervaizer-v2-local.0"
 
 
 class _LocalAccount(Account):
@@ -239,3 +241,339 @@ def job_status(**kwargs: Any) -> JobResponse:
         status=EntityStatus.STOPPED,
         message="idle",
     )
+
+
+def handle_v2_surface(surface_request: Any) -> dict[str, Any]:
+    """Return local Hello World A2UI documents."""
+    request = _request_dict(surface_request)
+    surface = str(request.get("surface") or "").strip()
+    if surface == "case.step.awaiting":
+        return _awaiting_surface(request)
+    if surface != "job.start":
+        return {
+            "surface": surface,
+            "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+            "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+            "document": {"type": "UnsupportedSurface", "surface": surface},
+        }
+    return {
+        "surface": surface,
+        "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+        "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+        "document": {
+            "type": "Form",
+            "id": "supervaizer.local.hello_world.job.start",
+            "title": "Start Hello World",
+            "fields": [
+                {
+                    "id": "count",
+                    "label": "How many times to say hello",
+                    "type": "number",
+                    "required": True,
+                    "default": 3,
+                },
+                {
+                    "id": "enable_human_review",
+                    "label": "Enable human review",
+                    "type": "boolean",
+                    "required": False,
+                    "default": False,
+                },
+            ],
+            "submit": {"action": "job.start", "label": "Start"},
+            "preview": {"action": "job.start.preview"},
+            "state": {"draft_session_id": request.get("draft_session_id")},
+        },
+    }
+
+
+def handle_v2_action(action_request: Any) -> dict[str, Any]:
+    """Dispatch minimal v2 actions for the local Hello World agent."""
+    request = _request_dict(action_request)
+    action = str(request.get("action") or "").strip()
+    if action == "job.start.preview":
+        return _ok_result("job.start.previewed", request_id=request.get("request_id"))
+    if action == "job.start":
+        return _job_start_result(request)
+    if action == "job.sync":
+        return _job_sync_result(request)
+    if action == "step.awaiting.submit":
+        return _awaiting_submit_result(request)
+    if action == "resource.hello_messages.list":
+        return _hello_messages_result()
+    return {
+        "status": "error",
+        "effects": [{"type": "action.unsupported", "action": action}],
+    }
+
+
+def _awaiting_surface(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "surface": "case.step.awaiting",
+        "a2ui_version": SUPERVAIZER_V2_A2UI_VERSION,
+        "a2ui_catalog_version": HELLO_WORLD_A2UI_CATALOG_VERSION,
+        "document": {
+            "type": "Form",
+            "id": "supervaizer.local.hello_world.case.step.awaiting",
+            "title": "Human Review",
+            "fields": _human_review_fields(),
+            "submit": {"action": "step.awaiting.submit", "label": "Submit"},
+            "state": {
+                "job_id": request.get("job_id"),
+                "case_id": request.get("case_id"),
+                "step_id": request.get("step_id"),
+            },
+        },
+    }
+
+
+def _job_start_result(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    job_id = str(request.get("job_id") or "local-v2-job")
+    if _human_review_enabled(action_input):
+        return {
+            "status": "ok",
+            "effects": [
+                {
+                    "type": "job.started",
+                    "job_id": job_id,
+                    "status": "awaiting",
+                    "message": "Awaiting human review",
+                }
+            ],
+            "job_state": _awaiting_job_state(request),
+        }
+
+    count = _bounded_count(action_input)
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "job.started",
+                "job_id": job_id,
+                "status": "completed",
+                "message": f"Completed {count} cases",
+            }
+        ],
+        "job_state": _completed_job_state(request),
+    }
+
+
+def _job_sync_result(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    if _human_review_enabled(action_input):
+        return {
+            "status": "ok",
+            "effects": [
+                {
+                    "type": "job.synced",
+                    "job_id": request.get("job_id"),
+                    "status": "awaiting",
+                    "message": "Awaiting human review",
+                }
+            ],
+            "job_state": _awaiting_job_state(request),
+        }
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "job.synced",
+                "job_id": request.get("job_id"),
+                "status": "completed",
+                "message": "Completed",
+            }
+        ],
+        "job_state": _completed_job_state(request),
+    }
+
+
+def _awaiting_submit_result(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "step.awaiting.submitted",
+                "job_id": request.get("job_id"),
+                "case_id": request.get("case_id"),
+                "step_id": request.get("step_id"),
+                "status": "completed",
+            }
+        ],
+        "job_state": _completed_review_job_state(request),
+    }
+
+
+def _hello_messages_result() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [
+            {
+                "type": "resource.listed",
+                "resource": "hello_messages",
+                "items": [
+                    {
+                        "id": "hello-1",
+                        "message": "Hello from Supervaizer v2",
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def _human_review_enabled(action_input: dict[str, Any]) -> bool:
+    value = action_input.get("enable_human_review", False)
+    return str(value).lower() in ("true", "on", "1", "yes")
+
+
+def _bounded_count(action_input: dict[str, Any]) -> int:
+    value = action_input.get("count", 1)
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = 1
+    return max(0, min(count, 100))
+
+
+def _awaiting_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    return _job_state(
+        request,
+        status="awaiting",
+        cases=[
+            {
+                "id": "hello-review-1",
+                "lane": "work",
+                "title": "Hello review",
+                "status": "awaiting",
+                "steps": [
+                    {
+                        "id": "human-review",
+                        "activity": "operation",
+                        "status": "awaiting",
+                        "title": "Human Review",
+                        "awaiting": {
+                            "reason": "human_input",
+                            "surface": "case.step.awaiting",
+                            "action": "step.awaiting.submit",
+                            "fields": _human_review_fields(),
+                        },
+                        "outputs": [],
+                    }
+                ],
+            }
+        ],
+    )
+
+
+def _completed_review_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    return _job_state(
+        request,
+        status="completed",
+        cases=[
+            {
+                "id": request.get("case_id") or "hello-review-1",
+                "lane": "work",
+                "title": "Hello review",
+                "status": "completed",
+                "steps": [
+                    {
+                        "id": request.get("step_id") or "human-review",
+                        "activity": "operation",
+                        "status": "completed",
+                        "title": "Human Review",
+                        "outputs": [
+                            {
+                                "id": "review-decision",
+                                "type": "decision",
+                                "title": "Review decision",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+
+def _completed_job_state(request: dict[str, Any]) -> dict[str, Any]:
+    action_input = _action_input(request)
+    cases = []
+    for index in range(1, _bounded_count(action_input) + 1):
+        cases.append({
+            "id": f"hello-case-{index}",
+            "lane": "work",
+            "title": f"Hello case {index}",
+            "status": "completed",
+            "steps": [
+                {
+                    "id": f"hello-case-{index}-complete",
+                    "activity": "operation",
+                    "status": "completed",
+                    "title": "Say hello",
+                    "outputs": [
+                        {
+                            "id": f"hello-case-{index}-message",
+                            "type": "message",
+                            "title": f"Hello case {index}",
+                        }
+                    ],
+                }
+            ],
+        })
+    return _job_state(request, status="completed", cases=cases)
+
+
+def _job_state(
+    request: dict[str, Any],
+    *,
+    status: str,
+    cases: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "job": {
+            "id": str(request.get("job_id") or "local-v2-job"),
+            "agent_slug": str(request.get("agent_slug") or "hello-world-ai-agent"),
+            "mission_id": str(request.get("mission_id") or "local-mission"),
+            "status": status,
+            "source": {"type": "fresh_start"},
+        },
+        "cases": cases,
+    }
+
+
+def _human_review_fields() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "approved",
+            "label": "Approve this case",
+            "type": "boolean",
+            "required": True,
+        },
+        {
+            "id": "comment",
+            "label": "Comment",
+            "type": "string",
+            "required": False,
+        },
+    ]
+
+
+def _ok_result(effect_type: str, **effect: Any) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "effects": [{"type": effect_type, **effect}],
+    }
+
+
+def _action_input(request: dict[str, Any]) -> dict[str, Any]:
+    value = request.get("input")
+    return value if isinstance(value, dict) else {}
+
+
+def _request_dict(request: Any) -> dict[str, Any]:
+    if isinstance(request, dict):
+        return request
+    if hasattr(request, "model_dump"):
+        return request.model_dump(mode="python")
+    raise TypeError(f"Unsupported request type: {type(request).__name__}")

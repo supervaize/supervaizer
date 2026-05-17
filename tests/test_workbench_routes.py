@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -38,6 +38,7 @@ from supervaizer.case import Cases
 def test_client_with_agent(monkeypatch):
     """Create a test client with a registered agent."""
     from fastapi import FastAPI
+
     from supervaizer.admin.routes import create_admin_routes
 
     monkeypatch.setenv("SUPERVAIZER_API_KEY", "test-api-key")

@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -20,8 +20,9 @@ from fastapi.testclient import TestClient
 
 def _make_app(peer_ip: str) -> FastAPI:
     """Build a minimal FastAPI app with require_tailscale on a single route."""
-    from supervaizer.access.tailscale import require_tailscale
     from fastapi import Depends
+
+    from supervaizer.access.tailscale import require_tailscale
 
     app = FastAPI()
 

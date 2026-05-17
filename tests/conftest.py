@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,13 +12,13 @@
 
 import os
 import tempfile
+from collections.abc import Generator
 from datetime import datetime
-from typing import Any, Dict, Generator
+from typing import Annotated, Any
 from uuid import uuid4
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
-from typing_extensions import Annotated
 
 import supervaizer.storage as storage_module
 from supervaizer import (
@@ -28,9 +28,9 @@ from supervaizer import (
     AgentMethods,
     Case,
     CaseNode,
+    CaseNodes,
     CaseNodeType,
     CaseNodeUpdate,
-    CaseNodes,
     EntityStatus,
     Event,
     EventType,
@@ -85,11 +85,11 @@ def mock_entity_class() -> Any:
             self.status = status
 
         @property
-        def to_dict(self) -> Dict[str, Any]:
+        def to_dict(self) -> dict[str, Any]:
             return {"id": self.id, "name": self.name, "status": self.status}
 
         @classmethod
-        def model_validate(cls, data: Dict[str, Any]) -> "MockEntity":
+        def model_validate(cls, data: dict[str, Any]) -> "MockEntity":
             return cls(**data)
 
     return MockEntity

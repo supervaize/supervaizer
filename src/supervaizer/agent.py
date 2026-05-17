@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -18,33 +18,45 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    List,
-    Optional,
     TypeVar,
     cast,
 )
+
 import shortuuid
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field
-from rich import inspect, print
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from slugify import slugify
+
 from supervaizer.__version__ import VERSION
+from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
+from supervaizer.contracts import SupervaizerV2AgentRegistrationContract
+from supervaizer.data_resource import DataResource
 from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.job_service import service_job_finished
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
-from supervaizer.case import CaseNodes
-from supervaizer.data_resource import DataResource
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
 
-insp = inspect
-prnt = print
-
 T = TypeVar("T")
+BLOCKED_AGENT_METHOD_MODULE_ROOTS = frozenset({
+    "builtins",
+    "importlib",
+    "os",
+    "pathlib",
+    "shutil",
+    "subprocess",
+    "sys",
+})
 
 
 class FieldTypeEnum(str, Enum):
@@ -106,19 +118,16 @@ class AgentMethodField(BaseModel):
     required: bool = Field(
         default=False, description="Whether field is required for form submission"
     )
-    dynamic_choices: str | None = Field(
-        default=None,
-        description="Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'.",
-    )
 
-    @model_validator(mode="after")
-    def validate_choices_mutual_exclusion(self) -> "AgentMethodField":
-        if self.choices is not None and self.dynamic_choices is not None:
+    @model_validator(mode="before")
+    @classmethod
+    def reject_dynamic_choices(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "dynamic_choices" in data:
             raise ValueError(
-                "'choices' and 'dynamic_choices' are mutually exclusive. "
-                "Use 'choices' for static options or 'dynamic_choices' for runtime-resolved options."
+                "dynamic_choices was removed in Supervaizer v2. "
+                "Use v2 resource option_sources or typed A2A actions for dynamic options."
             )
-        return self
+        return data
 
     model_config = cast(
         ConfigDict,
@@ -153,7 +162,7 @@ class AgentJobContextBase(BaseModel):
     """
 
     job_context: JobContext
-    job_fields: Dict[str, Any]
+    job_fields: dict[str, Any]
 
 
 class AgentMethodAbstract(BaseModel):
@@ -201,11 +210,11 @@ class AgentMethodAbstract(BaseModel):
     method: str = Field(
         description="The name of the method in the project's codebase that will be called with the provided parameters"
     )
-    params: Dict[str, Any] | None = Field(
+    params: dict[str, Any] | None = Field(
         default=None,
         description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
     )
-    fields: List[AgentMethodField] | None = Field(
+    fields: list[AgentMethodField] | None = Field(
         default=None,
         description="A list of field specifications for generating forms/UI, following the django.forms.fields definition",
     )
@@ -252,10 +261,20 @@ class AgentMethodAbstract(BaseModel):
         description="The definition of the Case Nodes (=steps) for this method",
     )
 
+    @field_validator("method")
+    @classmethod
+    def reject_unsafe_method_module_roots(cls, value: str) -> str:
+        root_module = value.split(".", 1)[0]
+        if root_module in BLOCKED_AGENT_METHOD_MODULE_ROOTS:
+            raise ValueError(
+                f"Agent method path '{value}' uses blocked module root '{root_module}'"
+            )
+        return value
+
 
 class AgentMethod(AgentMethodAbstract):
     @property
-    def fields_definitions(self) -> list[Dict[str, Any]]:
+    def fields_definitions(self) -> list[dict[str, Any]]:
         """
         Returns a list of the fields with the type key as a string
         Used for the API response.
@@ -314,7 +333,7 @@ class AgentMethod(AgentMethodAbstract):
 
             # Make field optional if not required
             field_annotations[field_name] = (
-                annotation_type if field.required else Optional[annotation_type]
+                annotation_type if field.required else annotation_type | None
             )
 
         # Create the dynamic model with proper module information
@@ -322,15 +341,13 @@ class AgentMethod(AgentMethodAbstract):
             "__module__": "supervaizer.agent",
             "__annotations__": field_annotations,
             "to_dict": lambda self: {
-                k: getattr(self, k)
-                for k in field_annotations.keys()
-                if hasattr(self, k)
+                k: getattr(self, k) for k in field_annotations if hasattr(self, k)
             },
         }
 
         return type("DynamicFieldsModel", (BaseModel,), model_dict)
 
-    def validate_method_fields(self, job_fields: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_method_fields(self, job_fields: dict[str, Any]) -> dict[str, Any]:
         """Validate job fields against the method's field definitions.
 
         Args:
@@ -339,8 +356,8 @@ class AgentMethod(AgentMethodAbstract):
         Returns:
             Dictionary with validation results:
             - "valid": bool - whether all fields are valid
-            - "errors": List[str] - list of validation error messages
-            - "invalid_fields": Dict[str, str] - field name to error message mapping
+            - "errors": list[str] - list of validation error messages
+            - "invalid_fields": dict[str, str] - field name to error message mapping
         """
         if self.fields is None:
             return {
@@ -418,7 +435,7 @@ class AgentMethod(AgentMethodAbstract):
                             errors.append(error_msg)
                             invalid_fields[field_name] = error_msg
                 except Exception as e:
-                    error_msg = f"Field '{field_name}' validation failed: {str(e)}"
+                    error_msg = f"Field '{field_name}' validation failed: {e!s}"
                     errors.append(error_msg)
                     invalid_fields[field_name] = error_msg
 
@@ -451,7 +468,7 @@ class AgentMethod(AgentMethodAbstract):
         )
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """
         Returns a JSON-serializable dictionary representation of the AgentMethod.
         """
@@ -473,7 +490,7 @@ class AgentMethodParams(BaseModel):
 
     """
 
-    params: Dict[str, Any] = Field(
+    params: dict[str, Any] = Field(
         default_factory=dict,
         description="A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs",
     )
@@ -487,10 +504,18 @@ class AgentMethodsAbstract(BaseModel):
     job_start: AgentMethod
     job_stop: AgentMethod | None = None
     job_status: AgentMethod | None = None
-    job_poll: AgentMethod | None = None
     human_answer: AgentMethod | None = None
     chat: AgentMethod | None = None
     custom: dict[str, AgentMethod] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_job_poll(cls, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("job_poll") is not None:
+            raise ValueError(
+                "job_poll was removed. Use Supervaizer v2 job.sync for status convergence."
+            )
+        return value
 
     @field_validator("custom")
     @classmethod
@@ -499,7 +524,7 @@ class AgentMethodsAbstract(BaseModel):
     ) -> dict[str, AgentMethod]:
         """Validate that custom method keys are valid slug-like values suitable for endpoints."""
         if value:
-            for key in value.keys():
+            for key in value:
                 # Check if key is a valid slug format
                 if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", key):
                     raise ValueError(
@@ -520,14 +545,13 @@ class AgentMethodsAbstract(BaseModel):
 
 class AgentMethods(AgentMethodsAbstract):
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         return {
             "job_start": self.job_start.registration_info,
             "job_stop": self.job_stop.registration_info if self.job_stop else None,
             "job_status": self.job_status.registration_info
             if self.job_status
             else None,
-            "job_poll": self.job_poll.registration_info if self.job_poll else None,
             "human_answer": self.human_answer.registration_info
             if self.human_answer
             else None,
@@ -587,17 +611,20 @@ class AgentAbstract(SvBaseModel):
 
     supervaizer_VERSION: ClassVar[str] = VERSION
     name: str = Field(description="Display name of the agent")
-    id: str = Field(description="Unique ID generated from name")
-    author: Optional[str] = Field(default=None, description="Author of the agent")
-    developer: Optional[str] = Field(
+    id: str = Field(
+        description=(
+            "Stable ID derived from name via shortuuid.uuid(name=...). "
+            "Renaming the agent changes this value."
+        )
+    )
+    author: str | None = Field(default=None, description="Author of the agent")
+    developer: str | None = Field(
         default=None, description="Developer of the controller integration"
     )
-    maintainer: Optional[str] = Field(
+    maintainer: str | None = Field(
         default=None, description="Maintainer of the integration"
     )
-    editor: Optional[str] = Field(
-        default=None, description="Editor (usually a company)"
-    )
+    editor: str | None = Field(default=None, description="Editor (usually a company)")
     version: str = Field(default="", description="Version string")
     release_notes_url: str | None = Field(
         default=None,
@@ -624,15 +651,11 @@ class AgentAbstract(SvBaseModel):
     server_agent_onboarding_status: str | None = Field(
         default=None, description="Onboarding status - Do not set this manually"
     )
-    server_encrypted_parameters: str | None = Field(
-        default=None,
-        description="Encrypted parameters from server - Do not set this manually",
-    )
     max_execution_time: int = Field(
         default=60 * 60,
         description="Maximum execution time in seconds, defaults to 1 hour",
     )
-    supervaize_instructions_template_path: Optional[str] = Field(
+    supervaize_instructions_template_path: str | None = Field(
         default=None,
         description="Optional path to a custom template file for supervaize_instructions.html page",
     )
@@ -645,15 +668,14 @@ class AgentAbstract(SvBaseModel):
         description="Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/...",
         exclude=True,
     )
-    dynamic_choices_callback: Any | None = Field(
-        default=None,
-        description="Callable that returns dynamic choices for method fields. Signature: (method_name: str, context: dict) -> dict[str, list[tuple[str, str]]]. Context includes workspace_id, workspace_slug, mission_id from the dynamic_choices request body.",
-        exclude=True,
-    )
     data_resources: list[DataResource] = Field(
         default_factory=list,
         description="Data resources this agent exposes for Studio CRUD access",
         exclude=True,
+    )
+    supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract | None = Field(
+        default=None,
+        description="Optional Supervaizer v2 registration contract for A2A/A2UI Studio integrations",
     )
 
     model_config = cast(
@@ -662,14 +684,16 @@ class AgentAbstract(SvBaseModel):
 
 
 class Agent(AgentAbstract):
+    _server_encrypted_parameters: str | None = PrivateAttr(default=None)
+
     def __init__(
         self,
         name: str,
         id: str | None = None,
-        author: Optional[str] = None,
-        developer: Optional[str] = None,
-        maintainer: Optional[str] = None,
-        editor: Optional[str] = None,
+        author: str | None = None,
+        developer: str | None = None,
+        maintainer: str | None = None,
+        editor: str | None = None,
         version: str = "",
         release_notes_url: str | None = None,
         description: str = "",
@@ -679,11 +703,12 @@ class Agent(AgentAbstract):
         server_agent_id: str | None = None,
         server_agent_status: str | None = None,
         server_agent_onboarding_status: str | None = None,
-        server_encrypted_parameters: str | None = None,
         max_execution_time: int = 60 * 60,  # 1 hour (in seconds)
         custom_routes: Any | None = None,
-        dynamic_choices_callback: Any | None = None,
         data_resources: list["DataResource"] | None = None,
+        supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract
+        | dict[str, Any]
+        | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -691,11 +716,12 @@ class Agent(AgentAbstract):
         It contains metadata about the agent like name, version, description etc. as well as
         the methods it supports and any parameter configurations.
 
-        The agent ID is automatically generated from the name and must match.
+        The agent ID is deterministically derived from ``name`` (``shortuuid.uuid(name=name)``).
+        Pass ``id`` only when it matches that derivation; renaming changes the ID.
 
         Attributes:
             name (str): Display name of the agent
-            id (str): Unique ID generated from name
+            id (str): Stable ID derived from name; omit to auto-generate
             author (str, optional): Original author
             developer (str, optional): Current developer
             maintainer (str, optional): Current maintainer
@@ -709,15 +735,23 @@ class Agent(AgentAbstract):
             server_agent_id (str, optional): ID assigned by server
             server_agent_status (str, optional): Current status on server
             server_agent_onboarding_status (str, optional): Onboarding status
-            server_encrypted_parameters (str, optional): Encrypted parameters from server
             max_execution_time (int):  Maximum execution time in seconds, defaults to 1 hour
 
         Tested in tests/test_agent.py
         """
-        # Validate or generate agent ID
-        agent_id = id or shortuuid.uuid(name=name)
-        if id is not None and id != shortuuid.uuid(name=name):
-            raise ValueError("Agent ID does not match")
+        if "dynamic_choices_callback" in kwargs:
+            raise ValueError(
+                "dynamic_choices_callback was removed in Supervaizer v2. "
+                "Use v2 resource option_sources or typed A2A actions for dynamic options."
+            )
+
+        expected_id = shortuuid.uuid(name=name)
+        agent_id = id or expected_id
+        if id is not None and id != expected_id:
+            raise ValueError(
+                f"Agent id {id!r} does not match deterministic id for name {name!r} "
+                f"({expected_id!r}); omit id or use the expected value"
+            )
 
         # Initialize using Pydantic's mechanism
         super().__init__(
@@ -736,13 +770,14 @@ class Agent(AgentAbstract):
             server_agent_id=server_agent_id,
             server_agent_status=server_agent_status,
             server_agent_onboarding_status=server_agent_onboarding_status,
-            server_encrypted_parameters=server_encrypted_parameters,
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
-            dynamic_choices_callback=dynamic_choices_callback,
             data_resources=data_resources or [],
+            supervaizer_v2_registration=supervaizer_v2_registration,
             **kwargs,
         )
+
+        self._validate_supervaizer_v2_identity()
 
         seen_resource_names: set[str] = set()
         for r in self.data_resources:
@@ -756,6 +791,18 @@ class Agent(AgentAbstract):
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
 
+    def _validate_supervaizer_v2_identity(self) -> None:
+        registration = self.supervaizer_v2_registration
+        if registration is None:
+            return
+
+        declared_slug = registration.agent.slug
+        if declared_slug != self.slug:
+            raise ValueError(
+                "Supervaizer v2 registration agent.slug must match Agent.slug: "
+                f"{declared_slug!r} != {self.slug!r}"
+            )
+
     @property
     def slug(self) -> str:
         return slugify(self.name)
@@ -765,7 +812,7 @@ class Agent(AgentAbstract):
         return f"/agents/{self.slug}"
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the agent"""
         return {
             "name": self.name,
@@ -787,13 +834,15 @@ class Agent(AgentAbstract):
             "server_agent_id": f"{self.server_agent_id}",
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
-            "server_encrypted_parameters": self.server_encrypted_parameters,
             "max_execution_time": self.max_execution_time,
             "instructions_path": self.instructions_path,
             "data_resources": [r.registration_info for r in self.data_resources],
+            "supervaizer_v2": self.supervaizer_v2_registration.model_dump(mode="json")
+            if self.supervaizer_v2_registration
+            else None,
         }
 
-    def update_agent_from_server(self, server: "Server") -> Optional["Agent"]:
+    def update_agent_from_server(self, server: "Server") -> "Agent | None":
         """
         Update agent attributes and parameters from server registration information.
         Example of agent_registration data is available in mock_api_responses.py
@@ -856,19 +905,22 @@ class Agent(AgentAbstract):
         self, server: "Server", server_encrypted_parameters: str | None
     ) -> None:
         if server_encrypted_parameters and self.parameters_setup:
-            self.server_encrypted_parameters = server_encrypted_parameters
+            self._server_encrypted_parameters = server_encrypted_parameters
             decrypted = server.decrypt(server_encrypted_parameters)
             self.parameters_setup.update_values_from_server(json.loads(decrypted))
         else:
             log.debug("[No encrypted parameters] for {self.name}")
 
-    def _execute(self, action: str, params: Dict[str, Any] = {}) -> JobResponse:
+    def _execute(self, action: str, params: dict[str, Any] = {}) -> JobResponse:
         """Execute an agent method and return a JobResponse.
 
         Runs synchronously in the caller's thread; HTTP entrypoints typically
         offload this via ``asyncio.to_thread`` so user code cannot block the
         event loop.
         """
+
+        if action not in self._declared_method_paths():
+            raise ValueError(f"Agent method path is not declared on agent: {action}")
 
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
@@ -881,10 +933,24 @@ class Agent(AgentAbstract):
             )
         return result
 
+    def _declared_method_paths(self) -> set[str]:
+        if not self.methods:
+            return set()
+        methods = [
+            self.methods.job_start,
+            self.methods.job_stop,
+            self.methods.job_status,
+            self.methods.human_answer,
+            self.methods.chat,
+        ]
+        if self.methods.custom:
+            methods.extend(self.methods.custom.values())
+        return {method.method for method in methods if method is not None}
+
     def job_start(
         self,
         job: Job,
-        job_fields: Dict[str, Any],
+        job_fields: dict[str, Any],
         context: JobContext,
         server: "Server",
         method_name: str = "job_start",
@@ -980,7 +1046,7 @@ class Agent(AgentAbstract):
 
         except Exception as e:
             # Handle any execution errors
-            error_msg = f"Job execution failed: {str(e)}"
+            error_msg = f"Job execution failed: {e!s}"
             log.error(f"[Agent job_start] Job failed : {job.id} - {error_msg}")
             job_response = JobResponse(
                 job_id=job.id,
@@ -993,14 +1059,14 @@ class Agent(AgentAbstract):
             raise
         return job
 
-    def job_stop(self, params: Dict[str, Any] = {}) -> Any:
+    def job_stop(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous stop hook; controller ``POST /stop`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_stop:
             raise ValueError("Agent methods not defined")
         method = self.methods.job_stop.method
         return self._execute(method, params)
 
-    def job_status(self, params: Dict[str, Any] = {}) -> Any:
+    def job_status(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous status hook; controller ``POST /status`` runs it in a worker thread."""
         if not self.methods or not self.methods.job_status:
             raise ValueError("Agent methods not defined")
@@ -1026,18 +1092,17 @@ class AgentResponse(BaseModel):
 
     name: str
     id: str
-    author: Optional[str] = None
-    developer: Optional[str] = None
-    maintainer: Optional[str] = None
-    editor: Optional[str] = None
+    author: str | None = None
+    developer: str | None = None
+    maintainer: str | None = None
+    editor: str | None = None
     version: str
-    release_notes_url: Optional[str] = None
+    release_notes_url: str | None = None
     api_path: str
     description: str
-    tags: Optional[list[str]] = None
-    methods: Optional[AgentMethods] = None
-    parameters_setup: Optional[List[Dict[str, Any]]] = None
-    server_agent_id: Optional[str] = None
-    server_agent_status: Optional[str] = None
-    server_agent_onboarding_status: Optional[str] = None
-    server_encrypted_parameters: Optional[str] = None
+    tags: list[str] | None = None
+    methods: AgentMethods | None = None
+    parameters_setup: list[dict[str, Any]] | None = None
+    server_agent_id: str | None = None
+    server_agent_status: str | None = None
+    server_agent_onboarding_status: str | None = None

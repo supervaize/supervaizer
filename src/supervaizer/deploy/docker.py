@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -18,7 +18,6 @@ This module handles Docker-related operations for deployment.
 
 import os
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -105,7 +104,7 @@ class DockerManager:
 
     def generate_dockerfile(
         self,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
         python_version: str = "3.12",
         app_port: int = 8000,
         controller_file: str = "supervaizer_control.py",
@@ -160,7 +159,7 @@ class DockerManager:
             debug_script_path.write_text(debug_template_path.read_text())
             log.info(f"Generated debug script at {debug_script_path}")
 
-    def generate_dockerignore(self, output_path: Optional[Path] = None) -> None:
+    def generate_dockerignore(self, output_path: Path | None = None) -> None:
         """Generate a .dockerignore file."""
         if output_path is None:
             output_path = Path(".deployment/.dockerignore")
@@ -177,7 +176,7 @@ class DockerManager:
 
     def generate_docker_compose(
         self,
-        output_path: Optional[Path] = None,
+        output_path: Path | None = None,
         port: int = 8000,
         service_name: str = "supervaizer-dev",
         environment: str = "dev",
@@ -225,10 +224,10 @@ class DockerManager:
     def build_image(
         self,
         tag: str,
-        context_path: Optional[Path] = None,
-        dockerfile_path: Optional[Path] = None,
+        context_path: Path | None = None,
+        dockerfile_path: Path | None = None,
         verbose: bool = False,
-        build_args: Optional[dict] = None,
+        build_args: dict | None = None,
     ) -> str:
         """Build Docker image and return the image ID."""
         from docker.errors import APIError, BuildError, DockerException
@@ -350,7 +349,7 @@ class DockerManager:
             log.error(f"Failed to push image: {e}")
             raise RuntimeError(f"Failed to push image: {e}") from e
 
-    def get_image_digest(self, tag: str) -> Optional[str]:
+    def get_image_digest(self, tag: str) -> str | None:
         """Get the digest of a Docker image."""
         from docker.errors import DockerException
 

@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -13,7 +13,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -402,14 +402,14 @@ def test_fields_annotations_dynamic_model() -> None:
     # Test 2: Check field annotations match expected types
     assert DynamicModel.__annotations__["full_name"] is str
     assert DynamicModel.__annotations__["age"] is int
-    assert DynamicModel.__annotations__["subscribe"] is Optional[bool]
+    assert DynamicModel.__annotations__["subscribe"] == bool | None
     assert DynamicModel.__annotations__["gender"] is str
-    assert DynamicModel.__annotations__["bio"] is Optional[str]
+    assert DynamicModel.__annotations__["bio"] == str | None
     assert DynamicModel.__annotations__["country"] is str
-    assert DynamicModel.__annotations__["languages"] is Optional[list]
+    assert DynamicModel.__annotations__["languages"] == list | None
 
     # Test 3: Create a valid instance
-    valid_data: Dict[str, Any] = {
+    valid_data: dict[str, Any] = {
         "full_name": "John Doe",
         "age": 30,
         "subscribe": True,
@@ -421,9 +421,9 @@ def test_fields_annotations_dynamic_model() -> None:
     model_instance = DynamicModel(**valid_data)
 
     # Verify we can access the fields
-    assert getattr(model_instance, "full_name") == "John Doe"
-    assert getattr(model_instance, "age") == 30
-    assert getattr(model_instance, "languages") == ["en", "es"]
+    assert model_instance.full_name == "John Doe"
+    assert model_instance.age == 30
+    assert model_instance.languages == ["en", "es"]
 
     # Test 4: Validation errors for invalid types
     with pytest.raises(ValidationError):
@@ -913,6 +913,15 @@ def test_custom_method_key_validation_none_value() -> None:
     assert methods.custom is None
 
 
+def test_agent_methods_rejects_job_poll() -> None:
+    basic_method = AgentMethod(
+        name="test", method="test.method", description="Test method", is_async=False
+    )
+
+    with pytest.raises(ValidationError, match="job_poll was removed"):
+        AgentMethodsAbstract(job_start=basic_method, job_poll=basic_method)
+
+
 def test_custom_method_key_validation_empty_dict() -> None:
     """Test that validation passes when custom is an empty dict."""
 
@@ -930,137 +939,47 @@ def test_custom_method_key_validation_empty_dict() -> None:
     assert methods.custom == {}
 
 
-def test_agent_method_field_dynamic_choices():
-    """Test that AgentMethodField accepts dynamic_choices attribute."""
-    field = AgentMethodField(
-        name="List of projects",
-        type=str,
-        field_type="ChoiceField",
-        dynamic_choices="projects",
-        required=True,
-    )
-    assert field.dynamic_choices == "projects"
-    assert field.choices is None
-
-
-def test_agent_method_field_dynamic_choices_default_none():
-    """Test that dynamic_choices defaults to None."""
-    field = AgentMethodField(
-        name="color",
-        type=str,
-        field_type="ChoiceField",
-        choices=[("R", "Red"), ("B", "Blue")],
-        required=True,
-    )
-    assert field.dynamic_choices is None
-
-
-def test_agent_method_field_dynamic_choices_mutual_exclusion():
-    """Test that choices and dynamic_choices cannot both be set."""
+def test_agent_method_field_rejects_dynamic_choices() -> None:
+    """Supervaizer v2 routes dynamic options through resources/actions, not v1 callbacks."""
     from pydantic import ValidationError
 
-    with pytest.raises(ValidationError, match="mutually exclusive"):
+    with pytest.raises(ValidationError, match="dynamic_choices was removed"):
         AgentMethodField(
             name="List of projects",
             type=str,
             field_type="ChoiceField",
-            choices=[("A", "Option A")],
             dynamic_choices="projects",
             required=True,
         )
 
 
-def test_agent_method_fields_definitions_includes_dynamic_choices():
-    """Test that fields_definitions includes dynamic_choices in the output."""
-    method = AgentMethod(
-        name="start",
-        method="my_module.start",
-        fields=[
-            AgentMethodField(
-                name="Project",
-                type=str,
-                field_type="ChoiceField",
-                dynamic_choices="projects",
-                required=True,
-            ),
-        ],
-        description="Start",
-    )
-    definitions = method.fields_definitions
-    assert len(definitions) == 1
-    assert definitions[0]["dynamic_choices"] == "projects"
-    assert definitions[0]["choices"] is None
+def test_agent_method_rejects_blocked_module_roots() -> None:
+    with pytest.raises(ValidationError, match="blocked module root 'os'"):
+        AgentMethod(name="danger", method="os.system")
 
 
-def test_agent_method_registration_info_includes_dynamic_choices():
-    """Test that registration_info propagates dynamic_choices through fields."""
-    method = AgentMethod(
-        name="start",
-        method="my_module.start",
-        fields=[
-            AgentMethodField(
-                name="Project",
-                type=str,
-                field_type="ChoiceField",
-                dynamic_choices="projects",
-                required=True,
-            ),
-        ],
-        description="Start",
-    )
-    info = method.registration_info
-    assert info["fields"][0]["dynamic_choices"] == "projects"
+def test_agent_execute_rejects_undeclared_method_path(agent_fixture: Agent) -> None:
+    with pytest.raises(ValueError, match="not declared on agent"):
+        agent_fixture._execute("tests.fake_agent.start", {})
 
 
-def test_agent_with_dynamic_choices_callback(agent_method_fixture: AgentMethod):
-    """Test that Agent accepts a dynamic_choices_callback callable."""
-
-    def my_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        return {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
-
-    agent = Agent(
-        name="dynamicAgent",
-        author="test",
-        version="1.0",
-        description="test agent",
-        methods=AgentMethods(job_start=agent_method_fixture),
-        dynamic_choices_callback=my_dynamic_choices,
-    )
-    assert agent.dynamic_choices_callback is not None
-    result = agent.dynamic_choices_callback("start", {})
-    assert result == {"projects": [("P1", "Project 1"), ("P2", "Project 2")]}
+def test_agent_rejects_dynamic_choices_callback(
+    agent_method_fixture: AgentMethod,
+) -> None:
+    """Removed v1 dynamic callbacks fail fast instead of being ignored."""
+    with pytest.raises(ValueError, match="dynamic_choices_callback was removed"):
+        Agent(
+            name="dynamicAgent",
+            author="test",
+            version="1.0",
+            description="test agent",
+            methods=AgentMethods(job_start=agent_method_fixture),
+            dynamic_choices_callback=lambda _method_name, _context: {},
+        )
 
 
-def test_agent_without_dynamic_choices_callback(agent_method_fixture: AgentMethod):
-    """Test that dynamic_choices_callback defaults to None."""
-    agent = Agent(
-        name="staticAgent",
-        author="test",
-        version="1.0",
-        description="test agent",
-        methods=AgentMethods(job_start=agent_method_fixture),
-    )
-    assert agent.dynamic_choices_callback is None
-
-
-def test_agent_method_field_dynamic_choices_in_model_dump():
-    """Test that dynamic_choices appears in model_dump output."""
-    field = AgentMethodField(
-        name="Project",
-        type=str,
-        field_type="ChoiceField",
-        dynamic_choices="projects",
-        required=True,
-    )
-    dumped = field.model_dump()
-    assert dumped["dynamic_choices"] == "projects"
-    assert dumped["choices"] is None
-
-
-def test_agent_method_field_static_choices_no_dynamic():
-    """Test that static choices field has dynamic_choices=None in model_dump."""
+def test_agent_method_field_static_choices_model_dump_has_no_dynamic_key() -> None:
+    """Static choices remain supported by the v1 field model."""
     field = AgentMethodField(
         name="Color",
         type=str,
@@ -1069,25 +988,12 @@ def test_agent_method_field_static_choices_no_dynamic():
         required=True,
     )
     dumped = field.model_dump()
-    assert dumped["dynamic_choices"] is None
+    assert "dynamic_choices" not in dumped
     assert dumped["choices"] == [("R", "Red"), ("B", "Blue")]
 
 
-def test_agent_method_field_optional_choice_field_with_dynamic_choices():
-    """Test that dynamic_choices can be set on an optional (required=False) ChoiceField."""
-    field = AgentMethodField(
-        name="Items",
-        type=str,
-        field_type="ChoiceField",
-        dynamic_choices="items",
-        required=False,
-    )
-    assert field.dynamic_choices == "items"
-    assert field.field_type == "ChoiceField"
-
-
-def test_agent_method_mixed_static_and_dynamic_fields():
-    """Test a method with both static and dynamic choice fields."""
+def test_agent_method_fields_definitions_exclude_dynamic_choices() -> None:
+    """Registration metadata no longer advertises v1 dynamic option keys."""
     method = AgentMethod(
         name="start",
         method="my_module.start",
@@ -1097,13 +1003,6 @@ def test_agent_method_mixed_static_and_dynamic_fields():
                 type=str,
                 field_type="ChoiceField",
                 choices=[("A", "Alpha"), ("B", "Beta")],
-                required=True,
-            ),
-            AgentMethodField(
-                name="Project",
-                type=str,
-                field_type="ChoiceField",
-                dynamic_choices="projects",
                 required=True,
             ),
             AgentMethodField(
@@ -1117,64 +1016,7 @@ def test_agent_method_mixed_static_and_dynamic_fields():
     )
     defs = method.fields_definitions
     assert defs[0]["choices"] == [("A", "Alpha"), ("B", "Beta")]
-    assert defs[0]["dynamic_choices"] is None
-    assert defs[1]["choices"] is None
-    assert defs[1]["dynamic_choices"] == "projects"
-    assert defs[2]["dynamic_choices"] is None
-
-
-def test_agent_dynamic_choices_callback_dispatches_by_method_name(
-    agent_method_fixture: AgentMethod,
-):
-    """Test that the callback receives the method name and can return different results per method."""
-
-    def my_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        if method_name == "start":
-            return {"projects": [("P1", "Project 1")]}
-        return {}
-
-    agent = Agent(
-        name="emptyCallbackAgent",
-        author="test",
-        version="1.0",
-        description="test",
-        methods=AgentMethods(job_start=agent_method_fixture),
-        dynamic_choices_callback=my_dynamic_choices,
-    )
-    assert agent.dynamic_choices_callback("start", {}) == {
-        "projects": [("P1", "Project 1")]
-    }
-    assert agent.dynamic_choices_callback("unknown", {}) == {}
-
-
-def test_agent_dynamic_choices_callback_multiple_keys(
-    agent_method_fixture: AgentMethod,
-):
-    """Test callback returning multiple choice keys."""
-
-    def my_dynamic_choices(
-        method_name: str, context: dict
-    ) -> dict[str, list[tuple[str, str]]]:
-        return {
-            "projects": [("P1", "Project 1"), ("P2", "Project 2")],
-            "teams": [("T1", "Team Alpha"), ("T2", "Team Beta")],
-        }
-
-    agent = Agent(
-        name="multiKeyAgent",
-        author="test",
-        version="1.0",
-        description="test",
-        methods=AgentMethods(job_start=agent_method_fixture),
-        dynamic_choices_callback=my_dynamic_choices,
-    )
-    result = agent.dynamic_choices_callback("start", {})
-    assert "projects" in result
-    assert "teams" in result
-    assert len(result["projects"]) == 2
-    assert len(result["teams"]) == 2
+    assert all("dynamic_choices" not in field for field in defs)
 
 
 def test_agent_method_fields_definitions() -> None:
@@ -1247,7 +1089,7 @@ def test_agent_rejects_duplicate_data_resource_names() -> None:
     """Two DataResources with the same name on one agent are invalid."""
     from supervaizer.data_resource import DataResource
 
-    dup = DataResource(name="items", fields=[], on_list=lambda: [], read_only=True)
+    dup = DataResource(name="items", fields=[], on_list=list, read_only=True)
     with pytest.raises(ValueError, match="Duplicate DataResource name"):
         Agent(
             name="agentName",
@@ -1272,7 +1114,7 @@ def test_agent_registration_info_includes_data_resources() -> None:
             ),
             DataResourceField(name="email", field_type="email", required=True),
         ],
-        on_list=lambda: [],
+        on_list=list,
         on_create=lambda d: {**d, "id": "1"},
     )
     agent = Agent(
@@ -1305,3 +1147,100 @@ def test_agent_registration_info_includes_release_notes_url() -> None:
 
     assert info["version"] == "1.0.0"
     assert info["release_notes_url"] == "https://example.com/releases/1.0.0"
+
+
+def test_agent_registration_info_includes_supervaizer_v2_contract() -> None:
+    """Agent.registration_info includes the optional Supervaizer v2 contract."""
+    agent = Agent(
+        name="Agent Name",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+        },
+    )
+
+    info = agent.registration_info
+
+    assert info["supervaizer_v2"]["supervaizer_contract_version"] == 2
+    assert info["supervaizer_v2"]["versions"]["a2ui_version"] == "v0.8"
+
+
+def test_agent_accepts_v2_registration_with_matching_slug() -> None:
+    """Agent accepts a v2 registration whose declared slug matches its runtime slug."""
+    agent = Agent(
+        name="Agent Name",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+        },
+    )
+
+    assert agent.slug == "agent-name"
+    assert agent.supervaizer_v2_registration is not None
+    assert agent.supervaizer_v2_registration.agent.slug == "agent-name"
+
+
+def test_agent_rejects_v2_registration_with_mismatched_slug() -> None:
+    """Agent rejects a v2 registration whose declared slug differs from runtime slug."""
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Supervaizer v2 registration agent.slug must match Agent.slug: "
+            "'other-agent' != 'agent-name'"
+        ),
+    ):
+        Agent(
+            name="Agent Name",
+            author="authorName",
+            developer="Dev",
+            version="1.0.0",
+            description="description",
+            supervaizer_v2_registration={
+                "agent": {
+                    "id": "agent_name",
+                    "slug": "other-agent",
+                    "display_name": "Agent Name",
+                },
+                "versions": {
+                    "a2ui_version": "v0.8",
+                    "a2ui_catalog_version": "test.0",
+                    "a2a_version": "0.2.6",
+                },
+                "a2a": {
+                    "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                    "controller_url": "/a2a",
+                },
+            },
+        )

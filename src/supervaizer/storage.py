@@ -4,22 +4,12 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, You can obtain one at
-# https://mozilla.org/MPL/2.0/.
+from __future__ import annotations
 
 import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from tinydb import Query, TinyDB
 from tinydb.storages import MemoryStorage
@@ -65,7 +55,7 @@ class StorageManager:
     When SUPERVAIZER_PERSISTENCE is false (default), uses in-memory storage only.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """
         Initialize the storage manager.
 
@@ -96,7 +86,7 @@ class StorageManager:
         #    f"[StorageManager] 🗃️ Local DB initialized at {self.db_path.absolute()}"
         # )
 
-    def save_object(self, type: str, obj: Dict[str, Any]) -> None:
+    def save_object(self, type: str, obj: dict[str, Any]) -> None:
         """
         Save an object to the appropriate table.
 
@@ -119,7 +109,7 @@ class StorageManager:
 
             # log.debug(f"Saved object with ID: {type} {obj_id} - {obj}")
 
-    def get_objects(self, type: str) -> List[Dict[str, Any]]:
+    def get_objects(self, type: str) -> list[dict[str, Any]]:
         """
         Get all objects of a specific type.
 
@@ -134,7 +124,7 @@ class StorageManager:
             documents = table.all()
             return [dict(doc) for doc in documents]
 
-    def get_object_by_id(self, type: str, obj_id: str) -> Optional[Dict[str, Any]]:
+    def get_object_by_id(self, type: str, obj_id: str) -> dict[str, Any] | None:
         """
         Get a specific object by its ID.
 
@@ -183,7 +173,7 @@ class StorageManager:
 
             log.info("Storage reset - all tables cleared")
 
-    def get_cases_for_job(self, job_id: str) -> List[Dict[str, Any]]:
+    def get_cases_for_job(self, job_id: str) -> list[dict[str, Any]]:
         """
         Helper method to get all cases for a specific job.
 
@@ -223,7 +213,7 @@ class EntityRepository(Generic[T]):
     """
 
     def __init__(
-        self, entity_class: type[T], storage_manager: Optional[StorageManager] = None
+        self, entity_class: type[T], storage_manager: StorageManager | None = None
     ):
         """
         Initialize repository for a specific entity type.
@@ -236,7 +226,7 @@ class EntityRepository(Generic[T]):
         self.type_name = entity_class.__name__
         self.storage = storage_manager or StorageManager()
 
-    def get_by_id(self, entity_id: str) -> Optional[T]:
+    def get_by_id(self, entity_id: str) -> T | None:
         """
         Get an entity by its ID.
 
@@ -261,7 +251,7 @@ class EntityRepository(Generic[T]):
         data = self._to_dict(entity)
         self.storage.save_object(self.type_name, data)
 
-    def get_all(self) -> List[T]:
+    def get_all(self) -> list[T]:
         """
         Get all entities of this type.
 
@@ -283,7 +273,7 @@ class EntityRepository(Generic[T]):
         """
         return self.storage.delete_object(self.type_name, entity_id)
 
-    def _to_dict(self, entity: T) -> Dict[str, Any]:
+    def _to_dict(self, entity: T) -> dict[str, Any]:
         """Convert entity to dictionary using its to_dict property."""
         if hasattr(entity, "to_dict"):
             return dict(entity.to_dict)
@@ -295,7 +285,7 @@ class EntityRepository(Generic[T]):
                 if hasattr(entity, field)
             }
 
-    def _from_dict(self, data: Dict[str, Any]) -> T:
+    def _from_dict(self, data: dict[str, Any]) -> T:
         """
         Convert dictionary back to entity instance.
 
@@ -319,7 +309,7 @@ class PersistentEntityLifecycle:
 
     @staticmethod
     def transition(
-        entity: T, to_status: "EntityStatus", storage: Optional[StorageManager] = None
+        entity: T, to_status: "EntityStatus", storage: StorageManager | None = None
     ) -> tuple[bool, str]:
         """
         Transition an entity and automatically persist the change.
@@ -351,7 +341,7 @@ class PersistentEntityLifecycle:
 
     @staticmethod
     def handle_event(
-        entity: T, event: "EntityEvents", storage: Optional[StorageManager] = None
+        entity: T, event: "EntityEvents", storage: StorageManager | None = None
     ) -> tuple[bool, str]:
         """
         Handle an event and automatically persist the change.

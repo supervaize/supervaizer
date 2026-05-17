@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -21,7 +21,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.__version__ import VERSION
+from supervaizer.contracts import API_VERSION
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -35,7 +36,7 @@ _home_templates = Jinja2Templates(
 
 
 def create_public_router(
-    server: "Server", admin_interface: bool = True
+    server: Server, admin_interface: bool = True
 ) -> APIRouter:  # <-- ADDED
     """Build and return the public router wired to *server*.
 
@@ -43,7 +44,10 @@ def create_public_router(
     * ``GET /`` — home page
     * ``/.well-known/*`` — A2A discovery (no auth)
     """
-    from supervaizer.protocol.a2a.routes import create_routes as create_a2a_routes
+    from supervaizer.protocol.a2a.routes import (
+        create_controller_routes,
+        create_routes as create_a2a_routes,
+    )
 
     router = APIRouter(tags=["Public"])
 
@@ -67,5 +71,6 @@ def create_public_router(
 
     if server.a2a_endpoints:
         router.include_router(create_a2a_routes(server))
+        router.include_router(create_controller_routes(server))
 
     return router

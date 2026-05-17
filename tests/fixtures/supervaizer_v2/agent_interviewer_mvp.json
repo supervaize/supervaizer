@@ -1,0 +1,475 @@
+{
+  "registration": {
+    "supervaizer_contract_version": 2,
+    "agent": {
+      "id": "agent_interviewer",
+      "slug": "agent_interviewer",
+      "display_name": "Agent Interviewer"
+    },
+    "versions": {
+      "a2ui_version": "v0.8",
+      "a2ui_catalog_version": "supervaizer-v2-mvp.0",
+      "a2a_version": "0.2.6",
+      "ag_ui_version": null
+    },
+    "a2a": {
+      "agent_card_url": "https://agent.example.com/.well-known/agent-card.json",
+      "controller_url": "https://agent.example.com/a2a",
+        "transport": {
+          "json_rpc": true,
+          "sse": true,
+          "push_notifications": false
+        },
+      "external_interop": {
+        "inbound_tasks": false,
+        "outbound_delegation": false
+      }
+    },
+    "capabilities": {
+      "surfaces": [
+        "mission.agent.overview",
+        "mission.agent.resource.campaigns",
+        "mission.agent.resource.contacts",
+        "mission.agent.resource.prompts",
+        "mission.agent.resource.scenarios",
+        "mission.agent.resource.campaign_contacts",
+        "mission.agent.surface.contact_import",
+        "mission.agent.surface.prompt_editor",
+        "mission.agent.surface.scenario_builder",
+        "job.start",
+        "case.step.awaiting",
+        "case.step.detail",
+        "mission.analytics"
+      ],
+      "actions": [
+        "job.start.preview",
+        "job.start",
+        "job.stop",
+        "job.sync",
+        "campaigns.sync",
+        "artifact.get",
+        "resource.campaigns.list",
+        "resource.campaigns.create",
+        "resource.campaigns.update",
+        "resource.contacts.list",
+        "resource.contacts.create",
+        "resource.contacts.update",
+        "resource.contacts.import",
+        "resource.prompts.list",
+        "resource.prompts.update",
+        "resource.scenarios.list",
+        "resource.scenarios.update",
+        "resource.campaign_contacts.list",
+        "resource.campaign_contacts.create",
+        "resource.campaign_contacts.delete",
+        "dataset.campaign_progress.query",
+        "dataset.session_metrics.query",
+        "step.awaiting.submit"
+      ],
+      "case_lanes": [
+        {
+          "id": "setup",
+          "label": "Setup"
+        },
+        {
+          "id": "work",
+          "label": "Work",
+          "default": true
+        },
+        {
+          "id": "deliverable",
+          "label": "Deliverables"
+        }
+      ],
+      "artifact_types": [
+        {
+          "type": "agent_interviewer.transcript",
+          "label": "Transcript",
+          "renderer_surface": "case.step.detail"
+        },
+        {
+          "type": "agent_interviewer.synthesis",
+          "label": "Synthesis",
+          "renderer_surface": "case.step.detail"
+        }
+      ]
+    },
+    "job_policy": {
+      "default_timeout_seconds": 3600,
+      "offline_start_policy": "block",
+      "offline_running_policy": "fail_in_studio",
+      "sync": {
+        "action": "job.sync",
+        "supported_statuses": [
+          "active",
+          "awaiting",
+          "failed",
+          "completed"
+        ]
+      }
+    },
+    "resources": [
+      {
+        "id": "campaigns",
+        "label": "Campaigns",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update"
+        ],
+        "display": {
+          "title_field": "name",
+          "columns": [
+            "name",
+            "status",
+            "contact_count",
+            "updated_at"
+          ],
+          "search_fields": [
+            "name"
+          ]
+        },
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      {
+        "id": "contacts",
+        "label": "Contacts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update",
+          "import"
+        ],
+        "display": {
+          "title_field": "email",
+          "columns": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ],
+          "search_fields": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ]
+        },
+        "fields": [
+          {
+            "id": "first_name",
+            "label": "First name",
+            "type": "string"
+          },
+          {
+            "id": "last_name",
+            "label": "Last name",
+            "type": "string"
+          },
+          {
+            "id": "email",
+            "label": "Email",
+            "type": "email",
+            "required": true
+          }
+        ],
+        "mounted_views": [
+          {
+            "view": "import",
+            "surface": "mission.agent.surface.contact_import"
+          }
+        ]
+      },
+      {
+        "id": "prompts",
+        "label": "Prompts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "update"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "content",
+            "label": "Content",
+            "type": "text",
+            "required": true,
+            "multiline": true
+          }
+        ],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.prompt_editor"
+          }
+        ]
+      },
+      {
+        "id": "scenarios",
+        "label": "Scenarios",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "get",
+          "update"
+        ],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.scenario_builder"
+          }
+        ]
+      },
+      {
+        "id": "campaign_contacts",
+        "label": "Campaign Contacts",
+        "auto_surface": true,
+        "operations": [
+          "list",
+          "create",
+          "delete"
+        ],
+        "display": {
+          "title_field": "contact_id",
+          "columns": [
+            "contact_id",
+            "interview_status",
+            "is_inactive"
+          ],
+          "search_fields": [
+            "contact_id",
+            "interview_status"
+          ]
+        },
+        "fields": [
+          {
+            "id": "campaign_id",
+            "label": "Campaign",
+            "type": "resource_ref",
+            "required": true,
+            "options_source": {
+              "type": "resource",
+              "resource": "campaigns",
+              "value_field": "id",
+              "label_field": "name"
+            }
+          },
+          {
+            "id": "contact_id",
+            "label": "Contact",
+            "type": "resource_ref",
+            "required": true,
+            "options_source": {
+              "type": "resource",
+              "resource": "contacts",
+              "value_field": "id",
+              "label_field": "email"
+            }
+          }
+        ]
+      }
+    ],
+    "datasets": [
+      {
+        "id": "campaign_progress",
+        "label": "Campaign Progress",
+        "auto_surface": true
+      },
+      {
+        "id": "session_metrics",
+        "label": "Session Metrics",
+        "auto_surface": true
+      }
+    ]
+  },
+  "action_request": {
+    "request_id": "req_start_123",
+    "idempotency_key": "idem_start_campaign_123",
+    "actor": {
+      "user_id": "user_123"
+    },
+    "workspace": {
+      "id": "workspace_123",
+      "slug": "acme"
+    },
+    "mission_id": "mission_123",
+    "agent_slug": "agent_interviewer",
+    "draft_session_id": "draft_123",
+    "job_id": "job_123",
+    "surface": "job.start",
+    "action": "job.start",
+    "input": {
+      "campaign_id": "campaign_123"
+    }
+  },
+  "action_result": {
+    "status": "ok",
+    "effects": [
+      {
+        "type": "job.started",
+        "job_id": "job_123",
+        "external_ref": "campaign_123"
+      },
+      {
+        "type": "case.created",
+        "case": {
+          "id": "case_setup_123",
+          "external_id": "campaign_123:setup",
+          "job_id": "job_123",
+          "lane": "setup",
+          "title": "Campaign setup",
+          "status": "completed"
+        }
+      }
+    ]
+  },
+  "job_state": {
+    "job": {
+      "id": "job_123",
+      "agent_slug": "agent_interviewer",
+      "mission_id": "mission_123",
+      "status": "active",
+      "source": {
+        "type": "fresh_start",
+        "external_ref": "campaign_123",
+        "target_type": "campaign"
+      }
+    },
+    "cases": [
+      {
+        "id": "case_session_abc",
+        "external_id": "campaign_123:session:session_abc",
+        "lane": "work",
+        "title": "Interview session for alex@example.com",
+        "status": "awaiting",
+        "steps": [
+          {
+            "id": "step_session_review",
+            "external_id": "session_abc:human_review",
+            "activity": "operation",
+            "status": "awaiting",
+            "title": "Review session synthesis",
+            "awaiting": {
+              "reason": "human_input",
+              "surface": "case.step.awaiting",
+              "action": "step.awaiting.submit"
+            },
+            "outputs": [
+              {
+                "id": "artifact_transcript_session_abc",
+                "external_id": "session_abc:transcript",
+                "type": "agent_interviewer.transcript",
+                "title": "Transcript",
+                "media_type": "text/markdown"
+              },
+              {
+                "id": "artifact_synthesis_session_abc",
+                "external_id": "session_abc:synthesis",
+                "type": "agent_interviewer.synthesis",
+                "title": "Synthesis",
+                "media_type": "application/json"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sync_result": {
+    "status": "ok",
+    "external_ref": "campaign_123",
+    "external_version": "campaign_123:rev_42",
+    "sync_cursor": "rev_42",
+    "observed_at": "2026-05-15T10:00:00Z",
+    "job_state": {
+      "job": {
+        "id": "job_123",
+        "agent_slug": "agent_interviewer",
+        "mission_id": "mission_123",
+        "status": "active",
+        "source": {
+          "type": "fresh_start",
+          "external_ref": "campaign_123",
+          "target_type": "campaign"
+        }
+      },
+      "cases": [
+        {
+          "id": "case_session_abc",
+          "external_id": "campaign_123:session:session_abc",
+          "lane": "work",
+          "title": "Interview session for alex@example.com",
+          "status": "awaiting",
+          "steps": [
+            {
+              "id": "step_session_review",
+              "external_id": "session_abc:human_review",
+              "activity": "operation",
+              "status": "awaiting",
+              "title": "Review session synthesis",
+              "awaiting": {
+                "reason": "human_input",
+                "surface": "case.step.awaiting",
+                "action": "step.awaiting.submit"
+              },
+              "outputs": [
+                {
+                  "id": "artifact_transcript_session_abc",
+                  "external_id": "session_abc:transcript",
+                  "type": "agent_interviewer.transcript",
+                  "title": "Transcript",
+                  "media_type": "text/markdown"
+                },
+                {
+                  "id": "artifact_synthesis_session_abc",
+                  "external_id": "session_abc:synthesis",
+                  "type": "agent_interviewer.synthesis",
+                  "title": "Synthesis",
+                  "media_type": "application/json"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "effects": [
+      {
+        "type": "step.updated",
+        "step": {
+          "id": "step_session_review",
+          "external_id": "session_abc:human_review",
+          "status": "completed"
+        }
+      }
+    ],
+    "replay_safety": {
+      "dedupe_keys": [
+        "job_123",
+        "campaign_123",
+        "campaign_123:rev_42"
+      ],
+      "stable_external_ids_required": true,
+      "strictly_idempotent_response": false,
+      "convergent": true
+    }
+  }
+}

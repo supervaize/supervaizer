@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -16,6 +16,7 @@ Also exports get_default_local_agent() for Server to import when injecting Hello
 """
 
 import os
+from typing import Any
 
 import shortuuid
 
@@ -28,11 +29,78 @@ from supervaizer import (
     Server,
 )
 from supervaizer.agent import AgentMethodField
+from supervaizer.contracts import (
+    V2ResourceDefinition,
+    build_v2_agent_registration,
+)
+
+HELLO_WORLD_AGENT_NAME = "Hello World AI Agent"
+HELLO_WORLD_AGENT_SLUG = "hello-world-ai-agent"
+HELLO_WORLD_AGENT_VERSION = "1.0"
+HELLO_WORLD_A2UI_CATALOG_VERSION = "supervaizer-v2-local.0"
+
+
+def build_default_local_v2_registration(
+    *,
+    agent_slug: str = HELLO_WORLD_AGENT_SLUG,
+    agent_version: str = HELLO_WORLD_AGENT_VERSION,
+) -> dict[str, Any]:
+    """Return the minimal Supervaizer v2 contract for the built-in local agent."""
+    registration = build_v2_agent_registration(
+        agent_id=agent_slug,
+        agent_slug=agent_slug,
+        display_name=HELLO_WORLD_AGENT_NAME,
+        agent_card_url=f"/.well-known/agents/v{agent_version}/{agent_slug}_agent.json",
+        controller_url="/a2a",
+        a2ui_catalog_version=HELLO_WORLD_A2UI_CATALOG_VERSION,
+        surfaces=["job.start", "case.step.awaiting"],
+        actions=[
+            "job.start.preview",
+            "job.start",
+            "step.awaiting.submit",
+        ],
+        case_lanes=[{"id": "work", "label": "Work", "default": True}],
+        job_policy={"sync": {"action": "job.sync"}},
+        resources=[
+            V2ResourceDefinition(
+                id="hello_messages",
+                label="Hello Messages",
+                auto_surface=True,
+                operations=["list"],
+            )
+        ],
+    )
+    return registration.model_dump(mode="json")
+
+
+def register_default_local_v2_handlers(
+    server: Any,
+    *,
+    agent_slug: str = HELLO_WORLD_AGENT_SLUG,
+) -> None:
+    """Register minimal v2 handlers for the built-in local Hello World agent."""
+    from supervaizer.examples.hello_world_agent import (
+        handle_v2_action,
+        handle_v2_surface,
+    )
+
+    for surface in ("job.start", "case.step.awaiting"):
+        server.register_v2_surface(surface, handle_v2_surface, agent_slug=agent_slug)
+    server.register_v2_action(
+        "job.start.preview", handle_v2_action, agent_slug=agent_slug
+    )
+    for action in (
+        "job.start",
+        "job.sync",
+        "step.awaiting.submit",
+        "resource.hello_messages.list",
+    ):
+        server.register_v2_action(action, handle_v2_action, agent_slug=agent_slug)
 
 
 def get_default_local_agent() -> Agent:
     """Default Hello World agent for local test mode (mirrors supervaize_hello_world)."""
-    agent_name = "Hello World AI Agent"
+    agent_name = HELLO_WORLD_AGENT_NAME
     module = "supervaizer.examples.hello_world_agent"
 
     parameters = ParametersSetup.from_list([
@@ -98,7 +166,7 @@ def get_default_local_agent() -> Agent:
         name=agent_name,
         id=shortuuid.uuid(agent_name),
         author="Supervaizer (local test)",
-        version="1.0",
+        version=HELLO_WORLD_AGENT_VERSION,
         description="Built-in Hello World agent for local testing without Studio.",
         tags=["hello world", "ai agent", "local"],
         methods=AgentMethods(
@@ -108,6 +176,7 @@ def get_default_local_agent() -> Agent:
             human_answer=human_answer_method,
         ),
         parameters_setup=parameters,
+        supervaizer_v2_registration=build_default_local_v2_registration(),
     )
 
 

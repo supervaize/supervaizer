@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.13.0\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 0.20.1\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -16,19 +16,135 @@
     "version": "v1"
   },
   "paths": {
-    "/supervaizer/jobs/{job_id}": {
+    "/api/supervaizer/contract": {
+      "get": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Get Controller Contract",
+        "description": "Return the controller contract Studio should use for route resolution.",
+        "operationId": "get_controller_contract_api_supervaizer_contract_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Controller Contract Api Supervaizer Contract Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/supervaizer/registration/refresh": {
+      "post": {
+        "tags": [
+          "Supervision"
+        ],
+        "summary": "Refresh Controller Registration",
+        "description": "Accept a Studio request to re-send the canonical server.register event.",
+        "operationId": "refresh_controller_registration_api_supervaizer_registration_refresh_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RegistrationRefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Refresh Controller Registration Api Supervaizer Registration Refresh Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/supervaizer/jobs/{job_id}": {
       "get": {
         "tags": [
           "Supervision"
         ],
         "summary": "Get Job Status",
         "description": "Get the status of a job by its ID",
-        "operationId": "get_job_status_supervaizer_jobs__job_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_job_status_api_supervaizer_jobs__job_id__get",
         "parameters": [
           {
             "name": "job_id",
@@ -37,6 +153,22 @@
             "schema": {
               "type": "string",
               "title": "Job Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -64,19 +196,14 @@
         }
       }
     },
-    "/supervaizer/jobs": {
+    "/api/supervaizer/jobs": {
       "get": {
         "tags": [
           "Supervision"
         ],
         "summary": "Get All Jobs",
         "description": "Get all jobs across all agents with pagination and optional status filtering",
-        "operationId": "get_all_jobs_supervaizer_jobs_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_all_jobs_api_supervaizer_jobs_get",
         "parameters": [
           {
             "name": "skip",
@@ -122,6 +249,22 @@
               "title": "Status"
             },
             "description": "Filter jobs by status"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -137,7 +280,7 @@
                       "$ref": "#/components/schemas/JobResponse"
                     }
                   },
-                  "title": "Response Get All Jobs Supervaizer Jobs Get"
+                  "title": "Response Get All Jobs Api Supervaizer Jobs Get"
                 }
               }
             }
@@ -155,19 +298,14 @@
         }
       }
     },
-    "/supervaizer/jobs/{job_id}/cases/{case_id}/update": {
+    "/api/supervaizer/jobs/{job_id}/cases/{case_id}/update": {
       "post": {
         "tags": [
           "Supervision"
         ],
         "summary": "Update case with answer to question",
         "description": "Provide an answer to a question that was requested by a case step",
-        "operationId": "update_case_with_answer_supervaizer_jobs__job_id__cases__case_id__update_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "update_case_with_answer_api_supervaizer_jobs__job_id__cases__case_id__update_post",
         "parameters": [
           {
             "name": "job_id",
@@ -185,6 +323,22 @@
             "schema": {
               "type": "string",
               "title": "Case Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -208,7 +362,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response 200 Update Case With Answer Supervaizer Jobs  Job Id  Cases  Case Id  Update Post"
+                  "title": "Response 200 Update Case With Answer Api Supervaizer Jobs  Job Id  Cases  Case Id  Update Post"
                 }
               }
             }
@@ -256,14 +410,14 @@
         }
       }
     },
-    "/supervaizer/agents": {
+    "/api/supervaizer/agents": {
       "get": {
         "tags": [
           "Supervision"
         ],
         "summary": "Get All Agents",
         "description": "Get all registered agents with pagination",
-        "operationId": "get_all_agents_supervaizer_agents_get",
+        "operationId": "get_all_agents_api_supervaizer_agents_get",
         "parameters": [
           {
             "name": "skip",
@@ -291,6 +445,22 @@
               "title": "Limit"
             },
             "description": "Number of jobs to return"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -303,7 +473,7 @@
                   "items": {
                     "$ref": "#/components/schemas/AgentResponse"
                   },
-                  "title": "Response Get All Agents Supervaizer Agents Get"
+                  "title": "Response Get All Agents Api Supervaizer Agents Get"
                 }
               }
             }
@@ -321,14 +491,14 @@
         }
       }
     },
-    "/supervaizer/agent/{agent_id}": {
+    "/api/supervaizer/agent/{agent_id}": {
       "get": {
         "tags": [
           "Supervision"
         ],
         "summary": "Get Agent Details",
         "description": "Get details of a specific agent by ID",
-        "operationId": "get_agent_details_supervaizer_agent__agent_id__get",
+        "operationId": "get_agent_details_api_supervaizer_agent__agent_id__get",
         "parameters": [
           {
             "name": "agent_id",
@@ -338,6 +508,22 @@
               "type": "string",
               "title": "Agent Id"
             }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -364,14 +550,32 @@
         }
       }
     },
-    "/supervaizer/utils/public_key": {
+    "/api/supervaizer/utils/public_key": {
       "get": {
         "tags": [
           "Supervision"
         ],
         "summary": "Get server's public key",
         "description": "Returns the server's public key in PEM format",
-        "operationId": "get_public_key_supervaizer_utils_public_key_get",
+        "operationId": "get_public_key_api_supervaizer_utils_public_key_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -379,7 +583,17 @@
               "application/json": {
                 "schema": {
                   "type": "string",
-                  "title": "Response Get Public Key Supervaizer Utils Public Key Get"
+                  "title": "Response Get Public Key Api Supervaizer Utils Public Key Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -387,15 +601,34 @@
         }
       }
     },
-    "/supervaizer/utils/encrypt": {
+    "/api/supervaizer/utils/encrypt": {
       "post": {
         "tags": [
           "Supervision"
         ],
         "summary": "Encrypt a string",
         "description": "Encrypts a string using the server's public key. Example: {'key':'value'}",
-        "operationId": "encrypt_string_supervaizer_utils_encrypt_post",
+        "operationId": "encrypt_string_api_supervaizer_utils_encrypt_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -403,8 +636,7 @@
                 "title": "Text"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -413,7 +645,7 @@
               "application/json": {
                 "schema": {
                   "type": "string",
-                  "title": "Response Encrypt String Supervaizer Utils Encrypt Post"
+                  "title": "Response Encrypt String Api Supervaizer Utils Encrypt Post"
                 }
               }
             }
@@ -431,7 +663,7 @@
         }
       }
     },
-    "/supervaizer/agents/competitor-summary/": {
+    "/api/supervaizer/agents/competitor-summary/": {
       "get": {
         "tags": [
           "Supervision",
@@ -440,7 +672,25 @@
         ],
         "summary": "Get information about the agent competitor_summary",
         "description": "Detailed information about the agent, returned as a JSON object with Agent class fields",
-        "operationId": "agent_info_supervaizer_agents_competitor_summary__get",
+        "operationId": "agent_info_api_supervaizer_agents_competitor_summary__get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -451,16 +701,21 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/supervaize_instructions.html": {
+    "/api/supervaizer/agents/competitor-summary/supervaize_instructions.html": {
       "get": {
         "tags": [
           "Supervision",
@@ -469,7 +724,25 @@
         ],
         "summary": "Get supervaize instructions page for agent competitor_summary",
         "description": "HTML page displaying agent registration information and instructions",
-        "operationId": "supervaize_instructions_supervaizer_agents_competitor_summary_supervaize_instructions_html_get",
+        "operationId": "supervaize_instructions_api_supervaizer_agents_competitor_summary_supervaize_instructions_html_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -480,11 +753,21 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/supervaizer/agents/competitor-summary/validate-agent-parameters": {
+    "/api/supervaizer/agents/competitor-summary/validate-agent-parameters": {
       "post": {
         "tags": [
           "Supervision",
@@ -492,16 +775,34 @@
         ],
         "summary": "Validate agent parameters for agent: competitor_summary",
         "description": "Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
-        "operationId": "validate_agent_parameters_supervaizer_agents_competitor_summary_validate_agent_parameters_post",
+        "operationId": "validate_agent_parameters_api_supervaizer_agents_competitor_summary_validate_agent_parameters_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "title": "Body Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -509,34 +810,34 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 200 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                  "additionalProperties": true,
+                  "title": "Response 200 Validate Agent Parameters Api Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 400 Validate Agent Parameters Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                  "additionalProperties": true,
+                  "title": "Response 400 Validate Agent Parameters Api Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -548,15 +849,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/validate-method-fields": {
+    "/api/supervaizer/agents/competitor-summary/validate-method-fields": {
       "post": {
         "tags": [
           "Supervision",
@@ -564,16 +860,34 @@
         ],
         "summary": "Validate method fields for agent: competitor_summary",
         "description": "Validate job input fields against the method's field definitions before starting a job",
-        "operationId": "validate_method_fields_supervaizer_agents_competitor_summary_validate_method_fields_post",
+        "operationId": "validate_method_fields_api_supervaizer_agents_competitor_summary_validate_method_fields_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "title": "Body Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -581,34 +895,34 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 200 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                  "additionalProperties": true,
+                  "title": "Response 200 Validate Method Fields Api Supervaizer Agents Competitor Summary Validate Method Fields Post"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 400 Validate Method Fields Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                  "additionalProperties": true,
+                  "title": "Response 400 Validate Method Fields Api Supervaizer Agents Competitor Summary Validate Method Fields Post"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -620,85 +934,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/start/dynamic_choices": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Get dynamic choices for agent: competitor_summary start method",
-        "description": "Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context (including workspace slug) for contextualized choices.",
-        "operationId": "get_dynamic_choices_supervaizer_agents_competitor_summary_start_dynamic_choices_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "Body Params"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response 200 Get Dynamic Choices Supervaizer Agents Competitor Summary Start Dynamic Choices Post"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
-      }
-    },
-    "/supervaizer/agents/competitor-summary/jobs": {
+    "/api/supervaizer/agents/competitor-summary/jobs": {
       "post": {
         "tags": [
           "Supervision",
@@ -706,10 +945,23 @@
         ],
         "summary": "Start a job with agent: competitor_summary",
         "description": "Start the collection of new competitor summary",
-        "operationId": "start_job_supervaizer_agents_competitor_summary_jobs_post",
-        "security": [
+        "operationId": "start_job_api_supervaizer_agents_competitor_summary_jobs_post",
+        "parameters": [
           {
-            "APIKeyHeader": []
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "requestBody": {
@@ -739,7 +991,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 400 Start Job Supervaizer Agents Competitor Summary Jobs Post"
+                  "title": "Response 400 Start Job Api Supervaizer Agents Competitor Summary Jobs Post"
                 }
               }
             },
@@ -784,12 +1036,7 @@
         ],
         "summary": "Get all jobs for agent: competitor_summary",
         "description": "Get all jobs for this agent with pagination and optional status filtering",
-        "operationId": "get_agent_jobs_supervaizer_agents_competitor_summary_jobs_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_agent_jobs_api_supervaizer_agents_competitor_summary_jobs_get",
         "parameters": [
           {
             "name": "skip",
@@ -835,6 +1082,22 @@
               "title": "Status"
             },
             "description": "Filter jobs by status"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
           }
         ],
         "responses": {
@@ -847,7 +1110,7 @@
                   "items": {
                     "$ref": "#/components/schemas/JobResponse"
                   },
-                  "title": "Response 200 Get Agent Jobs Supervaizer Agents Competitor Summary Jobs Get"
+                  "title": "Response 200 Get Agent Jobs Api Supervaizer Agents Competitor Summary Jobs Get"
                 }
               }
             }
@@ -875,7 +1138,7 @@
         }
       }
     },
-    "/supervaizer/agents/competitor-summary/jobs/{job_id}": {
+    "/api/supervaizer/agents/competitor-summary/jobs/{job_id}": {
       "get": {
         "tags": [
           "Supervision",
@@ -883,12 +1146,7 @@
         ],
         "summary": "Get job status for agent: competitor_summary",
         "description": "Get the status and details of a specific job",
-        "operationId": "get_job_status_supervaizer_agents_competitor_summary_jobs__job_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_job_status_api_supervaizer_agents_competitor_summary_jobs__job_id__get",
         "parameters": [
           {
             "name": "job_id",
@@ -897,6 +1155,22 @@
             "schema": {
               "type": "string",
               "title": "Job Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
             }
           }
         ],
@@ -944,7 +1218,7 @@
         }
       }
     },
-    "/supervaizer/agents/competitor-summary/stop": {
+    "/api/supervaizer/agents/competitor-summary/stop": {
       "post": {
         "tags": [
           "Supervision",
@@ -952,18 +1226,36 @@
         ],
         "summary": "Stop the agent: competitor_summary",
         "description": "Stop the agent",
-        "operationId": "stop_agent_supervaizer_agents_competitor_summary_stop_post",
+        "operationId": "stop_agent_api_supervaizer_agents_competitor_summary_stop_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
                 "type": "object",
+                "additionalProperties": true,
                 "title": "Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -977,14 +1269,14 @@
             }
           },
           "202": {
-            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentResponse"
                 }
               }
-            }
+            },
+            "description": "Accepted"
           },
           "422": {
             "description": "Validation Error",
@@ -996,15 +1288,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/status": {
+    "/api/supervaizer/agents/competitor-summary/status": {
       "post": {
         "tags": [
           "Supervision",
@@ -1012,16 +1299,34 @@
         ],
         "summary": "Get the status of the agent: competitor_summary",
         "description": "Get the status of the agent",
-        "operationId": "status_agent_supervaizer_agents_competitor_summary_status_post",
+        "operationId": "status_agent_api_supervaizer_agents_competitor_summary_status_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AgentMethodParams"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -1035,34 +1340,34 @@
             }
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "404": {
-            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Not Found"
           },
           "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -1074,15 +1379,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/parameters": {
+    "/api/supervaizer/agents/competitor-summary/parameters": {
       "post": {
         "tags": [
           "Supervision",
@@ -1090,12 +1390,30 @@
         ],
         "summary": "Server updates agent: competitor_summary",
         "description": "Server updates agent onboarding status and/or encrypted parameters",
-        "operationId": "server_update_agent_supervaizer_agents_competitor_summary_parameters_post",
+        "operationId": "server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post"
+                "$ref": "#/components/schemas/Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post"
               }
             }
           }
@@ -1112,14 +1430,14 @@
             }
           },
           "500": {
-            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Internal Server Error"
           },
           "422": {
             "description": "Validation Error",
@@ -1131,15 +1449,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/custom/custom1": {
+    "/api/supervaizer/agents/competitor-summary/custom/custom1": {
       "post": {
         "tags": [
           "Supervision",
@@ -1147,16 +1460,34 @@
         ],
         "summary": "Trigger custom method 'custom1' for agent: competitor_summary",
         "description": "Custom method",
-        "operationId": "competitor_summary_custom_custom1_supervaizer_agents_competitor_summary_custom_custom1_post",
+        "operationId": "competitor_summary_custom_custom1_api_supervaizer_agents_competitor_summary_custom_custom1_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "title": "Body Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -1170,36 +1501,36 @@
             }
           },
           "202": {
-            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobResponse"
                 }
               }
-            }
+            },
+            "description": "Accepted"
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 400 Competitor Summary Custom Custom1 Supervaizer Agents Competitor Summary Custom Custom1 Post"
+                  "additionalProperties": true,
+                  "title": "Response 400 Competitor Summary Custom Custom1 Api Supervaizer Agents Competitor Summary Custom Custom1 Post"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "405": {
-            "description": "Method Not Allowed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Method Not Allowed"
           },
           "422": {
             "description": "Validation Error",
@@ -1211,15 +1542,10 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/supervaizer/agents/competitor-summary/custom/custom2": {
+    "/api/supervaizer/agents/competitor-summary/custom/custom2": {
       "post": {
         "tags": [
           "Supervision",
@@ -1227,16 +1553,34 @@
         ],
         "summary": "Trigger custom method 'custom2' for agent: competitor_summary",
         "description": "Custom method",
-        "operationId": "competitor_summary_custom_custom2_supervaizer_agents_competitor_summary_custom_custom2_post",
+        "operationId": "competitor_summary_custom_custom2_api_supervaizer_agents_competitor_summary_custom_custom2_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "title": "Body Params"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -1250,36 +1594,36 @@
             }
           },
           "202": {
-            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobResponse"
                 }
               }
-            }
+            },
+            "description": "Accepted"
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
-                  "title": "Response 400 Competitor Summary Custom Custom2 Supervaizer Agents Competitor Summary Custom Custom2 Post"
+                  "additionalProperties": true,
+                  "title": "Response 400 Competitor Summary Custom Custom2 Api Supervaizer Agents Competitor Summary Custom Custom2 Post"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "405": {
-            "description": "Method Not Allowed",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Method Not Allowed"
           },
           "422": {
             "description": "Validation Error",
@@ -1291,17 +1635,34 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Home Page",
+        "operationId": "home_page__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
-        ]
+        }
       }
     },
     "/.well-known/agents.json": {
       "get": {
         "tags": [
+          "Public",
           "Protocol A2A"
         ],
         "summary": "A2A Agents Discovery",
@@ -1326,6 +1687,7 @@
     "/.well-known/health": {
       "get": {
         "tags": [
+          "Public",
           "Protocol A2A"
         ],
         "summary": "A2A Health Status",
@@ -1350,6 +1712,7 @@
     "/.well-known/agents/v1.3/competitor-summary_agent.json": {
       "get": {
         "tags": [
+          "Public",
           "Protocol A2A"
         ],
         "summary": "A2A Agent Card for competitor_summary (v1)",
@@ -1374,6 +1737,7 @@
     "/.well-known/agents/competitor-summary_agent.json": {
       "get": {
         "tags": [
+          "Public",
           "Protocol A2A"
         ],
         "summary": "A2A Agent Card for competitor_summary (Legacy)",
@@ -1395,14 +1759,82 @@
         }
       }
     },
-    "/admin/": {
+    "/a2a": {
+      "post": {
+        "tags": [
+          "Public",
+          "Protocol A2A"
+        ],
+        "summary": "A2A JSON-RPC Controller",
+        "description": "Dispatches Supervaizer v2 controller methods over A2A JSON-RPC.",
+        "operationId": "post_a2a_controller_a2a_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Post A2A Controller A2A Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/a2a/events": {
+      "get": {
+        "tags": [
+          "Public",
+          "Protocol A2A"
+        ],
+        "summary": "A2A SSE Event Stream",
+        "description": "Streams Supervaizer v2 controller effects over Server-Sent Events.",
+        "operationId": "get_a2a_events_a2a_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/manage/": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Dashboard",
         "description": "Admin dashboard page.",
-        "operationId": "admin_dashboard_admin__get",
+        "operationId": "admin_dashboard_manage__get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1417,14 +1849,14 @@
         }
       }
     },
-    "/admin/jobs": {
+    "/manage/jobs": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Jobs Page",
         "description": "Jobs management page.",
-        "operationId": "admin_jobs_page_admin_jobs_get",
+        "operationId": "admin_jobs_page_manage_jobs_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1439,14 +1871,14 @@
         }
       }
     },
-    "/admin/cases": {
+    "/manage/cases": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Cases Page",
         "description": "Cases management page.",
-        "operationId": "admin_cases_page_admin_cases_get",
+        "operationId": "admin_cases_page_manage_cases_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1461,14 +1893,14 @@
         }
       }
     },
-    "/admin/server": {
+    "/manage/server": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Server Page",
         "description": "Server status and configuration page.",
-        "operationId": "admin_server_page_admin_server_get",
+        "operationId": "admin_server_page_manage_server_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1483,14 +1915,14 @@
         }
       }
     },
-    "/admin/agents": {
+    "/manage/agents": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Agents Page",
         "description": "Agents management page.",
-        "operationId": "admin_agents_page_admin_agents_get",
+        "operationId": "admin_agents_page_manage_agents_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1505,14 +1937,14 @@
         }
       }
     },
-    "/admin/job-start-test": {
+    "/manage/job-start-test": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Job Start Test Page",
         "description": "Job start form test page.",
-        "operationId": "admin_job_start_test_page_admin_job_start_test_get",
+        "operationId": "admin_job_start_test_page_manage_job_start_test_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1527,14 +1959,14 @@
         }
       }
     },
-    "/admin/static/{file_path}": {
+    "/manage/static/{file_path}": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Serve Static",
         "description": "Serve static files from the admin static directory.",
-        "operationId": "serve_static_admin_static__file_path__get",
+        "operationId": "serve_static_manage_static__file_path__get",
         "parameters": [
           {
             "name": "file_path",
@@ -1568,14 +2000,14 @@
         }
       }
     },
-    "/admin/console": {
+    "/manage/console": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Admin Console Page",
-        "description": "Interactive console page - publicly accessible, authentication handled by frontend.",
-        "operationId": "admin_console_page_admin_console_get",
+        "description": "Interactive console page \u2014 access enforced by Tailscale at router level.",
+        "operationId": "admin_console_page_manage_console_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1590,14 +2022,14 @@
         }
       }
     },
-    "/admin/api/stats": {
+    "/manage/api/stats": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Stats",
         "description": "Get system statistics.",
-        "operationId": "get_stats_admin_api_stats_get",
+        "operationId": "get_stats_manage_api_stats_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1612,14 +2044,14 @@
         }
       }
     },
-    "/admin/api/server/status": {
+    "/manage/api/server/status": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Server Status Api",
         "description": "Get current server status for HTMX refresh.",
-        "operationId": "get_server_status_api_admin_api_server_status_get",
+        "operationId": "get_server_status_api_manage_api_server_status_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1632,14 +2064,14 @@
         }
       }
     },
-    "/admin/api/server/register": {
+    "/manage/api/server/register": {
       "post": {
         "tags": [
           "admin"
         ],
         "summary": "Register Server With Supervisor",
         "description": "Trigger SERVER_REGISTER to the supervaizer supervisor (no frontend API key; backend sends to SUPERVAIZE_API_URL).",
-        "operationId": "register_server_with_supervisor_admin_api_server_register_post",
+        "operationId": "register_server_with_supervisor_manage_api_server_register_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1652,14 +2084,14 @@
         }
       }
     },
-    "/admin/api/agents": {
+    "/manage/api/agents": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Agents Api",
         "description": "Get agents with filtering for HTMX refresh.",
-        "operationId": "get_agents_api_admin_api_agents_get",
+        "operationId": "get_agents_api_manage_api_agents_get",
         "parameters": [
           {
             "name": "status",
@@ -1742,14 +2174,14 @@
         }
       }
     },
-    "/admin/api/agents/{agent_slug}": {
+    "/manage/api/agents/{agent_slug}": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Agent Details",
         "description": "Get detailed agent information.",
-        "operationId": "get_agent_details_admin_api_agents__agent_slug__get",
+        "operationId": "get_agent_details_manage_api_agents__agent_slug__get",
         "parameters": [
           {
             "name": "agent_slug",
@@ -1783,14 +2215,14 @@
         }
       }
     },
-    "/admin/api/jobs": {
+    "/manage/api/jobs": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Jobs Api",
         "description": "Get jobs with filtering and pagination.",
-        "operationId": "get_jobs_api_admin_api_jobs_get",
+        "operationId": "get_jobs_api_manage_api_jobs_get",
         "parameters": [
           {
             "name": "status",
@@ -1895,14 +2327,14 @@
         }
       }
     },
-    "/admin/api/jobs/{job_id}": {
+    "/manage/api/jobs/{job_id}": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Job Details",
         "description": "Get detailed job information.",
-        "operationId": "get_job_details_admin_api_jobs__job_id__get",
+        "operationId": "get_job_details_manage_api_jobs__job_id__get",
         "parameters": [
           {
             "name": "job_id",
@@ -1941,7 +2373,7 @@
         ],
         "summary": "Delete Job",
         "description": "Delete a job and its related cases.",
-        "operationId": "delete_job_admin_api_jobs__job_id__delete",
+        "operationId": "delete_job_manage_api_jobs__job_id__delete",
         "parameters": [
           {
             "name": "job_id",
@@ -1963,7 +2395,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Delete Job Admin Api Jobs  Job Id  Delete"
+                  "title": "Response Delete Job Manage Api Jobs  Job Id  Delete"
                 }
               }
             }
@@ -1981,14 +2413,14 @@
         }
       }
     },
-    "/admin/api/cases": {
+    "/manage/api/cases": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Cases Api",
         "description": "Get cases with filtering and pagination.",
-        "operationId": "get_cases_api_admin_api_cases_get",
+        "operationId": "get_cases_api_manage_api_cases_get",
         "parameters": [
           {
             "name": "status",
@@ -2093,14 +2525,14 @@
         }
       }
     },
-    "/admin/api/cases/{case_id}": {
+    "/manage/api/cases/{case_id}": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Case Details",
         "description": "Get detailed case information.",
-        "operationId": "get_case_details_admin_api_cases__case_id__get",
+        "operationId": "get_case_details_manage_api_cases__case_id__get",
         "parameters": [
           {
             "name": "case_id",
@@ -2139,7 +2571,7 @@
         ],
         "summary": "Delete Case",
         "description": "Delete a case.",
-        "operationId": "delete_case_admin_api_cases__case_id__delete",
+        "operationId": "delete_case_manage_api_cases__case_id__delete",
         "parameters": [
           {
             "name": "case_id",
@@ -2161,7 +2593,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Delete Case Admin Api Cases  Case Id  Delete"
+                  "title": "Response Delete Case Manage Api Cases  Case Id  Delete"
                 }
               }
             }
@@ -2179,14 +2611,14 @@
         }
       }
     },
-    "/admin/api/jobs/{job_id}/status": {
+    "/manage/api/jobs/{job_id}/status": {
       "post": {
         "tags": [
           "admin"
         ],
         "summary": "Update Job Status",
         "description": "Update job status.",
-        "operationId": "update_job_status_admin_api_jobs__job_id__status_post",
+        "operationId": "update_job_status_manage_api_jobs__job_id__status_post",
         "parameters": [
           {
             "name": "job_id",
@@ -2222,7 +2654,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Update Job Status Admin Api Jobs  Job Id  Status Post"
+                  "title": "Response Update Job Status Manage Api Jobs  Job Id  Status Post"
                 }
               }
             }
@@ -2240,14 +2672,14 @@
         }
       }
     },
-    "/admin/api/cases/{case_id}/status": {
+    "/manage/api/cases/{case_id}/status": {
       "post": {
         "tags": [
           "admin"
         ],
         "summary": "Update Case Status",
         "description": "Update case status.",
-        "operationId": "update_case_status_admin_api_cases__case_id__status_post",
+        "operationId": "update_case_status_manage_api_cases__case_id__status_post",
         "parameters": [
           {
             "name": "case_id",
@@ -2283,7 +2715,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Update Case Status Admin Api Cases  Case Id  Status Post"
+                  "title": "Response Update Case Status Manage Api Cases  Case Id  Status Post"
                 }
               }
             }
@@ -2301,14 +2733,14 @@
         }
       }
     },
-    "/admin/api/recent-activity": {
+    "/manage/api/recent-activity": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Recent Activity",
         "description": "Get recent entity activity.",
-        "operationId": "get_recent_activity_admin_api_recent_activity_get",
+        "operationId": "get_recent_activity_manage_api_recent_activity_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2321,48 +2753,14 @@
         }
       }
     },
-    "/admin/log-stream": {
+    "/manage/log-stream": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Log Stream",
         "description": "Stream log messages via Server-Sent Events.",
-        "operationId": "log_stream_admin_log_stream_get",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
-          }
-        ],
+        "operationId": "log_stream_manage_log_stream_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2371,28 +2769,18 @@
                 "schema": {}
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
         }
       }
     },
-    "/admin/test-log": {
+    "/manage/test-log": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Test Log",
         "description": "Test endpoint to generate a log message.",
-        "operationId": "test_log_admin_test_log_get",
+        "operationId": "test_log_manage_test_log_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2403,7 +2791,7 @@
                     "type": "string"
                   },
                   "type": "object",
-                  "title": "Response Test Log Admin Test Log Get"
+                  "title": "Response Test Log Manage Test Log Get"
                 }
               }
             }
@@ -2411,38 +2799,14 @@
         }
       }
     },
-    "/admin/debug-tokens": {
-      "get": {
-        "tags": [
-          "admin"
-        ],
-        "summary": "Debug Tokens",
-        "description": "Debug endpoint to see current tokens.",
-        "operationId": "debug_tokens_admin_debug_tokens_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Debug Tokens Admin Debug Tokens Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/test-loguru": {
+    "/manage/test-loguru": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Test Loguru",
         "description": "Test endpoint to generate loguru messages.",
-        "operationId": "test_loguru_admin_test_loguru_get",
+        "operationId": "test_loguru_manage_test_loguru_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2453,7 +2817,7 @@
                     "type": "string"
                   },
                   "type": "object",
-                  "title": "Response Test Loguru Admin Test Loguru Get"
+                  "title": "Response Test Loguru Manage Test Loguru Get"
                 }
               }
             }
@@ -2461,14 +2825,14 @@
         }
       }
     },
-    "/admin/debug-queue": {
+    "/manage/debug-queue": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Debug Queue",
         "description": "Debug endpoint to check log queue status.",
-        "operationId": "debug_queue_admin_debug_queue_get",
+        "operationId": "debug_queue_manage_debug_queue_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2477,7 +2841,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Debug Queue Admin Debug Queue Get"
+                  "title": "Response Debug Queue Manage Debug Queue Get"
                 }
               }
             }
@@ -2485,45 +2849,27 @@
         }
       }
     },
-    "/admin/api/console/execute": {
+    "/manage/api/console/execute": {
       "post": {
         "tags": [
           "admin"
         ],
         "summary": "Execute Console Command",
-        "description": "Execute a console command and add output to log stream.",
-        "operationId": "execute_console_command_admin_api_console_execute_post",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Token"
-            }
-          }
-        ],
+        "description": "Execute a console command \u2014 access enforced by Tailscale at router level.",
+        "operationId": "execute_console_command_manage_api_console_execute_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "additionalProperties": {
                   "type": "string"
                 },
+                "type": "object",
                 "title": "Command Data"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2531,11 +2877,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Execute Console Command Admin Api Console Execute Post"
+                  "type": "object",
+                  "title": "Response Execute Console Command Manage Api Console Execute Post"
                 }
               }
             }
@@ -2553,7 +2899,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench": {
+    "/manage/agents/{slug}/workbench": {
       "get": {
         "tags": [
           "admin",
@@ -2561,12 +2907,7 @@
         ],
         "summary": "Workbench Page",
         "description": "Render the main workbench page.",
-        "operationId": "workbench_page_admin_agents__slug__workbench_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_page_manage_agents__slug__workbench_get",
         "parameters": [
           {
             "name": "slug",
@@ -2575,22 +2916,6 @@
             "schema": {
               "type": "string",
               "title": "Slug"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -2618,7 +2943,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/start": {
+    "/manage/agents/{slug}/workbench/start": {
       "post": {
         "tags": [
           "admin",
@@ -2626,12 +2951,7 @@
         ],
         "summary": "Workbench Start Job",
         "description": "Start a job from the workbench \u2014 no Studio communication.",
-        "operationId": "workbench_start_job_admin_agents__slug__workbench_start_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_start_job_manage_agents__slug__workbench_start_post",
         "parameters": [
           {
             "name": "slug",
@@ -2640,22 +2960,6 @@
             "schema": {
               "type": "string",
               "title": "Slug"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -2681,7 +2985,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}": {
       "get": {
         "tags": [
           "admin",
@@ -2689,12 +2993,7 @@
         ],
         "summary": "Workbench Job Monitor",
         "description": "HTMX partial \u2014 returns execution monitor HTML for polling.",
-        "operationId": "workbench_job_monitor_admin_agents__slug__workbench_jobs__job_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_job_monitor_manage_agents__slug__workbench_jobs__job_id__get",
         "parameters": [
           {
             "name": "slug",
@@ -2712,22 +3011,6 @@
             "schema": {
               "type": "string",
               "title": "Job Id"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -2755,7 +3038,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/stop": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/stop": {
       "post": {
         "tags": [
           "admin",
@@ -2763,12 +3046,7 @@
         ],
         "summary": "Workbench Stop Job",
         "description": "Stop a running job.",
-        "operationId": "workbench_stop_job_admin_agents__slug__workbench_jobs__job_id__stop_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_stop_job_manage_agents__slug__workbench_jobs__job_id__stop_post",
         "parameters": [
           {
             "name": "slug",
@@ -2786,22 +3064,6 @@
             "schema": {
               "type": "string",
               "title": "Job Id"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -2827,79 +3089,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/poll": {
-      "post": {
-        "tags": [
-          "admin",
-          "workbench"
-        ],
-        "summary": "Workbench Poll Job",
-        "description": "Trigger manual poll for external updates on a job.",
-        "operationId": "workbench_poll_job_admin_agents__slug__workbench_jobs__job_id__poll_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          },
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/status": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/status": {
       "get": {
         "tags": [
           "admin",
@@ -2907,12 +3097,7 @@
         ],
         "summary": "Workbench Job Status",
         "description": "Get job status via agent's job_status method.",
-        "operationId": "workbench_job_status_admin_agents__slug__workbench_jobs__job_id__status_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_job_status_manage_agents__slug__workbench_jobs__job_id__status_get",
         "parameters": [
           {
             "name": "slug",
@@ -2930,22 +3115,6 @@
             "schema": {
               "type": "string",
               "title": "Job Id"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -2971,7 +3140,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/cases/{case_id}/answer": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/cases/{case_id}/answer": {
       "post": {
         "tags": [
           "admin",
@@ -2979,12 +3148,7 @@
         ],
         "summary": "Workbench Answer Hitl",
         "description": "Submit HITL answer \u2014 two-step dispatch (receive + invoke human_answer).",
-        "operationId": "workbench_answer_hitl_admin_agents__slug__workbench_jobs__job_id__cases__case_id__answer_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_answer_hitl_manage_agents__slug__workbench_jobs__job_id__cases__case_id__answer_post",
         "parameters": [
           {
             "name": "slug",
@@ -3012,22 +3176,6 @@
               "type": "string",
               "title": "Case Id"
             }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
           }
         ],
         "responses": {
@@ -3052,7 +3200,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/execute": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/execute": {
       "post": {
         "tags": [
           "admin",
@@ -3060,12 +3208,7 @@
         ],
         "summary": "Workbench Execute Step",
         "description": "Execute a scheduled step immediately.",
-        "operationId": "workbench_execute_step_admin_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__execute_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_execute_step_manage_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__execute_post",
         "parameters": [
           {
             "name": "slug",
@@ -3102,22 +3245,6 @@
               "type": "integer",
               "title": "Step Index"
             }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
           }
         ],
         "responses": {
@@ -3142,7 +3269,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/cancel": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/cancel": {
       "post": {
         "tags": [
           "admin",
@@ -3150,12 +3277,7 @@
         ],
         "summary": "Workbench Cancel Step",
         "description": "Cancel a pending scheduled step.",
-        "operationId": "workbench_cancel_step_admin_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__cancel_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_cancel_step_manage_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__cancel_post",
         "parameters": [
           {
             "name": "slug",
@@ -3192,22 +3314,6 @@
               "type": "integer",
               "title": "Step Index"
             }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
           }
         ],
         "responses": {
@@ -3232,7 +3338,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/schedule": {
+    "/manage/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/schedule": {
       "patch": {
         "tags": [
           "admin",
@@ -3240,12 +3346,7 @@
         ],
         "summary": "Workbench Reschedule Step",
         "description": "Reschedule a pending scheduled step.",
-        "operationId": "workbench_reschedule_step_admin_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__schedule_patch",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_reschedule_step_manage_agents__slug__workbench_jobs__job_id__steps__case_id___step_index__schedule_patch",
         "parameters": [
           {
             "name": "slug",
@@ -3282,22 +3383,6 @@
               "type": "integer",
               "title": "Step Index"
             }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
-            }
           }
         ],
         "responses": {
@@ -3322,7 +3407,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/console": {
+    "/manage/agents/{slug}/workbench/console": {
       "get": {
         "tags": [
           "admin",
@@ -3330,12 +3415,7 @@
         ],
         "summary": "Workbench Console",
         "description": "HTMX partial \u2014 returns recent console log entries.",
-        "operationId": "workbench_console_admin_agents__slug__workbench_console_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_console_manage_agents__slug__workbench_console_get",
         "parameters": [
           {
             "name": "slug",
@@ -3344,22 +3424,6 @@
             "schema": {
               "type": "string",
               "title": "Slug"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -3387,7 +3451,7 @@
         }
       }
     },
-    "/admin/agents/{slug}/workbench/jobs": {
+    "/manage/agents/{slug}/workbench/jobs": {
       "get": {
         "tags": [
           "admin",
@@ -3395,12 +3459,7 @@
         ],
         "summary": "Workbench Jobs List",
         "description": "HTMX partial \u2014 returns job history list.",
-        "operationId": "workbench_jobs_list_admin_agents__slug__workbench_jobs_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "workbench_jobs_list_manage_agents__slug__workbench_jobs_get",
         "parameters": [
           {
             "name": "slug",
@@ -3409,22 +3468,6 @@
             "schema": {
               "type": "string",
               "title": "Slug"
-            }
-          },
-          {
-            "name": "key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Key"
             }
           }
         ],
@@ -3445,24 +3488,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/": {
-      "get": {
-        "summary": "Home Page",
-        "operationId": "home_page__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
                 }
               }
             }
@@ -3560,6 +3585,19 @@
             "title": "Is Async",
             "description": "Whether the method is asynchronous",
             "default": false
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout",
+            "description": "Maximum automatic job duration in seconds. Use None for jobs that must run until Studio stops them manually.",
+            "default": 600
           },
           "nodes": {
             "anyOf": [
@@ -3668,18 +3706,6 @@
             "title": "Required",
             "description": "Whether field is required for form submission",
             "default": false
-          },
-          "dynamic_choices": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dynamic Choices",
-            "description": "Key name for dynamic choices resolved at runtime via Agent.dynamic_choices_callback. Mutually exclusive with 'choices'."
           }
         },
         "type": "object",
@@ -3749,16 +3775,6 @@
             ]
           },
           "job_status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AgentMethod"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "job_poll": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AgentMethod"
@@ -3867,6 +3883,17 @@
             "type": "string",
             "title": "Version"
           },
+          "release_notes_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Notes Url"
+          },
           "api_path": {
             "type": "string",
             "title": "Api Path"
@@ -3970,7 +3997,7 @@
         "title": "AgentResponse",
         "description": "Response model for agent endpoints - values provided by Agent.registration_info"
       },
-      "Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post": {
+      "Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post": {
         "properties": {
           "onboarding_status": {
             "anyOf": [
@@ -3996,7 +4023,7 @@
           }
         },
         "type": "object",
-        "title": "Body_server_update_agent_supervaizer_agents_competitor_summary_parameters_post"
+        "title": "Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post"
       },
       "CaseNode": {
         "properties": {
@@ -4125,7 +4152,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-04-09T00:25:26.894055"
+            "default": "2026-05-15T20:25:32.352375"
           },
           "status_code": {
             "type": "integer",
@@ -4285,6 +4312,12 @@
             "type": "array",
             "title": "Case Ids",
             "default": []
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Agent-provided domain metadata (e.g. campaign context)"
           }
         },
         "type": "object",
@@ -4466,6 +4499,35 @@
         ],
         "title": "JobResponse"
       },
+      "RegistrationRefreshRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          }
+        },
+        "type": "object",
+        "title": "RegistrationRefreshRequest",
+        "description": "Request model for re-sending the server registration event."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -4505,13 +4567,6 @@
           "type"
         ],
         "title": "ValidationError"
-      }
-    },
-    "securitySchemes": {
-      "APIKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-API-Key"
       }
     }
   }

@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -15,11 +15,38 @@ import pytest
 from fastapi.testclient import TestClient
 
 from supervaizer import Agent, Server
+from supervaizer.access import API_KEYS
+from supervaizer.contracts import (
+    V2ActionRequest,
+    V2ActionResult,
+    V2Effect,
+    V2SurfaceRequest,
+)
 from supervaizer.protocol.a2a import (
     create_agent_card,
     create_agents_list,
     create_health_data,
 )
+from supervaizer.protocol.a2a.model import _agent_health_status
+from supervaizer.protocol.a2a.controller import (
+    JSON_RPC_ACTION_NOT_REGISTERED,
+    JSON_RPC_INTERNAL_ERROR,
+    JSON_RPC_METHOD_NOT_FOUND,
+    JSON_RPC_SURFACE_NOT_REGISTERED,
+    SUPERVAIZER_ACTION_INVOKE_METHOD,
+    SUPERVAIZER_SURFACE_LOAD_METHOD,
+    register_v2_action_handler,
+    register_v2_surface_handler,
+)
+from supervaizer.protocol.a2a.events import (
+    A2A_EFFECT_EVENT,
+    subscribe_v2_events,
+    unsubscribe_v2_events,
+)
+
+
+def _a2a_write_headers(server: Server) -> dict[str, str]:
+    return {"X-API-Key": server.api_key or ""}
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:
@@ -84,6 +111,37 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert "changelog_url" in card["version_info"]
 
 
+def test_create_agent_card_includes_supervaizer_v2_extension() -> None:
+    agent = Agent(
+        name="Agent Name",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+        },
+    )
+
+    card = create_agent_card(agent, "https://agent.example.com")
+
+    assert card["supervaizer"]["v2"]["supervaizer_contract_version"] == 2
+    assert card["supervaizer"]["v2"]["a2a"]["controller_url"] == "/a2a"
+
+
 def test_create_agents_list(agent_fixture: Agent) -> None:
     """Test the create_agents_list function."""
     base_url = "http://test.example.com"
@@ -107,6 +165,33 @@ def test_create_agents_list(agent_fixture: Agent) -> None:
     assert (
         agent_entry["agent_card_url"]
         == f"{base_url}/.well-known/agents/v{agent_fixture.version}/{agent_fixture.slug}_agent.json"
+    )
+
+
+@pytest.mark.parametrize(
+    ("total_jobs", "failed_jobs", "in_progress_jobs", "expected"),
+    [
+        (0, 0, 0, "available"),
+        (1, 1, 0, "unavailable"),
+        (2, 1, 0, "available"),
+        (3, 2, 0, "degraded"),
+        (3, 3, 0, "unavailable"),
+        (2, 0, 1, "busy"),
+    ],
+)
+def test_agent_health_status(
+    total_jobs: int,
+    failed_jobs: int,
+    in_progress_jobs: int,
+    expected: str,
+) -> None:
+    assert (
+        _agent_health_status(
+            total_jobs=total_jobs,
+            failed_jobs=failed_jobs,
+            in_progress_jobs=in_progress_jobs,
+        )
+        == expected
     )
 
 
@@ -171,6 +256,476 @@ def test_a2a_route_endpoints(server_fixture: Server) -> None:
     # Test 404 for non-existent agent
     response = client.get("/.well-known/agents/nonexistent_agent.json")
     assert response.status_code == 404
+
+
+def test_a2a_controller_rejects_unknown_method(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={"jsonrpc": "2.0", "id": "rpc-1", "method": "missing.method"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-1"
+    assert payload["error"]["code"] == JSON_RPC_METHOD_NOT_FOUND
+
+
+def test_a2a_controller_rejects_unregistered_v2_action(
+    server_fixture: Server,
+) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-2",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-2"
+    assert payload["error"]["code"] == JSON_RPC_ACTION_NOT_REGISTERED
+    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
+    assert payload["error"]["data"]["action"] == "job.start"
+
+
+def test_a2a_controller_rejects_unregistered_v2_surface(
+    server_fixture: Server,
+) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-1",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-1"
+    assert payload["error"]["code"] == JSON_RPC_SURFACE_NOT_REGISTERED
+    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
+    assert payload["error"]["data"]["surface"] == "job.start"
+
+
+def test_a2a_events_requires_authentication(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.get("/a2a/events")
+
+    assert response.status_code == 401
+
+
+def test_a2a_discovery_and_health_remain_public(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    discovery_response = client.get("/.well-known/agents.json")
+    health_response = client.get("/.well-known/health")
+
+    assert discovery_response.status_code == 200
+    assert health_response.status_code == 200
+
+
+def test_a2a_controller_requires_authentication(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        json={"jsonrpc": "2.0", "id": "rpc-auth", "method": "missing.method"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_a2a_controller_requires_write_scope(server_fixture: Server) -> None:
+    client = TestClient(server_fixture.app)
+    API_KEYS["a2a-read-key"] = {"scope": "read"}
+    try:
+        response = client.post(
+            "/a2a",
+            headers={"X-API-Key": "a2a-read-key"},
+            json={"jsonrpc": "2.0", "id": "rpc-read", "method": "missing.method"},
+        )
+    finally:
+        API_KEYS.pop("a2a-read-key", None)
+
+    assert response.status_code == 403
+
+
+def test_a2a_events_remains_read_scoped(server_fixture: Server) -> None:
+    route = next(
+        route
+        for route in server_fixture.app.routes
+        if getattr(route, "path", None) == "/a2a/events"
+    )
+    dependency = route.dependant.dependencies[0].call
+    closure_values = [
+        cell.cell_contents for cell in getattr(dependency, "__closure__", None) or ()
+    ]
+
+    assert "read" in closure_values
+
+
+def test_a2a_controller_dispatches_registered_v2_action(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.action == "job.start"
+        return V2ActionResult(
+            status="ok",
+            effects=[V2Effect(type="job.created", job_id="job-123")],
+        )
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-3",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-3"
+    assert payload["result"]["status"] == "ok"
+    assert payload["result"]["effects"] == [
+        {"type": "job.created", "job_id": "job-123"}
+    ]
+
+
+def test_a2a_controller_serializes_v2_action_replay_safety(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def sync_job(_request: V2ActionRequest) -> dict[str, object]:
+        return {
+            "status": "ok",
+            "replay_safety": {
+                "dedupe_keys": ["job-123", "rev-1"],
+                "convergent": True,
+                "strictly_idempotent_response": False,
+            },
+        }
+
+    register_v2_action_handler(server_fixture, "job.sync", sync_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-replay-safety-1",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.sync", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["replay_safety"] == {
+        "dedupe_keys": ["job-123", "rev-1"],
+        "stable_external_ids_required": True,
+        "strictly_idempotent_response": False,
+        "convergent": True,
+    }
+
+
+def test_a2a_controller_action_errors_do_not_leak_exception_details(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        raise RuntimeError("database password secret-value leaked")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-error-1",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["error"]["code"] == JSON_RPC_INTERNAL_ERROR
+    assert payload["error"]["data"] == {
+        "agent_slug": agent_slug,
+        "action": "job.start",
+    }
+    assert "secret-value" not in response.text
+
+
+def test_a2a_controller_publishes_v2_action_effects(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+    queue = subscribe_v2_events(server_fixture)
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        return V2ActionResult(
+            status="ok",
+            effects=[V2Effect(type="job.started", job_id="job-123")],
+        )
+
+    try:
+        register_v2_action_handler(server_fixture, "job.start", start_job)
+        client = TestClient(server_fixture.app)
+
+        response = client.post(
+            "/a2a",
+            headers=_a2a_write_headers(server_fixture),
+            json={
+                "jsonrpc": "2.0",
+                "id": "rpc-event-1",
+                "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+                "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+            },
+        )
+
+        assert response.status_code == 200
+        event = queue.get_nowait()
+        assert event["event"] == A2A_EFFECT_EVENT
+        assert event["data"] == {
+            "agent_slug": agent_slug,
+            "action": "job.start",
+            "request_id": "request-1",
+            "effects": [{"type": "job.started", "job_id": "job-123"}],
+        }
+    finally:
+        unsubscribe_v2_events(server_fixture, queue)
+
+
+def test_a2a_controller_dispatches_registered_v2_surface(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.surface == "job.start"
+        return {
+            "surface": "job.start",
+            "a2ui_version": "v0.8",
+            "document": {"type": "Form", "fields": []},
+        }
+
+    register_v2_surface_handler(server_fixture, "job.start", load_job_start)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-2",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-2"
+    assert payload["result"] == {
+        "surface": "job.start",
+        "a2ui_version": "v0.8",
+        "a2ui_catalog_version": None,
+        "document": {"type": "Form", "fields": []},
+    }
+
+
+def test_server_v2_action_decorator_registers_handler(server_fixture: Server) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    @server_fixture.v2_action("job.start.preview")
+    def preview_job_start(request: V2ActionRequest) -> dict[str, object]:
+        assert request.action == "job.start.preview"
+        return {"status": "ok", "effects": [{"type": "job.start.previewed"}]}
+
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-4",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(
+                action="job.start.preview", agent_slug=agent_slug
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-4"
+    assert payload["result"] == {
+        "status": "ok",
+        "effects": [{"type": "job.start.previewed"}],
+    }
+
+
+def test_server_v2_surface_decorator_registers_handler(server_fixture: Server) -> None:
+    agent_slug = server_fixture.agents[0].slug
+
+    @server_fixture.v2_surface("job.start")
+    def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.surface == "job.start"
+        return {
+            "surface": "job.start",
+            "document": {"type": "Form", "submit": {"action": "job.start"}},
+        }
+
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-surface-3",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == "rpc-surface-3"
+    assert payload["result"]["surface"] == "job.start"
+    assert payload["result"]["document"]["submit"] == {"action": "job.start"}
+
+
+def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> None:
+    first_slug = server_fixture.agents[0].slug
+    second_agent = Agent(
+        name="Second Agent",
+        author="authorName",
+        developer="Dev",
+        version="1.0.0",
+        description="description",
+    )
+    server_fixture.agents.append(second_agent)
+
+    register_v2_action_handler(
+        server_fixture,
+        "job.start",
+        lambda _request: {"status": "ok", "effects": [{"type": "first-agent"}]},
+        agent_slug=first_slug,
+    )
+    register_v2_action_handler(
+        server_fixture,
+        "job.start",
+        lambda _request: {"status": "ok", "effects": [{"type": "second-agent"}]},
+        agent_slug=second_agent.slug,
+    )
+    client = TestClient(server_fixture.app)
+
+    first_response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-5",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=first_slug),
+        },
+    )
+    second_response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-6",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(
+                action="job.start", agent_slug=second_agent.slug
+            ),
+        },
+    )
+
+    assert first_response.json()["result"]["effects"] == [{"type": "first-agent"}]
+    assert second_response.json()["result"]["effects"] == [{"type": "second-agent"}]
+
+
+def test_v2_action_registration_requires_agent_slug_for_multi_agent_server(
+    server_fixture: Server,
+) -> None:
+    server_fixture.agents.append(
+        Agent(
+            name="Second Agent",
+            author="authorName",
+            developer="Dev",
+            version="1.0.0",
+            description="description",
+        )
+    )
+
+    with pytest.raises(ValueError, match="agent_slug is required"):
+        server_fixture.register_v2_action(
+            "job.start",
+            lambda _request: V2ActionResult(status="ok"),
+        )
+
+
+def _v2_action_payload(
+    action: str, agent_slug: str = "agent-interviewer"
+) -> dict[str, object]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": agent_slug,
+        "surface": "job.start",
+        "action": action,
+        "input": {"campaign_id": "campaign-1"},
+        "draft_session_id": "draft-1",
+    }
+
+
+def _v2_surface_payload(
+    surface: str, agent_slug: str = "agent-interviewer"
+) -> dict[str, object]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": agent_slug,
+        "surface": surface,
+        "input": {"campaign_id": "campaign-1"},
+        "draft_session_id": "draft-1",
+    }
 
 
 def test_a2a_schema_conformance(agent_fixture: Agent) -> None:

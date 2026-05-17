@@ -5,7 +5,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -23,8 +23,10 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = ROOT / "src" / "supervaizer" / "__version__.py"
 PYPROJECT = ROOT / "pyproject.toml"
 
-VERSION_LINE_RE = re.compile(r'^(VERSION\s*=\s*")([^"]+)(")', re.M)
-CURRENT_VERSION_LINE_RE = re.compile(r'^(current_version\s*=\s*")([^"]+)(")', re.M)
+VERSION_LINE_RE = re.compile(r'^(VERSION\s*=\s*")([^"]+)(")', re.MULTILINE)
+CURRENT_VERSION_LINE_RE = re.compile(
+    r'^(current_version\s*=\s*")([^"]+)(")', re.MULTILINE
+)
 
 RELEASE_RE = re.compile(r"^\d+\.\d+\.\d+$")
 DEV_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)\.dev(\d+)$")
