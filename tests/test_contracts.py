@@ -28,6 +28,7 @@ from supervaizer.contracts import (
     V2ActionRequest,
     V2ActionResult,
     V2AwaitingState,
+    V2CaseSnapshot,
     V2DashboardWidgetDataRef,
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
@@ -135,6 +136,17 @@ def test_v2_effect_has_typed_common_fields() -> None:
         "gaps": [],
         "summary": {"enrollments_created": 1},
         "case": {"lane": "setup", "title": "User enrollment"},
+    }
+
+
+def test_v2_case_snapshot_accepts_public_metadata() -> None:
+    case = V2CaseSnapshot(
+        id="enrollment-1",
+        metadata={"interview_url": "https://app.example.com/interview/tok-abc"},
+    )
+
+    assert case.metadata == {
+        "interview_url": "https://app.example.com/interview/tok-abc"
     }
 
 
