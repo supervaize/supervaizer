@@ -1,7 +1,7 @@
 # Supervaizer Changelog
 
 > **Created:** 2025-08-05
-> **Updated:** 2026-05-16
+> **Updated:** 2026-05-17
 
 All notable changes to this project will be documented in this file.
 
@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 ### Supervaizer v2 2️⃣
 
 - **Supervaizer v2 documentation** — Added `docs/2026_05_SUPERVAIZER_v2.md` and updated the README/protocol docs to explain the v2 A2A/A2UI layering, registration model, resources, datasets, surfaces, actions, HITL, artifacts, and `job.sync` convergence semantics.
+- **Supervaizer v2 README** — Reworked the repository README as a v2-first onboarding guide, linking to the protocol docs and Hello World example while removing the old v1 scaffold/job-field quick start path.
 - **Supervaizer v2 contract primitives** — Added typed SDK models for the v2 registration and action contract, including pinned A2UI/A2A versions, resources, datasets, case lanes, artifact declarations, job snapshots, sync metadata, and replay-safety metadata.
 - **A2A JSON-RPC action runtime** — Added the `/a2a` `supervaizer/action.invoke` dispatcher, v2 Agent Card extension payloads, and public SDK helpers for registering typed v2 actions through `Server.register_v2_action()` and `@server.v2_action(...)`.
 - **A2A SSE event stream** — Added `/a2a/events` and an in-process v2 event bus so action effects returned through `supervaizer/action.invoke` can also be observed over Server-Sent Events.
