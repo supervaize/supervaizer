@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -14,18 +14,19 @@
 Tests for deployment commands.
 """
 
-from pytest_mock import MockerFixture
 from pathlib import Path
 
-from supervaizer.deploy.commands.plan import plan_deployment
-from supervaizer.deploy.commands.up import deploy_up
+from pytest_mock import MockerFixture
+
 from supervaizer.deploy.commands.down import deploy_down
+from supervaizer.deploy.commands.plan import plan_deployment
 from supervaizer.deploy.commands.status import deploy_status
+from supervaizer.deploy.commands.up import deploy_up
 from supervaizer.deploy.drivers.base import (
+    ActionType,
     DeploymentPlan,
     DeploymentResult,
     ResourceAction,
-    ActionType,
     ResourceType,
 )
 

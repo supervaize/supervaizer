@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -17,9 +17,9 @@ This module handles deployment state persistence and management.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -39,23 +39,23 @@ class DeploymentState(BaseModel):
     )
     environment: str = Field(..., description="Environment (dev|staging|prod)")
     region: str = Field(..., description="Provider region")
-    project_id: Optional[str] = Field(
+    project_id: str | None = Field(
         None, description="GCP project / AWS account / DO project"
     )
 
     # Deployment details
     image_tag: str = Field(..., description="Docker image tag")
-    image_digest: Optional[str] = Field(None, description="Docker image digest")
-    service_url: Optional[str] = Field(None, description="Public service URL")
-    revision: Optional[str] = Field(None, description="Service revision/version")
+    image_digest: str | None = Field(None, description="Docker image digest")
+    service_url: str | None = Field(None, description="Public service URL")
+    revision: str | None = Field(None, description="Service revision/version")
 
     # Timestamps
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Deployment creation time",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Last update time",
     )
 
@@ -69,7 +69,7 @@ class DeploymentState(BaseModel):
     rsa_key_generated: bool = Field(False, description="Whether RSA key was generated")
 
     # Provider-specific data
-    provider_data: Dict[str, Any] = Field(
+    provider_data: dict[str, Any] = Field(
         default_factory=dict, description="Platform-specific data"
     )
 
@@ -93,7 +93,7 @@ class StateManager:
 
         log.info(f"Deployment directory: {self.deployment_dir}")
 
-    def load_state(self) -> Optional[DeploymentState]:
+    def load_state(self) -> DeploymentState | None:
         """Load deployment state from file."""
         if not self.state_file.exists():
             return None
@@ -129,7 +129,7 @@ class StateManager:
         """Save deployment state to file."""
         try:
             # Update timestamp
-            state.updated_at = datetime.now(timezone.utc)
+            state.updated_at = datetime.now(UTC)
 
             # Convert to dict and handle datetime serialization
             data = state.model_dump()
@@ -194,7 +194,7 @@ class StateManager:
 
         return True
 
-    def migrate_state(self, state_data: Dict[str, Any]) -> Dict[str, Any]:
+    def migrate_state(self, state_data: dict[str, Any]) -> dict[str, Any]:
         """Migrate state data from older versions."""
         version = state_data.get("version", 1)
         if version > 2:

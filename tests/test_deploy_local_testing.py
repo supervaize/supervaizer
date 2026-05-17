@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -23,16 +23,16 @@ import pytest
 from pytest_mock import MockerFixture
 
 from supervaizer.deploy.commands.local import (
-    local_docker,
     _check_docker_available,
-    _generate_test_secrets,
-    _start_docker_compose,
-    _wait_for_service,
-    _run_health_checks,
+    _cleanup_test_resources,
     _display_health_results,
     _display_service_info,
+    _generate_test_secrets,
+    _run_health_checks,
     _show_service_logs,
-    _cleanup_test_resources,
+    _start_docker_compose,
+    _wait_for_service,
+    local_docker,
 )
 
 

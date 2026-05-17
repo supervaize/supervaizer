@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -23,16 +23,16 @@ import pytest
 from docker.errors import DockerException
 from pytest_mock import MockerFixture
 
+from supervaizer.deploy.commands import (
+    plan,
+    up,
+)  # Import plan and up modules to access their console instances
 from supervaizer.deploy.docker import DockerManager, ensure_docker_running
 from supervaizer.deploy.state import (
     DeploymentState,
     StateManager,
 )
 from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
-from supervaizer.deploy.commands import (
-    plan,
-    up,
-)  # Import plan and up modules to access their console instances
 
 
 class TestDockerManager:
@@ -573,7 +573,7 @@ class TestDeployCommands:
 
     def test_deploy_down_command(self, mocker: MockerFixture) -> None:
         """Test deploy down command."""
-        from supervaizer.deploy.commands.down import deploy_down, StateManager
+        from supervaizer.deploy.commands.down import StateManager, deploy_down
 
         # Mock the driver factory to return a mock driver
         mock_driver = mocker.Mock()

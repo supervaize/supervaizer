@@ -4,15 +4,14 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 import json
-from typing import TYPE_CHECKING, Any, Dict, Optional
-
+from typing import TYPE_CHECKING, Any
 
 from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
@@ -32,8 +31,8 @@ async def service_job_start(
     background_tasks: "BackgroundTasks",
     agent: "Agent",
     sv_context: "JobContext",
-    job_fields: Dict[str, Any],
-    encrypted_agent_parameters: Optional[str] = None,
+    job_fields: dict[str, Any],
+    encrypted_agent_parameters: str | None = None,
 ) -> "Job":
     """
     Create a new job and schedule its execution.
@@ -51,7 +50,7 @@ async def service_job_start(
     """
     agent_parameters = None
     # If agent has parameters_setup defined, validate parameters
-    if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
+    if agent.parameters_setup and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
@@ -110,8 +109,8 @@ async def service_job_custom(
     background_tasks: "BackgroundTasks",
     agent: "Agent",
     sv_context: "JobContext",
-    job_fields: Dict[str, Any],
-    encrypted_agent_parameters: Optional[str] = None,
+    job_fields: dict[str, Any],
+    encrypted_agent_parameters: str | None = None,
 ) -> "Job":
     """
     Create a new job and schedule its execution for a custom method.
@@ -132,7 +131,7 @@ async def service_job_custom(
     )
     _agent_parameters: dict[str, Any] | None = None
     # If agent has parameters_setup defined, validate parameters
-    if getattr(agent, "parameters_setup") and encrypted_agent_parameters:
+    if agent.parameters_setup and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )

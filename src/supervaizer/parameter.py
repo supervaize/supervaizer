@@ -4,18 +4,17 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 
-from pydantic import Field
 import os
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from supervaizer.common import SvBaseModel, log
 
@@ -70,7 +69,7 @@ class ParameterAbstract(SvBaseModel):
 
 class Parameter(ParameterAbstract):
     @property
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Override the to_dict method to handle the value field.
         """
@@ -80,7 +79,7 @@ class Parameter(ParameterAbstract):
         return data
 
     @property
-    def registration_info(self) -> Dict[str, Any]:
+    def registration_info(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -117,7 +116,7 @@ class ParametersSetup(SvBaseModel):
     ```
     """
 
-    definitions: Dict[str, Parameter] = Field(
+    definitions: dict[str, Parameter] = Field(
         description="A dictionary of Parameters, where the key is the parameter name and the value is the parameter object.",
     )
 
@@ -125,7 +124,7 @@ class ParametersSetup(SvBaseModel):
 
     @classmethod
     def from_list(
-        cls, parameter_list: List[Parameter | Dict[str, Any]] | None
+        cls, parameter_list: list[Parameter | dict[str, Any]] | None
     ) -> "ParametersSetup | None":
         if not parameter_list:
             return None
@@ -151,11 +150,11 @@ class ParametersSetup(SvBaseModel):
         return parameter.value if parameter else None
 
     @property
-    def registration_info(self) -> List[Dict[str, Any]]:
+    def registration_info(self) -> list[dict[str, Any]]:
         return [parameter.registration_info for parameter in self.definitions.values()]
 
     def update_values_from_server(
-        self, server_parameters_setup: List[Dict[str, Any]]
+        self, server_parameters_setup: list[dict[str, Any]]
     ) -> "ParametersSetup":
         """Update the values of the parameters from the server.
 
@@ -181,7 +180,7 @@ class ParametersSetup(SvBaseModel):
 
         return self
 
-    def validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """Validate parameters against their expected types and return validation errors.
 
         Args:

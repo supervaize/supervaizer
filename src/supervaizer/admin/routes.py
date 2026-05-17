@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -31,8 +31,9 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from supervaizer.__version__ import API_VERSION, VERSION
+from supervaizer.__version__ import VERSION
 from supervaizer.common import log
+from supervaizer.contracts import API_VERSION
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import (
     StorageManager,

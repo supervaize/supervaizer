@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -15,7 +15,8 @@ import base64
 import json
 import os
 import traceback
-from typing import Any, Callable, Dict, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import demjson3
 from cryptography.hazmat.primitives import hashes
@@ -66,7 +67,7 @@ class SvBaseModel(BaseModel):
             return value
 
     @property
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert the model to a dictionary.
 
@@ -85,7 +86,7 @@ class SvBaseModel(BaseModel):
 
 
 class ApiResult:
-    def __init__(self, message: str, detail: Optional[Dict[str, Any]], code: str):
+    def __init__(self, message: str, detail: dict[str, Any] | None, code: str):
         self.message = message
         self.code = str(code)
         self.detail = detail
@@ -97,7 +98,7 @@ class ApiResult:
         return f"{self.__class__.__name__} ({self.message})"
 
     @property
-    def dict(self) -> Dict[str, Any]:
+    def dict(self) -> dict[str, Any]:
         return {key: value for key, value in self.__dict__.items()}
 
     @property
@@ -119,7 +120,7 @@ class ApiSuccess(ApiResult):
     """
 
     def __init__(
-        self, message: str, detail: Optional[Dict[str, Any] | str], code: int = 200
+        self, message: str, detail: dict[str, Any] | str | None, code: int = 200
     ):
         log_message = "✅ "
         if isinstance(detail, str):
@@ -140,7 +141,7 @@ class ApiSuccess(ApiResult):
             detail=detail,
             code=str(code),
         )
-        self.id: Optional[str] = id
+        self.id: str | None = id
         self.log_message = log_message
         log.debug(f"[API Success] {self.log_message}")
 
@@ -158,10 +159,10 @@ class ApiError(ApiResult):
         self,
         message: str,
         code: str = "",
-        detail: Optional[Dict[str, Any]] = None,
-        exception: Optional[Exception] = None,
+        detail: dict[str, Any] | None = None,
+        exception: Exception | None = None,
         url: str = "",
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ):
         super().__init__(message, detail, code)
         self.exception = exception
@@ -170,9 +171,9 @@ class ApiError(ApiResult):
         self.log_message = f"❌ {message} : {self.exception}"
 
     @property
-    def dict(self) -> Dict[str, Any]:
+    def dict(self) -> dict[str, Any]:
         if self.exception:
-            exception_dict: Dict[str, Any] = {
+            exception_dict: dict[str, Any] = {
                 "type": type(self.exception).__name__,
                 "message": str(self.exception),
                 "traceback": traceback.format_exc(),
@@ -205,7 +206,7 @@ class ApiError(ApiResult):
                 except Exception:
                     pass
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "message": self.message,
             "code": self.code,
             "url": self.url,
@@ -234,7 +235,7 @@ def singleton(cls: type[T]) -> Callable[..., T]:
     """Decorator to create a singleton class
     Tested in tests/test_common.py
     """
-    instances: Dict[type[T], T] = {}
+    instances: dict[type[T], T] = {}
 
     def get_instance(*args: Any, **kwargs: Any) -> T:
         if cls not in instances:
@@ -316,7 +317,7 @@ def decrypt_value(encrypted_value: str, private_key: rsa.RSAPrivateKey) -> str:
     try:
         combined = base64.b64decode(encrypted_value)
     except Exception as e:
-        raise ValueError(f"Base64 decode failed: {str(e)}")
+        raise ValueError(f"Base64 decode failed: {e!s}")
 
     # Validate combined data structure
     if len(combined) < 272:

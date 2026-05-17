@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -15,8 +15,7 @@ import pytest
 from httpx import ConnectError, HTTPStatusError
 from pytest_mock import MockerFixture
 
-from supervaizer import Account, ApiSuccess
-import supervaizer.account_service as account_service
+from supervaizer import Account, ApiSuccess, account_service
 from supervaizer.account_service import send_event, send_event_sync
 from supervaizer.common import SvBaseModel
 from supervaizer.event import Event

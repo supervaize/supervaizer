@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -18,7 +18,7 @@ This module implements deployment to Google Cloud Platform Cloud Run.
 
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -36,17 +36,13 @@ console = Console()
 
 # Conditional imports for Google Cloud libraries
 if TYPE_CHECKING:
-    from google.cloud import artifactregistry_v1
-    from google.cloud import run_v2
-    from google.cloud import secretmanager
+    from google.cloud import artifactregistry_v1, run_v2, secretmanager
     from google.cloud.exceptions import NotFound
 
     GOOGLE_CLOUD_AVAILABLE = True
 else:
     try:
-        from google.cloud import artifactregistry_v1
-        from google.cloud import run_v2
-        from google.cloud import secretmanager
+        from google.cloud import artifactregistry_v1, run_v2, secretmanager
         from google.cloud.exceptions import NotFound
 
         GOOGLE_CLOUD_AVAILABLE = True
@@ -99,8 +95,8 @@ class CloudRunDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
     ) -> DeploymentPlan:
         """Plan deployment changes without applying them."""
         full_service_name = self.get_service_key(service_name, environment)
@@ -194,8 +190,8 @@ class CloudRunDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
         timeout: int = 300,
     ) -> DeploymentResult:
         """Deploy or update the service."""
@@ -332,7 +328,7 @@ class CloudRunDriver(BaseDriver):
         """Verify service health by checking the health endpoint."""
         return self.verify_health_enhanced(service_url, timeout=timeout)
 
-    def check_prerequisites(self) -> List[str]:
+    def check_prerequisites(self) -> list[str]:
         """Check prerequisites and return list of missing requirements."""
         errors = []
 
@@ -399,7 +395,7 @@ class CloudRunDriver(BaseDriver):
 
         return errors
 
-    def _create_or_update_secrets(self, secrets: Dict[str, str]) -> None:
+    def _create_or_update_secrets(self, secrets: dict[str, str]) -> None:
         """Create or update secrets in Secret Manager."""
         for secret_name, secret_value in secrets.items():
             secret_path = f"projects/{self.project_id}/secrets/{secret_name}"
@@ -443,8 +439,8 @@ class CloudRunDriver(BaseDriver):
         service_name: str,
         image_tag: str,
         port: int,
-        env_vars: Dict[str, str],
-        secrets: Dict[str, str],
+        env_vars: dict[str, str],
+        secrets: dict[str, str],
     ) -> Any:
         """Create or update Cloud Run service."""
         service_path = f"{self.service_parent}/services/{service_name}"
@@ -456,7 +452,7 @@ class CloudRunDriver(BaseDriver):
 
         # Build secret references
         secret_refs = []
-        for secret_name in secrets.keys():
+        for secret_name in secrets:
             secret_refs.append({
                 "name": secret_name,
                 "value_source": {
@@ -507,7 +503,7 @@ class CloudRunDriver(BaseDriver):
             log.info(f"Created Cloud Run service: {service_name}")
             return service
 
-    def _wait_for_service_ready(self, service_path: str, timeout: int) -> Optional[str]:
+    def _wait_for_service_ready(self, service_path: str, timeout: int) -> str | None:
         """Wait for service to be ready and return URL."""
         start_time = time.time()
 
@@ -530,7 +526,7 @@ class CloudRunDriver(BaseDriver):
             service = self.run_client.get_service(name=service_path)
 
             # Update environment variables (list accepts dicts for API update)
-            env_vars: List[Any] = []
+            env_vars: list[Any] = []
             for env_var in service.template.containers[0].env:
                 if env_var.name != "SUPERVAIZER_PUBLIC_URL":
                     env_vars.append(env_var)

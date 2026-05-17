@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -19,8 +19,9 @@ with the same API key as all other agent routes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Any, Callable
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -133,6 +134,14 @@ class DataResource(SvBaseModel):
     fields: list[DataResourceField] = Field(default_factory=list)
     read_only: bool = Field(default=False)
     importable: bool = Field(default=False, description="Enables CSV bulk import route")
+    scope: Literal["workspace", "mission", "job"] = Field(
+        default="workspace",
+        description="Studio context boundary for this resource.",
+    )
+    requires_context: list[str] = Field(
+        default_factory=lambda: ["workspace_id"],
+        description="Context keys Studio must send for resource access control.",
+    )
     # Callbacks — excluded from model serialization
     on_list: Callable[..., list[dict[str, Any]]] | None = Field(
         default=None, exclude=True
@@ -148,7 +157,7 @@ class DataResource(SvBaseModel):
     on_import: Callable[..., dict[str, Any]] | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
-    def check_callbacks(self) -> "DataResource":
+    def check_callbacks(self) -> DataResource:
         """Validate required callbacks.
 
         on_list is always required.
@@ -199,4 +208,6 @@ class DataResource(SvBaseModel):
             "read_only": self.read_only,
             "importable": self.importable,
             "operations": self.operations,
+            "scope": self.scope,
+            "requires_context": self.requires_context,
         }

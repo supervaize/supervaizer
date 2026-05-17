@@ -4,14 +4,14 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
 
 import httpx
 from pydantic import ConfigDict, Field, field_validator
@@ -118,7 +118,7 @@ class Account(AccountAbstract):
         return f"{self.api_url}/w/{self.workspace_id}/api/v1"
 
     @property
-    def api_headers(self) -> Dict[str, str]:
+    def api_headers(self) -> dict[str, str]:
         """Headers for the Supervaize Control API.
         Tested in tests/test_account.py
         """
@@ -243,7 +243,7 @@ class Account(AccountAbstract):
         message: str,
         detail: Any = None,
         url: str = "",
-        exception: Optional[Exception] = None,
+        exception: Exception | None = None,
     ) -> ApiResult:
         if success:
             return ApiSuccess(message=message, detail=detail)

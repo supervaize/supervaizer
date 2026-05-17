@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 
-def create_agent_data_routes(server: "Server", agent: "Agent") -> APIRouter:
+def create_agent_data_routes(server: Server, agent: Agent) -> APIRouter:
     """Generate CRUD REST routes for all DataResources declared on an agent."""
     router = APIRouter(prefix=agent.path, tags=["Data Resources"])
     agent_slug = agent.slug

@@ -1,21 +1,64 @@
 # Supervaizer Changelog
 
+> **Created:** 2025-08-05
+> **Updated:** 2026-05-17
+
 All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## TODO
 
-- Fix CICD
-- Review and test feature/data-persistance
-- Complete feature/smartinstall implementation
+- Review and test feature/data-persistence
+- Complete feature/smart-install implementation
 - Fix receive_human_input
-- Test and fix deploy
 - When AgentMethodField returns its value (in the kwargs of job_start), the value should be casted in the appropriate type :
   - example: here the 'How many times to say hello' is supposed to be an 'int'.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
 ## [Unreleased]
+
+### Supervaizer v2 2️⃣
+
+- **Supervaizer v2 documentation** — Added `docs/2026_05_SUPERVAIZER_v2.md` and updated the README/protocol docs to explain the v2 A2A/A2UI layering, registration model, resources, datasets, surfaces, actions, HITL, artifacts, and `job.sync` convergence semantics.
+- **Supervaizer v2 README** — Reworked the repository README as a v2-first onboarding guide, linking to the protocol docs and Hello World example while removing the old v1 scaffold/job-field quick start path.
+- **Supervaizer v2 contract primitives** — Added typed SDK models for the v2 registration and action contract, including pinned A2UI/A2A versions, resources, datasets, case lanes, artifact declarations, job snapshots, sync metadata, and replay-safety metadata.
+- **A2A JSON-RPC action runtime** — Added the `/a2a` `supervaizer/action.invoke` dispatcher, v2 Agent Card extension payloads, and public SDK helpers for registering typed v2 actions through `Server.register_v2_action()` and `@server.v2_action(...)`.
+- **A2A SSE event stream** — Added `/a2a/events` and an in-process v2 event bus so action effects returned through `supervaizer/action.invoke` can also be observed over Server-Sent Events.
+- **Supervaizer v2 transport honesty** — `V2A2ATransport.push_notifications` now defaults to `false`; the MVP advertises JSON-RPC and SSE support only until A2A push notifications are implemented.
+- **A2A JSON-RPC surface runtime** — Added `supervaizer/surface.load`, typed `V2SurfaceRequest`/`V2SurfaceResult` models, and public SDK helpers for registering A2UI surface handlers through `Server.register_v2_surface()` and `@server.v2_surface(...)`.
+- **Supervaizer v2 agent identity guard** — `Agent` now rejects v2 registration payloads whose declared `agent.slug` differs from the runtime SDK slug, preventing A2A action handlers from registering under one slug while Studio invokes another.
+- **Supervaizer v2 job sync state** — `V2JobSyncResult` now carries an optional `job_state` snapshot so agents can return convergent Job/Case/Step/Artifact state through `job.sync`.
+- **Supervaizer v2 job source target metadata** — `V2JobSource` now includes an optional `target_type` so external sources can declare the business object Studio should use for dedupe and catch-up.
+- **Supervaizer v2 resource form fields** — `V2ResourceDefinition` now carries typed `fields` metadata so Studio can render simple agent-owned resource create/edit forms without callback-style dynamic field logic.
+- **Supervaizer v2 ResourceImport documents** — Added a typed A2UI `ResourceImport` document contract so agents can declare import formats, contextual fields, row columns, and submit actions without adding agent-specific protocol fields.
+- **Supervaizer v2 resource option sources** — Resource fields can now declare typed resource-backed `options_source` metadata so Studio can render relationship selectors without callback-style dynamic choices.
+- **Supervaizer v2 workspace-scoped resources** — Resource declarations now advertise `scope` and `requires_context` metadata, and legacy DataResource registration info carries the same workspace context requirement for Studio-side access control.
+- **Supervaizer v2 dataset display metadata** — `V2DatasetDefinition` now carries typed display columns so Studio can render generic dataset surfaces from the registration contract.
+- **Supervaizer v2 dashboard widgets** — Added generic dashboard and widget registration contracts, including dataset/action/inline data refs and Vega-Lite widget specs under `visualization: { type: "vega-lite", spec: ... }` without AnalyticsResource REST routes.
+- **Supervaizer v2 mounted HITL review docs** — Documented `DocumentReview` as a generic A2UI document payload for mounted awaiting-step surfaces without adding agent-specific protocol fields.
+- **Supervaizer v2 registration builder** — Added `build_v2_agent_registration()` to derive validated v2 registration payloads from public SDK primitives, including generated resource/dataset surfaces and actions.
+- **Supervaizer v2 public SDK ergonomics** — Exported the remaining v2 registration helper models from `supervaizer` and neutralized agent-specific examples in v2 public documentation and contract descriptions.
+- **Legacy dynamic choices removed** — Removed the v1 `dynamic_choices` field metadata, `dynamic_choices_callback`, `/start/dynamic_choices` route, and related contract exports; dynamic options now belong to v2 resource `options_source` metadata or typed A2A actions.
+- **Legacy job poll removed** — Removed `job_poll` from the public v1 method contract and the local workbench poll route/button; v2 status convergence is represented by the typed `job.sync` action.
+- **Supervaizer v2 awaiting form fields** — Step awaiting state can now declare typed form fields so Studio can submit HITL actions through `step.awaiting.submit`.
+- **Local Hello World v2 contract** — The built-in local Hello World agent now declares a minimal Supervaizer v2 registration through the SDK builder and registers `job.start`, `job.sync`, `case.step.awaiting`, and a generated resource handler for local Studio and SDK smoke tests.
+- **Controller correctness fixes** — Scoped `Jobs.get_job(..., agent_name=...)` to the requested agent, gave `EventType.AGENT_SEND_ANOMALY` a distinct value, and fixed custom method routes to parse normal JSON request bodies.
+- **Supervaizer v2 runtime hardening** — Added typed common fields to v2 action effects, including resource import counts, rows, errors, gaps, summaries, and case snapshots; validated `job_state` on action results; authenticated the A2A JSON-RPC controller and SSE event stream while keeping A2A discovery/health public; sanitized A2A handler errors; and constrained legacy method execution to declared non-blocked method paths.
+- **Supervaizer v2 replay and context contracts** — Action results now validate and serialize replay-safety metadata, and DataResource context header generation includes the agent slug advertised by the contract model.
+
+### Tests
+
+- `uv run pytest tests/test_a2a.py tests/test_contracts.py -q`
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 601   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 69s   |
 
 ## [0.20.1] - 2026-05-13
 
@@ -560,7 +603,7 @@ All notable changes to this project will be documented in this file.
   - Set `SUPERVAIZER_PERSISTENCE=true` (or `1`/`yes`) to enable file persistence.
   - CLI: `supervaizer start --persist` enables persistence for that run.
   - Explicit `StorageManager(db_path=...)` in code still uses file storage (e.g. tests).
-  - See [PERSISTENCE.md](PERSISTENCE.md) for configuration.
+  - See [2025_08_PERSISTENCE.md](2025_08_PERSISTENCE.md) for configuration.
 
 ### Unit Tests Results
 
@@ -590,7 +633,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **🚀 Cloud Deployment CLI** - Complete automated deployment system for Supervaizer agents
-  - Full implementation of [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md)
+  - Full implementation of [RFC-001: Cloud Deployment CLI](rfc/2025_10_001-cloud-deployment-cli.md)
   - Support for three major cloud platforms:
     - **Google Cloud Run** with Artifact Registry and Secret Manager
     - **AWS App Runner** with ECR and Secrets Manager
@@ -607,7 +650,7 @@ All notable changes to this project will be documented in this file.
   - **Health Verification**: Automatic health checks at `/.well-known/health` endpoint
   - **Idempotent Deployments**: Safe create/update operations with rollback on failure
   - **Local Testing**: Full Docker Compose environment for pre-deployment testing
-  - See [Local Testing Documentation](docs/LOCAL_TESTING.md) for details
+  - See [Local Testing Documentation](2025_10_LOCAL_TESTING.md) for details
 
 - **Agent Instructions Template** - New HTML page served by FastAPI for Supervaize integration instructions
   - Accessible at `/admin/supervaize-instructions`
@@ -646,7 +689,7 @@ All notable changes to this project will be documented in this file.
   - Added comprehensive deployment documentation
   - Updated model reference documentation
   - Improved README with deployment examples
-  - Updated PROTOCOLS.md to focus on unified A2A protocol
+  - Updated 2025_08_PROTOCOLS.md to focus on unified A2A protocol
   - Added Protocol Evolution section explaining ACP merger
 
 ### Fixed
@@ -711,7 +754,7 @@ All notable changes to this project will be documented in this file.
 ## [0.9.6]
 
 - Public release to Pypi
-- Fixed the gihut workflows
+- Fixed the github workflows
 - Improve README.md
 
 ## [0.9.5]
@@ -761,7 +804,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Paramater.to_dict : override to avoid storing secrets.
+- Parameter.to_dict : override to avoid storing secrets.
 - Removed Case Nodes
 - Improved test coverage : accounts, admin/routes,
 
