@@ -5,6 +5,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 ## Working Rules
 
 - Prefer simple, typed Python changes that match existing FastAPI/Pydantic patterns.
+- **No guessing / no implicit fallbacks:** when protocol versions, workspace identity, action/resource contracts, authentication, or transport configuration are missing or inconsistent, fail with a clear error that names the missing configuration. Do not infer another context, broaden scope, or silently fall back.
 - Use `just` recipes from this repo for local commands.
 - Use `uv` for Python environment and package operations.
 - Add or update targeted tests for changed behavior.
