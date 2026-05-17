@@ -5,5 +5,5 @@
 # https://mozilla.org/MPL/2.0/.
 
 
-VERSION = "0.20.1"
+VERSION = "1.0.0"
 __version__ = VERSION

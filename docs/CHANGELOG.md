@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-17
+
 ### Supervaizer v2 2️⃣
 
 - **Supervaizer v2 documentation** — Added `docs/2026_05_SUPERVAIZER_v2.md` and updated the README/protocol docs to explain the v2 A2A/A2UI layering, registration model, resources, datasets, surfaces, actions, HITL, artifacts, and `job.sync` convergence semantics.
