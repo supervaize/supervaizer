@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -15,14 +15,13 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
-from supervaizer.deploy.cli import deploy_app
 
 import typer
 from rich.console import Console
 from rich.prompt import Confirm
 
 from supervaizer.__version__ import VERSION
+from supervaizer.deploy.cli import deploy_app
 from supervaizer.utils.version_check import check_is_latest_version
 
 console = Console()
@@ -110,7 +109,7 @@ app.add_typer(scaffold_app, name="scaffold", invoke_without_command=True)
 
 @app.command()
 def start(
-    public_url: Optional[str] = typer.Option(
+    public_url: str | None = typer.Option(
         None,
         help="Public URL to use for inbound connections (reads SUPERVAIZER_PUBLIC_URL env var if not set)",
     ),
@@ -147,7 +146,7 @@ def start(
         "--local",
         help="Local test mode: run without Studio credentials, with built-in Hello World agent",
     ),
-    script_path: Optional[str] = typer.Argument(
+    script_path: str | None = typer.Argument(
         None,
         help="Path to the supervaizer_control.py script",
     ),
@@ -408,11 +407,11 @@ def scaffold(
 
 @scaffold_app.command(name="instructions")
 def scaffold_instructions(
-    control_file: Optional[str] = typer.Option(
+    control_file: str | None = typer.Option(
         None,
         help="Path to supervaizer_control.py (default: auto-detect)",
     ),
-    output_path: Optional[str] = typer.Option(
+    output_path: str | None = typer.Option(
         None,
         help="Path to save supervaize_instructions.html (default: same directory as control file)",
     ),
@@ -455,11 +454,11 @@ def scaffold_instructions(
 
 @scaffold_app.command(name="refresh-instructions")
 def refresh_instructions(
-    control_file: Optional[str] = typer.Option(
+    control_file: str | None = typer.Option(
         None,
         help="Path to supervaizer_control.py (default: auto-detect)",
     ),
-    output_path: Optional[str] = typer.Option(
+    output_path: str | None = typer.Option(
         None,
         help="Path to supervaize_instructions.html (default: same directory as control file)",
     ),

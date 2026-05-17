@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -47,19 +47,22 @@ Output:
 """
 
 from __future__ import annotations
-import re
+
+import dataclasses
 import importlib
 import inspect
+import json
 import os
 import pkgutil
-import dataclasses
+import re
 import shutil
-import json
-from datetime import datetime
 import sys
-from types import ModuleType
+from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator, Union, Dict, List, Set
+from types import ModuleType
+from typing import Any, Union
+
 from pydantic import BaseModel
 from rich import print
 
@@ -212,9 +215,12 @@ def sanitize_default_for_mdx(default_repr: str) -> str:
                 if value_end != -1:
                     value_part = default_repr[value_start:value_end].strip()
                     # Remove quotes if present
-                    if value_part.startswith("'") and value_part.endswith("'"):
-                        value_part = value_part[1:-1]
-                    elif value_part.startswith('"') and value_part.endswith('"'):
+                    if (
+                        value_part.startswith("'")
+                        and value_part.endswith("'")
+                        or value_part.startswith('"')
+                        and value_part.endswith('"')
+                    ):
                         value_part = value_part[1:-1]
                     return f"`{value_part}`"
         except Exception:
@@ -283,7 +289,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
                         non_none_types.append(f"`{arg_str}`")
                     else:
                         non_none_types.append(
-                            f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                            f"`{arg.__name__ if hasattr(arg, '__name__') else arg!s}`"
                         )
 
             # If we have non-None types, use them; otherwise fall back to original logic
@@ -302,7 +308,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
                             type_parts.append(f"`{arg_str}`")
                         else:
                             type_parts.append(
-                                f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                                f"`{arg.__name__ if hasattr(arg, '__name__') else arg!s}`"
                             )
                 type_str = " \\| ".join(type_parts)
         elif type_obj is not None and str(type_obj).startswith("typing.Union"):
@@ -355,7 +361,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
             default_repr = "**required**"
         else:
             if hasattr(field, "default"):
-                default_val = getattr(field, "default")
+                default_val = field.default
                 # Hide Pydantic undefined sentinels
                 if default_val is None:
                     default_repr = "`None`"
@@ -374,7 +380,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
 
 def get_parent_model(
     model: type[BaseModel],
-    models_by_group: Dict[str, List[Union[type[BaseModel], type]]],
+    models_by_group: dict[str, list[type[BaseModel] | type]],
 ) -> type[BaseModel] | None:
     """Find the parent model that is also documented in the same group."""
     if not issubclass(model, BaseModel):
@@ -398,7 +404,7 @@ def get_parent_model(
 
 def get_model_group(
     model: type[BaseModel],
-    models_by_group: Dict[str, List[Union[type[BaseModel], type]]],
+    models_by_group: dict[str, list[type[BaseModel] | type]],
 ) -> str:
     """Find which group a model belongs to."""
     for group_name, group_models in models_by_group.items():
@@ -439,7 +445,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
                         non_none_types.append(f"`{arg_str}`")
                     else:
                         non_none_types.append(
-                            f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                            f"`{arg.__name__ if hasattr(arg, '__name__') else arg!s}`"
                         )
 
             # If we have non-None types, use them; otherwise fall back to original logic
@@ -458,7 +464,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
                             type_parts.append(f"`{arg_str}`")
                         else:
                             type_parts.append(
-                                f"`{str(arg.__name__ if hasattr(arg, '__name__') else arg)}`"
+                                f"`{arg.__name__ if hasattr(arg, '__name__') else arg!s}`"
                             )
                 type_str = " \\| ".join(type_parts)
         elif type_ is not None and str(type_).startswith("typing.Union"):
@@ -535,11 +541,11 @@ def generate_model_docs() -> None:
     LOCAL_MODEL_DOCS.mkdir(parents=True, exist_ok=True)
 
     # Get all models and their reference_group
-    models_by_group: Dict[str, List[Union[type[BaseModel], type]]] = {}
+    models_by_group: dict[str, list[type[BaseModel] | type]] = {}
     seen = set()
 
     # Track all generated slugs across all files for link validation
-    all_slugs: Dict[str, Set[str]] = {}
+    all_slugs: dict[str, set[str]] = {}
 
     for mod in iter_modules(PACKAGE):
         for name, obj in inspect.getmembers(mod, inspect.isclass):

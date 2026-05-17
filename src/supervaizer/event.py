@@ -4,13 +4,13 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
@@ -26,11 +26,11 @@ if TYPE_CHECKING:
 
 class AbstractEvent(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
-    source: Dict[str, Any]
+    source: dict[str, Any]
     account: Any  # Use Any to avoid Pydantic type resolution issues
     type: EventType
     object_type: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 class Event(AbstractEvent):
@@ -52,7 +52,7 @@ class Event(AbstractEvent):
         super().__init__(**kwargs)
 
     @property
-    def payload(self) -> Dict[str, Any]:
+    def payload(self) -> dict[str, Any]:
         """
         Returns the payload for the event.
         This must be a dictionary that can be serialized to JSON to be sent in the request body.

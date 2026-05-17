@@ -4,14 +4,14 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from supervaizer import (
@@ -135,7 +135,7 @@ def test_event_payload_json_encodable_with_metadata_datetime(
     account_fixture: Account,
 ) -> None:
     """Metadata with datetime/type must JSON-encode for httpx (event.details → payload)."""
-    dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+    dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
     job = Job.new(
         job_context=context_fixture,
         agent_name="test-agent",

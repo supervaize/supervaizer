@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -190,7 +190,7 @@ def test_job_status_transitions(job_fixture: Job) -> None:
     assert job_fixture.status != EntityStatus.AWAITING
 
 
-def make_job_dict(job: Job) -> Dict[str, Any]:
+def make_job_dict(job: Job) -> dict[str, Any]:
     # Helper to convert a Job to a dict for persistence simulation
     d = job.__dict__.copy()
     d["job_context"] = job.job_context.__dict__
@@ -225,6 +225,48 @@ def test_get_job_include_persisted_not_found() -> None:
         mock_get.return_value = None  # Simulate job not found in persistence
         result = Jobs().get_job(job_id, include_persisted=True)
         assert result is None
+
+
+def test_get_job_with_agent_name_stays_scoped(context_fixture: JobContext) -> None:
+    Jobs().reset()
+    job_id = "shared-job-id"
+    first_context = context_fixture.model_copy(update={"job_id": job_id})
+    second_context = context_fixture.model_copy(update={"job_id": job_id})
+    first_job = Job.new(job_context=first_context, agent_name="first-agent")
+    second_job = Job.new(job_context=second_context, agent_name="second-agent")
+
+    registry = Jobs()
+    registry.add_job(first_job)
+    registry.add_job(second_job)
+
+    assert registry.get_job(job_id, agent_name="first-agent") is first_job
+    assert registry.get_job(job_id, agent_name="second-agent") is second_job
+    assert registry.get_job(job_id, agent_name="missing-agent") is None
+
+
+def test_get_job_include_persisted_respects_agent_name(job_fixture: Job) -> None:
+    Jobs().reset()
+    job_dict = make_job_dict(job_fixture)
+
+    with patch("supervaizer.job.storage_manager.get_object_by_id") as mock_get:
+        mock_get.return_value = job_dict
+
+        assert (
+            Jobs().get_job(
+                job_fixture.id,
+                agent_name=job_fixture.agent_name,
+                include_persisted=True,
+            )
+            is not None
+        )
+        assert (
+            Jobs().get_job(
+                job_fixture.id,
+                agent_name="other-agent",
+                include_persisted=True,
+            )
+            is None
+        )
 
 
 def test_job_metadata_default_is_empty_dict(context_fixture: JobContext) -> None:

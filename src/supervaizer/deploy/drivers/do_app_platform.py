@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -20,7 +20,6 @@ import json
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from rich.console import Console
 
@@ -40,7 +39,7 @@ console = Console()
 class DOAppPlatformDriver(BaseDriver):
     """Driver for deploying to DigitalOcean App Platform."""
 
-    def __init__(self, region: str, project_id: Optional[str] = None):
+    def __init__(self, region: str, project_id: str | None = None):
         """Initialize DigitalOcean App Platform driver."""
         super().__init__(region, project_id)
         self.project_id = project_id
@@ -51,8 +50,8 @@ class DOAppPlatformDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
     ) -> DeploymentPlan:
         """Plan deployment changes without applying them."""
         full_service_name = self.get_service_key(service_name, environment)
@@ -145,8 +144,8 @@ class DOAppPlatformDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
         timeout: int = 300,
     ) -> DeploymentResult:
         """Deploy or update the service."""
@@ -288,7 +287,7 @@ class DOAppPlatformDriver(BaseDriver):
         """Verify service health by checking the health endpoint."""
         return self.verify_health_enhanced(service_url, timeout=timeout)
 
-    def check_prerequisites(self) -> List[str]:
+    def check_prerequisites(self) -> list[str]:
         """Check prerequisites and return list of missing requirements."""
         errors = []
 
@@ -340,8 +339,8 @@ class DOAppPlatformDriver(BaseDriver):
         registry_name: str,
         image_tag: str,
         port: int,
-        env_vars: Dict[str, str],
-        secrets: Dict[str, str],
+        env_vars: dict[str, str],
+        secrets: dict[str, str],
     ) -> Path:
         """Create App Platform specification file."""
         # Build environment variables
@@ -351,7 +350,7 @@ class DOAppPlatformDriver(BaseDriver):
 
         # Build secret references
         secret_refs = []
-        for secret_name in secrets.keys():
+        for secret_name in secrets:
             secret_refs.append({
                 "key": secret_name,
                 "scope": "RUN_TIME",
@@ -407,9 +406,7 @@ class DOAppPlatformDriver(BaseDriver):
         log.info(f"Created app spec at {spec_path}")
         return spec_path
 
-    def _deploy_app(
-        self, app_name: str, spec_path: Path, timeout: int
-    ) -> Optional[str]:
+    def _deploy_app(self, app_name: str, spec_path: Path, timeout: int) -> str | None:
         """Deploy app using doctl."""
         try:
             # Check if app exists
@@ -442,7 +439,7 @@ class DOAppPlatformDriver(BaseDriver):
             log.error(f"Failed to deploy app: {e}")
             raise RuntimeError(f"App deployment failed: {e}") from e
 
-    def _wait_for_deployment(self, app_name: str, timeout: int) -> Optional[str]:
+    def _wait_for_deployment(self, app_name: str, timeout: int) -> str | None:
         """Wait for deployment to complete and return URL."""
         start_time = time.time()
 

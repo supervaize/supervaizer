@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from supervaizer.server import Server
 
 
-def create_api_router(server: "Server") -> APIRouter:  # <-- ADDED
+def create_api_router(server: Server) -> APIRouter:  # <-- ADDED
     """Build and return the /api router wired to *server*.
 
     Router-level ``require_api_key`` covers every sub-route.

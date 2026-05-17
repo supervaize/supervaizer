@@ -1,5 +1,9 @@
 # SUPERVAIZER
 
+
+> **Created:** 2024-12-28
+> **Updated:** 2026-05-16
+
 [Operate AI Agents with confidence]
 
 A Python toolkit for building, managing, and connecting AI agents with full [Agent-to-Agent (A2A)](https://a2a-protocol.org/) protocol support.
@@ -23,6 +27,7 @@ A Python toolkit for building, managing, and connecting AI agents with full [Age
     - [What's next?](#whats-next)
   - [Features](#features)
   - [Protocol Support](#protocol-support)
+    - [Supervaizer v2](#supervaizer-v2)
   - [Cloud Deployment](#cloud-deployment)
     - [Quick Start](#quick-start-1)
     - [Deployment Commands](#deployment-commands)
@@ -45,6 +50,7 @@ With comprehensive support for the A2A protocol specification, SUPERVAIZER allow
 
 - Enhance the capabilities of your agents, making them automatically discoverable by other A2A compatible systems
 - Expose standardized agent capabilities through agent cards
+- Expose typed Supervaizer v2 surfaces and actions so Studio can operate the agent through generic UI primitives
 - Monitor agent health and status through dedicated endpoints
 - Connect your agents to the growing ecosystem of A2A-compatible tools
 
@@ -147,6 +153,7 @@ export SUPERVAIZE_MAX_HTTP_RETRIES=3  # Will attempt up to 4 times total (1 orig
 
 - Add more **custom methods** (`chat`, `custom`) to extend control
 - Turn on **A2A** discovery for interoperability
+- Add a **Supervaizer v2 registration** when Studio should manage resources, datasets, job start surfaces, HITL steps, and artifact rendering through the generic SDK contract
 - Hook your controller into Supervaize to **monitor, audit, and operate** the agent
 
 For detailed instructions on customizing your controller, see the [Controller Setup Guide](https://doc.supervaize.com/docs/supervaizer-controller/controller-setup)
@@ -159,6 +166,7 @@ For detailed instructions on customizing your controller, see the [Controller Se
 - **Custom Routes**: Agents can mount their own FastAPI routers under `/api/agents/{slug}/...` for tool endpoints, webhooks, or custom APIs
 - **Scheduled Steps**: Defer step execution to a future time with automatic background polling and workbench controls (execute now, cancel, reschedule)
 - **Human-in-the-Loop (HITL)**: Form-based and dialog-based interactive content review with chat interface
+- **Supervaizer v2 SDK contract**: Typed resources, datasets, A2UI surfaces, actions, job snapshots, case lanes, steps, awaiting state, and artifact references for generic Studio operation
 - **Agent Workbench**: Built-in testing interface with real-time monitoring, job control, HITL forms, and live console
 - **🚀 Cloud Deployment**: Automated deployment to GCP Cloud Run, AWS App Runner, and DigitalOcean App Platform
 - **A2A Protocol Support**: Full integration with the Agent-to-Agent protocol for standardized agent discovery and interaction
@@ -167,7 +175,18 @@ For detailed instructions on customizing your controller, see the [Controller Se
 
 ## Protocol Support
 
-SUPERVAIZER provides comprehensive support for the A2A agent communication protocol. See [Protocol Documentation](docs/PROTOCOLS.md) for complete details.
+SUPERVAIZER provides comprehensive support for the A2A agent communication protocol. See [Protocol Documentation](docs/2025_08_PROTOCOLS.md) for complete details.
+
+### Supervaizer v2
+
+Supervaizer v2 is the Studio operation contract layered on top of A2A discovery/transport and A2UI surface payloads. It lets an agent declare:
+
+- generic business resources and datasets Studio can list, edit, import, and query
+- agent-owned A2UI surfaces such as `job.start`, `case.step.awaiting`, `case.step.detail`, `mission.analytics`, and mounted resource views
+- typed actions such as `job.start`, `job.stop`, `job.sync`, `step.awaiting.submit`, `resource.<id>.<operation>`, and `dataset.<id>.query`
+- convergent job state snapshots made of Jobs, Cases, Steps, awaiting forms, and artifact references
+
+Start with [Supervaizer v2 Concepts](docs/2026_05_SUPERVAIZER_v2.md) for the new model and [Protocol Documentation](docs/2025_08_PROTOCOLS.md) for the A2A/A2UI transport layer.
 
 ## Cloud Deployment
 
@@ -211,23 +230,23 @@ supervaizer deploy up --platform do-app-platform --region nyc
 
 ### Documentation
 
-- [RFC-001: Cloud Deployment CLI](docs/rfc/001-cloud-deployment-cli.md) - Complete specification
-- [Local Testing Guide](docs/LOCAL_TESTING.md) - Docker testing documentation
+- [RFC-001: Cloud Deployment CLI](docs/rfc/2025_10_001-cloud-deployment-cli.md) - Complete specification
+- [Local Testing Guide](docs/2025_10_LOCAL_TESTING.md) - Docker testing documentation
 
 ## Using the CLI
 
-SUPERVAIZER includes a command-line interface to simplify setup and operation. See [CLI Documentation](docs/CLI.md) for complete details.
+SUPERVAIZER includes a command-line interface to simplify setup and operation. See [CLI Documentation](docs/2025_08_CLI.md) for complete details.
 
-Also, check the list of [Environment variables](CLI.md#environment-variables).
+Also, check the list of [Environment variables](docs/2025_08_CLI.md#environment-variables).
 
 ## API Documentation & User Interfaces
 
-SUPERVAIZER provides multiple ways to interact with and explore the API. See [REST API Documentation](docs/REST_API.md) for complete details.
+SUPERVAIZER provides multiple ways to interact with and explore the API. See [REST API Documentation](docs/2025_08_REST_API.md) for complete details.
 
 ### Admin Interface (`/admin`)
 
 A comprehensive web-based admin interface for managing your SUPERVAIZER instance
-See [Admin documentation](docs/ADMIN_README.md)
+See [Admin documentation](docs/2025_08_ADMIN_README.md)
 
 #### Quick Start
 

@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 
 from enum import Enum
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
@@ -56,7 +56,7 @@ class TelemetryModel(BaseModel):
     type: TelemetryType
     category: TelemetryCategory
     severity: TelemetrySeverity
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 class Telemetry(TelemetryModel):
@@ -77,7 +77,7 @@ class Telemetry(TelemetryModel):
         super().__init__(**kwargs)
 
     @property
-    def payload(self) -> Dict[str, Any]:
+    def payload(self) -> dict[str, Any]:
         return {
             "agentId": self.agentId,
             "eventType": self.type.value,

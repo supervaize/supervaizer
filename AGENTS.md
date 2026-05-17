@@ -5,6 +5,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 ## Working Rules
 
 - Prefer simple, typed Python changes that match existing FastAPI/Pydantic patterns.
+- **No guessing / no implicit fallbacks:** when protocol versions, workspace identity, action/resource contracts, authentication, or transport configuration are missing or inconsistent, fail with a clear error that names the missing configuration. Do not infer another context, broaden scope, or silently fall back.
 - Use `just` recipes from this repo for local commands.
 - Use `uv` for Python environment and package operations.
 - Add or update targeted tests for changed behavior.
@@ -40,6 +41,8 @@ Reference specific personas when requesting work:
 - In `9agents/agent_interviewer`, empty `MANAGE_ALLOWED_IPS` still requires `MANAGE_AUTH_TOKEN` when that env is set; supervaizer’s admin IP middleware has no equivalent token fallback when the allowlist is empty.
 - CI (`python-package` workflow): the pre-commit job checks **Ruff** formatting (`ruff format --check`) and **YAML** in `.github/workflows` via `yamllint` (not Black).
 - In the matrix **build** job, `astral-sh/setup-uv` sets `cache-suffix: py-${{ matrix.python-version }}` so parallel Python versions do not race on the same GitHub Actions cache reservation.
+- `@singleton` (from `supervaizer.common`) replaces the decorated class name with a function at import time; modules that annotate with that class in unions (e.g. `StorageManager | None` in `storage.py`) need `from __future__ import annotations` or class-body evaluation raises `TypeError`.
+- `UTC` lives on the `datetime` module (`from datetime import UTC`), not on `datetime.datetime`; use `datetime.now(UTC)`, not `datetime.now(datetime.UTC)` (the latter raises `AttributeError` at runtime).
 
 ## Security and Supply-Chain Rules
 

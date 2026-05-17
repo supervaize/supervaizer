@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -723,50 +723,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
-    @router.post(
-        "/start/dynamic_choices",
-        summary=f"Get dynamic choices for agent: {agent.name} start method",
-        description="Returns dynamic choice values for fields that use dynamic_choices. Accepts workspace and mission context (including workspace slug) for contextualized choices.",
-        response_model=dict[str, Any],
-        responses={
-            http_status.HTTP_200_OK: {"model": dict[str, Any]},
-            http_status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
-            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-        },
-        dependencies=[
-            Depends(require_scope("write"))
-        ],  # <-- MODIFIED: scope-enforced write
-    )
-    @handle_route_errors()
-    async def get_dynamic_choices(
-        body_params: Any = Body(...),
-        agent: Agent = Depends(get_agent),
-    ) -> dict[str, Any]:
-        """Get dynamic choices for the start method fields."""
-        log.info(f"📥 POST /start/dynamic_choices [Dynamic choices] {agent.name}")
-
-        if not agent.dynamic_choices_callback:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Agent {agent.name} does not have dynamic choices configured",
-            )
-
-        if body_params is None:
-            body_params = {}
-
-        context = {
-            "workspace_id": body_params.get("workspace_id"),
-            "workspace_slug": body_params.get("workspace_slug"),
-            "mission_id": body_params.get("mission_id"),
-        }
-
-        choices = await asyncio.to_thread(
-            agent.dynamic_choices_callback, "start", context
-        )
-
-        log.info(f"📤 Agent {agent.name}: Dynamic choices keys: {list(choices.keys())}")
-        return {"choices": choices}
-
     if not agent.methods:
         raise ValueError(f"Agent {agent.name} has no methods defined")
 
@@ -1010,6 +966,15 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
     async def get_agent() -> Agent:
         return agent
 
+    def custom_job_body_params(body_params: Any) -> dict[str, Any]:
+        if body_params is None:
+            raise ValueError("body_params cannot be None")
+        if isinstance(body_params, dict):
+            return body_params
+        if isinstance(body_params, SvBaseModel):
+            return body_params.model_dump()
+        raise ValueError("body_params must be an object")
+
     # Create a route for each custom method
     for method_name, method_config in agent.methods.custom.items():
         # Create the dynamic model with the custom name for FastAPI documentation
@@ -1046,16 +1011,17 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             )
             log.info(f"body_params: {body_params}")
 
-            if body_params is None:
-                raise ValueError("body_params cannot be None")
+            body_data = custom_job_body_params(body_params)
 
-            sv_context: JobContext = body_params.job_context
-            job_fields = body_params.job_fields.to_dict()
+            job_context_data = body_data.get("job_context")
+            if job_context_data is None:
+                raise ValueError("job_context is required")
+
+            sv_context = JobContext(**job_context_data)
+            job_fields = body_data.get("job_fields", {})
 
             # Get job encrypted parameters if available
-            encrypted_agent_parameters = getattr(
-                body_params, "encrypted_agent_parameters", None
-            )
+            encrypted_agent_parameters = body_data.get("encrypted_agent_parameters")
 
             # Delegate job creation and scheduling to the service
             new_job = await service_job_custom(

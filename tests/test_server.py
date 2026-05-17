@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -12,7 +12,7 @@
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from fastapi import status
@@ -150,10 +150,10 @@ async def test_get_all_jobs_endpoint(
     mocker: Any,
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
-    exception: Optional[Exception],
-    status_filter: Optional[EntityStatus],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
+    exception: Exception | None,
+    status_filter: EntityStatus | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
 ) -> None:
     """Test the GET /supervaizer/jobs endpoint for listing all jobs."""
     if not exception:
@@ -272,7 +272,7 @@ async def test_start_job_endpoint(
     no_response_validation: Any,
     mocker: Any,
     exception: Exception,
-    expected_error_type: Optional[ErrorType],
+    expected_error_type: ErrorType | None,
     expected_status: int,
     use_no_response_validation: bool,
 ) -> None:
@@ -328,12 +328,59 @@ async def test_start_job_endpoint(
     i_tested_something = True
 
     assert response.status_code == expected_status
-
     if expected_error_type:
         response_data = response.json()
         assert response_data["error_type"] == expected_error_type.value
 
     assert i_tested_something, "No test was performed"
+
+
+@pytest.mark.asyncio
+async def test_custom_method_endpoint_accepts_dict_body(
+    server_fixture: Server,
+    agent_fixture: Agent,
+    job_fixture: Job,
+    context_fixture: JobContext,
+    mocker: Any,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def mock_service_job_custom(*args: Any) -> Job:
+        captured["method_name"] = args[0]
+        captured["sv_context"] = args[4]
+        captured["job_fields"] = args[5]
+        captured["encrypted_agent_parameters"] = args[6]
+        return job_fixture
+
+    mocker.patch(
+        "supervaizer.routes.service_job_custom",
+        new=mock_service_job_custom,
+    )
+
+    client = TestClient(server_fixture.app)
+    response = client.post(
+        f"/api/supervaizer{agent_fixture.path}/custom/method2",
+        json={
+            "job_context": {
+                "workspace_id": context_fixture.workspace_id,
+                "job_id": context_fixture.job_id,
+                "started_by": context_fixture.started_by,
+                "started_at": context_fixture.started_at.isoformat(),
+                "mission_id": context_fixture.mission_id,
+                "mission_name": context_fixture.mission_name,
+            },
+            "job_fields": {"answer": 42},
+            "encrypted_agent_parameters": "encrypted",
+        },
+        headers={"X-API-Key": server_fixture.api_key},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["job_id"] == job_fixture.id
+    assert captured["method_name"] == "method2"
+    assert captured["sv_context"].job_id == context_fixture.job_id
+    assert captured["job_fields"] == {"answer": 42}
+    assert captured["encrypted_agent_parameters"] == "encrypted"
 
 
 @pytest.mark.asyncio
@@ -363,10 +410,10 @@ async def test_get_agent_jobs_endpoint(
     mocker: Any,
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
-    exception: Optional[Exception],
-    status_filter: Optional[EntityStatus],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
+    exception: Exception | None,
+    status_filter: EntityStatus | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
 ) -> None:
     """Test the get_agent_jobs endpoint with parametrization"""
     i_tested_something = False
@@ -460,10 +507,10 @@ async def test_get_job_status_for_agent(
     monkeypatch: pytest.MonkeyPatch,
     no_response_validation: Any,
     job_exists: bool,
-    exception: Optional[Exception],
-    expected_error_type: Optional[ErrorType],
-    expected_status: Optional[int],
-    expected_error_message: Optional[str],
+    exception: Exception | None,
+    expected_error_type: ErrorType | None,
+    expected_status: int | None,
+    expected_error_message: str | None,
 ) -> None:
     """Test the get_job_status endpoint for a specific agent with parametrization"""
     i_tested_something = False
@@ -605,6 +652,196 @@ class TestServerLocalMode:
             assert len(server.agents) == 2
             assert server.agents[0].name == "Hello World AI Agent"
             assert server.agents[1].name == agent_fixture.name
+            assert server.agents[0].supervaizer_v2_registration is not None
+        finally:
+            del os.environ["SUPERVAIZER_LOCAL_MODE"]
+
+    def test_local_mode_registers_hello_world_v2_handlers(self) -> None:
+        """The built-in Hello World agent works through the v2 A2A surface/action path."""
+        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        try:
+            server = Server(
+                agents=[],
+                host="localhost",
+                port=8002,
+                environment="test",
+                api_key="test-key",
+            )
+            agent_slug = server.agents[0].slug
+            client = TestClient(server.app)
+            headers = {"X-API-Key": server.api_key}
+
+            card_response = client.get(
+                f"/.well-known/agents/v{server.agents[0].version}/{agent_slug}_agent.json"
+            )
+            assert card_response.status_code == 200
+            assert (
+                card_response.json()["supervaizer"]["v2"]["a2a"]["controller_url"]
+                == "/a2a"
+            )
+            capabilities = card_response.json()["supervaizer"]["v2"]["capabilities"]
+            assert "case.step.awaiting" in capabilities["surfaces"]
+            assert "mission.agent.resource.hello_messages" in capabilities["surfaces"]
+            assert "job.sync" in capabilities["actions"]
+            assert "step.awaiting.submit" in capabilities["actions"]
+            assert "resource.hello_messages.list" in capabilities["actions"]
+
+            surface_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "surface-1",
+                    "method": "supervaizer/surface.load",
+                    "params": {
+                        "request_id": "surface-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "input": {},
+                        "draft_session_id": "draft-1",
+                    },
+                },
+            )
+            assert surface_response.status_code == 200
+            assert (
+                surface_response.json()["result"]["document"]["submit"]["action"]
+                == "job.start"
+            )
+
+            action_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "action-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "action-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "action": "job.start.preview",
+                        "input": {"count": 0},
+                    },
+                },
+            )
+            assert action_response.status_code == 200
+            assert (
+                action_response.json()["result"]["effects"][0]["type"]
+                == "job.start.previewed"
+            )
+
+            resource_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "resource-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "resource-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "mission.agent.resource.hello_messages",
+                        "action": "resource.hello_messages.list",
+                        "input": {},
+                    },
+                },
+            )
+            assert resource_response.status_code == 200
+            resource_result = resource_response.json()["result"]
+            assert resource_result["effects"][0]["type"] == "resource.listed"
+            assert resource_result["effects"][0]["resource"] == "hello_messages"
+
+            start_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "start-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "start-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "job.start",
+                        "action": "job.start",
+                        "input": {"count": 1, "enable_human_review": True},
+                        "job_id": "job-1",
+                    },
+                },
+            )
+            assert start_response.status_code == 200
+            start_result = start_response.json()["result"]
+            assert start_result["effects"][0]["status"] == "awaiting"
+            step = start_result["job_state"]["cases"][0]["steps"][0]
+            assert step["status"] == "awaiting"
+            assert step["awaiting"]["surface"] == "case.step.awaiting"
+
+            awaiting_surface_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "awaiting-surface-1",
+                    "method": "supervaizer/surface.load",
+                    "params": {
+                        "request_id": "awaiting-surface-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "case.step.awaiting",
+                        "input": {},
+                        "job_id": "job-1",
+                        "case_id": "hello-review-1",
+                        "step_id": "human-review",
+                    },
+                },
+            )
+            assert awaiting_surface_response.status_code == 200
+            assert (
+                awaiting_surface_response.json()["result"]["document"]["submit"][
+                    "action"
+                ]
+                == "step.awaiting.submit"
+            )
+
+            submit_response = client.post(
+                "/a2a",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "submit-1",
+                    "method": "supervaizer/action.invoke",
+                    "params": {
+                        "request_id": "submit-1",
+                        "actor": {"user_id": "user-1"},
+                        "workspace": {"id": "workspace-1"},
+                        "mission_id": "mission-1",
+                        "agent_slug": agent_slug,
+                        "surface": "case.step.awaiting",
+                        "action": "step.awaiting.submit",
+                        "input": {"response_data": {"approved": True}},
+                        "job_id": "job-1",
+                        "case_id": "hello-review-1",
+                        "step_id": "human-review",
+                    },
+                },
+            )
+            assert submit_response.status_code == 200
+            submit_result = submit_response.json()["result"]
+            assert submit_result["effects"][0]["type"] == "step.awaiting.submitted"
+            assert submit_result["job_state"]["job"]["status"] == "completed"
         finally:
             del os.environ["SUPERVAIZER_LOCAL_MODE"]
 

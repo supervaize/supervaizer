@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -19,9 +19,9 @@ exponential backoff, and detailed health reporting for deployment verification.
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import httpx
 from rich.console import Console
@@ -47,9 +47,9 @@ class HealthCheckResult:
 
     status: HealthStatus
     response_time: float
-    status_code: Optional[int] = None
-    error_message: Optional[str] = None
-    endpoint: Optional[str] = None
+    status_code: int | None = None
+    error_message: str | None = None
+    endpoint: str | None = None
     timestamp: float = 0.0
 
     def __post_init__(self) -> None:
@@ -67,7 +67,7 @@ class HealthCheckConfig:
     max_delay: float = 30.0
     backoff_multiplier: float = 2.0
     success_threshold: int = 1  # Number of successful checks required
-    endpoints: Optional[List[str]] = None
+    endpoints: list[str] | None = None
 
     def __post_init__(self) -> None:
         if self.endpoints is None:
@@ -77,15 +77,15 @@ class HealthCheckConfig:
 class HealthVerifier:
     """Enhanced health verification with retry logic and exponential backoff."""
 
-    def __init__(self, config: Optional[HealthCheckConfig] = None):
+    def __init__(self, config: HealthCheckConfig | None = None):
         """Initialize the health verifier with configuration."""
         self.config = config or HealthCheckConfig()
 
     def verify_health(
         self,
         service_url: str,
-        api_key: Optional[str] = None,
-        config: Optional[HealthCheckConfig] = None,
+        api_key: str | None = None,
+        config: HealthCheckConfig | None = None,
     ) -> HealthCheckResult:
         """
         Verify service health with retry logic and exponential backoff.
@@ -146,9 +146,9 @@ class HealthVerifier:
             except httpx.TimeoutException:
                 last_error = f"Request timeout after {config.timeout}s"
             except httpx.RequestError as e:
-                last_error = f"Request error: {str(e)}"
+                last_error = f"Request error: {e!s}"
             except Exception as e:
-                last_error = f"Unexpected error: {str(e)}"
+                last_error = f"Unexpected error: {e!s}"
 
             # Calculate delay for next attempt
             if attempt < config.max_retries - 1:
@@ -172,8 +172,8 @@ class HealthVerifier:
     def verify_health_async(
         self,
         service_url: str,
-        api_key: Optional[str] = None,
-        config: Optional[HealthCheckConfig] = None,
+        api_key: str | None = None,
+        config: HealthCheckConfig | None = None,
     ) -> HealthCheckResult:
         """
         Async version of health verification.
@@ -191,8 +191,8 @@ class HealthVerifier:
     async def _verify_health_async(
         self,
         service_url: str,
-        api_key: Optional[str] = None,
-        config: Optional[HealthCheckConfig] = None,
+        api_key: str | None = None,
+        config: HealthCheckConfig | None = None,
     ) -> HealthCheckResult:
         """Internal async health verification implementation."""
         config = config or self.config
@@ -243,9 +243,9 @@ class HealthVerifier:
                 except httpx.TimeoutException:
                     last_error = f"Request timeout after {config.timeout}s"
                 except httpx.RequestError as e:
-                    last_error = f"Request error: {str(e)}"
+                    last_error = f"Request error: {e!s}"
                 except Exception as e:
-                    last_error = f"Unexpected error: {str(e)}"
+                    last_error = f"Unexpected error: {e!s}"
 
                 # Calculate delay for next attempt
                 if attempt < config.max_retries - 1:
@@ -269,10 +269,10 @@ class HealthVerifier:
     def verify_multiple_endpoints(
         self,
         service_url: str,
-        endpoints: List[str],
-        api_key: Optional[str] = None,
-        config: Optional[HealthCheckConfig] = None,
-    ) -> Dict[str, HealthCheckResult]:
+        endpoints: list[str],
+        api_key: str | None = None,
+        config: HealthCheckConfig | None = None,
+    ) -> dict[str, HealthCheckResult]:
         """
         Verify multiple endpoints and return individual results.
 
@@ -307,8 +307,8 @@ class HealthVerifier:
         return results
 
     def get_health_summary(
-        self, results: Dict[str, HealthCheckResult]
-    ) -> Dict[str, Any]:
+        self, results: dict[str, HealthCheckResult]
+    ) -> dict[str, Any]:
         """
         Generate a summary of health check results.
 
@@ -351,7 +351,7 @@ class HealthVerifier:
 
 def verify_service_health(
     service_url: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     timeout: int = 60,
     max_retries: int = 5,
 ) -> bool:
@@ -375,7 +375,7 @@ def verify_service_health(
     return result.status == HealthStatus.HEALTHY
 
 
-def display_health_results(results: Dict[str, HealthCheckResult]) -> None:
+def display_health_results(results: dict[str, HealthCheckResult]) -> None:
     """
     Display health check results in a formatted table.
 

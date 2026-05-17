@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -17,15 +17,14 @@ Tests for deployment drivers.
 import pytest
 from pytest_mock import MockerFixture
 
+from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
+from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver, ClientError
 from supervaizer.deploy.drivers.base import (
     ActionType,
     BaseDriver,
 )
 from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
-from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver, ClientError
-
 from supervaizer.deploy.drivers.do_app_platform import DOAppPlatformDriver
-from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 
 
 class TestBaseDriver:

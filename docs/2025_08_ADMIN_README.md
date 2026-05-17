@@ -1,5 +1,9 @@
 # Supervaizer Admin Interface
 
+
+> **Created:** 2025-08-05
+> **Updated:** 2026-03-23
+
 A lightweight web-based admin interface for managing WorkflowEntity objects (Jobs and Cases) using FastAPI, TinyDB, and HTMX.
 
 ## Features

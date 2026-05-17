@@ -4,7 +4,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2025 Alain Prasquier - Supervaize.com. All rights reserved.
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
 #
 # This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 # If a copy of the MPL was not distributed with this file, you can obtain one at
@@ -18,7 +18,7 @@ This module implements deployment to AWS App Runner.
 
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -65,7 +65,7 @@ else:
 class AWSAppRunnerDriver(BaseDriver):
     """Driver for deploying to AWS App Runner."""
 
-    def __init__(self, region: str, project_id: Optional[str] = None):
+    def __init__(self, region: str, project_id: str | None = None):
         """Initialize AWS App Runner driver."""
         if not AWS_AVAILABLE:
             raise ImportError(
@@ -89,8 +89,8 @@ class AWSAppRunnerDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
     ) -> DeploymentPlan:
         """Plan deployment changes without applying them."""
         full_service_name = self.get_service_key(service_name, environment)
@@ -207,8 +207,8 @@ class AWSAppRunnerDriver(BaseDriver):
         environment: str,
         image_tag: str,
         port: int = 8000,
-        env_vars: Optional[Dict[str, str]] = None,
-        secrets: Optional[Dict[str, str]] = None,
+        env_vars: dict[str, str] | None = None,
+        secrets: dict[str, str] | None = None,
         timeout: int = 300,
     ) -> DeploymentResult:
         """Deploy or update the service."""
@@ -364,7 +364,7 @@ class AWSAppRunnerDriver(BaseDriver):
         """Verify service health by checking the health endpoint."""
         return self.verify_health_enhanced(service_url, timeout=timeout)
 
-    def check_prerequisites(self) -> List[str]:
+    def check_prerequisites(self) -> list[str]:
         """Check prerequisites and return list of missing requirements."""
         errors = []
 
@@ -417,7 +417,7 @@ class AWSAppRunnerDriver(BaseDriver):
             else:
                 raise
 
-    def _create_or_update_secrets(self, secrets: Dict[str, str]) -> None:
+    def _create_or_update_secrets(self, secrets: dict[str, str]) -> None:
         """Create or update secrets in Secrets Manager."""
         for secret_name, secret_value in secrets.items():
             try:
@@ -444,8 +444,8 @@ class AWSAppRunnerDriver(BaseDriver):
         repo_name: str,
         image_tag: str,
         port: int,
-        env_vars: Dict[str, str],
-        secrets: Dict[str, str],
+        env_vars: dict[str, str],
+        secrets: dict[str, str],
     ) -> str:
         """Create or update App Runner service."""
         account_id = self._get_account_id()
@@ -460,7 +460,7 @@ class AWSAppRunnerDriver(BaseDriver):
 
         # Build secret references
         secret_refs = []
-        for secret_name in secrets.keys():
+        for secret_name in secrets:
             secret_refs.append({
                 "Name": secret_name,
                 "ValueFrom": f"arn:aws:secretsmanager:{self.region}:{account_id}:secret:{secret_name}",
@@ -514,7 +514,7 @@ class AWSAppRunnerDriver(BaseDriver):
             else:
                 raise
 
-    def _wait_for_service_ready(self, service_arn: str, timeout: int) -> Optional[str]:
+    def _wait_for_service_ready(self, service_arn: str, timeout: int) -> str | None:
         """Wait for service to be ready and return URL."""
         start_time = time.time()
 
