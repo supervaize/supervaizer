@@ -272,10 +272,7 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     )
     assert len(contacts.mounted_views) == 1
     assert contacts.mounted_views[0].view == "import"
-    assert (
-        contacts.mounted_views[0].surface
-        == "mission.agent.surface.contact_import"
-    )
+    assert contacts.mounted_views[0].surface == "mission.agent.surface.contact_import"
 
 
 def test_v2_resource_field_options_source_is_typed() -> None:
@@ -325,6 +322,38 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
                 "display": {"columns": ["campaign_name", "completion_pct"]},
             }
         ],
+        dashboards=[
+            {
+                "id": "mission_overview",
+                "label": "Mission Overview",
+                "widgets": [
+                    {
+                        "id": "completion_chart",
+                        "title": "Completion",
+                        "data": {
+                            "mode": "ref",
+                            "datasetId": "campaign_progress",
+                        },
+                        "visualization": {
+                            "type": "vega-lite",
+                            "spec": {
+                                "mark": "bar",
+                                "encoding": {
+                                    "x": {
+                                        "field": "campaign_name",
+                                        "type": "nominal",
+                                    },
+                                    "y": {
+                                        "field": "completion_pct",
+                                        "type": "quantitative",
+                                    },
+                                },
+                            },
+                        },
+                    }
+                ],
+            }
+        ],
         case_lanes=[{"id": "work", "label": "Work", "default": True}],
         job_policy={"sync": {"action": "job.sync"}},
     )
@@ -338,6 +367,7 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "case.step.awaiting",
         "mission.agent.resource.contacts",
         "mission.agent.dataset.campaign_progress",
+        "mission.analytics",
     ]
     assert registration.capabilities.actions == [
         "job.start",
@@ -347,13 +377,47 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "dataset.campaign_progress.query",
         "job.sync",
     ]
+    assert registration.resources[0].scope == "workspace"
+    assert registration.resources[0].requires_context == ["workspace.id"]
     assert registration.resources[0].fields[0].id == "email"
     assert registration.datasets[0].display is not None
     assert registration.datasets[0].display.columns == [
         "campaign_name",
         "completion_pct",
     ]
+    widget = registration.dashboards[0].widgets[0]
+    assert widget.visualization.type == "vega-lite"
+    assert widget.data is not None
+    assert widget.data.mode == "ref"
+    assert widget.data.datasetId == "campaign_progress"
+    assert widget.visualization.spec == {
+        "mark": "bar",
+        "encoding": {
+            "x": {"field": "campaign_name", "type": "nominal"},
+            "y": {"field": "completion_pct", "type": "quantitative"},
+        },
+    }
     assert registration.capabilities.case_lanes[0].default is True
+
+
+def test_v2_dashboard_widget_validates_data_ref_target() -> None:
+    with pytest.raises(ValidationError, match="datasetId"):
+        V2DashboardWidgetDataRef(mode="ref")
+
+
+def test_v2_dashboard_widget_requires_vega_lite_spec() -> None:
+    with pytest.raises(ValidationError, match="visualization.spec"):
+        V2DashboardWidgetDefinition(
+            id="missing-spec",
+            title="Missing Spec",
+            visualization={"type": "vega-lite"},
+            data={"mode": "ref", "datasetId": "metrics"},
+        )
+
+
+def test_v2_dashboard_widget_rejects_unknown_visualization() -> None:
+    with pytest.raises(ValidationError):
+        V2DashboardWidgetVisualization(type="agent-specific-chart")
 
 
 def test_v2_awaiting_state_declares_typed_form_fields() -> None:
@@ -423,6 +487,82 @@ def test_v2_surface_request_and_result_models() -> None:
     assert result.document["submit"] == {"action": "job.start"}
 
 
+def test_v2_surface_result_accepts_document_review_a2ui_document() -> None:
+    result = V2SurfaceResult.model_validate({
+        "surface": "case.step.awaiting",
+        "a2ui_version": "v0.8",
+        "document": {
+            "type": "DocumentReview",
+            "document": {
+                "title": "Review",
+                "field": "review_text",
+                "language": "markdown",
+                "value": "# Draft\n\nReview this content.",
+            },
+            "submit": {
+                "action": "step.awaiting.submit",
+                "label": "Approve",
+            },
+            "fields": [
+                {
+                    "id": "review_text",
+                    "label": "Review text",
+                    "type": "text",
+                    "multiline": True,
+                    "required": True,
+                },
+                {
+                    "id": "approved",
+                    "label": "Approved",
+                    "type": "boolean",
+                    "required": True,
+                },
+            ],
+        },
+    })
+
+    assert result.document["type"] == "DocumentReview"
+    assert result.document["submit"]["action"] == "step.awaiting.submit"
+
+
+def test_v2_resource_import_document_declares_columns_and_submit_action() -> None:
+    document = V2A2UIResourceImportDocument.model_validate({
+        "id": "agent.contacts.import",
+        "title": "Enroll users",
+        "resource": "campaign_contacts",
+        "accepted_formats": ["csv", "xlsx"],
+        "fields": [
+            {
+                "id": "campaign_id",
+                "label": "Campaign",
+                "type": "resource_ref",
+                "required": True,
+                "options_source": {"type": "resource", "resource": "campaigns"},
+            }
+        ],
+        "columns": [
+            {"id": "email", "label": "Email", "required": True},
+            {"id": "first_name", "label": "First name"},
+        ],
+        "submit": {"action": "resource.campaign_contacts.import", "label": "Enroll"},
+    })
+
+    assert document.type == "ResourceImport"
+    assert document.columns[0].id == "email"
+    assert document.submit.action == "resource.campaign_contacts.import"
+
+
+def test_v2_resource_import_document_requires_csv_columns() -> None:
+    with pytest.raises(ValidationError, match="columns"):
+        V2A2UIResourceImportDocument.model_validate({
+            "id": "agent.contacts.import",
+            "title": "Enroll users",
+            "resource": "campaign_contacts",
+            "accepted_formats": ["csv"],
+            "submit": {"action": "resource.campaign_contacts.import"},
+        })
+
+
 def test_v2_job_state_snapshot_fixture() -> None:
     fixture = load_v2_fixture("agent_interviewer_mvp.json")
 
@@ -467,11 +607,26 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
         supervaizer.SupervaizerV2AgentRegistrationContract
         is SupervaizerV2AgentRegistrationContract
     )
+    assert supervaizer.V2A2AController.__name__ == "V2A2AController"
+    assert supervaizer.V2A2AExternalInterop.__name__ == "V2A2AExternalInterop"
+    assert supervaizer.V2A2ATransport.__name__ == "V2A2ATransport"
+    assert supervaizer.V2A2UIResourceImportDocument is V2A2UIResourceImportDocument
     assert supervaizer.V2ActionRequest is V2ActionRequest
+    assert supervaizer.V2DashboardDefinition.__name__ == "V2DashboardDefinition"
+    assert supervaizer.V2DashboardWidgetDataRef is V2DashboardWidgetDataRef
+    assert supervaizer.V2DashboardWidgetDefinition is V2DashboardWidgetDefinition
+    assert supervaizer.V2DashboardWidgetVisualization is V2DashboardWidgetVisualization
     assert supervaizer.V2JobStateSnapshot is V2JobStateSnapshot
+    assert supervaizer.V2JobSyncPolicy.__name__ == "V2JobSyncPolicy"
+    assert supervaizer.V2MountedResourceViewDefinition.__name__ == (
+        "V2MountedResourceViewDefinition"
+    )
     assert supervaizer.V2ReplaySafetyMetadata is V2ReplaySafetyMetadata
     assert supervaizer.V2AwaitingFieldDefinition.__name__ == (
         "V2AwaitingFieldDefinition"
+    )
+    assert supervaizer.V2ResourceDisplayDefinition.__name__ == (
+        "V2ResourceDisplayDefinition"
     )
     assert supervaizer.V2ResourceFieldDefinition.__name__ == (
         "V2ResourceFieldDefinition"

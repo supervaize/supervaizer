@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-05-16
+> **Updated:** 2026-05-17
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -52,12 +52,12 @@ from supervaizer.contracts import (
 )
 
 registration = build_v2_agent_registration(
-    agent_id="agent-interviewer",
-    agent_slug="agent-interviewer",
-    display_name="Agent Interviewer",
-    agent_card_url="/.well-known/agents/v1.0.0/agent-interviewer_agent.json",
+    agent_id="research-agent",
+    agent_slug="research-agent",
+    display_name="Research Agent",
+    agent_card_url="/.well-known/agents/v1.0.0/research-agent_agent.json",
     controller_url="/a2a",
-    a2ui_catalog_version="agent-interviewer.2026-05-16",
+    a2ui_catalog_version="research-agent.2026-05-16",
     surfaces=[
         "job.start",
         "case.step.awaiting",
@@ -90,7 +90,7 @@ registration = build_v2_agent_registration(
 )
 
 agent = Agent(
-    name="Agent Interviewer",
+    name="Research Agent",
     version="1.0.0",
     supervaizer_v2_registration=registration,
     # v1 fields may still exist during transition in older agents,
@@ -113,26 +113,26 @@ from supervaizer.contracts import V2ActionRequest, V2ActionResult, V2SurfaceRequ
 server = Server(agents=[agent])
 
 
-@server.v2_surface("job.start", agent_slug="agent-interviewer")
+@server.v2_surface("job.start", agent_slug="research-agent")
 def load_job_start(request: V2SurfaceRequest) -> dict:
     return {
         "surface": request.surface,
         "document": {
             "type": "Form",
             "fields": [
-                {"id": "campaign_id", "label": "Campaign", "type": "string"},
+                {"id": "topic_id", "label": "Topic", "type": "string"},
             ],
-            "submit": {"label": "Start campaign", "action": "job.start"},
+            "submit": {"label": "Start research", "action": "job.start"},
         },
     }
 
 
-@server.v2_action("job.start", agent_slug="agent-interviewer")
+@server.v2_action("job.start", agent_slug="research-agent")
 def start_job(request: V2ActionRequest) -> V2ActionResult:
-    campaign_id = request.input["campaign_id"]
+    topic_id = request.input["topic_id"]
     return V2ActionResult(
         status="ok",
-        effects=[{"type": "job.started", "campaign_id": campaign_id}],
+        effects=[{"type": "job.started", "data": {"topic_id": topic_id}}],
     )
 ```
 
@@ -174,6 +174,45 @@ In the current SDK model:
 
 HITL is therefore not a Step kind. It is represented by `status="awaiting"` plus an `awaiting` object with a surface, action, and fields.
 
+The awaiting `surface` can return any valid A2UI document through `V2SurfaceResult.document`. For mounted review workflows, agents can return a generic `DocumentReview` document that contains document content, submit metadata, and typed fields. Supervaizer does not interpret document-review semantics; Studio renders the A2UI document and invokes the declared action, usually `step.awaiting.submit`.
+
+Example:
+
+```python
+V2SurfaceResult(
+    surface="case.step.awaiting",
+    a2ui_version="v0.8",
+    document={
+        "type": "DocumentReview",
+        "document": {
+            "title": "Review",
+            "field": "review_text",
+            "language": "markdown",
+            "value": "# Draft\n\nReview this content.",
+            "validation": [
+                {"id": "readiness", "label": "Ready for approval", "status": "review"}
+            ],
+        },
+        "submit": {"action": "step.awaiting.submit", "label": "Approve"},
+        "fields": [
+            {
+                "id": "review_text",
+                "label": "Review text",
+                "type": "text",
+                "multiline": True,
+                "required": True,
+            },
+            {
+                "id": "approve_review",
+                "label": "Approve review",
+                "type": "boolean",
+                "required": True,
+            }
+        ],
+    },
+)
+```
+
 ### Artifact
 
 Artifacts are agent-owned outputs. The protocol only defines the reference shape:
@@ -191,11 +230,11 @@ Resources are agent-owned business objects Studio can manage generically.
 
 Examples:
 
-- campaigns
+- projects
 - contacts
 - prompts
 - scenarios
-- campaign_contacts
+- project_contacts
 
 A resource declaration can include:
 
@@ -225,6 +264,59 @@ An auto-surfaced dataset declares:
 
 The SDK derives the action id `dataset.<id>.query`. Studio can render the result in generic tables and dashboards, including `mission.analytics` surfaces.
 
+## Dashboards
+
+Dashboards are declarative registration metadata for Studio-rendered views. They do not create AnalyticsResource routes and they do not imply agent-specific analytics business logic.
+
+A dashboard declares:
+
+- `id`
+- `label`
+- `surface`, defaulting to `mission.analytics`
+- `widgets`
+
+Each widget can reference data from a dataset, typed action, or inline sample data. Widgets carry a `visualization` object whose `type` is `table`, `metric`, `vega-lite`, or `custom`. For Vega-Lite charts, use `visualization.type = "vega-lite"` and place the Vega-Lite JSON spec in `visualization.spec`. Studio is responsible for rendering and validating the visualization; Supervaizer only transports the typed contract.
+
+Example:
+
+```python
+registration = build_v2_agent_registration(
+    # ...
+    datasets=[
+        {
+            "id": "progress_metrics",
+            "label": "Progress Metrics",
+            "auto_surface": True,
+            "display": {"columns": ["label", "value"]},
+        }
+    ],
+    dashboards=[
+        {
+            "id": "mission_overview",
+            "label": "Mission Overview",
+            "widgets": [
+                {
+                    "id": "progress_chart",
+                    "title": "Progress",
+                    "data": {"mode": "ref", "datasetId": "progress_metrics"},
+                    "visualization": {
+                        "type": "vega-lite",
+                        "spec": {
+                            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                            "mark": "bar",
+                            "encoding": {
+                                "x": {"field": "label", "type": "nominal"},
+                                "y": {"field": "value", "type": "quantitative"},
+                            },
+                        },
+                    },
+                }
+            ],
+        }
+    ],
+)
+```
+
 ## Surfaces
 
 Surfaces are named UI entry points. A surface handler returns an A2UI document.
@@ -242,6 +334,16 @@ Common surface IDs:
 | `mission.agent.dataset.<dataset_id>` | Studio-generated dataset surface. |
 
 Mounted resource views use a resource-shaped URL in Studio but let the agent replace a whole view, such as `edit` or `import`, with a custom A2UI surface.
+
+For imports, agents should use the `ResourceImport` A2UI document shape. The document declares:
+
+- `resource`, such as `campaign_contacts`
+- `accepted_formats`, currently `csv` and optionally `xlsx`
+- contextual `fields`, such as a required campaign picker
+- row `columns`, such as `email` and `phone_number`
+- `submit.action`, such as `resource.campaign_contacts.import`
+
+Studio reads this document to show the required format, validate CSV rows before submit, and route the typed action. The agent remains responsible for tenant checks, business validation, persistence, and returning typed effects. If an import changes an existing Job, the action can return a top-level `job_state`; Studio treats that like `job.sync` and upserts the returned cases and steps.
 
 ## Actions
 

@@ -310,7 +310,7 @@ class Case(CaseAbstractModel):
 
         Sets upsert=True so Studio performs an update_or_create on the step at that index.
         Use this when a later event should enrich or complete a previously sent step
-        (e.g. adding interview end time to the interview start step).
+        (e.g. adding completion metadata to a previously started step).
         """
         updateCaseNode.index = index
         updateCaseNode.upsert = True

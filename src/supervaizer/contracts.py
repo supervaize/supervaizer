@@ -136,6 +136,8 @@ class DataResourceContract(ContractModel):
     read_only: bool = False
     importable: bool = False
     operations: dict[str, bool] = Field(default_factory=dict)
+    scope: Literal["workspace", "mission", "job"] = "workspace"
+    requires_context: list[str] = Field(default_factory=lambda: ["workspace_id"])
 
 
 class AgentMethodFieldContract(ContractModel):
@@ -339,6 +341,42 @@ class V2ResourceFieldDefinition(ContractModel):
     options_source: V2ResourceFieldOptionsSource | None = None
 
 
+class V2A2UISubmitDefinition(ContractModel):
+    action: str
+    label: str | None = None
+
+
+class V2A2UIResourceImportColumn(ContractModel):
+    id: str
+    label: str | None = None
+    type: str = "string"
+    required: bool = False
+
+
+class V2A2UIResourceImportDocument(ContractModel):
+    """A2UI-shaped resource import surface consumed by Studio."""
+
+    type: Literal["ResourceImport"] = "ResourceImport"
+    id: str
+    title: str
+    resource: str
+    accepted_formats: list[Literal["csv", "xlsx"]] = Field(
+        default_factory=lambda: ["csv"]
+    )
+    fields: list[V2ResourceFieldDefinition] = Field(default_factory=list)
+    columns: list[V2A2UIResourceImportColumn] = Field(default_factory=list)
+    submit: V2A2UISubmitDefinition
+    state: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_import_shape(self) -> V2A2UIResourceImportDocument:
+        if not self.columns and "csv" in self.accepted_formats:
+            raise ValueError(
+                "ResourceImport documents that accept csv must declare columns"
+            )
+        return self
+
+
 class V2MountedResourceViewDefinition(ContractModel):
     """Agent override that mounts an A2UI surface on a full resource view."""
 
@@ -354,6 +392,8 @@ class V2ResourceDefinition(ContractModel):
     id: str
     label: str
     auto_surface: bool = False
+    scope: Literal["workspace", "mission", "job"] = "workspace"
+    requires_context: list[str] = Field(default_factory=lambda: ["workspace.id"])
     operations: list[str] = Field(default_factory=list)
     display: V2ResourceDisplayDefinition | None = None
     fields: list[V2ResourceFieldDefinition] = Field(default_factory=list)
@@ -367,6 +407,52 @@ class V2DatasetDefinition(ContractModel):
     display: V2ResourceDisplayDefinition | None = None
 
 
+class V2DashboardWidgetDataRef(ContractModel):
+    mode: Literal["ref", "action", "inline"] = "ref"
+    datasetId: str | None = None
+    action: str | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    values: list[dict[str, Any]] | dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_ref_target(self) -> V2DashboardWidgetDataRef:
+        if self.mode == "ref" and not self.datasetId:
+            raise ValueError("Dashboard dataset refs require datasetId")
+        if self.mode == "action" and not self.action:
+            raise ValueError("Dashboard action data refs require action")
+        if self.mode == "inline" and self.values is None:
+            raise ValueError("Dashboard inline data refs require values")
+        return self
+
+
+class V2DashboardWidgetVisualization(ContractModel):
+    type: Literal["table", "metric", "vega-lite", "custom"] = "table"
+    spec: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_spec(self) -> V2DashboardWidgetVisualization:
+        if self.type == "vega-lite" and self.spec is None:
+            raise ValueError("Vega-Lite dashboard widgets require visualization.spec")
+        return self
+
+
+class V2DashboardWidgetDefinition(ContractModel):
+    id: str
+    title: str
+    data: V2DashboardWidgetDataRef | None = None
+    layout: dict[str, Any] = Field(default_factory=dict)
+    visualization: V2DashboardWidgetVisualization = Field(
+        default_factory=V2DashboardWidgetVisualization
+    )
+
+
+class V2DashboardDefinition(ContractModel):
+    id: str
+    label: str
+    surface: str = "mission.analytics"
+    widgets: list[V2DashboardWidgetDefinition] = Field(default_factory=list)
+
+
 class SupervaizerV2AgentRegistrationContract(ContractModel):
     supervaizer_contract_version: Literal[2] = SUPERVAIZER_V2_CONTRACT_VERSION
     agent: V2AgentIdentity
@@ -376,6 +462,7 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
     job_policy: V2JobPolicy = Field(default_factory=V2JobPolicy)
     resources: list[V2ResourceDefinition] = Field(default_factory=list)
     datasets: list[V2DatasetDefinition] = Field(default_factory=list)
+    dashboards: list[V2DashboardDefinition] = Field(default_factory=list)
 
 
 def build_v2_agent_registration(
@@ -390,6 +477,7 @@ def build_v2_agent_registration(
     actions: Iterable[str] = (),
     resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
     datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
+    dashboards: Iterable[V2DashboardDefinition | dict[str, Any]] = (),
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
@@ -402,12 +490,14 @@ def build_v2_agent_registration(
     """Build and validate a Supervaizer v2 registration from SDK primitives."""
     resource_definitions = _contract_list(resources, V2ResourceDefinition)
     dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
+    dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
     sync_policy = _job_policy(job_policy)
 
     capability_surfaces = _unique_strings([
         *surfaces,
         *_auto_resource_surface_ids(resource_definitions),
         *_auto_dataset_surface_ids(dataset_definitions),
+        *_dashboard_surface_ids(dashboard_definitions),
     ])
     capability_actions = _unique_strings([
         *actions,
@@ -446,6 +536,7 @@ def build_v2_agent_registration(
         job_policy=sync_policy,
         resources=resource_definitions,
         datasets=dataset_definitions,
+        dashboards=dashboard_definitions,
     )
 
 
@@ -497,6 +588,10 @@ def _auto_dataset_surface_ids(datasets: Iterable[V2DatasetDefinition]) -> list[s
         for dataset in datasets
         if dataset.auto_surface
     ]
+
+
+def _dashboard_surface_ids(dashboards: Iterable[V2DashboardDefinition]) -> list[str]:
+    return [dashboard.surface for dashboard in dashboards]
 
 
 def _resource_action_ids(resources: Iterable[V2ResourceDefinition]) -> list[str]:
@@ -566,8 +661,14 @@ class V2Effect(ContractModel):
     artifact_id: str | None = None
     status: str | None = None
     message: str | None = None
+    count: int | None = None
     item: dict[str, Any] | None = None
     items: list[dict[str, Any]] | None = None
+    rows: list[dict[str, Any]] | None = None
+    errors: list[dict[str, Any]] | None = None
+    gaps: list[dict[str, Any]] | None = None
+    summary: dict[str, Any] | None = None
+    case: dict[str, Any] | None = None
     data: dict[str, Any] | None = None
 
 
@@ -640,7 +741,7 @@ class V2JobSource(ContractModel):
     target_type: str | None = Field(
         default=None,
         description=(
-            "Agent-declared business object type for external sources (e.g. campaign). "
+            "Agent-declared business object type for external sources (e.g. project). "
             "Open vocabulary unlike protocol-fixed fields such as step activity."
         ),
     )

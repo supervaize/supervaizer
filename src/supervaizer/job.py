@@ -261,7 +261,7 @@ class AbstractJob(SvBaseModel):
     case_ids: list[str] = []  # Foreign key relationship to cases
     metadata: dict[str, Any] = Field(
         default_factory=dict,
-        description="Agent-provided domain metadata (e.g. campaign context)",
+        description="Agent-provided domain metadata (e.g. source object context)",
     )
 
 

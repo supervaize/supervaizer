@@ -1,7 +1,7 @@
 # Protocol Support
 
 > **Created:** 2025-08-06
-> **Updated:** 2026-05-16
+> **Updated:** 2026-05-17
 
 SUPERVAIZER uses several protocol layers. They are related, but they do different jobs:
 
@@ -44,7 +44,7 @@ When an agent declares `supervaizer_v2_registration`, its A2A Agent Card include
 - controller URLs and transport support
 - supported surfaces and actions
 - case lanes and artifact types
-- resource and dataset contracts
+- resource, dataset, and dashboard contracts
 - job policy, including `job.sync` support and offline behavior
 
 This extension does **not** replace the existing Studio server-registration trust model. Studio registration still owns server identity, public key exchange, and encrypted payload handling. The A2A Agent Card advertises the v2 operational contract after the controller is known.
@@ -100,6 +100,12 @@ In Supervaizer v2, A2UI is used for surface payloads:
 - `mission.analytics` dashboards
 - `mission.agent.overview` pages
 - mounted resource views such as prompt editors, scenario builders, or contact import flows
+
+Mounted HITL surfaces can return specialized A2UI document types, such as `DocumentReview`, through the generic `V2SurfaceResult.document` payload. Supervaizer keeps this opaque and typed only as an A2UI document transport; the agent declares the surface/action and Studio renders the document.
+
+Mounted resource import views can return `ResourceImport`. This document declares contextual fields, accepted file formats, row columns, and the submit action. Studio uses it to communicate and enforce the import structure, while the agent still owns validation and persistence.
+
+Dashboard declarations live in the Supervaizer v2 registration contract. Widgets can point at datasets, typed actions, or inline data, and can declare `visualization: { type: "vega-lite", spec: ... }` using the [Vega-Lite](https://vega.github.io/vega-lite/) JSON grammar. This ports the useful chart declaration idea into the generic contract without reviving AnalyticsResource REST routes.
 
 SUPERVAIZER does not render A2UI. The controller transports A2UI documents through `supervaizer/surface.load`; Studio validates the declared `a2ui_version` and renders the document.
 

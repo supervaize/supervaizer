@@ -125,6 +125,8 @@ def test_data_resource_registration_info() -> None:
     assert info["fields"][1]["required"] is True
     assert info["operations"]["create"] is True
     assert info["operations"]["import"] is False
+    assert info["scope"] == "workspace"
+    assert info["requires_context"] == ["workspace_id"]
 
 
 def test_data_resource_display_name_derived_from_name() -> None:

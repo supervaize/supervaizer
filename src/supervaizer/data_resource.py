@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -134,6 +134,14 @@ class DataResource(SvBaseModel):
     fields: list[DataResourceField] = Field(default_factory=list)
     read_only: bool = Field(default=False)
     importable: bool = Field(default=False, description="Enables CSV bulk import route")
+    scope: Literal["workspace", "mission", "job"] = Field(
+        default="workspace",
+        description="Studio context boundary for this resource.",
+    )
+    requires_context: list[str] = Field(
+        default_factory=lambda: ["workspace_id"],
+        description="Context keys Studio must send for resource access control.",
+    )
     # Callbacks — excluded from model serialization
     on_list: Callable[..., list[dict[str, Any]]] | None = Field(
         default=None, exclude=True
@@ -200,4 +208,6 @@ class DataResource(SvBaseModel):
             "read_only": self.read_only,
             "importable": self.importable,
             "operations": self.operations,
+            "scope": self.scope,
+            "requires_context": self.requires_context,
         }
