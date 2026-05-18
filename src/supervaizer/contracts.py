@@ -25,6 +25,9 @@ API_BASE_PATH = "/api"
 SUPERVAIZER_V2_CONTRACT_VERSION: Literal[2] = 2
 SUPERVAIZER_V2_A2UI_VERSION = "v0.8"
 SUPERVAIZER_V2_A2A_VERSION = "0.2.6"
+WORKSPACE_BINDING_OPTIONS_ACTION = "workspace_binding.options"
+WORKSPACE_BINDING_CREATE_ACTION = "workspace_binding.create"
+WORKSPACE_BINDING_CREATE_SURFACE = "workspace_binding.create"
 
 
 class ContractModel(BaseModel):
@@ -457,6 +460,42 @@ class V2DashboardDefinition(ContractModel):
     widgets: list[V2DashboardWidgetDefinition] = Field(default_factory=list)
 
 
+class V2WorkspaceBindingExistingDefinition(ContractModel):
+    action: str = WORKSPACE_BINDING_OPTIONS_ACTION
+    value_field: str = "agent_workspace_ref"
+    label_field: str = "display_name"
+
+
+class V2WorkspaceBindingCreateDefinition(ContractModel):
+    surface: str = WORKSPACE_BINDING_CREATE_SURFACE
+    action: str = WORKSPACE_BINDING_CREATE_ACTION
+    fields: list[V2ResourceFieldDefinition] = Field(default_factory=list)
+
+
+class V2WorkspaceBindingDefinition(ContractModel):
+    required: bool = False
+    modes: list[Literal["bind_existing", "create_and_bind"]] = Field(
+        default_factory=list
+    )
+    reference_label: str = "Agent workspace reference"
+    reference_help: str = (
+        "Select or create the agent-side record this Studio workspace may access."
+    )
+    reference_placeholder: str = "Example: workspace-prod"
+    existing: V2WorkspaceBindingExistingDefinition | None = None
+    create: V2WorkspaceBindingCreateDefinition | None = None
+
+    @model_validator(mode="after")
+    def validate_modes(self) -> V2WorkspaceBindingDefinition:
+        if self.required and not self.modes:
+            raise ValueError("workspace_binding.required requires at least one mode")
+        if "bind_existing" in self.modes and self.existing is None:
+            self.existing = V2WorkspaceBindingExistingDefinition()
+        if "create_and_bind" in self.modes and self.create is None:
+            self.create = V2WorkspaceBindingCreateDefinition()
+        return self
+
+
 class SupervaizerV2AgentRegistrationContract(ContractModel):
     supervaizer_contract_version: Literal[2] = SUPERVAIZER_V2_CONTRACT_VERSION
     agent: V2AgentIdentity
@@ -467,6 +506,7 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
     resources: list[V2ResourceDefinition] = Field(default_factory=list)
     datasets: list[V2DatasetDefinition] = Field(default_factory=list)
     dashboards: list[V2DashboardDefinition] = Field(default_factory=list)
+    workspace_binding: V2WorkspaceBindingDefinition | None = None
 
 
 def build_v2_agent_registration(
@@ -482,6 +522,7 @@ def build_v2_agent_registration(
     resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
     datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
     dashboards: Iterable[V2DashboardDefinition | dict[str, Any]] = (),
+    workspace_binding: V2WorkspaceBindingDefinition | dict[str, Any] | None = None,
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
@@ -495,6 +536,7 @@ def build_v2_agent_registration(
     resource_definitions = _contract_list(resources, V2ResourceDefinition)
     dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
+    workspace_binding_definition = _workspace_binding(workspace_binding)
     sync_policy = _job_policy(job_policy)
 
     capability_surfaces = _unique_strings([
@@ -502,12 +544,14 @@ def build_v2_agent_registration(
         *_auto_resource_surface_ids(resource_definitions),
         *_auto_dataset_surface_ids(dataset_definitions),
         *_dashboard_surface_ids(dashboard_definitions),
+        *_workspace_binding_surface_ids(workspace_binding_definition),
     ])
     capability_actions = _unique_strings([
         *actions,
         *_resource_action_ids(resource_definitions),
         *_dataset_action_ids(dataset_definitions),
         *(_job_sync_actions(sync_policy)),
+        *_workspace_binding_action_ids(workspace_binding_definition),
     ])
 
     return SupervaizerV2AgentRegistrationContract(
@@ -541,6 +585,7 @@ def build_v2_agent_registration(
         resources=resource_definitions,
         datasets=dataset_definitions,
         dashboards=dashboard_definitions,
+        workspace_binding=workspace_binding_definition,
     )
 
 
@@ -565,6 +610,16 @@ def _contract_or_default[ContractModelT: ContractModel](
 
 def _job_policy(value: V2JobPolicy | dict[str, Any] | None) -> V2JobPolicy:
     return _contract_or_default(value, V2JobPolicy)
+
+
+def _workspace_binding(
+    value: V2WorkspaceBindingDefinition | dict[str, Any] | None,
+) -> V2WorkspaceBindingDefinition | None:
+    if value is None:
+        return None
+    if isinstance(value, V2WorkspaceBindingDefinition):
+        return value
+    return V2WorkspaceBindingDefinition.model_validate(value)
 
 
 def _unique_strings(values: Iterable[str]) -> list[str]:
@@ -616,6 +671,27 @@ def _job_sync_actions(job_policy: V2JobPolicy) -> list[str]:
     return [job_policy.sync.action]
 
 
+def _workspace_binding_action_ids(
+    workspace_binding: V2WorkspaceBindingDefinition | None,
+) -> list[str]:
+    if workspace_binding is None:
+        return []
+    action_ids: list[str] = []
+    if workspace_binding.existing is not None:
+        action_ids.append(workspace_binding.existing.action)
+    if workspace_binding.create is not None:
+        action_ids.append(workspace_binding.create.action)
+    return action_ids
+
+
+def _workspace_binding_surface_ids(
+    workspace_binding: V2WorkspaceBindingDefinition | None,
+) -> list[str]:
+    if workspace_binding is None or workspace_binding.create is None:
+        return []
+    return [workspace_binding.create.surface]
+
+
 class V2ActorContext(ContractModel):
     user_id: str
 
@@ -633,7 +709,7 @@ class V2VerifiedWorkspaceContext(ContractModel):
     agent_slug: str
     server_id: str
     scopes: list[str] = Field(default_factory=list)
-    agent_tenant_ref: str | None = None
+    agent_workspace_ref: str | None = None
 
 
 class V2WorkspaceAuthorizationSettings(ContractModel):

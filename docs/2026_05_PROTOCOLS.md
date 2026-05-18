@@ -68,6 +68,12 @@ Supervaizer v2 currently exposes two A2A JSON-RPC methods:
 
 Both methods are scoped by `agent_slug`. In multi-agent controllers, handlers must be registered for the correct agent slug.
 
+Workspace-scoped calls require a Studio-signed workspace authorization token.
+The only bootstrap exceptions are `workspace_binding.*` actions and the
+`workspace_binding.create` surface. These calls are used before a Workspace
+Agent Grant exists, so they require normal Studio-to-agent transport
+authentication but not a workspace authorization token.
+
 ### Transport Status
 
 The current MVP advertises:

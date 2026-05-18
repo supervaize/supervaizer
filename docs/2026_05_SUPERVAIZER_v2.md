@@ -110,6 +110,14 @@ When Studio operates an agent shared into another workspace, Studio must prove t
 
 Agents may be stateless. They do not need to persist grants locally. The agent verifies the token on every request and uses the verified grant context for resource access, dataset queries, `job.start`, `job.sync`, artifacts, and HITL actions.
 
+If an agent requires an agent-side record before accepting a workspace, it can
+declare `workspace_binding` in its v2 registration. Supervaizer treats
+`workspace_binding.*` actions and the `workspace_binding.create` surface as
+bootstrap capabilities: they still require Studio-to-agent transport
+authentication, but they run before a workspace authorization token exists. All
+other workspace-scoped actions and surfaces fail closed without a valid
+workspace authorization token.
+
 See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md) for the implementation plan.
 
 ## Runtime Handlers

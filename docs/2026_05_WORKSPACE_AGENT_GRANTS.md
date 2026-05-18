@@ -16,7 +16,7 @@ Studio must be the source of truth for workspace approval.
 When a workspace admin accepts an agent, Studio creates a durable grant. This
 applies both to recipient workspaces for shared agents and to the owner workspace
 for its own agent. The owner workspace is not a runtime authorization bypass; it
-must have an accepted grant with an explicit agent-side tenant binding before
+must have an accepted grant with an explicit agent-side workspace binding before
 Studio can operate the agent.
 
 ```text
@@ -118,7 +118,7 @@ Recommended claims:
     "resource.campaigns.list",
     "job.start"
   ],
-  "agent_tenant_ref": "01AGENTTENANT",
+  "agent_workspace_ref": "01AGENTWORKSPACE",
   "iat": 1779100000,
   "exp": 1779100600,
   "jti": "01TOKEN"
@@ -127,12 +127,54 @@ Recommended claims:
 
 `workspace_slug` is informational. The trusted identity is `workspace_id` plus `grant_id`.
 
-`agent_tenant_ref` is useful for stateless agents. If present, Studio owns the
-binding between the Studio workspace grant and the agent-side tenant reference.
+`agent_workspace_ref` is useful for stateless agents. If present, Studio owns the
+binding between the Studio workspace grant and the agent-side workspace reference.
 If absent, the agent may resolve the binding from an external trusted data store
 using `grant_id` or `workspace_id`. Agents that cannot resolve that binding from
-another trusted store must require `agent_tenant_ref` and fail clearly when it is
+another trusted store must require `agent_workspace_ref` and fail clearly when it is
 missing.
+
+## Workspace Binding Registration
+
+Agents that need an agent-side record before Studio can operate them declare a
+generic `workspace_binding` block in the Supervaizer v2 registration. The block
+does not name agent-specific concepts such as tenant, account, or project.
+
+```json
+{
+  "workspace_binding": {
+    "required": true,
+    "modes": ["bind_existing", "create_and_bind"],
+    "reference_label": "Agent workspace reference",
+    "reference_help": "Select or create the agent-side record this Studio workspace may access.",
+    "reference_placeholder": "Example: workspace-prod",
+    "existing": {
+      "action": "workspace_binding.options",
+      "value_field": "agent_workspace_ref",
+      "label_field": "display_name"
+    },
+    "create": {
+      "surface": "workspace_binding.create",
+      "action": "workspace_binding.create"
+    }
+  }
+}
+```
+
+Supervaizer treats these as bootstrap capabilities:
+
+- `workspace_binding.*` actions may run before the workspace grant exists.
+- `workspace_binding.options` lists existing agent-side records that can be bound.
+- `workspace_binding.create` creates a new agent-side record and returns the
+  `agent_workspace_ref` Studio should store on the grant.
+- `workspace_binding.create` surface can expose an A2UI form for collecting the
+  fields needed to create the agent-side record.
+
+These bootstrap calls still require normal Studio-to-agent transport
+authentication through `SUPERVAIZER_API_KEY`. They do not require an existing
+workspace authorization token because they are used to create the grant that
+future tokens will represent. Every non-bootstrap surface and action remains
+blocked until Studio sends a valid workspace authorization token.
 
 ## Request Transport
 
@@ -169,7 +211,7 @@ The target workspace UI should show the agent as **pending acceptance**, not as 
 
 A workspace admin or agent-manager user accepts the agent. Studio creates
 `WorkspaceAgentGrant(status="accepted")` with explicit scopes and, for agents
-that require stateless tenant binding, a required `agent_tenant_ref`.
+that require stateless workspace binding, a required `agent_workspace_ref`.
 
 Acceptance must be explicit and auditable. Studio records:
 
@@ -204,7 +246,7 @@ WorkspaceContext
 - agent_slug
 - server_id
 - scopes
-- agent_tenant_ref
+- agent_workspace_ref
 ```
 
 Handlers use this context. They must not trust raw `workspace_slug`, `tenant_slug`, or caller-provided resource filters as authorization.
@@ -250,7 +292,7 @@ The acceptance screen should show enough information for an admin or agent manag
 - requested scopes and their user-facing meaning
 - resources and datasets the agent wants to expose
 - whether the agent will access workspace-scoped data
-- the agent-side tenant binding, if configured
+- the agent-side workspace binding, if configured
 - links to terms, documentation, and privacy/security information when available
 
 The primary action should be explicit, for example `Accept agent for this workspace`. A normal member should see that admin approval is required, not a generic failure or empty agent page.
@@ -307,16 +349,16 @@ For `agent_interviewer`, the verified workspace context should drive tenant acce
 Recommended behavior:
 
 - campaign listing requires a valid workspace grant token
-- campaign listing returns only campaigns owned by the verified agent tenant reference
+- campaign listing returns only campaigns owned by the verified agent workspace reference
 - campaign listing still filters to `is_supervaize=true`
 - `job.start` requires `job.start` scope
 - contact import requires the campaign/contact import scope
 - Supabase database or tenant selection must be derived from verified context, not from raw request slug
 
-If the token is valid but no agent-side tenant binding exists, the agent should fail clearly:
+If the token is valid but no agent-side workspace binding exists, the agent should fail clearly:
 
 ```text
-Workspace is authorized in Studio but has no agent-side tenant binding.
+Workspace is authorized in Studio but has no agent-side workspace binding.
 ```
 
 It should not fall back to slug matching.
@@ -339,14 +381,14 @@ It should not fall back to slug matching.
 - Allow only workspace admins and agent-manager users to accept a shared agent.
 - Add target-workspace UI states for available, accepted, revoked, and suspended agents.
 - Add an acceptance screen that explains publisher, server identity, version, contract, scopes, resources, datasets, and data-access impact.
-- Store status, scopes, server id, agent id, workspace id, accepted actor, accepted timestamp, acceptance snapshot, revocation actor, revocation timestamp, and optional agent tenant binding.
+- Store status, scopes, server id, agent id, workspace id, accepted actor, accepted timestamp, acceptance snapshot, revocation actor, revocation timestamp, and optional agent workspace binding.
 - Require re-acceptance when requested scopes or contract fingerprint expand.
 - Revoke grants when the target workspace removes the agent.
 - Expose a signing key or JWKS that agents can verify.
 - Mint short-lived workspace authorization tokens for Studio-to-agent calls.
 - Attach tokens to A2A calls, resource calls, dataset calls, artifact calls, `job.start`, and `job.sync`.
 - Fail clearly when no accepted grant exists for the workspace and agent.
-- Fail clearly when a grant is revoked, suspended, missing scope, or missing agent tenant binding.
+- Fail clearly when a grant is revoked, suspended, missing scope, or missing agent workspace binding.
 
 ### Agent Interviewer
 
@@ -354,7 +396,7 @@ It should not fall back to slug matching.
 - Resolve Supabase tenant/database context from verified workspace grant context.
 - Keep campaign filtering strict: verified tenant plus `is_supervaize=true`.
 - Require explicit scopes for campaign listing, campaign start, contact import, HITL submit, datasets, and artifacts.
-- Add tests for accepted grant, missing grant, wrong workspace, revoked grant, missing scope, and missing tenant binding.
+- Add tests for accepted grant, missing grant, wrong workspace, revoked grant, missing scope, and missing workspace binding.
 
 ## Failure Policy
 
@@ -370,7 +412,7 @@ The system must fail with explicit errors when:
 - the token workspace has no accepted grant
 - the grant is revoked or suspended
 - the token lacks required scope
-- the agent-side tenant binding is missing
+- the agent-side workspace binding is missing
 
 Studio should surface these failures to operators as configuration or authorization errors, not as empty tables or generic loading failures.
 
@@ -386,4 +428,4 @@ Studio should surface these failures to operators as configuration or authorizat
 - A valid workspace token for one agent cannot access another agent.
 - An agent without local persistence can still verify every request.
 - Revoked grants stop authorizing requests after token expiry, and immediately for operations that use introspection.
-- Studio and agent_interviewer show clear errors for missing grant, missing scope, and missing tenant binding.
+- Studio and agent_interviewer show clear errors for missing grant, missing scope, and missing workspace binding.

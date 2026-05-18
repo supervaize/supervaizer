@@ -53,7 +53,7 @@ class WorkspaceAuthorizationClaims(ContractModel):
     agent_slug: str
     server_id: str
     scopes: list[str] = Field(default_factory=list)
-    agent_tenant_ref: str | None = None
+    agent_workspace_ref: str | None = None
     iat: int | None = None
     exp: int
     jti: str | None = None
@@ -147,7 +147,7 @@ def verify_workspace_authorization_for_request(
         agent_slug=claims.agent_slug,
         server_id=claims.server_id,
         scopes=claims.scopes,
-        agent_tenant_ref=claims.agent_tenant_ref,
+        agent_workspace_ref=claims.agent_workspace_ref,
     )
 
 

@@ -463,6 +463,93 @@ def test_a2a_workspace_authorization_missing_token_blocks_action_handler(
     assert payload["error"]["data"]["code"] == "workspace_authorization_missing"
 
 
+def test_a2a_workspace_binding_options_action_bootstraps_without_token(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    captured: dict[str, object] = {}
+
+    def list_options(request: V2ActionRequest) -> V2ActionResult:
+        captured["workspace_authorization"] = request.workspace_authorization
+        return V2ActionResult(
+            status="ok",
+            effects=[
+                V2Effect(
+                    type="workspace_binding.options",
+                    items=[{"value": "agent-workspace-1", "label": "Workspace 1"}],
+                )
+            ],
+        )
+
+    register_v2_action_handler(
+        server_fixture, "workspace_binding.options", list_options
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-binding-options",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(
+                action="workspace_binding.options", agent_slug=agent.slug
+            ),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["result"]["status"] == "ok"
+    assert payload["result"]["effects"][0]["items"] == [
+        {"value": "agent-workspace-1", "label": "Workspace 1"}
+    ]
+    assert captured == {"workspace_authorization": None}
+
+
+def test_a2a_workspace_binding_create_surface_bootstraps_without_token(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    captured: dict[str, object] = {}
+
+    def load_create_surface(request: V2SurfaceRequest) -> dict[str, object]:
+        captured["workspace_authorization"] = request.workspace_authorization
+        return {
+            "surface": "workspace_binding.create",
+            "document": {
+                "type": "Form",
+                "fields": [{"id": "display_name", "label": "Display name"}],
+            },
+        }
+
+    register_v2_surface_handler(
+        server_fixture, "workspace_binding.create", load_create_surface
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-binding-create-surface",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(
+                surface="workspace_binding.create", agent_slug=agent.slug
+            ),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["result"]["surface"] == "workspace_binding.create"
+    assert captured == {"workspace_authorization": None}
+
+
 def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     server_fixture: Server,
 ) -> None:
@@ -473,7 +560,9 @@ def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     def start_job(request: V2ActionRequest) -> V2ActionResult:
         assert request.workspace_authorization is not None
         captured["grant_id"] = request.workspace_authorization.grant_id
-        captured["tenant_ref"] = request.workspace_authorization.agent_tenant_ref or ""
+        captured["workspace_ref"] = (
+            request.workspace_authorization.agent_workspace_ref or ""
+        )
         return V2ActionResult(status="ok")
 
     register_v2_action_handler(server_fixture, "job.start", start_job)
@@ -498,7 +587,7 @@ def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
 
     assert response.status_code == 200
     assert response.json()["result"]["status"] == "ok"
-    assert captured == {"grant_id": "grant-1", "tenant_ref": "tenant-1"}
+    assert captured == {"grant_id": "grant-1", "workspace_ref": "agent-workspace-1"}
 
 
 def test_a2a_workspace_authorization_valid_eddsa_token_reaches_action_handler(
@@ -1170,7 +1259,7 @@ def _workspace_authorization_eddsa_token(
         "agent_slug": agent.slug,
         "server_id": server.server_id,
         "scopes": scopes,
-        "agent_tenant_ref": "tenant-1",
+        "agent_workspace_ref": "agent-workspace-1",
         "iat": now,
         "exp": now + expires_in,
         "jti": "token-1",

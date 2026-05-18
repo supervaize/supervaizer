@@ -491,7 +491,7 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
     assert context.workspace_slug == "team-slug"
     assert context.workspace_authorization is not None
     assert context.workspace_authorization.grant_id == "grant-1"
-    assert context.workspace_authorization.agent_tenant_ref == "tenant-1"
+    assert context.workspace_authorization.agent_workspace_ref == "agent-workspace-1"
 
 
 def _make_data_resource_server(
@@ -571,7 +571,7 @@ def _workspace_authorization_token(
         "agent_slug": agent.slug,
         "server_id": server.server_id,
         "scopes": scopes,
-        "agent_tenant_ref": "tenant-1",
+        "agent_workspace_ref": "agent-workspace-1",
         "iat": now,
         "exp": now + 300,
         "jti": "token-1",
