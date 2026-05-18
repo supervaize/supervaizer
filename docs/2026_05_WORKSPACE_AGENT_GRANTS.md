@@ -22,9 +22,15 @@ WorkspaceAgentGrant
 - workspace_slug
 - agent_id
 - server_id
+- offered_by_workspace_id
+- accepted_agent_version
+- accepted_contract_fingerprint
 - accepted_by_admin_id
+- accepted_at
+- revoked_by_user_id
 - status: accepted | revoked | suspended
 - scopes
+- acceptance_snapshot
 - created_at
 - revoked_at
 ```
@@ -123,11 +129,25 @@ This does not grant workspace access to every tenant. It only makes the agent kn
 
 ### 2. Agent Sharing
 
-Studio may show the agent to another workspace as shareable or installable. Until an admin accepts it, the recipient workspace has no active grant.
+Studio may show the agent to another workspace as shareable or installable. Until an authorized user accepts it, the recipient workspace has no active grant.
+
+The target workspace UI should show the agent as **pending acceptance**, not as an installed or usable agent. Pending agents must not appear as selectable execution agents in mission/job flows.
 
 ### 3. Admin Acceptance
 
-A recipient workspace admin accepts the agent. Studio creates `WorkspaceAgentGrant(status="accepted")` with explicit scopes and optional `agent_tenant_ref`.
+A recipient workspace admin or agent-manager user accepts the agent. Studio creates `WorkspaceAgentGrant(status="accepted")` with explicit scopes and optional `agent_tenant_ref`.
+
+Acceptance must be explicit and auditable. Studio records:
+
+- who accepted the agent
+- when it was accepted
+- which workspace accepted it
+- which agent and server were accepted
+- which agent version and v2 contract fingerprint were accepted
+- which scopes were granted
+- the acceptance terms or summary shown to the user
+
+If the agent later changes its declared scopes, server identity, signing expectations, or contract fingerprint, Studio should require a new acceptance before enabling the expanded capability.
 
 ### 4. Studio Calls Agent
 
@@ -169,6 +189,83 @@ Revoked or suspended grants stop working when existing tokens expire. For high-r
 
 If introspection is enabled and Studio cannot confirm the grant, the request fails closed.
 
+## Studio UI Impact
+
+Studio must make agent sharing an explicit installation workflow in the target workspace.
+
+### Target Workspace Agent States
+
+Studio should distinguish at least these target-workspace states:
+
+| State | Meaning | Studio behavior |
+| --- | --- | --- |
+| `available` | Agent was shared or made installable, but no target-workspace user has accepted it. | Show install/accept CTA only to workspace admins and agent managers. Do not allow mission/job use. |
+| `accepted` | A workspace admin or agent manager accepted the agent. | Show as usable in mission/job flows according to scopes and permissions. |
+| `revoked` | The workspace removed the agent. | Hide from normal mission/job flows. Existing jobs remain visible according to audit policy, but new calls fail. |
+| `suspended` | Studio or the offering workspace disabled the grant. | Show a clear disabled state and block calls. |
+
+### Acceptance Screen
+
+The acceptance screen should show enough information for an admin or agent manager to make an informed decision:
+
+- agent name and publisher
+- offering workspace or owner
+- controller server identity
+- agent version
+- Supervaizer v2 contract version
+- requested scopes and their user-facing meaning
+- resources and datasets the agent wants to expose
+- whether the agent will access workspace-scoped data
+- the agent-side tenant binding, if configured
+- links to terms, documentation, and privacy/security information when available
+
+The primary action should be explicit, for example `Accept agent for this workspace`. A normal member should see that admin approval is required, not a generic failure or empty agent page.
+
+### Recording Acceptance
+
+Studio should store an immutable acceptance snapshot on the grant. The snapshot should preserve what the user accepted even if the agent later changes its registration.
+
+Minimum snapshot:
+
+```json
+{
+  "agent_name": "agent_interviewer",
+  "agent_slug": "agent-interviewer",
+  "server_id": "01SERVER",
+  "agent_version": "2.66.0",
+  "supervaizer_contract_version": 2,
+  "a2a_version": "0.2.6",
+  "a2ui_version": "v0.8",
+  "a2ui_catalog_version": "agent-interviewer.2026-05-18",
+  "scopes": ["job.start", "resource.campaigns.list"],
+  "resources": ["campaigns", "contacts"],
+  "datasets": ["campaign_progress"],
+  "accepted_by_user_id": "01USER",
+  "accepted_at": "2026-05-18T11:30:00Z"
+}
+```
+
+### Revocation By Removing The Agent
+
+Removing the agent from the target workspace should revoke the `WorkspaceAgentGrant`.
+
+Studio records:
+
+- who removed the agent
+- when it was removed
+- reason, if provided
+- previous grant id
+- affected active jobs, if any
+
+After revocation:
+
+- Studio must stop minting workspace authorization tokens for the grant.
+- Agent resource, dataset, artifact, `job.start`, and HITL calls must fail with a clear revoked-grant error.
+- Existing jobs and cases should remain visible as historical/audit records unless product policy explicitly deletes them.
+- Existing running jobs should follow the workspace revocation policy, likely `fail_in_studio` or `cancel_requested`, not silent continuation.
+
+No fallback to a fresh grant should occur without a new explicit acceptance.
+
 ## Agent Interviewer Application
 
 For `agent_interviewer`, the verified workspace context should drive tenant access.
@@ -205,7 +302,12 @@ It should not fall back to slug matching.
 
 - Add `WorkspaceAgentGrant`.
 - Create grants only from recipient workspace admin acceptance.
-- Store status, scopes, server id, agent id, workspace id, and optional agent tenant binding.
+- Allow only workspace admins and agent-manager users to accept a shared agent.
+- Add target-workspace UI states for available, accepted, revoked, and suspended agents.
+- Add an acceptance screen that explains publisher, server identity, version, contract, scopes, resources, datasets, and data-access impact.
+- Store status, scopes, server id, agent id, workspace id, accepted actor, accepted timestamp, acceptance snapshot, revocation actor, revocation timestamp, and optional agent tenant binding.
+- Require re-acceptance when requested scopes or contract fingerprint expand.
+- Revoke grants when the target workspace removes the agent.
 - Expose a signing key or JWKS that agents can verify.
 - Mint short-lived workspace authorization tokens for Studio-to-agent calls.
 - Attach tokens to A2A calls, resource calls, dataset calls, artifact calls, `job.start`, and `job.sync`.
@@ -241,6 +343,9 @@ Studio should surface these failures to operators as configuration or authorizat
 ## Acceptance Criteria
 
 - A shared agent cannot list resources for a workspace until a workspace admin accepts the agent.
+- A workspace admin or agent manager must explicitly accept a shared agent before it appears in mission/job flows.
+- Studio records who accepted what, when, and under which contract/scopes.
+- Removing an agent from a workspace revokes the grant and stops new token minting.
 - A forged `workspace_slug` or `tenant_slug` cannot grant access.
 - A valid transport API key without a workspace grant token cannot access workspace-scoped resources.
 - A valid workspace token for one workspace cannot access another workspace.
@@ -248,4 +353,3 @@ Studio should surface these failures to operators as configuration or authorizat
 - An agent without local persistence can still verify every request.
 - Revoked grants stop authorizing requests after token expiry, and immediately for operations that use introspection.
 - Studio and agent_interviewer show clear errors for missing grant, missing scope, and missing tenant binding.
-
