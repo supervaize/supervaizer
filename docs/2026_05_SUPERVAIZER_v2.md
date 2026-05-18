@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-05-17
+> **Updated:** 2026-05-18
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -101,6 +101,16 @@ agent = Agent(
 The v2 registration is exposed in the A2A Agent Card under `supervaizer.v2`.
 
 This does not replace the existing Studio server registration process. Server identity, public key exchange, and encrypted payload handling still belong to the normal Studio registration path. The v2 extension tells Studio how to operate the already-registered controller.
+
+## Workspace Authorization
+
+Workspace slugs and tenant slugs are not authorization primitives. They are display and routing hints only.
+
+When Studio operates an agent shared into another workspace, Studio must prove that the recipient workspace admin accepted the agent. The planned v2 model is a Studio-owned Workspace Agent Grant plus a short-lived Studio-signed workspace authorization token on each Studio-to-agent request.
+
+Agents may be stateless. They do not need to persist grants locally. The agent verifies the token on every request and uses the verified grant context for resource access, dataset queries, `job.start`, `job.sync`, artifacts, and HITL actions.
+
+See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md) for the implementation plan.
 
 ## Runtime Handlers
 
