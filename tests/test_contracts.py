@@ -39,6 +39,8 @@ from supervaizer.contracts import (
     V2ResourceFieldDefinition,
     V2SurfaceRequest,
     V2SurfaceResult,
+    V2VerifiedWorkspaceContext,
+    V2WorkspaceAuthorizationSettings,
     build_data_resource_context_headers,
     build_v2_agent_registration,
     controller_contract_info,
@@ -663,4 +665,8 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2SurfaceRequest is V2SurfaceRequest
     assert supervaizer.V2SurfaceResult is V2SurfaceResult
+    assert supervaizer.V2VerifiedWorkspaceContext is V2VerifiedWorkspaceContext
+    assert (
+        supervaizer.V2WorkspaceAuthorizationSettings is V2WorkspaceAuthorizationSettings
+    )
     assert supervaizer.build_v2_agent_registration is build_v2_agent_registration

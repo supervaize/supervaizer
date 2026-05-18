@@ -13,7 +13,11 @@ The recommended model is a Studio-owned **Workspace Agent Grant** plus a short-l
 
 Studio must be the source of truth for workspace approval.
 
-When a recipient workspace admin accepts a shared agent, Studio creates a durable grant:
+When a workspace admin accepts an agent, Studio creates a durable grant. This
+applies both to recipient workspaces for shared agents and to the owner workspace
+for its own agent. The owner workspace is not a runtime authorization bypass; it
+must have an accepted grant with an explicit agent-side tenant binding before
+Studio can operate the agent.
 
 ```text
 WorkspaceAgentGrant
@@ -52,6 +56,29 @@ Supervaizer v2 has separate trust concerns:
 
 The agent public key protects confidentiality. It does not prove that a workspace accepted the agent. Workspace approval requires the signed grant token.
 
+## Signing Key Decision
+
+Workspace authorization uses a dedicated Studio signing key family, separate from
+skills artifact signing and separate from the agent public key exchanged during
+server registration.
+
+The token algorithm is **EdDSA with Ed25519 keys**. Supervaizer v2 should reject
+tokens signed with any other JWT algorithm.
+
+Studio must not duplicate cryptographic plumbing for every signing use case.
+The shared implementation should provide reusable Ed25519 primitives for:
+
+- keypair generation
+- key id generation
+- compact JWT signing
+- public JWK generation
+- JWKS payload generation
+
+Skills artifact signing and workspace-grant signing may store keys in separate
+tables and expose separate JWKS endpoints, but they should call the same shared
+Ed25519 helper code. The separation is about trust domains and rotation policy,
+not about duplicating signing logic.
+
 ## Stateless Agent Requirement
 
 Agents may not have persistent local memory. The grant model must therefore be stateless from the agent's perspective.
@@ -70,7 +97,7 @@ The agent does not need to store grants locally.
 
 ## Token Shape
 
-The token should be a compact signed JWT or equivalent signed envelope.
+The token is a compact EdDSA-signed JWT.
 
 Recommended claims:
 
@@ -100,7 +127,12 @@ Recommended claims:
 
 `workspace_slug` is informational. The trusted identity is `workspace_id` plus `grant_id`.
 
-`agent_tenant_ref` is optional but useful for stateless agents. If present, Studio owns the binding between the Studio workspace grant and the agent-side tenant reference. If absent, the agent may resolve the binding from an external data store using `grant_id` or `workspace_id`.
+`agent_tenant_ref` is useful for stateless agents. If present, Studio owns the
+binding between the Studio workspace grant and the agent-side tenant reference.
+If absent, the agent may resolve the binding from an external trusted data store
+using `grant_id` or `workspace_id`. Agents that cannot resolve that binding from
+another trusted store must require `agent_tenant_ref` and fail clearly when it is
+missing.
 
 ## Request Transport
 
@@ -135,7 +167,9 @@ The target workspace UI should show the agent as **pending acceptance**, not as 
 
 ### 3. Admin Acceptance
 
-A recipient workspace admin or agent-manager user accepts the agent. Studio creates `WorkspaceAgentGrant(status="accepted")` with explicit scopes and optional `agent_tenant_ref`.
+A workspace admin or agent-manager user accepts the agent. Studio creates
+`WorkspaceAgentGrant(status="accepted")` with explicit scopes and, for agents
+that require stateless tenant binding, a required `agent_tenant_ref`.
 
 Acceptance must be explicit and auditable. Studio records:
 

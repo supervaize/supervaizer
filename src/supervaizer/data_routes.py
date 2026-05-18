@@ -41,7 +41,13 @@ from fastapi.responses import JSONResponse
 
 from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.common import log
+from supervaizer.contracts import V2WorkspaceContext
 from supervaizer.data_resource import DataResource, DataResourceContext
+from supervaizer.workspace_authorization import (
+    WorkspaceAuthorizationError,
+    extract_workspace_authorization_token,
+    verify_workspace_authorization_for_request,
+)
 
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
@@ -53,9 +59,7 @@ def create_agent_data_routes(server: Server, agent: Agent) -> APIRouter:
     router = APIRouter(prefix=agent.path, tags=["Data Resources"])
     agent_slug = agent.slug
     for resource in agent.data_resources:
-        _add_resource_routes(
-            router, resource, agent_slug
-        )  # <-- MODIFIED: removed server arg
+        _add_resource_routes(router, resource, agent_slug, server)
     return router
 
 
@@ -69,7 +73,8 @@ def _data_resource_operation_id(
 def _add_resource_routes(
     router: APIRouter,
     resource: DataResource,
-    agent_slug: str,  # <-- MODIFIED: removed server arg
+    agent_slug: str,
+    server: Server,
 ) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
@@ -78,7 +83,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "list")
         router.add_api_route(
             f"{prefix}/",
-            _make_list_handler(resource, prefix, agent_slug),
+            _make_list_handler(resource, prefix, agent_slug, server),
             methods=["GET"],
             # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"List {resource.display_name_resolved}",
@@ -90,7 +95,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "get")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_get_handler(resource, prefix, agent_slug),
+            _make_get_handler(resource, prefix, agent_slug, server),
             methods=["GET"],
             # <-- REMOVED: Security(server.verify_api_key); api_router handles auth
             summary=f"Get {resource.display_name_resolved}",
@@ -102,7 +107,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "create")
         router.add_api_route(
             f"{prefix}/",
-            _make_create_handler(resource, prefix, agent_slug),
+            _make_create_handler(resource, prefix, agent_slug, server),
             methods=["POST"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -116,7 +121,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "update")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_update_handler(resource, prefix, agent_slug),
+            _make_update_handler(resource, prefix, agent_slug, server),
             methods=["PUT"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -130,7 +135,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "delete")
         router.add_api_route(
             f"{prefix}/{{item_id}}",
-            _make_delete_handler(resource, prefix, agent_slug),
+            _make_delete_handler(resource, prefix, agent_slug, server),
             methods=["DELETE"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -144,7 +149,7 @@ def _add_resource_routes(
         op_id = _data_resource_operation_id(agent_slug, resource.name, "import")
         router.add_api_route(
             f"{prefix}/import/",
-            _make_import_handler(resource, prefix, agent_slug),
+            _make_import_handler(resource, prefix, agent_slug, server),
             methods=["POST"],
             dependencies=[
                 Depends(require_scope("write"))
@@ -155,7 +160,9 @@ def _add_resource_routes(
         )
 
 
-def _make_list_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_list_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     async def _handler(
         request: Request,
         skip: int = Query(default=0, ge=0),
@@ -164,19 +171,25 @@ def _make_list_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
         log.info(f"📥 GET {prefix}/ [DataResource list: {r.name}]")
         result = _call_with_context(
             r.on_list,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "list")
+            ),
         )
         return result[skip : skip + limit]
 
     return _handler
 
 
-def _make_get_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_get_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     async def _handler(request: Request, item_id: str) -> dict[str, Any]:
         log.info(f"📥 GET {prefix}/{item_id} [DataResource get: {r.name}]")
         result = _call_with_context(
             r.on_get,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "get")
+            ),
             item_id,
         )
         if result is None:
@@ -188,14 +201,18 @@ def _make_get_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     return _handler
 
 
-def _make_create_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_create_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     async def _handler(
         request: Request, data: dict[str, Any] = Body(...)
     ) -> JSONResponse:
         log.info(f"📥 POST {prefix}/ [DataResource create: {r.name}]")
         result = _call_with_context(
             r.on_create,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "create")
+            ),
             data,
         )
         if not isinstance(result, dict) or "id" not in result:
@@ -208,7 +225,9 @@ def _make_create_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     return _handler
 
 
-def _make_update_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_update_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     on_update = r.on_update
     assert on_update is not None  # route registered only when on_update is set
 
@@ -218,7 +237,9 @@ def _make_update_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
         log.info(f"📥 PUT {prefix}/{item_id} [DataResource update: {r.name}]")
         result = _call_with_context(
             on_update,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "update")
+            ),
             item_id,
             data,
         )
@@ -231,12 +252,16 @@ def _make_update_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     return _handler
 
 
-def _make_delete_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_delete_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     async def _handler(request: Request, item_id: str) -> JSONResponse:
         log.info(f"📥 DELETE {prefix}/{item_id} [DataResource delete: {r.name}]")
         success = _call_with_context(
             r.on_delete,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "delete")
+            ),
             item_id,
         )
         if not success:
@@ -248,28 +273,61 @@ def _make_delete_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
     return _handler
 
 
-def _make_import_handler(r: DataResource, prefix: str, agent_slug: str) -> Any:
+def _make_import_handler(
+    r: DataResource, prefix: str, agent_slug: str, server: Server
+) -> Any:
     async def _handler(
         request: Request, records: list[dict[str, Any]] = Body(...)
     ) -> dict[str, Any]:
         log.info(f"📥 POST {prefix}/import/ [DataResource import: {r.name}]")
         return _call_with_context(
             r.on_import,
-            _context_from_request(request, agent_slug),
+            _context_from_request(
+                request, agent_slug, server, _resource_scope(r, "import")
+            ),
             records,
         )
 
     return _handler
 
 
-def _context_from_request(request: Request, agent_slug: str) -> DataResourceContext:
+def _context_from_request(
+    request: Request, agent_slug: str, server: Server, required_scope: str
+) -> DataResourceContext:
+    raw_workspace = V2WorkspaceContext(
+        id=request.headers.get("X-Supervaize-Workspace-Id") or "",
+        slug=request.headers.get("X-Supervaize-Workspace-Slug"),
+    )
+    try:
+        verified_workspace = verify_workspace_authorization_for_request(
+            server=server,
+            token=extract_workspace_authorization_token(request.headers),
+            required_scopes=[required_scope],
+            request_workspace=raw_workspace,
+            agent_slug=agent_slug,
+        )
+    except WorkspaceAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=exc.message) from exc
+    workspace_id: str | None
+    workspace_slug: str | None
+    if verified_workspace is not None:
+        workspace_id = verified_workspace.workspace_id
+        workspace_slug = verified_workspace.workspace_slug
+    else:
+        workspace_id = request.headers.get("X-Supervaize-Workspace-Id")
+        workspace_slug = request.headers.get("X-Supervaize-Workspace-Slug")
     return DataResourceContext(
-        workspace_id=request.headers.get("X-Supervaize-Workspace-Id"),
-        workspace_slug=request.headers.get("X-Supervaize-Workspace-Slug"),
+        workspace_id=workspace_id,
+        workspace_slug=workspace_slug,
         mission_id=request.headers.get("X-Supervaize-Mission-Id"),
         agent_slug=agent_slug,
         request_id=request.headers.get("X-Supervaize-Request-Id"),
+        workspace_authorization=verified_workspace,
     )
+
+
+def _resource_scope(resource: DataResource, operation: str) -> str:
+    return f"resource.{resource.name}.{operation}"
 
 
 def _accepts_context(callback: Any) -> bool:

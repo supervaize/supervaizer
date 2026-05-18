@@ -23,6 +23,10 @@ from supervaizer.contracts import (
     V2SurfaceResult,
 )
 from supervaizer.protocol.a2a.events import A2A_EFFECT_EVENT, publish_v2_event
+from supervaizer.workspace_authorization import (
+    WorkspaceAuthorizationError,
+    verify_workspace_authorization_for_request,
+)
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -34,6 +38,7 @@ JSON_RPC_METHOD_NOT_FOUND = -32601
 JSON_RPC_INVALID_PARAMS = -32602
 JSON_RPC_ACTION_NOT_REGISTERED = -32010
 JSON_RPC_SURFACE_NOT_REGISTERED = -32011
+JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED = -32030
 JSON_RPC_INTERNAL_ERROR = -32603
 
 ActionHandler = Callable[
@@ -96,7 +101,12 @@ def register_v2_surface_handler(
     )
 
 
-async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcResponse:
+async def dispatch_json_rpc(
+    server: "Server",
+    body: dict[str, Any],
+    *,
+    workspace_authorization_token: str | None = None,
+) -> JsonRpcResponse:
     """Dispatch one A2A JSON-RPC request."""
     try:
         request = JsonRpcRequest.model_validate(body)
@@ -109,9 +119,17 @@ async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcRe
         )
 
     if request.method == SUPERVAIZER_ACTION_INVOKE_METHOD:
-        return await _dispatch_action(server, request)
+        return await _dispatch_action(
+            server,
+            request,
+            workspace_authorization_token=workspace_authorization_token,
+        )
     if request.method == SUPERVAIZER_SURFACE_LOAD_METHOD:
-        return await _dispatch_surface(server, request)
+        return await _dispatch_surface(
+            server,
+            request,
+            workspace_authorization_token=workspace_authorization_token,
+        )
 
     return _json_rpc_error(
         request_id=request.id,
@@ -121,7 +139,10 @@ async def dispatch_json_rpc(server: "Server", body: dict[str, Any]) -> JsonRpcRe
 
 
 async def _dispatch_action(
-    server: "Server", request: JsonRpcRequest
+    server: "Server",
+    request: JsonRpcRequest,
+    *,
+    workspace_authorization_token: str | None = None,
 ) -> JsonRpcResponse:
     try:
         action_request = _validate_action_request(request.params)
@@ -132,6 +153,29 @@ async def _dispatch_action(
             message="Invalid Supervaizer v2 action request",
             data={"errors": exc.errors()},
         )
+
+    action_request = action_request.model_copy(update={"workspace_authorization": None})
+    try:
+        verified_workspace = verify_workspace_authorization_for_request(
+            server=server,
+            token=workspace_authorization_token,
+            required_scopes=[
+                SUPERVAIZER_ACTION_INVOKE_METHOD,
+                action_request.action,
+            ],
+            request_workspace=action_request.workspace,
+            agent_slug=action_request.agent_slug,
+        )
+    except WorkspaceAuthorizationError as exc:
+        return _json_rpc_error(
+            request_id=request.id,
+            code=JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED,
+            message=exc.message,
+            data={"code": exc.code},
+        )
+    action_request = action_request.model_copy(
+        update={"workspace_authorization": verified_workspace}
+    )
 
     handler = _get_action_handlers(server).get(
         _action_handler_key(action_request.agent_slug, action_request.action)
@@ -188,7 +232,10 @@ async def _dispatch_action(
 
 
 async def _dispatch_surface(
-    server: "Server", request: JsonRpcRequest
+    server: "Server",
+    request: JsonRpcRequest,
+    *,
+    workspace_authorization_token: str | None = None,
 ) -> JsonRpcResponse:
     try:
         surface_request = _validate_surface_request(request.params)
@@ -199,6 +246,31 @@ async def _dispatch_surface(
             message="Invalid Supervaizer v2 surface request",
             data={"errors": exc.errors()},
         )
+
+    surface_request = surface_request.model_copy(
+        update={"workspace_authorization": None}
+    )
+    try:
+        verified_workspace = verify_workspace_authorization_for_request(
+            server=server,
+            token=workspace_authorization_token,
+            required_scopes=[
+                SUPERVAIZER_SURFACE_LOAD_METHOD,
+                surface_request.surface,
+            ],
+            request_workspace=surface_request.workspace,
+            agent_slug=surface_request.agent_slug,
+        )
+    except WorkspaceAuthorizationError as exc:
+        return _json_rpc_error(
+            request_id=request.id,
+            code=JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED,
+            message=exc.message,
+            data={"code": exc.code},
+        )
+    surface_request = surface_request.model_copy(
+        update={"workspace_authorization": verified_workspace}
+    )
 
     handler = _get_surface_handlers(server).get(
         _surface_handler_key(surface_request.agent_slug, surface_request.surface)

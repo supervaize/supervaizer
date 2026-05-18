@@ -169,7 +169,31 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2StepSnapshot": ("supervaizer.contracts", "V2StepSnapshot"),
     "V2SurfaceRequest": ("supervaizer.contracts", "V2SurfaceRequest"),
     "V2SurfaceResult": ("supervaizer.contracts", "V2SurfaceResult"),
+    "V2VerifiedWorkspaceContext": (
+        "supervaizer.contracts",
+        "V2VerifiedWorkspaceContext",
+    ),
+    "V2WorkspaceAuthorizationSettings": (
+        "supervaizer.contracts",
+        "V2WorkspaceAuthorizationSettings",
+    ),
     "V2WorkspaceContext": ("supervaizer.contracts", "V2WorkspaceContext"),
+    "WORKSPACE_AUTHORIZATION_HEADER": (
+        "supervaizer.workspace_authorization",
+        "WORKSPACE_AUTHORIZATION_HEADER",
+    ),
+    "WorkspaceAuthorizationError": (
+        "supervaizer.workspace_authorization",
+        "WorkspaceAuthorizationError",
+    ),
+    "extract_workspace_authorization_token": (
+        "supervaizer.workspace_authorization",
+        "extract_workspace_authorization_token",
+    ),
+    "verify_workspace_authorization_for_request": (
+        "supervaizer.workspace_authorization",
+        "verify_workspace_authorization_for_request",
+    ),
     "build_data_resource_context_headers": (
         "supervaizer.contracts",
         "build_data_resource_context_headers",

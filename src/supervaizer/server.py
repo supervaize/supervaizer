@@ -50,7 +50,11 @@ from supervaizer.common import (
     is_local_mode,
     log,
 )
-from supervaizer.contracts import API_VERSION, controller_contract_info
+from supervaizer.contracts import (
+    API_VERSION,
+    V2WorkspaceAuthorizationSettings,
+    controller_contract_info,
+)
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a.controller import (
     ActionHandler,
@@ -65,6 +69,9 @@ from supervaizer.routers import (
 )  # <-- ADDED
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
+from supervaizer.workspace_authorization import (
+    validate_workspace_authorization_settings,
+)
 
 insp = inspect
 
@@ -87,6 +94,30 @@ def _controller_key_fingerprint(api_key: str | None) -> str | None:
     if not api_key:
         return None
     return sha256(api_key.encode("utf-8")).hexdigest()[:12]
+
+
+def _resolve_workspace_authorization_settings(
+    explicit_settings: V2WorkspaceAuthorizationSettings | dict[str, Any] | None,
+) -> V2WorkspaceAuthorizationSettings:
+    if explicit_settings is not None:
+        return V2WorkspaceAuthorizationSettings.model_validate(explicit_settings)
+    return V2WorkspaceAuthorizationSettings(
+        enabled=_env_bool("SUPERVAIZER_WORKSPACE_AUTH_REQUIRED", default=False),
+        issuer=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER") or None,
+        audience=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE") or None,
+        public_key_pem=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY") or None,
+        jwks_url=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL") or None,
+        leeway_seconds=int(
+            os.getenv("SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS", "30")
+        ),
+    )
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _get_or_create_private_key() -> RSAPrivateKey:
@@ -316,6 +347,10 @@ class ServerAbstract(SvBaseModel):
     api_key_header: APIKeyHeader | None = Field(
         default=None, description="API key header for authentication"
     )
+    workspace_authorization: V2WorkspaceAuthorizationSettings = Field(
+        default_factory=V2WorkspaceAuthorizationSettings,
+        description="Optional Studio-signed workspace authorization verifier settings",
+    )
 
     model_config = cast(
         ConfigDict,
@@ -380,6 +415,9 @@ class Server(ServerAbstract):
         private_key: RSAPrivateKey | None = None,
         public_url: str | None = None,
         api_key: str | None = None,
+        workspace_authorization: V2WorkspaceAuthorizationSettings
+        | dict[str, Any]
+        | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration.
@@ -461,6 +499,10 @@ class Server(ServerAbstract):
 
         if private_key is None:
             private_key = _get_or_create_private_key()
+        workspace_authorization_settings = _resolve_workspace_authorization_settings(
+            workspace_authorization
+        )
+        validate_workspace_authorization_settings(workspace_authorization_settings)
 
         public_key = private_key.public_key()
         log.info(f"[Server launch] Public key: {public_key}")
@@ -545,6 +587,7 @@ class Server(ServerAbstract):
             public_url=public_url,
             api_key=api_key,
             api_key_header=api_key_header,
+            workspace_authorization=workspace_authorization_settings,
             **kwargs,
         )
 

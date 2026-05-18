@@ -353,6 +353,10 @@ class V2A2UIResourceImportColumn(ContractModel):
     required: bool = False
 
 
+def _default_resource_import_formats() -> list[Literal["csv", "xlsx"]]:
+    return ["csv"]
+
+
 class V2A2UIResourceImportDocument(ContractModel):
     """A2UI-shaped resource import surface consumed by Studio."""
 
@@ -361,7 +365,7 @@ class V2A2UIResourceImportDocument(ContractModel):
     title: str
     resource: str
     accepted_formats: list[Literal["csv", "xlsx"]] = Field(
-        default_factory=lambda: ["csv"]
+        default_factory=_default_resource_import_formats
     )
     fields: list[V2ResourceFieldDefinition] = Field(default_factory=list)
     columns: list[V2A2UIResourceImportColumn] = Field(default_factory=list)
@@ -621,6 +625,26 @@ class V2WorkspaceContext(ContractModel):
     slug: str | None = None
 
 
+class V2VerifiedWorkspaceContext(ContractModel):
+    grant_id: str
+    workspace_id: str
+    workspace_slug: str | None = None
+    agent_id: str
+    agent_slug: str
+    server_id: str
+    scopes: list[str] = Field(default_factory=list)
+    agent_tenant_ref: str | None = None
+
+
+class V2WorkspaceAuthorizationSettings(ContractModel):
+    enabled: bool = False
+    issuer: str | None = None
+    audience: str | None = None
+    public_key_pem: str | None = None
+    jwks_url: str | None = None
+    leeway_seconds: int = 30
+
+
 class V2ActionRequest(ContractModel):
     request_id: str
     actor: V2ActorContext
@@ -635,6 +659,7 @@ class V2ActionRequest(ContractModel):
     job_id: str | None = None
     case_id: str | None = None
     step_id: str | None = None
+    workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
 
 class V2SurfaceRequest(ContractModel):
@@ -649,6 +674,7 @@ class V2SurfaceRequest(ContractModel):
     job_id: str | None = None
     case_id: str | None = None
     step_id: str | None = None
+    workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
 
 class V2Effect(ContractModel):
