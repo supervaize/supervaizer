@@ -349,6 +349,11 @@ def _split_jwt(
             "workspace_authorization_malformed",
             "Workspace authorization token is malformed",
         ) from exc
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        raise WorkspaceAuthorizationError(
+            "workspace_authorization_malformed",
+            "Workspace authorization token header and claims must be JSON objects",
+        )
     return (
         header,
         payload,
@@ -428,6 +433,11 @@ def _load_public_key_from_jwks(
             "Workspace authorization JWKS payload has no keys list",
         )
     for key_data in keys:
+        if not isinstance(key_data, dict):
+            raise WorkspaceAuthorizationError(
+                "workspace_authorization_invalid_jwks",
+                "Workspace authorization JWKS keys must be JSON objects",
+            )
         if key_data.get("kid") == key_id:
             public_key = _ed25519_public_key_from_jwk(key_data)
             _cache_jwks_key(jwks_url, key_id, public_key)

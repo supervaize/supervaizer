@@ -1037,6 +1037,59 @@ def test_a2a_workspace_authorization_wrong_alg_fails_before_handler(
     assert payload["error"]["data"]["code"] == "workspace_authorization_unsupported_alg"
 
 
+@pytest.mark.parametrize("header", [[], "not-an-object", None])
+def test_a2a_workspace_authorization_non_object_header_fails_before_handler(
+    server_fixture: Server,
+    header: object,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _sign_eddsa_jwt_parts(
+        key,
+        header=header,
+        claims={
+            "iss": "https://studio.example.test",
+            "aud": f"supervaizer-server:{server_fixture.server_id}",
+            "sub": "workspace-agent-grant:grant-1",
+            "grant_id": "grant-1",
+            "workspace_id": "workspace-1",
+            "workspace_slug": "workspace",
+            "agent_id": agent.server_agent_id or agent.id,
+            "agent_slug": agent.slug,
+            "server_id": server_fixture.server_id,
+            "scopes": [SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300,
+        },
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-non-object-header",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert called is False
+    assert payload["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert payload["error"]["data"]["code"] == "workspace_authorization_malformed"
+
+
 def test_a2a_workspace_authorization_malformed_pem_fails_before_handler(
     server_fixture: Server,
 ) -> None:
@@ -1198,6 +1251,61 @@ def test_a2a_workspace_authorization_malformed_jwks_key_fails_before_handler(
     assert called is False
     assert payload["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
     assert payload["error"]["data"]["code"] == "workspace_authorization_invalid_jwk"
+
+
+@pytest.mark.parametrize("key_entry", [None, "not-a-key", []])
+def test_a2a_workspace_authorization_non_object_jwks_key_fails_before_handler(
+    server_fixture: Server,
+    monkeypatch: pytest.MonkeyPatch,
+    key_entry: object,
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    key = ed25519.Ed25519PrivateKey.generate()
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url="https://studio.example.test/.well-known/non-object-jwks.json",
+        leeway_seconds=0,
+    )
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="workspace-grant-key-non-object",
+    )
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    def get_jwks(_url: str, timeout: int) -> _JwksResponse:
+        assert timeout == 5
+        return _JwksResponse({"keys": [key_entry]})
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", get_jwks)
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-non-object-jwks-key",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert called is False
+    assert payload["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert payload["error"]["data"]["code"] == "workspace_authorization_invalid_jwks"
 
 
 def test_a2a_workspace_authorization_missing_scope_blocks_surface_handler(
@@ -1778,6 +1886,19 @@ def _sign_eddsa_jwt(
     return f"{encoded_header}.{encoded_claims}.{_base64url(signature)}"
 
 
+def _sign_eddsa_jwt_parts(
+    key: ed25519.Ed25519PrivateKey,
+    *,
+    header: object,
+    claims: object,
+) -> str:
+    encoded_header = _base64url_json_value(header)
+    encoded_claims = _base64url_json_value(claims)
+    signing_input = f"{encoded_header}.{encoded_claims}".encode("ascii")
+    signature = key.sign(signing_input)
+    return f"{encoded_header}.{encoded_claims}.{_base64url(signature)}"
+
+
 def _ed25519_jwk(
     public_key: ed25519.Ed25519PublicKey, *, kid: str
 ) -> dict[str, object]:
@@ -1807,6 +1928,10 @@ class _JwksResponse:
 
 
 def _base64url_json(value: dict[str, object]) -> str:
+    return _base64url_json_value(value)
+
+
+def _base64url_json_value(value: object) -> str:
     return _base64url(json.dumps(value, separators=(",", ":")).encode("utf-8"))
 
 
