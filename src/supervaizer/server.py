@@ -775,6 +775,8 @@ class Server(ServerAbstract):
             f"[Server launch] Starting Supervaize Controller API v{VERSION} - Log : {log_level} "
         )
 
+        self._validate_studio_a2a_workspace_authorization()
+
         # self.instructions()
         if self.supervisor_account:
             # Register the server with the supervisor account
@@ -842,6 +844,18 @@ class Server(ServerAbstract):
             f"controller_key_fingerprint={_controller_key_fingerprint(self.api_key)} "
             f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
             f"reason={handshake.get('reason')}"
+        )
+
+    def _validate_studio_a2a_workspace_authorization(self) -> None:
+        if not self.a2a_endpoints or self.supervisor_account is None:
+            return
+        if self.workspace_authorization.enabled:
+            return
+        raise RuntimeError(
+            "Studio-registered Supervaizer v2 A2A requires workspace authorization. "
+            "Set SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true and configure "
+            "SUPERVAIZER_WORKSPACE_AUTH_ISSUER plus either "
+            "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY or SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL."
         )
 
     def _apply_workspace_authorization_handshake(

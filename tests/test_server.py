@@ -219,6 +219,34 @@ def test_server_registration_handshake_accepts_key_match(
     server_fixture._validate_registration_handshake(result)
 
 
+def test_studio_a2a_requires_workspace_authorization(server_fixture: Server) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="Studio-registered Supervaizer v2 A2A requires workspace authorization",
+    ):
+        server_fixture._validate_studio_a2a_workspace_authorization()
+
+
+def test_studio_a2a_accepts_enabled_workspace_authorization(
+    server_fixture: Server,
+) -> None:
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.supervaize.com",
+        jwks_url="https://studio.supervaize.com/jwks",
+    )
+
+    server_fixture._validate_studio_a2a_workspace_authorization()
+
+
+def test_local_a2a_can_start_without_workspace_authorization(
+    server_fixture: Server,
+) -> None:
+    server_fixture.supervisor_account = None
+
+    server_fixture._validate_studio_a2a_workspace_authorization()
+
+
 def test_server_registration_handshake_sets_workspace_authorization_audience(
     server_fixture: Server,
 ) -> None:
