@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-19
+
 ### Added
 
 - **Workspace agent authorization** — Studio-signed Ed25519 workspace authorization tokens on `X-Supervaize-Workspace-Authorization`; the SDK verifies JWKS-backed tokens and exposes `V2VerifiedWorkspaceContext` for handlers. Workspace and tenant slugs remain routing hints only.
