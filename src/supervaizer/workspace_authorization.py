@@ -8,13 +8,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import binascii
 import json
+from collections import OrderedDict
+import threading
 import time
 from collections.abc import Iterable, Mapping
 from typing import Any, TypeAlias
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 import httpx
@@ -29,8 +33,14 @@ from supervaizer.contracts import (
 
 WORKSPACE_AUTHORIZATION_HEADER = "X-Supervaize-Workspace-Authorization"
 WORKSPACE_AUTHORIZATION_ALGORITHM = "EdDSA"
+JWKS_KEY_CACHE_MAX_SIZE = 16
 
 WorkspaceAuthorizationPublicKey: TypeAlias = ed25519.Ed25519PublicKey
+_JwksKeyCacheKey: TypeAlias = tuple[str, str]
+_JWKS_KEY_CACHE: OrderedDict[_JwksKeyCacheKey, WorkspaceAuthorizationPublicKey] = (
+    OrderedDict()
+)
+_JWKS_KEY_CACHE_LOCK = threading.Lock()
 
 
 class WorkspaceAuthorizationError(ValueError):
@@ -155,6 +165,26 @@ def verify_workspace_authorization_for_request(
         server_id=claims.server_id,
         scopes=claims.scopes,
         agent_workspace_ref=claims.agent_workspace_ref,
+    )
+
+
+async def verify_workspace_authorization_for_request_async(
+    *,
+    server: Any,
+    token: str | None,
+    required_scopes: Iterable[str],
+    request_workspace: V2WorkspaceContext,
+    agent_slug: str,
+    require_configured: bool = True,
+) -> V2VerifiedWorkspaceContext | None:
+    return await asyncio.to_thread(
+        verify_workspace_authorization_for_request,
+        server=server,
+        token=token,
+        required_scopes=required_scopes,
+        request_workspace=request_workspace,
+        agent_slug=agent_slug,
+        require_configured=require_configured,
     )
 
 
@@ -314,7 +344,7 @@ def _split_jwt(
         header = json.loads(_base64url_decode(encoded_header))
         payload = json.loads(_base64url_decode(encoded_payload))
         signature = _base64url_decode(encoded_signature)
-    except (json.JSONDecodeError, ValueError) as exc:
+    except (binascii.Error, json.JSONDecodeError, ValueError) as exc:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_malformed",
             "Workspace authorization token is malformed",
@@ -346,7 +376,13 @@ def _load_public_key(
 
 
 def _load_public_key_pem(public_key_pem: str) -> WorkspaceAuthorizationPublicKey:
-    key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+    try:
+        key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+    except (ValueError, TypeError, UnsupportedAlgorithm) as exc:
+        raise WorkspaceAuthorizationError(
+            "workspace_authorization_invalid_key",
+            "Workspace authorization EdDSA public key could not be loaded",
+        ) from exc
     if not isinstance(key, ed25519.Ed25519PublicKey):
         raise WorkspaceAuthorizationError(
             "workspace_authorization_invalid_key",
@@ -373,6 +409,9 @@ def _load_public_key_from_jwks(
             "workspace_authorization_missing_kid",
             "Workspace authorization token header must include kid for JWKS",
         )
+    cached_key = _get_cached_jwks_key(jwks_url, key_id)
+    if cached_key is not None:
+        return cached_key
     try:
         response = httpx.get(jwks_url, timeout=5)
         response.raise_for_status()
@@ -390,7 +429,9 @@ def _load_public_key_from_jwks(
         )
     for key_data in keys:
         if key_data.get("kid") == key_id:
-            return _ed25519_public_key_from_jwk(key_data)
+            public_key = _ed25519_public_key_from_jwk(key_data)
+            _cache_jwks_key(jwks_url, key_id, public_key)
+            return public_key
     raise WorkspaceAuthorizationError(
         "workspace_authorization_unknown_kid",
         "Workspace authorization JWKS has no key matching token kid",
@@ -409,7 +450,41 @@ def _ed25519_public_key_from_jwk(jwk: dict[str, Any]) -> ed25519.Ed25519PublicKe
             "workspace_authorization_invalid_jwk",
             "Workspace authorization Ed25519 JWK must include x",
         )
-    return ed25519.Ed25519PublicKey.from_public_bytes(_base64url_decode(key_material))
+    try:
+        public_bytes = _base64url_decode(key_material)
+        if len(public_bytes) != 32:
+            raise ValueError("Ed25519 public key material must be 32 bytes")
+        return ed25519.Ed25519PublicKey.from_public_bytes(public_bytes)
+    except (binascii.Error, TypeError, ValueError) as exc:
+        raise WorkspaceAuthorizationError(
+            "workspace_authorization_invalid_jwk",
+            "Workspace authorization Ed25519 JWK x is invalid",
+        ) from exc
+
+
+def _get_cached_jwks_key(
+    jwks_url: str, key_id: str
+) -> WorkspaceAuthorizationPublicKey | None:
+    cache_key = (jwks_url, key_id)
+    with _JWKS_KEY_CACHE_LOCK:
+        public_key = _JWKS_KEY_CACHE.get(cache_key)
+        if public_key is None:
+            return None
+        _JWKS_KEY_CACHE.move_to_end(cache_key)
+        return public_key
+
+
+def _cache_jwks_key(
+    jwks_url: str,
+    key_id: str,
+    public_key: WorkspaceAuthorizationPublicKey,
+) -> None:
+    cache_key = (jwks_url, key_id)
+    with _JWKS_KEY_CACHE_LOCK:
+        _JWKS_KEY_CACHE[cache_key] = public_key
+        _JWKS_KEY_CACHE.move_to_end(cache_key)
+        while len(_JWKS_KEY_CACHE) > JWKS_KEY_CACHE_MAX_SIZE:
+            _JWKS_KEY_CACHE.popitem(last=False)
 
 
 def _audience_matches(audience: str | list[str], expected: str) -> bool:
@@ -420,7 +495,11 @@ def _audience_matches(audience: str | list[str], expected: str) -> bool:
 
 def _base64url_decode(value: str) -> bytes:
     padding_length = (-len(value)) % 4
-    return base64.urlsafe_b64decode(value + ("=" * padding_length))
+    return base64.b64decode(
+        value + ("=" * padding_length),
+        altchars=b"-_",
+        validate=True,
+    )
 
 
 def _get_header(headers: Mapping[str, str], name: str) -> str | None:

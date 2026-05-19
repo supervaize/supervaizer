@@ -21,12 +21,14 @@ from supervaizer.contracts import (
     V2ActionResult,
     V2SurfaceRequest,
     V2SurfaceResult,
+    WORKSPACE_BINDING_CREATE_ACTION,
     WORKSPACE_BINDING_CREATE_SURFACE,
+    WORKSPACE_BINDING_OPTIONS_ACTION,
 )
 from supervaizer.protocol.a2a.events import A2A_EFFECT_EVENT, publish_v2_event
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationError,
-    verify_workspace_authorization_for_request,
+    verify_workspace_authorization_for_request_async,
 )
 
 if TYPE_CHECKING:
@@ -34,7 +36,10 @@ if TYPE_CHECKING:
 
 SUPERVAIZER_ACTION_INVOKE_METHOD = "supervaizer/action.invoke"
 SUPERVAIZER_SURFACE_LOAD_METHOD = "supervaizer/surface.load"
-WORKSPACE_BINDING_BOOTSTRAP_ACTION_PREFIX = "workspace_binding."
+WORKSPACE_BINDING_BOOTSTRAP_ACTIONS = frozenset({
+    WORKSPACE_BINDING_OPTIONS_ACTION,
+    WORKSPACE_BINDING_CREATE_ACTION,
+})
 WORKSPACE_BINDING_BOOTSTRAP_SURFACES = frozenset({WORKSPACE_BINDING_CREATE_SURFACE})
 
 JSON_RPC_METHOD_NOT_FOUND = -32601
@@ -161,7 +166,7 @@ async def _dispatch_action(
     verified_workspace = None
     if _action_requires_workspace_authorization(action_request.action):
         try:
-            verified_workspace = verify_workspace_authorization_for_request(
+            verified_workspace = await verify_workspace_authorization_for_request_async(
                 server=server,
                 token=workspace_authorization_token,
                 required_scopes=[
@@ -259,7 +264,7 @@ async def _dispatch_surface(
     verified_workspace = None
     if _surface_requires_workspace_authorization(surface_request.surface):
         try:
-            verified_workspace = verify_workspace_authorization_for_request(
+            verified_workspace = await verify_workspace_authorization_for_request_async(
                 server=server,
                 token=workspace_authorization_token,
                 required_scopes=[
@@ -330,7 +335,7 @@ def _validate_surface_request(params: dict[str, Any]) -> V2SurfaceRequest:
 
 
 def _action_requires_workspace_authorization(action: str) -> bool:
-    return not action.startswith(WORKSPACE_BINDING_BOOTSTRAP_ACTION_PREFIX)
+    return action not in WORKSPACE_BINDING_BOOTSTRAP_ACTIONS
 
 
 def _surface_requires_workspace_authorization(surface: str) -> bool:
