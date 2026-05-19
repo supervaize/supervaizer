@@ -305,17 +305,14 @@ def _context_from_request(
             required_scopes=[required_scope],
             request_workspace=raw_workspace,
             agent_slug=agent_slug,
+            require_configured=True,
         )
     except WorkspaceAuthorizationError as exc:
         raise HTTPException(status_code=403, detail=exc.message) from exc
     workspace_id: str | None
     workspace_slug: str | None
-    if verified_workspace is not None:
-        workspace_id = verified_workspace.workspace_id
-        workspace_slug = verified_workspace.workspace_slug
-    else:
-        workspace_id = request.headers.get("X-Supervaize-Workspace-Id")
-        workspace_slug = request.headers.get("X-Supervaize-Workspace-Slug")
+    workspace_id = verified_workspace.workspace_id
+    workspace_slug = verified_workspace.workspace_slug
     return DataResourceContext(
         workspace_id=workspace_id,
         workspace_slug=workspace_slug,

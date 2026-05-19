@@ -115,9 +115,15 @@ def verify_workspace_authorization_for_request(
     required_scopes: Iterable[str],
     request_workspace: V2WorkspaceContext,
     agent_slug: str,
+    require_configured: bool = True,
 ) -> V2VerifiedWorkspaceContext | None:
     settings = get_workspace_authorization_settings(server)
     if not settings.enabled:
+        if require_configured:
+            raise WorkspaceAuthorizationError(
+                "workspace_authorization_not_configured",
+                "Workspace authorization is required but is not configured for this Supervaizer server",
+            )
         return None
     validate_workspace_authorization_settings(settings)
     if not token:
@@ -138,6 +144,7 @@ def verify_workspace_authorization_for_request(
         request_workspace=request_workspace,
         required_scopes=list(required_scopes),
         leeway_seconds=settings.leeway_seconds,
+        expected_server_id=_expected_server_id(server, settings),
     )
     return V2VerifiedWorkspaceContext(
         grant_id=claims.grant_id,
@@ -211,6 +218,7 @@ def _validate_claims_against_request(
     request_workspace: V2WorkspaceContext,
     required_scopes: list[str],
     leeway_seconds: int,
+    expected_server_id: str,
 ) -> None:
     now = int(time.time())
     if claims.exp + leeway_seconds < now:
@@ -223,7 +231,7 @@ def _validate_claims_against_request(
             "workspace_authorization_not_yet_valid",
             "Workspace authorization token was issued in the future",
         )
-    if claims.server_id != server.server_id:
+    if claims.server_id != expected_server_id:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_wrong_server",
             "Workspace authorization token server_id does not match this server",
@@ -234,7 +242,7 @@ def _validate_claims_against_request(
             "workspace_authorization_wrong_agent",
             "Workspace authorization token agent_slug does not match the request",
         )
-    if claims.agent_id != agent.id:
+    if claims.agent_id != _expected_agent_id(agent):
         raise WorkspaceAuthorizationError(
             "workspace_authorization_wrong_agent",
             "Workspace authorization token agent_id does not match the request",
@@ -262,6 +270,24 @@ def _validate_claims_against_request(
             f"Workspace authorization token is missing scope(s): "
             f"{', '.join(missing_scopes)}",
         )
+
+
+def _expected_server_id(server: Any, settings: V2WorkspaceAuthorizationSettings) -> str:
+    audience_prefix = "supervaizer-server:"
+    if settings.audience and settings.audience.startswith(audience_prefix):
+        return settings.audience[len(audience_prefix) :]
+    return str(server.server_id)
+
+
+def _expected_agent_id(agent: Any) -> str:
+    server_agent_id = getattr(agent, "server_agent_id", None)
+    if not server_agent_id:
+        raise WorkspaceAuthorizationError(
+            "workspace_authorization_agent_not_registered",
+            "Workspace authorization requires the Studio agent id from registration, "
+            "but this agent has not been linked to Studio",
+        )
+    return str(server_agent_id)
 
 
 def _get_agent_by_slug(server: Any, agent_slug: str) -> Any:

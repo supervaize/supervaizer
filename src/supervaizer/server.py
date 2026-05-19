@@ -715,6 +715,7 @@ class Server(ServerAbstract):
             "url": self.public_url,
             "uri": self.uri,
             "api_version": API_VERSION,
+            "controller_version": VERSION,
             **contract,
             "environment": self.environment,
             "public_key": str(
@@ -828,6 +829,7 @@ class Server(ServerAbstract):
                 f"response_keys={response_keys}"
             )
         if handshake.get("controller_api_key_match") is True:
+            self._apply_workspace_authorization_handshake(handshake)
             log.info(
                 "[Server launch] Studio registration handshake verified "
                 f"server_id={handshake.get('server_id')} "
@@ -841,6 +843,85 @@ class Server(ServerAbstract):
             f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
             f"reason={handshake.get('reason')}"
         )
+
+    def _apply_workspace_authorization_handshake(self, handshake: dict[str, Any]) -> None:
+        if not self.workspace_authorization.enabled:
+            return
+
+        workspace_authorization = handshake.get("workspace_authorization")
+        if not isinstance(workspace_authorization, dict):
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization is missing."
+            )
+
+        audience = workspace_authorization.get("audience")
+        if not isinstance(audience, str) or not audience.strip():
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization.audience is missing."
+            )
+
+        configured_audience = self.workspace_authorization.audience
+        if configured_audience and configured_audience != audience:
+            raise RuntimeError(
+                "Studio registration handshake failed: configured workspace authorization "
+                "audience does not match Studio's server audience."
+            )
+
+        self.workspace_authorization = self.workspace_authorization.model_copy(
+            update={"audience": audience}
+        )
+        agent_bindings = workspace_authorization.get("agents")
+        if not isinstance(agent_bindings, list):
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization.agents is missing."
+            )
+        self._apply_workspace_authorization_agent_bindings(agent_bindings)
+
+    def _apply_workspace_authorization_agent_bindings(
+        self, agent_bindings: list[Any]
+    ) -> None:
+        bindings_by_slug: dict[str, str] = {}
+        for binding in agent_bindings:
+            if not isinstance(binding, dict):
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding must be an object."
+                )
+            agent_id = binding.get("id")
+            agent_slug = binding.get("slug")
+            if not isinstance(agent_id, str) or not agent_id.strip():
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding is missing id."
+                )
+            if not isinstance(agent_slug, str) or not agent_slug.strip():
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding is missing slug."
+                )
+            bindings_by_slug[agent_slug] = agent_id
+
+        missing_agents = []
+        for agent in self.agents:
+            studio_agent_id = bindings_by_slug.get(agent.slug)
+            if not studio_agent_id:
+                missing_agents.append(agent.slug)
+                continue
+            if agent.server_agent_id and agent.server_agent_id != studio_agent_id:
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    f"id mismatch for slug={agent.slug}."
+                )
+            agent.server_agent_id = studio_agent_id
+
+        if missing_agents:
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization did not "
+                f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
+            )
 
     def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""

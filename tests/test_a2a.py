@@ -463,6 +463,38 @@ def test_a2a_workspace_authorization_missing_token_blocks_action_handler(
     assert payload["error"]["data"]["code"] == "workspace_authorization_missing"
 
 
+def test_a2a_workspace_authorization_not_configured_blocks_action_handler(
+    server_fixture: Server,
+) -> None:
+    agent_slug = server_fixture.agents[0].slug
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-not-configured",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert called is False
+    assert payload["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert payload["error"]["data"]["code"] == "workspace_authorization_not_configured"
+
+
 def test_a2a_workspace_binding_options_action_bootstraps_without_token(
     server_fixture: Server,
 ) -> None:
@@ -588,6 +620,128 @@ def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     assert response.status_code == 200
     assert response.json()["result"]["status"] == "ok"
     assert captured == {"grant_id": "grant-1", "workspace_ref": "agent-workspace-1"}
+
+
+def test_a2a_workspace_authorization_uses_studio_server_audience(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    server_fixture.workspace_authorization = server_fixture.workspace_authorization.model_copy(
+        update={"audience": "supervaizer-server:studio-server-1"}
+    )
+    captured: dict[str, str] = {}
+
+    def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.workspace_authorization is not None
+        captured["server_id"] = request.workspace_authorization.server_id
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides={
+            "aud": "supervaizer-server:studio-server-1",
+            "server_id": "studio-server-1",
+        },
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-studio-server",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["status"] == "ok"
+    assert captured == {"server_id": "studio-server-1"}
+
+
+def test_a2a_workspace_authorization_uses_studio_agent_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    captured: dict[str, str] = {}
+
+    def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.workspace_authorization is not None
+        captured["agent_id"] = request.workspace_authorization.agent_id
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides={"agent_id": "studio-agent-1"},
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-studio-agent",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["status"] == "ok"
+    assert captured == {"agent_id": "studio-agent-1"}
+
+
+def test_a2a_workspace_authorization_requires_studio_agent_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(
+        server_fixture, studio_agent_id=None
+    )
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-missing-studio-agent",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        payload["error"]["data"]["code"]
+        == "workspace_authorization_agent_not_registered"
+    )
 
 
 def test_a2a_workspace_authorization_valid_eddsa_token_reaches_action_handler(
@@ -1213,6 +1367,8 @@ def _enable_workspace_authorization_with_rsa_public_key(
 
 def _enable_workspace_authorization_eddsa(
     server: Server,
+    *,
+    studio_agent_id: str | None = "studio-agent-1",
 ) -> ed25519.Ed25519PrivateKey:
     key = ed25519.Ed25519PrivateKey.generate()
     public_key_pem = (
@@ -1230,6 +1386,8 @@ def _enable_workspace_authorization_eddsa(
         public_key_pem=public_key_pem,
         leeway_seconds=0,
     )
+    if studio_agent_id:
+        server.agents[0].server_agent_id = studio_agent_id
     return key
 
 
@@ -1255,7 +1413,7 @@ def _workspace_authorization_eddsa_token(
         "grant_id": "grant-1",
         "workspace_id": workspace_id,
         "workspace_slug": workspace_slug,
-        "agent_id": agent.id,
+        "agent_id": agent.server_agent_id or agent.id,
         "agent_slug": agent.slug,
         "server_id": server.server_id,
         "scopes": scopes,

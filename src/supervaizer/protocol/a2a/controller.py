@@ -170,6 +170,7 @@ async def _dispatch_action(
                 ],
                 request_workspace=action_request.workspace,
                 agent_slug=action_request.agent_slug,
+                require_configured=True,
             )
         except WorkspaceAuthorizationError as exc:
             return _json_rpc_error(
@@ -267,6 +268,7 @@ async def _dispatch_surface(
                 ],
                 request_workspace=surface_request.workspace,
                 agent_slug=surface_request.agent_slug,
+                require_configured=True,
             )
         except WorkspaceAuthorizationError as exc:
             return _json_rpc_error(

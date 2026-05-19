@@ -230,6 +230,7 @@ class ServerRegistrationContract(ControllerContract):
     url: str
     uri: str
     api_version: str
+    controller_version: str | None = None
     environment: str | None = None
     agents: list[AgentRegistrationContract] = Field(default_factory=list)
 

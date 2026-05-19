@@ -357,15 +357,16 @@ def test_data_resource_openapi_operation_ids_unique_per_agent(
     assert f"{agent_b.slug}_items_list" in list_ids
 
 
-def test_data_resource_callbacks_receive_context(
+def test_data_resource_workspace_authorization_not_configured_blocks_callback(
     account_fixture: Account,
     agent_method_fixture: AgentMethod,
     parameters_setup_fixture: ParametersSetup,
 ) -> None:
-    captured: dict[str, DataResourceContext] = {}
+    called = False
 
     def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
-        captured["context"] = context
+        nonlocal called
+        called = True
         return [{"id": "1"}]
 
     resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
@@ -408,13 +409,11 @@ def test_data_resource_callbacks_receive_context(
         },
     )
 
-    assert response.status_code == 200
-    context = captured["context"]
-    assert context.agent_slug == agent.slug
-    assert context.workspace_id == "team-1"
-    assert context.workspace_slug == "team-slug"
-    assert context.mission_id == "mission-1"
-    assert context.request_id == "request-1"
+    assert response.status_code == 403
+    assert called is False
+    assert response.json()["detail"] == (
+        "Workspace authorization is required but is not configured for this Supervaizer server"
+    )
 
 
 def test_data_resource_workspace_authorization_missing_token_blocks_callback(
@@ -546,6 +545,7 @@ def _enable_workspace_authorization(server: Server) -> ed25519.Ed25519PrivateKey
         public_key_pem=public_key_pem,
         leeway_seconds=0,
     )
+    server.agents[0].server_agent_id = "studio-agent-1"
     return key
 
 
@@ -567,7 +567,7 @@ def _workspace_authorization_token(
         "grant_id": "grant-1",
         "workspace_id": workspace_id,
         "workspace_slug": workspace_slug,
-        "agent_id": agent.id,
+        "agent_id": agent.server_agent_id or agent.id,
         "agent_slug": agent.slug,
         "server_id": server.server_id,
         "scopes": scopes,

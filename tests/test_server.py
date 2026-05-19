@@ -21,8 +21,10 @@ from fastapi.testclient import TestClient
 from rich import inspect
 
 from supervaizer import Server
+from supervaizer.__version__ import VERSION
 from supervaizer.agent import Agent
 from supervaizer.common import ApiSuccess
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings
 from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
@@ -120,6 +122,95 @@ def test_server_registration_handshake_accepts_key_match(
     )
 
     server_fixture._validate_registration_handshake(result)
+
+
+def test_server_registration_handshake_sets_workspace_authorization_audience(
+    server_fixture: Server,
+) -> None:
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.supervaize.com",
+        jwks_url="https://studio.supervaize.com/jwks",
+    )
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={
+            "object": {
+                "supervaizer_handshake": {
+                    "server_id": "remote-server-1",
+                    "controller_api_key_match": True,
+                    "workspace_authorization": {
+                        "audience": "supervaizer-server:studio-server-1",
+                        "studio_server_id": "studio-server-1",
+                        "agents": [
+                            {
+                                "id": "studio-agent-1",
+                                "slug": server_fixture.agents[0].slug,
+                            }
+                        ],
+                    },
+                }
+            }
+        },
+    )
+
+    server_fixture._validate_registration_handshake(result)
+
+    assert server_fixture.workspace_authorization.audience == "supervaizer-server:studio-server-1"
+    assert server_fixture.agents[0].server_agent_id == "studio-agent-1"
+
+
+def test_server_registration_handshake_requires_workspace_authorization_agent_binding(
+    server_fixture: Server,
+) -> None:
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.supervaize.com",
+        jwks_url="https://studio.supervaize.com/jwks",
+    )
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={
+            "object": {
+                "supervaizer_handshake": {
+                    "server_id": "remote-server-1",
+                    "controller_api_key_match": True,
+                    "workspace_authorization": {
+                        "audience": "supervaizer-server:studio-server-1",
+                        "studio_server_id": "studio-server-1",
+                        "agents": [],
+                    },
+                }
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="did not return Studio agent id"):
+        server_fixture._validate_registration_handshake(result)
+
+
+def test_server_registration_handshake_requires_workspace_authorization_audience(
+    server_fixture: Server,
+) -> None:
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.supervaize.com",
+        jwks_url="https://studio.supervaize.com/jwks",
+    )
+    result = ApiSuccess(
+        message="POST Event SERVER_REGISTER sent",
+        detail={
+            "object": {
+                "supervaizer_handshake": {
+                    "server_id": "remote-server-1",
+                    "controller_api_key_match": True,
+                }
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="workspace_authorization is missing"):
+        server_fixture._validate_registration_handshake(result)
 
 
 def test_server_registration_handshake_rejects_missing_handshake(
@@ -667,6 +758,7 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert "url" in registration_info
     assert "uri" in registration_info
     assert "api_version" in registration_info
+    assert registration_info["controller_version"] == VERSION
     assert "environment" in registration_info
     assert "public_key" in registration_info
     assert "api_key" in registration_info
@@ -699,6 +791,7 @@ def test_server_registration_info(server_fixture: Server) -> None:
     assert registration_info == {
         "uri": "server:E2-AC-ED-22-BF-B2",
         "api_version": "v1",
+        "controller_version": VERSION,
         "controller_contract_version": "1.0",
         "api_base_path": "/api",
         "endpoints": registration_info["endpoints"],
