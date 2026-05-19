@@ -18,8 +18,39 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Workspace agent authorization** — Studio-signed Ed25519 workspace authorization tokens on `X-Supervaize-Workspace-Authorization`; the SDK verifies JWKS-backed tokens and exposes `V2VerifiedWorkspaceContext` for handlers. Workspace and tenant slugs remain routing hints only.
+- **Workspace binding protocol** — Agents can declare optional `workspace_binding` metadata with bootstrap `workspace_binding.options`, `workspace_binding.create`, and the `workspace_binding.create` surface so Studio can bind an agent-side record before a Workspace Agent Grant exists.
+- **Workspace authorization docs** — `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` plus workspace authorization and binding bootstrap rules in `docs/2026_05_PROTOCOLS.md` and `docs/2026_05_SUPERVAIZER_v2.md`.
+
+### Changed
+
+- **Fail-closed Studio A2A** — Workspace-scoped v2 JSON-RPC actions and surfaces reject requests without a valid workspace authorization token when workspace authorization is enabled.
+- **Workspace-scoped data resources** — Data resource routes require verified workspace context from the authorization token instead of trusting caller-supplied slugs alone.
 - **Studio server audience handoff** — `server.register` handshakes can now supply the Studio-persisted server audience for workspace authorization tokens, and Supervaizer adopts that audience before serving protected v2 calls so workspace grants survive agent process restarts.
 - **Controller version registration** — `server.register` now sends the Supervaizer controller package version directly as `controller_version`, so Studio no longer depends on OpenAPI scraping to refresh the server detail page version.
+
+### Fixed
+
+- **Workspace authorization validation** — Malformed or incomplete workspace authorization tokens and settings now fail with explicit `workspace_authorization_*` errors instead of ambiguous handler failures.
+
+### Tests
+
+- `tests/test_a2a.py` — workspace authorization accept/reject paths, JWKS verification, binding bootstrap exceptions, and protected action/surface enforcement.
+- `tests/test_agent.py` — v2 registration carries workspace binding and authorization settings.
+- `tests/test_contracts.py` — workspace binding and authorization contract models.
+- `tests/test_routes.py` — data resource routes require verified workspace context.
+- `tests/test_server.py` — registration handshake audience handoff, workspace authorization startup validation, and `controller_version` registration.
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 657   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 76s   |
 
 ## [1.0.1] - 2026-05-17
 
