@@ -10,11 +10,15 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import base64
 import json
 import os
+import time
 from typing import Any
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from fastapi import status
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -29,8 +33,99 @@ from supervaizer.job import Job, JobContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
 from supervaizer.server_utils import ErrorType, create_error_response
+from supervaizer.workspace_authorization import WORKSPACE_AUTHORIZATION_HEADER
 
 insp = inspect
+
+
+def _enable_workspace_authorization_eddsa(
+    server: Server,
+) -> ed25519.Ed25519PrivateKey:
+    key = ed25519.Ed25519PrivateKey.generate()
+    public_key_pem = (
+        key
+        .public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
+    server.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        public_key_pem=public_key_pem,
+        leeway_seconds=0,
+    )
+    server.agents[0].server_agent_id = "studio-agent-1"
+    return key
+
+
+def _workspace_authorization_eddsa_token(
+    server: Server,
+    key: ed25519.Ed25519PrivateKey,
+    *,
+    agent_slug: str,
+    scopes: list[str],
+    workspace_id: str = "workspace-1",
+) -> str:
+    agent = next(agent for agent in server.agents if agent.slug == agent_slug)
+    now = int(time.time())
+    claims = {
+        "iss": "https://studio.example.test",
+        "aud": f"supervaizer-server:{server.server_id}",
+        "sub": "workspace-agent-grant:grant-1",
+        "grant_id": "grant-1",
+        "workspace_id": workspace_id,
+        "agent_id": agent.server_agent_id or agent.id,
+        "agent_slug": agent.slug,
+        "server_id": server.server_id,
+        "scopes": scopes,
+        "agent_workspace_ref": "agent-workspace-1",
+        "iat": now,
+        "exp": now + 300,
+        "jti": "token-1",
+    }
+    return _sign_eddsa_jwt(key, {"alg": "EdDSA", "typ": "JWT"}, claims)
+
+
+def _a2a_workspace_headers(
+    server: Server,
+    key: ed25519.Ed25519PrivateKey,
+    *,
+    agent_slug: str,
+    scopes: list[str],
+) -> dict[str, str]:
+    token = _workspace_authorization_eddsa_token(
+        server,
+        key,
+        agent_slug=agent_slug,
+        scopes=scopes,
+    )
+    return {
+        "X-API-Key": server.api_key or "",
+        WORKSPACE_AUTHORIZATION_HEADER: f"Bearer {token}",
+    }
+
+
+def _sign_eddsa_jwt(
+    key: ed25519.Ed25519PrivateKey,
+    header: dict[str, object],
+    claims: dict[str, object],
+) -> str:
+    encoded_header = _base64url_json(header)
+    encoded_claims = _base64url_json(claims)
+    signing_input = f"{encoded_header}.{encoded_claims}".encode("ascii")
+    signature = key.sign(signing_input)
+    return f"{encoded_header}.{encoded_claims}.{_base64url(signature)}"
+
+
+def _base64url_json(value: dict[str, object]) -> str:
+    return _base64url(json.dumps(value, separators=(",", ":")).encode("utf-8"))
+
+
+def _base64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
 @pytest.fixture
@@ -156,7 +251,10 @@ def test_server_registration_handshake_sets_workspace_authorization_audience(
 
     server_fixture._validate_registration_handshake(result)
 
-    assert server_fixture.workspace_authorization.audience == "supervaizer-server:studio-server-1"
+    assert (
+        server_fixture.workspace_authorization.audience
+        == "supervaizer-server:studio-server-1"
+    )
     assert server_fixture.agents[0].server_agent_id == "studio-agent-1"
 
 
@@ -834,7 +932,7 @@ class TestServerLocalMode:
             )
             agent_slug = server.agents[0].slug
             client = TestClient(server.app)
-            headers = {"X-API-Key": server.api_key}
+            key = _enable_workspace_authorization_eddsa(server)
 
             card_response = client.get(
                 f"/.well-known/agents/v{server.agents[0].version}/{agent_slug}_agent.json"
@@ -853,7 +951,12 @@ class TestServerLocalMode:
 
             surface_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=["supervaizer/surface.load", "job.start"],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "surface-1",
@@ -878,7 +981,12 @@ class TestServerLocalMode:
 
             action_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=["supervaizer/action.invoke", "job.start.preview"],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "action-1",
@@ -903,7 +1011,15 @@ class TestServerLocalMode:
 
             resource_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=[
+                        "supervaizer/action.invoke",
+                        "resource.hello_messages.list",
+                    ],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "resource-1",
@@ -927,7 +1043,12 @@ class TestServerLocalMode:
 
             start_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=["supervaizer/action.invoke", "job.start"],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "start-1",
@@ -954,7 +1075,12 @@ class TestServerLocalMode:
 
             awaiting_surface_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=["supervaizer/surface.load", "case.step.awaiting"],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "awaiting-surface-1",
@@ -983,7 +1109,12 @@ class TestServerLocalMode:
 
             submit_response = client.post(
                 "/a2a",
-                headers=headers,
+                headers=_a2a_workspace_headers(
+                    server,
+                    key,
+                    agent_slug=agent_slug,
+                    scopes=["supervaizer/action.invoke", "step.awaiting.submit"],
+                ),
                 json={
                     "jsonrpc": "2.0",
                     "id": "submit-1",

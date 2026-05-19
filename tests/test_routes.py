@@ -599,6 +599,31 @@ def _base64url(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
+def _data_resource_headers(
+    server: Server,
+    agent: Agent,
+    *,
+    scope: str,
+    workspace_id: str = "workspace-1",
+    workspace_slug: str = "workspace",
+) -> dict[str, str]:
+    key = _enable_workspace_authorization(server)
+    token = _workspace_authorization_token(
+        server,
+        key,
+        agent_slug=agent.slug,
+        scopes=[scope],
+        workspace_id=workspace_id,
+        workspace_slug=workspace_slug,
+    )
+    return {
+        "X-API-Key": "test-api-key",
+        WORKSPACE_AUTHORIZATION_HEADER: f"Bearer {token}",
+        "X-Supervaize-Workspace-Id": workspace_id,
+        "X-Supervaize-Workspace-Slug": workspace_slug,
+    }
+
+
 def test_data_resource_create_requires_id_in_callback_result(
     account_fixture: Account,
     agent_method_fixture: AgentMethod,
@@ -617,7 +642,7 @@ def test_data_resource_create_requires_id_in_callback_result(
 
     response = client.post(
         f"/api/agents/{agent.slug}/data/items/",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.create"),
         json={"name": "No ID"},
     )
 
@@ -644,7 +669,7 @@ def test_data_resource_update_returns_404_when_callback_returns_none(
 
     response = client.put(
         f"/api/agents/{agent.slug}/data/items/missing",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.update"),
         json={"name": "Missing"},
     )
 
@@ -671,7 +696,7 @@ def test_data_resource_delete_returns_404_when_callback_is_false(
 
     response = client.delete(
         f"/api/agents/{agent.slug}/data/items/missing",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.delete"),
     )
 
     assert response.status_code == 404
@@ -694,7 +719,7 @@ def test_data_resource_permission_error_becomes_403(
 
     response = client.get(
         f"/api/agents/{agent.slug}/data/items/",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.list"),
     )
 
     assert response.status_code == 403

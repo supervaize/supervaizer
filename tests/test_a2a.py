@@ -65,6 +65,23 @@ def _a2a_workspace_headers(server: Server, token: str) -> dict[str, str]:
     }
 
 
+def _authorized_a2a_headers(
+    server: Server, *, agent_slug: str, scopes: list[str]
+) -> dict[str, str]:
+    key = _enable_workspace_authorization_eddsa(
+        server,
+        agent_slug=agent_slug,
+        studio_agent_id=f"studio-{agent_slug}",
+    )
+    token = _workspace_authorization_eddsa_token(
+        server,
+        key,
+        agent_slug=agent_slug,
+        scopes=scopes,
+    )
+    return _a2a_workspace_headers(server, token)
+
+
 def test_create_agent_card(agent_fixture: Agent) -> None:
     """Test the create_agent_card function."""
     base_url = "http://test.example.com"
@@ -292,16 +309,22 @@ def test_a2a_controller_rejects_unknown_method(server_fixture: Server) -> None:
 def test_a2a_controller_rejects_unregistered_v2_action(
     server_fixture: Server,
 ) -> None:
+    agent = server_fixture.agents[0]
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
     client = TestClient(server_fixture.app)
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-2",
             "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
-            "params": _v2_action_payload(action="job.start"),
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
         },
     )
 
@@ -309,23 +332,29 @@ def test_a2a_controller_rejects_unregistered_v2_action(
     payload = response.json()
     assert payload["id"] == "rpc-2"
     assert payload["error"]["code"] == JSON_RPC_ACTION_NOT_REGISTERED
-    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
+    assert payload["error"]["data"]["agent_slug"] == agent.slug
     assert payload["error"]["data"]["action"] == "job.start"
 
 
 def test_a2a_controller_rejects_unregistered_v2_surface(
     server_fixture: Server,
 ) -> None:
+    agent = server_fixture.agents[0]
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_SURFACE_LOAD_METHOD, "job.start"],
+    )
     client = TestClient(server_fixture.app)
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-1",
             "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
-            "params": _v2_surface_payload(surface="job.start"),
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent.slug),
         },
     )
 
@@ -333,7 +362,7 @@ def test_a2a_controller_rejects_unregistered_v2_surface(
     payload = response.json()
     assert payload["id"] == "rpc-surface-1"
     assert payload["error"]["code"] == JSON_RPC_SURFACE_NOT_REGISTERED
-    assert payload["error"]["data"]["agent_slug"] == "agent-interviewer"
+    assert payload["error"]["data"]["agent_slug"] == agent.slug
     assert payload["error"]["data"]["surface"] == "job.start"
 
 
@@ -398,7 +427,12 @@ def test_a2a_events_remains_read_scoped(server_fixture: Server) -> None:
 def test_a2a_controller_dispatches_registered_v2_action(
     server_fixture: Server,
 ) -> None:
-    agent_slug = server_fixture.agents[0].slug
+    agent = server_fixture.agents[0]
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
 
     def start_job(request: V2ActionRequest) -> V2ActionResult:
         assert request.action == "job.start"
@@ -412,12 +446,12 @@ def test_a2a_controller_dispatches_registered_v2_action(
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-3",
             "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
-            "params": _v2_action_payload(action="job.start", agent_slug=agent_slug),
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
         },
     )
 
@@ -627,8 +661,10 @@ def test_a2a_workspace_authorization_uses_studio_server_audience(
 ) -> None:
     agent = server_fixture.agents[0]
     key = _enable_workspace_authorization_eddsa(server_fixture)
-    server_fixture.workspace_authorization = server_fixture.workspace_authorization.model_copy(
-        update={"audience": "supervaizer-server:studio-server-1"}
+    server_fixture.workspace_authorization = (
+        server_fixture.workspace_authorization.model_copy(
+            update={"audience": "supervaizer-server:studio-server-1"}
+        )
     )
     captured: dict[str, str] = {}
 
@@ -708,9 +744,7 @@ def test_a2a_workspace_authorization_requires_studio_agent_id(
     server_fixture: Server,
 ) -> None:
     agent = server_fixture.agents[0]
-    key = _enable_workspace_authorization_eddsa(
-        server_fixture, studio_agent_id=None
-    )
+    key = _enable_workspace_authorization_eddsa(server_fixture, studio_agent_id=None)
 
     def start_job(_request: V2ActionRequest) -> V2ActionResult:
         return V2ActionResult(status="ok")
@@ -789,6 +823,7 @@ def test_a2a_workspace_authorization_eddsa_jwks_token_reaches_action_handler(
     server_fixture: Server, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
     key = ed25519.Ed25519PrivateKey.generate()
     server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
         enabled=True,
@@ -1033,6 +1068,11 @@ def test_a2a_controller_serializes_v2_action_replay_safety(
     server_fixture: Server,
 ) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.sync"],
+    )
 
     def sync_job(_request: V2ActionRequest) -> dict[str, object]:
         return {
@@ -1049,7 +1089,7 @@ def test_a2a_controller_serializes_v2_action_replay_safety(
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-replay-safety-1",
@@ -1071,6 +1111,11 @@ def test_a2a_controller_action_errors_do_not_leak_exception_details(
     server_fixture: Server,
 ) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
 
     def start_job(_request: V2ActionRequest) -> V2ActionResult:
         raise RuntimeError("database password secret-value leaked")
@@ -1080,7 +1125,7 @@ def test_a2a_controller_action_errors_do_not_leak_exception_details(
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-error-1",
@@ -1103,6 +1148,11 @@ def test_a2a_controller_publishes_v2_action_effects(
     server_fixture: Server,
 ) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
     queue = subscribe_v2_events(server_fixture)
 
     def start_job(_request: V2ActionRequest) -> V2ActionResult:
@@ -1117,7 +1167,7 @@ def test_a2a_controller_publishes_v2_action_effects(
 
         response = client.post(
             "/a2a",
-            headers=_a2a_write_headers(server_fixture),
+            headers=headers,
             json={
                 "jsonrpc": "2.0",
                 "id": "rpc-event-1",
@@ -1143,6 +1193,11 @@ def test_a2a_controller_dispatches_registered_v2_surface(
     server_fixture: Server,
 ) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_SURFACE_LOAD_METHOD, "job.start"],
+    )
 
     def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
         assert request.surface == "job.start"
@@ -1157,7 +1212,7 @@ def test_a2a_controller_dispatches_registered_v2_surface(
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-2",
@@ -1179,6 +1234,11 @@ def test_a2a_controller_dispatches_registered_v2_surface(
 
 def test_server_v2_action_decorator_registers_handler(server_fixture: Server) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start.preview"],
+    )
 
     @server_fixture.v2_action("job.start.preview")
     def preview_job_start(request: V2ActionRequest) -> dict[str, object]:
@@ -1189,7 +1249,7 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-4",
@@ -1211,6 +1271,11 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
 
 def test_server_v2_surface_decorator_registers_handler(server_fixture: Server) -> None:
     agent_slug = server_fixture.agents[0].slug
+    headers = _authorized_a2a_headers(
+        server_fixture,
+        agent_slug=agent_slug,
+        scopes=[SUPERVAIZER_SURFACE_LOAD_METHOD, "job.start"],
+    )
 
     @server_fixture.v2_surface("job.start")
     def load_job_start(request: V2SurfaceRequest) -> dict[str, object]:
@@ -1224,7 +1289,7 @@ def test_server_v2_surface_decorator_registers_handler(server_fixture: Server) -
 
     response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=headers,
         json={
             "jsonrpc": "2.0",
             "id": "rpc-surface-3",
@@ -1250,6 +1315,24 @@ def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> 
         description="description",
     )
     server_fixture.agents.append(second_agent)
+    key = _enable_workspace_authorization_eddsa(
+        server_fixture,
+        agent_slug=first_slug,
+        studio_agent_id=f"studio-{first_slug}",
+    )
+    second_agent.server_agent_id = f"studio-{second_agent.slug}"
+    first_token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=first_slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    second_token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=second_agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
 
     register_v2_action_handler(
         server_fixture,
@@ -1267,7 +1350,7 @@ def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> 
 
     first_response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=_a2a_workspace_headers(server_fixture, first_token),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-5",
@@ -1277,7 +1360,7 @@ def test_v2_action_handlers_are_scoped_by_agent_slug(server_fixture: Server) -> 
     )
     second_response = client.post(
         "/a2a",
-        headers=_a2a_write_headers(server_fixture),
+        headers=_a2a_workspace_headers(server_fixture, second_token),
         json={
             "jsonrpc": "2.0",
             "id": "rpc-6",
@@ -1369,6 +1452,7 @@ def _enable_workspace_authorization_eddsa(
     server: Server,
     *,
     studio_agent_id: str | None = "studio-agent-1",
+    agent_slug: str | None = None,
 ) -> ed25519.Ed25519PrivateKey:
     key = ed25519.Ed25519PrivateKey.generate()
     public_key_pem = (
@@ -1387,7 +1471,12 @@ def _enable_workspace_authorization_eddsa(
         leeway_seconds=0,
     )
     if studio_agent_id:
-        server.agents[0].server_agent_id = studio_agent_id
+        agent = (
+            next(item for item in server.agents if item.slug == agent_slug)
+            if agent_slug
+            else server.agents[0]
+        )
+        agent.server_agent_id = studio_agent_id
     return key
 
 
