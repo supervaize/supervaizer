@@ -844,7 +844,9 @@ class Server(ServerAbstract):
             f"reason={handshake.get('reason')}"
         )
 
-    def _apply_workspace_authorization_handshake(self, handshake: dict[str, Any]) -> None:
+    def _apply_workspace_authorization_handshake(
+        self, handshake: dict[str, Any]
+    ) -> None:
         if not self.workspace_authorization.enabled:
             return
 

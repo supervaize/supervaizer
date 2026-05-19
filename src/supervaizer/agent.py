@@ -889,7 +889,11 @@ class Agent(AgentAbstract):
         agent_from_server = _agent_detail_from_server_response(from_server.detail)
         server_agent_id = _agent_id_from_server_detail(agent_from_server)
 
-        if self.server_agent_id and server_agent_id and self.server_agent_id != server_agent_id:
+        if (
+            self.server_agent_id
+            and server_agent_id
+            and self.server_agent_id != server_agent_id
+        ):
             message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
             raise ValueError(message)
         if not self.server_agent_id and not server_agent_id:

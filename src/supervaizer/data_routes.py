@@ -309,8 +309,14 @@ def _context_from_request(
         )
     except WorkspaceAuthorizationError as exc:
         raise HTTPException(status_code=403, detail=exc.message) from exc
-    workspace_id: str | None
-    workspace_slug: str | None
+    if verified_workspace is None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Workspace authorization is required but is not configured "
+                "for this Supervaizer server"
+            ),
+        )
     workspace_id = verified_workspace.workspace_id
     workspace_slug = verified_workspace.workspace_slug
     return DataResourceContext(

@@ -12,7 +12,7 @@ import base64
 import json
 import time
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import Any, TypeAlias
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -30,7 +30,7 @@ from supervaizer.contracts import (
 WORKSPACE_AUTHORIZATION_HEADER = "X-Supervaize-Workspace-Authorization"
 WORKSPACE_AUTHORIZATION_ALGORITHM = "EdDSA"
 
-WorkspaceAuthorizationPublicKey = ed25519.Ed25519PublicKey
+WorkspaceAuthorizationPublicKey: TypeAlias = ed25519.Ed25519PublicKey
 
 
 class WorkspaceAuthorizationError(ValueError):
