@@ -1,7 +1,7 @@
 # Protocol Support
 
 > **Created:** 2025-08-06
-> **Updated:** 2026-05-17
+> **Updated:** 2026-05-18
 
 SUPERVAIZER uses several protocol layers. They are related, but they do different jobs:
 
@@ -49,6 +49,14 @@ When an agent declares `supervaizer_v2_registration`, its A2A Agent Card include
 
 This extension does **not** replace the existing Studio server-registration trust model. Studio registration still owns server identity, public key exchange, and encrypted payload handling. The A2A Agent Card advertises the v2 operational contract after the controller is known.
 
+### Workspace Authorization
+
+Workspace and tenant slugs are not enough to authorize shared-agent access. A Supervaizer v2 controller should treat them as display and routing hints only.
+
+The planned shared-agent model uses a Studio-owned Workspace Agent Grant and a short-lived Studio-signed workspace authorization token. Studio sends the token with Studio-to-agent requests, and the Supervaizer SDK verifies it before dispatching handlers. This lets stateless agents safely serve multiple workspaces without storing grant state locally.
+
+See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md).
+
 ### Supervaizer v2 JSON-RPC Methods
 
 Supervaizer v2 currently exposes two A2A JSON-RPC methods:
@@ -59,6 +67,12 @@ Supervaizer v2 currently exposes two A2A JSON-RPC methods:
 | `supervaizer/action.invoke` | Invoke a typed agent action such as `job.start`, `job.sync`, `step.awaiting.submit`, `resource.contacts.create`, or `dataset.session_metrics.query`. |
 
 Both methods are scoped by `agent_slug`. In multi-agent controllers, handlers must be registered for the correct agent slug.
+
+Workspace-scoped calls require a Studio-signed workspace authorization token.
+The only bootstrap exceptions are `workspace_binding.*` actions and the
+`workspace_binding.create` surface. These calls are used before a Workspace
+Agent Grant exists, so they require normal Studio-to-agent transport
+authentication but not a workspace authorization token.
 
 ### Transport Status
 

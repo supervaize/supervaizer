@@ -50,7 +50,11 @@ from supervaizer.common import (
     is_local_mode,
     log,
 )
-from supervaizer.contracts import API_VERSION, controller_contract_info
+from supervaizer.contracts import (
+    API_VERSION,
+    V2WorkspaceAuthorizationSettings,
+    controller_contract_info,
+)
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a.controller import (
     ActionHandler,
@@ -65,6 +69,9 @@ from supervaizer.routers import (
 )  # <-- ADDED
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
 from supervaizer.storage import StorageManager, load_running_entities_on_startup
+from supervaizer.workspace_authorization import (
+    validate_workspace_authorization_settings,
+)
 
 insp = inspect
 
@@ -87,6 +94,30 @@ def _controller_key_fingerprint(api_key: str | None) -> str | None:
     if not api_key:
         return None
     return sha256(api_key.encode("utf-8")).hexdigest()[:12]
+
+
+def _resolve_workspace_authorization_settings(
+    explicit_settings: V2WorkspaceAuthorizationSettings | dict[str, Any] | None,
+) -> V2WorkspaceAuthorizationSettings:
+    if explicit_settings is not None:
+        return V2WorkspaceAuthorizationSettings.model_validate(explicit_settings)
+    return V2WorkspaceAuthorizationSettings(
+        enabled=_env_bool("SUPERVAIZER_WORKSPACE_AUTH_REQUIRED", default=False),
+        issuer=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER") or None,
+        audience=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE") or None,
+        public_key_pem=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY") or None,
+        jwks_url=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL") or None,
+        leeway_seconds=int(
+            os.getenv("SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS", "30")
+        ),
+    )
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _get_or_create_private_key() -> RSAPrivateKey:
@@ -316,6 +347,10 @@ class ServerAbstract(SvBaseModel):
     api_key_header: APIKeyHeader | None = Field(
         default=None, description="API key header for authentication"
     )
+    workspace_authorization: V2WorkspaceAuthorizationSettings = Field(
+        default_factory=V2WorkspaceAuthorizationSettings,
+        description="Optional Studio-signed workspace authorization verifier settings",
+    )
 
     model_config = cast(
         ConfigDict,
@@ -380,6 +415,9 @@ class Server(ServerAbstract):
         private_key: RSAPrivateKey | None = None,
         public_url: str | None = None,
         api_key: str | None = None,
+        workspace_authorization: V2WorkspaceAuthorizationSettings
+        | dict[str, Any]
+        | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the server with the given configuration.
@@ -461,6 +499,10 @@ class Server(ServerAbstract):
 
         if private_key is None:
             private_key = _get_or_create_private_key()
+        workspace_authorization_settings = _resolve_workspace_authorization_settings(
+            workspace_authorization
+        )
+        validate_workspace_authorization_settings(workspace_authorization_settings)
 
         public_key = private_key.public_key()
         log.info(f"[Server launch] Public key: {public_key}")
@@ -545,6 +587,7 @@ class Server(ServerAbstract):
             public_url=public_url,
             api_key=api_key,
             api_key_header=api_key_header,
+            workspace_authorization=workspace_authorization_settings,
             **kwargs,
         )
 
@@ -672,6 +715,7 @@ class Server(ServerAbstract):
             "url": self.public_url,
             "uri": self.uri,
             "api_version": API_VERSION,
+            "controller_version": VERSION,
             **contract,
             "environment": self.environment,
             "public_key": str(
@@ -731,6 +775,8 @@ class Server(ServerAbstract):
             f"[Server launch] Starting Supervaize Controller API v{VERSION} - Log : {log_level} "
         )
 
+        self._validate_studio_a2a_workspace_authorization()
+
         # self.instructions()
         if self.supervisor_account:
             # Register the server with the supervisor account
@@ -785,6 +831,7 @@ class Server(ServerAbstract):
                 f"response_keys={response_keys}"
             )
         if handshake.get("controller_api_key_match") is True:
+            self._apply_workspace_authorization_handshake(handshake)
             log.info(
                 "[Server launch] Studio registration handshake verified "
                 f"server_id={handshake.get('server_id')} "
@@ -798,6 +845,99 @@ class Server(ServerAbstract):
             f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
             f"reason={handshake.get('reason')}"
         )
+
+    def _validate_studio_a2a_workspace_authorization(self) -> None:
+        if not self.a2a_endpoints or self.supervisor_account is None:
+            return
+        if self.workspace_authorization.enabled:
+            return
+        raise RuntimeError(
+            "Studio-registered Supervaizer v2 A2A requires workspace authorization. "
+            "Set SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true and configure "
+            "SUPERVAIZER_WORKSPACE_AUTH_ISSUER plus either "
+            "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY or SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL."
+        )
+
+    def _apply_workspace_authorization_handshake(
+        self, handshake: dict[str, Any]
+    ) -> None:
+        if not self.workspace_authorization.enabled:
+            return
+
+        workspace_authorization = handshake.get("workspace_authorization")
+        if not isinstance(workspace_authorization, dict):
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization is missing."
+            )
+
+        audience = workspace_authorization.get("audience")
+        if not isinstance(audience, str) or not audience.strip():
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization.audience is missing."
+            )
+
+        configured_audience = self.workspace_authorization.audience
+        if configured_audience and configured_audience != audience:
+            raise RuntimeError(
+                "Studio registration handshake failed: configured workspace authorization "
+                "audience does not match Studio's server audience."
+            )
+
+        self.workspace_authorization = self.workspace_authorization.model_copy(
+            update={"audience": audience}
+        )
+        agent_bindings = workspace_authorization.get("agents")
+        if not isinstance(agent_bindings, list):
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization is enabled "
+                "but supervaizer_handshake.workspace_authorization.agents is missing."
+            )
+        self._apply_workspace_authorization_agent_bindings(agent_bindings)
+
+    def _apply_workspace_authorization_agent_bindings(
+        self, agent_bindings: list[Any]
+    ) -> None:
+        bindings_by_slug: dict[str, str] = {}
+        for binding in agent_bindings:
+            if not isinstance(binding, dict):
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding must be an object."
+                )
+            agent_id = binding.get("id")
+            agent_slug = binding.get("slug")
+            if not isinstance(agent_id, str) or not agent_id.strip():
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding is missing id."
+                )
+            if not isinstance(agent_slug, str) or not agent_slug.strip():
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    "binding is missing slug."
+                )
+            bindings_by_slug[agent_slug] = agent_id
+
+        missing_agents = []
+        for agent in self.agents:
+            studio_agent_id = bindings_by_slug.get(agent.slug)
+            if not studio_agent_id:
+                missing_agents.append(agent.slug)
+                continue
+            if agent.server_agent_id and agent.server_agent_id != studio_agent_id:
+                raise RuntimeError(
+                    "Studio registration handshake failed: workspace authorization agent "
+                    f"id mismatch for slug={agent.slug}."
+                )
+            agent.server_agent_id = studio_agent_id
+
+        if missing_agents:
+            raise RuntimeError(
+                "Studio registration handshake failed: workspace authorization did not "
+                f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
+            )
 
     def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""

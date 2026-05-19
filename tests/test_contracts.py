@@ -39,6 +39,9 @@ from supervaizer.contracts import (
     V2ResourceFieldDefinition,
     V2SurfaceRequest,
     V2SurfaceResult,
+    V2VerifiedWorkspaceContext,
+    V2WorkspaceAuthorizationSettings,
+    V2WorkspaceBindingDefinition,
     build_data_resource_context_headers,
     build_v2_agent_registration,
     controller_contract_info,
@@ -383,6 +386,21 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         ],
         case_lanes=[{"id": "work", "label": "Work", "default": True}],
         job_policy={"sync": {"action": "job.sync"}},
+        workspace_binding={
+            "required": True,
+            "modes": ["bind_existing", "create_and_bind"],
+            "reference_label": "Agent workspace reference",
+            "create": {
+                "fields": [
+                    {
+                        "id": "display_name",
+                        "label": "Display name",
+                        "type": "text",
+                        "required": True,
+                    }
+                ]
+            },
+        },
     )
 
     assert registration.versions.a2ui_version == "v0.8"
@@ -395,6 +413,7 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "mission.agent.resource.contacts",
         "mission.agent.dataset.campaign_progress",
         "mission.analytics",
+        "workspace_binding.create",
     ]
     assert registration.capabilities.actions == [
         "job.start",
@@ -403,7 +422,15 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "resource.contacts.create",
         "dataset.campaign_progress.query",
         "job.sync",
+        "workspace_binding.options",
+        "workspace_binding.create",
     ]
+    assert registration.workspace_binding is not None
+    assert registration.workspace_binding.existing is not None
+    assert registration.workspace_binding.existing.action == "workspace_binding.options"
+    assert registration.workspace_binding.create is not None
+    assert registration.workspace_binding.create.surface == "workspace_binding.create"
+    assert registration.workspace_binding.create.action == "workspace_binding.create"
     assert registration.resources[0].scope == "workspace"
     assert registration.resources[0].requires_context == ["workspace.id"]
     assert registration.resources[0].fields[0].id == "email"
@@ -425,6 +452,11 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         },
     }
     assert registration.capabilities.case_lanes[0].default is True
+
+
+def test_v2_workspace_binding_required_requires_mode() -> None:
+    with pytest.raises(ValidationError, match="at least one mode"):
+        V2WorkspaceBindingDefinition(required=True)
 
 
 def test_v2_dashboard_widget_validates_data_ref_target() -> None:
@@ -663,4 +695,9 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2SurfaceRequest is V2SurfaceRequest
     assert supervaizer.V2SurfaceResult is V2SurfaceResult
+    assert supervaizer.V2VerifiedWorkspaceContext is V2VerifiedWorkspaceContext
+    assert (
+        supervaizer.V2WorkspaceAuthorizationSettings is V2WorkspaceAuthorizationSettings
+    )
+    assert supervaizer.V2WorkspaceBindingDefinition is V2WorkspaceBindingDefinition
     assert supervaizer.build_v2_agent_registration is build_v2_agent_registration
