@@ -663,6 +663,31 @@ def test_agent_update_agent_from_server(
         agent_fixture.update_agent_from_server(server_fixture)
 
 
+def test_agent_update_keeps_registration_agent_id_when_detail_omits_id(
+    agent_fixture: Agent, server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agent_fixture.server_agent_id = "studio-agent-id"
+    agent_detail_without_id = dict(GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL)
+    agent_detail_without_id.pop("id")
+    agent_detail_without_id["onboarding_status"] = "new"
+
+    monkeypatch.setattr(
+        server_fixture.supervisor_account.__class__,
+        "get_agent_by",
+        lambda self, agent_id=None, agent_slug=None: ApiSuccess(
+            message="Success",
+            detail=agent_detail_without_id,
+            code=200,
+        ),
+    )
+
+    updated_agent = agent_fixture.update_agent_from_server(server_fixture)
+
+    assert updated_agent is agent_fixture
+    assert updated_agent.server_agent_id == "studio-agent-id"
+    assert updated_agent.server_agent_onboarding_status == "new"
+
+
 def test_job_start_custom_async_uses_action_is_async(
     server_fixture: Server,
     context_fixture: JobContext,
