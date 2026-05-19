@@ -11,10 +11,15 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+import base64
+import json
+import time
 from io import StringIO
 from typing import Any
 
 import httpx
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
@@ -28,6 +33,7 @@ from supervaizer import (
     Server,
 )
 from supervaizer.common import log
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
@@ -39,6 +45,7 @@ from supervaizer.routes import (
     create_utils_routes,
     get_server,
 )
+from supervaizer.workspace_authorization import WORKSPACE_AUTHORIZATION_HEADER
 
 
 def test_utils_public_key_and_encrypt(server_fixture: Server, mocker: Any) -> None:
@@ -350,15 +357,16 @@ def test_data_resource_openapi_operation_ids_unique_per_agent(
     assert f"{agent_b.slug}_items_list" in list_ids
 
 
-def test_data_resource_callbacks_receive_context(
+def test_data_resource_workspace_authorization_not_configured_blocks_callback(
     account_fixture: Account,
     agent_method_fixture: AgentMethod,
     parameters_setup_fixture: ParametersSetup,
 ) -> None:
-    captured: dict[str, DataResourceContext] = {}
+    called = False
 
     def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
-        captured["context"] = context
+        nonlocal called
+        called = True
         return [{"id": "1"}]
 
     resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
@@ -401,13 +409,88 @@ def test_data_resource_callbacks_receive_context(
         },
     )
 
+    assert response.status_code == 403
+    assert called is False
+    assert response.json()["detail"] == (
+        "Workspace authorization is required but is not configured for this Supervaizer server"
+    )
+
+
+def test_data_resource_workspace_authorization_missing_token_blocks_callback(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    called = False
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        nonlocal called
+        called = True
+        return [{"workspace": context.workspace_id}]
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    _enable_workspace_authorization(server)
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={
+            "X-API-Key": "test-api-key",
+            "X-Supervaize-Workspace-Id": "team-1",
+        },
+    )
+
+    assert response.status_code == 403
+    assert called is False
+    assert "Missing X-Supervaize-Workspace-Authorization" in response.json()["detail"]
+
+
+def test_data_resource_workspace_authorization_valid_token_sets_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    captured: dict[str, DataResourceContext] = {}
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        captured["context"] = context
+        return [{"workspace": context.workspace_id}]
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    key = _enable_workspace_authorization(server)
+    token = _workspace_authorization_token(
+        server,
+        key,
+        agent_slug=agent.slug,
+        scopes=["resource.items.list"],
+        workspace_id="team-1",
+        workspace_slug="team-slug",
+    )
+    client = TestClient(server.app)
+
+    response = client.get(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={
+            "X-API-Key": "test-api-key",
+            WORKSPACE_AUTHORIZATION_HEADER: f"Bearer {token}",
+            "X-Supervaize-Workspace-Id": "team-1",
+            "X-Supervaize-Workspace-Slug": "team-slug",
+        },
+    )
+
     assert response.status_code == 200
     context = captured["context"]
-    assert context.agent_slug == agent.slug
     assert context.workspace_id == "team-1"
     assert context.workspace_slug == "team-slug"
-    assert context.mission_id == "mission-1"
-    assert context.request_id == "request-1"
+    assert context.workspace_authorization is not None
+    assert context.workspace_authorization.grant_id == "grant-1"
+    assert context.workspace_authorization.agent_workspace_ref == "agent-workspace-1"
 
 
 def _make_data_resource_server(
@@ -445,6 +528,102 @@ def _make_data_resource_server(
     return server, agent
 
 
+def _enable_workspace_authorization(server: Server) -> ed25519.Ed25519PrivateKey:
+    key = ed25519.Ed25519PrivateKey.generate()
+    public_key_pem = (
+        key
+        .public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
+    server.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        public_key_pem=public_key_pem,
+        leeway_seconds=0,
+    )
+    server.agents[0].server_agent_id = "studio-agent-1"
+    return key
+
+
+def _workspace_authorization_token(
+    server: Server,
+    key: ed25519.Ed25519PrivateKey,
+    *,
+    agent_slug: str,
+    scopes: list[str],
+    workspace_id: str,
+    workspace_slug: str,
+) -> str:
+    agent = next(agent for agent in server.agents if agent.slug == agent_slug)
+    now = int(time.time())
+    claims = {
+        "iss": "https://studio.example.test",
+        "aud": f"supervaizer-server:{server.server_id}",
+        "sub": "workspace-agent-grant:grant-1",
+        "grant_id": "grant-1",
+        "workspace_id": workspace_id,
+        "workspace_slug": workspace_slug,
+        "agent_id": agent.server_agent_id or agent.id,
+        "agent_slug": agent.slug,
+        "server_id": server.server_id,
+        "scopes": scopes,
+        "agent_workspace_ref": "agent-workspace-1",
+        "iat": now,
+        "exp": now + 300,
+        "jti": "token-1",
+    }
+    return _sign_eddsa_jwt(key, {"alg": "EdDSA", "typ": "JWT"}, claims)
+
+
+def _sign_eddsa_jwt(
+    key: ed25519.Ed25519PrivateKey,
+    header: dict[str, object],
+    claims: dict[str, object],
+) -> str:
+    encoded_header = _base64url_json(header)
+    encoded_claims = _base64url_json(claims)
+    signing_input = f"{encoded_header}.{encoded_claims}".encode("ascii")
+    signature = key.sign(signing_input)
+    return f"{encoded_header}.{encoded_claims}.{_base64url(signature)}"
+
+
+def _base64url_json(value: dict[str, object]) -> str:
+    return _base64url(json.dumps(value, separators=(",", ":")).encode("utf-8"))
+
+
+def _base64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _data_resource_headers(
+    server: Server,
+    agent: Agent,
+    *,
+    scope: str,
+    workspace_id: str = "workspace-1",
+    workspace_slug: str = "workspace",
+) -> dict[str, str]:
+    key = _enable_workspace_authorization(server)
+    token = _workspace_authorization_token(
+        server,
+        key,
+        agent_slug=agent.slug,
+        scopes=[scope],
+        workspace_id=workspace_id,
+        workspace_slug=workspace_slug,
+    )
+    return {
+        "X-API-Key": "test-api-key",
+        WORKSPACE_AUTHORIZATION_HEADER: f"Bearer {token}",
+        "X-Supervaize-Workspace-Id": workspace_id,
+        "X-Supervaize-Workspace-Slug": workspace_slug,
+    }
+
+
 def test_data_resource_create_requires_id_in_callback_result(
     account_fixture: Account,
     agent_method_fixture: AgentMethod,
@@ -463,7 +642,7 @@ def test_data_resource_create_requires_id_in_callback_result(
 
     response = client.post(
         f"/api/agents/{agent.slug}/data/items/",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.create"),
         json={"name": "No ID"},
     )
 
@@ -490,7 +669,7 @@ def test_data_resource_update_returns_404_when_callback_returns_none(
 
     response = client.put(
         f"/api/agents/{agent.slug}/data/items/missing",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.update"),
         json={"name": "Missing"},
     )
 
@@ -517,7 +696,7 @@ def test_data_resource_delete_returns_404_when_callback_is_false(
 
     response = client.delete(
         f"/api/agents/{agent.slug}/data/items/missing",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.delete"),
     )
 
     assert response.status_code == 404
@@ -540,7 +719,7 @@ def test_data_resource_permission_error_becomes_403(
 
     response = client.get(
         f"/api/agents/{agent.slug}/data/items/",
-        headers={"X-API-Key": "test-api-key"},
+        headers=_data_resource_headers(server, agent, scope="resource.items.list"),
     )
 
     assert response.status_code == 403

@@ -25,6 +25,7 @@ from supervaizer.protocol.a2a.model import (
     create_health_data,
 )
 from supervaizer.routes import handle_route_errors
+from supervaizer.workspace_authorization import extract_workspace_authorization_token
 
 if TYPE_CHECKING:
     from supervaizer.agent import Agent
@@ -121,9 +122,17 @@ def create_controller_routes(server: "Server") -> APIRouter:
         dependencies=[Depends(require_scope("write"))],
     )
     @handle_route_errors()
-    async def post_a2a_controller(body: dict[str, Any]) -> dict[str, Any]:
+    async def post_a2a_controller(
+        request: Request, body: dict[str, Any]
+    ) -> dict[str, Any]:
         log.info("[A2A] POST /a2a [JSON-RPC controller]")
-        response = await dispatch_json_rpc(server, body)
+        response = await dispatch_json_rpc(
+            server,
+            body,
+            workspace_authorization_token=extract_workspace_authorization_token(
+                request.headers
+            ),
+        )
         return response.model_dump(mode="json", exclude_none=True)
 
     @router.get(

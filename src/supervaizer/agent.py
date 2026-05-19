@@ -59,6 +59,24 @@ BLOCKED_AGENT_METHOD_MODULE_ROOTS = frozenset({
 })
 
 
+def _agent_detail_from_server_response(detail: Any) -> dict[str, Any]:
+    if not isinstance(detail, dict):
+        raise ValueError(
+            "Agent update from Studio failed: response body must be an object"
+        )
+    nested_detail = detail.get("object") or detail.get("agent") or detail.get("data")
+    if isinstance(nested_detail, dict):
+        return nested_detail
+    return detail
+
+
+def _agent_id_from_server_detail(agent_detail: dict[str, Any]) -> str | None:
+    value = agent_detail.get("id")
+    if value is None:
+        return None
+    return str(value)
+
+
 class FieldTypeEnum(str, Enum):
     CHAR = "CharField"
     INT = "IntegerField"
@@ -868,16 +886,26 @@ class Agent(AgentAbstract):
             log.error(f"[Agent update_agent_from_server] Failed : {from_server}")
             return None
 
-        agent_from_server = from_server.detail
-        server_agent_id = agent_from_server.get("id") if agent_from_server else None
+        agent_from_server = _agent_detail_from_server_response(from_server.detail)
+        server_agent_id = _agent_id_from_server_detail(agent_from_server)
 
-        # This should never happen, but just in case
-        if self.server_agent_id and self.server_agent_id != server_agent_id:
+        if (
+            self.server_agent_id
+            and server_agent_id
+            and self.server_agent_id != server_agent_id
+        ):
             message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
+            raise ValueError(message)
+        if not self.server_agent_id and not server_agent_id:
+            response_keys = sorted(str(key) for key in agent_from_server.keys())
+            message = (
+                "Agent update from Studio failed: response did not include agent id "
+                f"for slug={self.slug}. response_keys={response_keys}"
+            )
             raise ValueError(message)
 
         # Update agent attributes
-        self.server_agent_id = server_agent_id
+        self.server_agent_id = server_agent_id or self.server_agent_id
         self.server_agent_status = (
             agent_from_server.get("status") if agent_from_server else None
         )

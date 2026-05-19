@@ -1,7 +1,7 @@
 # Supervaizer Changelog
 
 > **Created:** 2025-08-05
-> **Updated:** 2026-05-18
+> **Updated:** 2026-05-19
 
 All notable changes to this project will be documented in this file.
 
@@ -17,6 +17,40 @@ All notable changes to this project will be documented in this file.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
 ## [Unreleased]
+
+### Added
+
+- **Workspace agent authorization** — Studio-signed Ed25519 workspace authorization tokens on `X-Supervaize-Workspace-Authorization`; the SDK verifies JWKS-backed tokens and exposes `V2VerifiedWorkspaceContext` for handlers. Workspace and tenant slugs remain routing hints only.
+- **Workspace binding protocol** — Agents can declare optional `workspace_binding` metadata with bootstrap `workspace_binding.options`, `workspace_binding.create`, and the `workspace_binding.create` surface so Studio can bind an agent-side record before a Workspace Agent Grant exists.
+- **Workspace authorization docs** — `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` plus workspace authorization and binding bootstrap rules in `docs/2026_05_PROTOCOLS.md` and `docs/2026_05_SUPERVAIZER_v2.md`.
+
+### Changed
+
+- **Fail-closed Studio A2A** — Workspace-scoped v2 JSON-RPC actions and surfaces reject requests without a valid workspace authorization token when workspace authorization is enabled.
+- **Workspace-scoped data resources** — Data resource routes require verified workspace context from the authorization token instead of trusting caller-supplied slugs alone.
+- **Studio server audience handoff** — `server.register` handshakes can now supply the Studio-persisted server audience for workspace authorization tokens, and Supervaizer adopts that audience before serving protected v2 calls so workspace grants survive agent process restarts.
+- **Controller version registration** — `server.register` now sends the Supervaizer controller package version directly as `controller_version`, so Studio no longer depends on OpenAPI scraping to refresh the server detail page version.
+
+### Fixed
+
+- **Workspace authorization validation** — Malformed or incomplete workspace authorization tokens and settings now fail with explicit `workspace_authorization_*` errors instead of ambiguous handler failures.
+
+### Tests
+
+- `tests/test_a2a.py` — workspace authorization accept/reject paths, JWKS verification, binding bootstrap exceptions, and protected action/surface enforcement.
+- `tests/test_agent.py` — v2 registration carries workspace binding and authorization settings.
+- `tests/test_contracts.py` — workspace binding and authorization contract models.
+- `tests/test_routes.py` — data resource routes require verified workspace context.
+- `tests/test_server.py` — registration handshake audience handoff, workspace authorization startup validation, and `controller_version` registration.
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 657   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 76s   |
 
 ## [1.0.1] - 2026-05-17
 
@@ -35,10 +69,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 616   |
+| ✅ Passed  | 645   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 78s   |
+| ⏱️ in      | 77s   |
 
 ## [1.0.0] - 2026-05-17
 
