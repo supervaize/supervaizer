@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-20
+
 ### Changed
 
 - **Cloud Logging structured output** — `SUPERVAIZER_LOG_FORMAT=json` now switches controller stderr logs to newline-delimited JSON with Cloud Logging-compatible `severity` plus bound fields such as access-denial `path`, `reason`, and truncated `key_preview`; local text logging remains the default.
