@@ -14,9 +14,10 @@
 import base64
 import json
 import os
+import sys
 import traceback
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TextIO, TypeVar
 
 import demjson3
 from cryptography.hazmat.primitives import hashes
@@ -28,6 +29,57 @@ from pydantic import BaseModel
 log = logger.bind(module="supervaize")
 
 T = TypeVar("T")
+STRUCTURED_LOG_FORMAT_ENV = "SUPERVAIZER_LOG_FORMAT"
+STRUCTURED_LOG_FORMAT_JSON = "json"
+_DEFAULT_LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green>|"
+    "<level> {level}</level> | <level>{message}</level>"
+)
+
+
+def structured_logging_enabled() -> bool:
+    """Return whether Supervaizer should emit newline-delimited JSON logs."""
+    return (
+        os.getenv(STRUCTURED_LOG_FORMAT_ENV, "").strip().lower()
+        == STRUCTURED_LOG_FORMAT_JSON
+    )
+
+
+def configure_controller_logging(
+    log_level: str,
+    *,
+    sink: TextIO = sys.stderr,
+) -> int:
+    """Configure Supervaizer controller logs for local text or Cloud Logging JSON."""
+    log.remove()
+    if structured_logging_enabled():
+        return log.add(
+            lambda message: _write_structured_log(message.record, sink),
+            level=log_level,
+        )
+    return log.add(
+        sink,
+        colorize=True,
+        format=_DEFAULT_LOG_FORMAT,
+        level=log_level,
+    )
+
+
+def _write_structured_log(record: dict[str, Any], sink: TextIO) -> None:
+    payload: dict[str, Any] = {
+        "severity": record["level"].name,
+        "message": record["message"],
+        "timestamp": record["time"].isoformat(),
+        "logger": record["name"],
+        "module": record["module"],
+        "function": record["function"],
+        "line": record["line"],
+    }
+    for key, value in record["extra"].items():
+        target_key = key if key not in payload else f"extra_{key}"
+        payload[target_key] = value
+    sink.write(json.dumps(payload, default=str, separators=(",", ":")) + "\n")
+    sink.flush()
 
 
 def is_local_mode() -> bool:
@@ -220,13 +272,20 @@ class ApiError(ApiResult):
 
 def log_access_denied_tailscale(ip: str, path: str, reason: str) -> None:  # <-- ADDED
     """Log a Tailscale access denial with structured fields."""
-    log.warning(f"[access:tailscale] denied ip={ip!r} path={path!r} reason={reason!r}")
+    log.bind(access_type="tailscale", ip=ip, path=path, reason=reason).warning(
+        f"[access:tailscale] denied ip={ip!r} path={path!r} reason={reason!r}"
+    )
 
 
 def log_access_denied_api(key: str | None, path: str, reason: str) -> None:  # <-- ADDED
     """Log an API-key access denial; key is truncated to avoid leaking secrets."""
-    key_preview = (key[:6] + "…") if key and len(key) > 6 else (key or "<none>")
-    log.warning(
+    key_preview = f"{key[:6]}..." if key and len(key) > 6 else (key or "<none>")
+    log.bind(
+        access_type="api",
+        key_preview=key_preview,
+        path=path,
+        reason=reason,
+    ).warning(
         f"[access:api] denied key={key_preview!r} path={path!r} reason={reason!r}"
     )
 

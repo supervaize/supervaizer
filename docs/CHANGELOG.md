@@ -1,7 +1,7 @@
 # Supervaizer Changelog
 
 > **Created:** 2025-08-05
-> **Updated:** 2026-05-19
+> **Updated:** 2026-05-20
 
 All notable changes to this project will be documented in this file.
 
@@ -11,19 +11,32 @@ All notable changes to this project will be documented in this file.
 
 - Review and test feature/data-persistence
 - Complete feature/smart-install implementation
-- Fix receive_human_input
-- When AgentMethodField returns its value (in the kwargs of job_start), the value should be casted in the appropriate type :
-  - example: here the 'How many times to say hello' is supposed to be an 'int'.
   - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
 
 ## [Unreleased]
+
+### Changed
+
+- **Cloud Logging structured output** — `SUPERVAIZER_LOG_FORMAT=json` now switches controller stderr logs to newline-delimited JSON with Cloud Logging-compatible `severity` plus bound fields such as access-denial `path`, `reason`, and truncated `key_preview`; local text logging remains the default.
+
+### Tests
+
+- `tests/test_common.py` — structured JSON log output for API access-denial records
+- `just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 658   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 92s   |
 
 ## [1.1.0] - 2026-05-19
 
 ### Added
 
 - **Workspace agent authorization** — Studio-signed Ed25519 workspace authorization tokens on `X-Supervaize-Workspace-Authorization`; the SDK verifies JWKS-backed tokens and exposes `V2VerifiedWorkspaceContext` for handlers. Workspace and tenant slugs remain routing hints only.
-- **Workspace binding protocol** — Agents can declare optional `workspace_binding` metadata with bootstrap `workspace_binding.options`, `workspace_binding.create`, and the `workspace_binding.create` surface so Studio can bind an agent-side record before a Workspace Agent Grant exists.
+- **Workspace binding rotocol** — Agents can declare optional `workspace_binding` metadata with bootstrap `workspace_binding.options`, `workspace_binding.create`, and the `workspace_binding.create` surface so Studio can bind an agent-side record before a Workspace Agent Grant exists.
 - **Workspace authorization docs** — `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` plus workspace authorization and binding bootstrap rules in `docs/2026_05_PROTOCOLS.md` and `docs/2026_05_SUPERVAIZER_v2.md`.
 
 ### Changed
