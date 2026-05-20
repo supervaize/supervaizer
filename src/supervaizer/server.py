@@ -11,15 +11,14 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
-from hashlib import sha256
 import os
 import secrets
-import sys
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
+from hashlib import sha256
 from typing import Any, ClassVar, TypeVar, cast
 from urllib.parse import urlunparse
 
@@ -45,6 +44,7 @@ from supervaizer.common import (
     ApiResult,
     ApiSuccess,
     SvBaseModel,
+    configure_controller_logging,
     decrypt_value,
     encrypt_value,
     is_local_mode,
@@ -735,13 +735,7 @@ class Server(ServerAbstract):
 
     def launch(self, log_level: str | None = "INFO") -> None:
         if log_level:
-            log.remove()
-            log.add(
-                sys.stderr,
-                colorize=True,
-                format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green>|<level> {level}</level> | <level>{message}</level>",
-                level=log_level,
-            )
+            configure_controller_logging(log_level)
 
             # Add log handler for admin streaming if API key is enabled
             if self.api_key:

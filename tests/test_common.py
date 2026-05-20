@@ -12,6 +12,7 @@
 
 
 import json
+from io import StringIO
 from typing import Any
 
 import pytest
@@ -23,8 +24,12 @@ from supervaizer.common import (
     ApiError,
     ApiSuccess,
     SvBaseModel,
+    STRUCTURED_LOG_FORMAT_ENV,
+    configure_controller_logging,
     decrypt_value,
     encrypt_value,
+    log,
+    log_access_denied_api,
     singleton,
 )
 
@@ -201,6 +206,29 @@ def test_api_error() -> None:
     """Test ApiError with empty exception message"""
     error = ApiError(message="error", exception=Exception())
     assert error.log_message == "❌ error : "
+
+
+def test_configure_controller_logging_outputs_cloud_logging_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Structured logging emits JSON with Cloud Logging severity and queryable fields."""
+    monkeypatch.setenv(STRUCTURED_LOG_FORMAT_ENV, "json")
+    output = StringIO()
+    sink_id = configure_controller_logging("INFO", sink=output)
+    try:
+        log_access_denied_api("abcdef123456", "/a2a", "invalid key")
+    finally:
+        log.remove(sink_id)
+
+    payload = json.loads(output.getvalue())
+    assert payload["severity"] == "WARNING"
+    assert payload["message"] == (
+        "[access:api] denied key='abcdef...' path='/a2a' reason='invalid key'"
+    )
+    assert payload["access_type"] == "api"
+    assert payload["key_preview"] == "abcdef..."
+    assert payload["path"] == "/a2a"
+    assert payload["reason"] == "invalid key"
 
 
 def test_singleton() -> None:
