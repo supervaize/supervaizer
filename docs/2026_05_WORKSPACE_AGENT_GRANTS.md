@@ -1,7 +1,7 @@
 # Workspace Agent Grants
 
 > **Created:** 2026-05-18
-> **Updated:** 2026-05-18
+> **Updated:** 2026-05-22
 
 This document plans the Supervaizer v2 authorization model for shared agents.
 
@@ -429,3 +429,49 @@ Studio should surface these failures to operators as configuration or authorizat
 - An agent without local persistence can still verify every request.
 - Revoked grants stop authorizing requests after token expiry, and immediately for operations that use introspection.
 - Studio and agent_interviewer show clear errors for missing grant, missing scope, and missing workspace binding.
+
+## Current Implementation Notes
+
+As of 2026-05-22, the implementation has moved beyond this plan in the local
+Runwaize repos:
+
+- Studio stores explicit workspace-agent acceptance and revocation state,
+  including who accepted the agent and when.
+- Studio mints workspace authorization tokens for v2 calls and Supervaizer
+  verifies them before dispatching workspace-scoped handlers.
+- Agent Interviewer requires verified workspace context for v2 resources,
+  datasets, job start, sync, HITL, and artifacts. It must not resolve access
+  from raw `workspace_slug` or `tenant_slug`.
+- Agent-side workspace binding is generic in the v2 contract. Agent Interviewer
+  maps the generic `agent_workspace_ref` to its tenant configuration record,
+  but that tenant terminology is not exposed as a protocol requirement.
+- Bootstrap binding actions are allowed before a workspace grant exists, but
+  only under normal Studio-to-agent transport authentication. Every other
+  workspace-scoped operation fails closed without a valid workspace token.
+
+Important learning from local restarts and multi-instance concerns:
+
+- A grant must not be bound to an ephemeral process instance id. Use the
+  registered Studio server identity from `server.register.details.server_id`
+  and let registration refresh update the server record transparently.
+- Agent developers should not have to manually set Studio server ids. If the
+  effective registered server identity changes, Studio should refresh the
+  association or offer an explicit reset/refresh action to the operator.
+- Registration handshake failures must be startup failures, not latent runtime
+  failures. The agent should fail to start when Studio did not persist the
+  effective controller API key or when the handshake response is missing the
+  data required to verify Studio-to-agent calls.
+- Contract fingerprint checks should distinguish expanding changes from
+  harmless refreshes. Requiring manual reacceptance on every Studio restart is
+  too strict and creates operational noise.
+
+Open product decisions:
+
+- Which registration changes automatically refresh an accepted grant, and which
+  require explicit reacceptance?
+- Should revocation immediately cancel running jobs, mark them failed in
+  Studio, or only block new calls while preserving active agent-side work?
+- How should Studio present stale accepted grants when a server is replaced by
+  a new deployment with the same public URL and agent identity?
+- Should high-risk operations introspect grant status on every call, or is
+  short-lived token expiry sufficient for the MVP?

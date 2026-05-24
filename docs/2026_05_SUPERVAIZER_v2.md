@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-05-18
+> **Updated:** 2026-05-22
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -431,3 +431,72 @@ New agents should model Studio integration through v2 from the start.
 - Use `awaiting` state for HITL.
 - Return stable external ids in Job/Case/Step/Artifact snapshots.
 - Keep business validation inside agent actions, not inside Studio-specific code paths.
+
+## Implementation Status: Agent Interviewer Reference Agent
+
+As of 2026-05-22, Agent Interviewer is the reference implementation for the
+v2 operating model. The current implementation is not just discovery metadata;
+Studio can call the agent through A2A JSON-RPC, render A2UI surfaces, and sync
+job state back from the agent.
+
+Implemented across the local Runwaize repos:
+
+- Supervaizer SDK exposes the v2 registration builder, A2A Agent Card metadata,
+  JSON-RPC action dispatch, surface dispatch, resource/dataset/action contracts,
+  workspace authorization verification, and clear handler-blocking errors.
+- Studio ingests v2 registration data, renders generic resources, datasets,
+  surfaces, HITL forms, artifacts, job analytics, case lanes, and job-state
+  snapshots, and no longer relies on v1 dynamic job-start choices for v2 agents.
+- Agent Interviewer declares campaigns, contacts, prompts, scenarios,
+  campaign_contacts, campaign datasets, transcript/synthesis artifacts, setup /
+  work / deliverable lanes, job analytics, workspace binding actions, and
+  campaign-specific surfaces through the v2 contract.
+- Studio-to-agent calls for workspace-scoped actions use Workspace Agent Grants
+  and Studio-signed workspace authorization tokens. Raw tenant or workspace
+  slugs are not authority.
+- Campaign starts return a top-level `job_state` snapshot so Studio can
+  materialize setup cases immediately, then converge through `job.sync`.
+- Contact enrollment import is modeled as a generic `ResourceImport` surface.
+  Studio communicates and validates file structure; Agent Interviewer owns the
+  import format, tenant validation, persistence, and returned job state.
+- Agent Interviewer job analytics are Vega-Lite based and currently focus on
+  the campaign-scoped session-duration-over-time chart for Studio job detail.
+- Public interview configuration failures must be caught before live interview
+  startup. A missing or empty configured campaign prompt is a campaign
+  configuration error, not a network interruption.
+
+Deliberate decisions:
+
+- v2 does not preserve v1 dynamic-choice, job-poll, or legacy case-update
+  behavior unless explicitly required. For the current v2 workstream, enforce
+  v2 workspace operations whenever the Supervaize controller path is active.
+- No guessing and no implicit fallback: missing workspace authorization,
+  missing workspace binding, mismatched server/agent id, missing scopes, and
+  missing campaign prompt configuration must fail with explicit errors.
+- Studio owns generic rendering and acceptance records. Agents own business
+  vocabulary and must validate every business mutation.
+- `server.register.details.server_id` is the authoritative controller identity.
+  It should survive agent restarts through registration, not by manual user
+  configuration.
+- If `SUPERVAIZER_API_KEY` is set, Supervaizer uses it. If it is not set, the
+  agent developer may allow generation. Startup must verify Studio persisted
+  the effective key; mismatches fail startup instead of producing repeated
+  `/a2a` 401s later.
+
+Current gaps to consider next:
+
+- Make contract-change reacceptance smarter: already accepted grants should be
+  refreshable automatically when only non-expanding registration metadata
+  changes; expanded scopes or data access still require explicit acceptance.
+- Strengthen e2e coverage for the entire blue-sky flow: share agent, accept
+  workspace binding, create mission, create campaign job, import contacts, run
+  setup case, start interview, sync transcript/synthesis, render analytics, and
+  revoke access.
+- Add clearer Studio operator recovery for invalid campaign configuration,
+  missing workspace binding, missing signing key, wrong server id, and revoked
+  grants.
+- Complete production deployment hardening for split public/controller runtimes,
+  Cloud Run startup probes, Secret Manager requirements, and dashboarded
+  registration-handshake health.
+- Decide how Studio should present historical jobs when grants are revoked or
+  when an agent/server is replaced.
