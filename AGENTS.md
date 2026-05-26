@@ -32,6 +32,8 @@ Reference specific personas when requesting work:
 ## Learned User Preferences
 
 - When preparing a merge to `main` or a release, keep `docs/CHANGELOG.md` **Unreleased** accurate; on request, align listed dependency or tooling changes with the delta since the previous git tag (including `pyproject.toml`).
+- Prefer `docs/CHANGELOG.md` `Unreleased` entries grouped into `Added` / `Changed` / `Fixed` (instead of custom feature headings).
+- Dependabot PRs should target `develop`, not `main` (set `target-branch: "develop"` in `.github/dependabot.yml`).
 
 ## Learned Workspace Facts
 

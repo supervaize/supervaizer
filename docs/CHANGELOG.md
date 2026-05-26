@@ -15,10 +15,26 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **FastAPI lifespan cleanup** — Controller shutdown now cancels the scheduled-step background loop and waits briefly for it to stop.
+- **Supervaizer v2 agent methods** — SDK agents can now declare optional standard actions such as `agent.refresh` plus custom agent actions through the same `AgentMethods` structure used for job methods, and the A2A runtime registers those handlers automatically.
 
 ### Tests
 
 - `tests/test_server.py` — scheduler task cancellation and bounded shutdown waiting during FastAPI lifespan shutdown.
+- `tests/test_a2a.py` — standard and custom agent method dispatch through the v2 A2A controller.
+- `tests/test_agent.py` — agent-level v2 method registration and contract validation.
+- `tests/test_contracts.py` — typed agent method contract serialization.
+
+### Tests
+
+- `tests/test_common.py` — structured JSON log output for API access-denial records
+- `just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 663   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 136s  |
 
 ## [1.1.1] - 2026-05-20
 
