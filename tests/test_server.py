@@ -374,14 +374,14 @@ def test_server_generated_api_key_is_exported_for_reload(
 
 
 @pytest.mark.asyncio
-async def test_server_lifespan_cleans_up_background_resources(
+async def test_server_lifespan_cancels_scheduled_step_task(
     agent_fixture: Agent,
     monkeypatch: pytest.MonkeyPatch,
-    mocker: Any,
 ) -> None:
     monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
-    loop_servers: list[Server] = []
     created_task_names: list[str | None] = []
+    waited_tasks: list[set[object]] = []
+    waited_timeouts: list[float | None] = []
 
     class FakeScheduledStepTask:
         def __init__(self) -> None:
