@@ -20,6 +20,18 @@ All notable changes to this project will be documented in this file.
 
 - `tests/test_server.py` — scheduler task cancellation and bounded shutdown waiting during FastAPI lifespan shutdown.
 
+### Tests
+
+- `tests/test_common.py` — structured JSON log output for API access-denial records
+- `just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 663   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 136s  |
+
 ## [1.1.1] - 2026-05-20
 
 ### Changed
