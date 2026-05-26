@@ -19,7 +19,16 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from supervaizer import Agent, AgentMethod, AgentMethods, ApiSuccess, Server
+from supervaizer import (
+    AGENT_REFRESH_ACTION,
+    Agent,
+    AgentMethod,
+    AgentMethods,
+    ApiSuccess,
+    Server,
+    V2AgentMethod,
+    V2AgentMethods,
+)
 from supervaizer.agent import AgentMethodField, AgentMethodsAbstract, FieldTypeEnum
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
@@ -1235,6 +1244,39 @@ def test_agent_accepts_v2_registration_with_matching_slug() -> None:
     assert agent.slug == "agent-name"
     assert agent.supervaizer_v2_registration is not None
     assert agent.supervaizer_v2_registration.agent.slug == "agent-name"
+
+
+def test_agent_v2_methods_are_added_to_v2_capabilities() -> None:
+    agent = Agent(
+        name="Agent Name",
+        version="1.0.0",
+        supervaizer_v2_registration={
+            "agent": {
+                "id": "agent_name",
+                "slug": "agent-name",
+                "display_name": "Agent Name",
+            },
+            "versions": {
+                "a2ui_version": "v0.8",
+                "a2ui_catalog_version": "test.0",
+                "a2a_version": "0.2.6",
+            },
+            "a2a": {
+                "agent_card_url": "/.well-known/agents/v1.0.0/agent-name_agent.json",
+                "controller_url": "/a2a",
+            },
+            "capabilities": {"actions": ["job.sync"]},
+        },
+        v2_methods=V2AgentMethods(
+            refresh=V2AgentMethod(method="tests.test_agent.refresh_agent")
+        ),
+    )
+
+    assert agent.supervaizer_v2_registration is not None
+    assert agent.supervaizer_v2_registration.capabilities.actions == [
+        "job.sync",
+        AGENT_REFRESH_ACTION,
+    ]
 
 
 def test_agent_rejects_v2_registration_with_mismatched_slug() -> None:

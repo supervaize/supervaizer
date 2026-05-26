@@ -21,7 +21,15 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 from fastapi.testclient import TestClient
 
-from supervaizer import Agent, Server
+from supervaizer import (
+    AGENT_REFRESH_ACTION,
+    AGENT_REFRESH_EFFECT,
+    Agent,
+    Server,
+    V2AgentMethod,
+    V2AgentMethods,
+    build_v2_agent_registration,
+)
 from supervaizer.access import API_KEYS
 from supervaizer.contracts import (
     V2ActionRequest,
@@ -54,6 +62,13 @@ from supervaizer.protocol.a2a.events import (
     unsubscribe_v2_events,
 )
 from supervaizer.workspace_authorization import WORKSPACE_AUTHORIZATION_HEADER
+
+
+def _test_agent_refresh(request: V2ActionRequest) -> dict[str, object]:
+    return {
+        "status": "ok",
+        "effects": [{"type": AGENT_REFRESH_EFFECT, "request_id": request.request_id}],
+    }
 
 
 def _a2a_write_headers(server: Server) -> dict[str, str]:
@@ -1619,6 +1634,57 @@ def test_server_v2_action_decorator_registers_handler(server_fixture: Server) ->
     assert payload["result"] == {
         "status": "ok",
         "effects": [{"type": "job.start.previewed"}],
+    }
+
+
+def test_server_registers_agent_v2_method_handlers() -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    agent = Agent(
+        name="Agent Name",
+        version="1.0.0",
+        supervaizer_v2_registration=build_v2_agent_registration(
+            agent_id="agent-name",
+            agent_slug="agent-name",
+            display_name="Agent Name",
+            agent_card_url="/.well-known/agents/v1.0.0/agent-name_agent.json",
+            controller_url="/a2a",
+            a2ui_catalog_version="test.0",
+        ),
+        v2_methods=V2AgentMethods(
+            refresh=V2AgentMethod(method="tests.test_a2a._test_agent_refresh")
+        ),
+    )
+    server = Server(
+        agents=[agent],
+        private_key=private_key,
+        api_key="test-api-key",
+        admin_interface=False,
+    )
+    headers = _authorized_a2a_headers(
+        server,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, AGENT_REFRESH_ACTION],
+    )
+    client = TestClient(server.app)
+
+    response = client.post(
+        "/a2a",
+        headers=headers,
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-agent-refresh",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(
+                action=AGENT_REFRESH_ACTION,
+                agent_slug=agent.slug,
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == {
+        "status": "ok",
+        "effects": [{"type": AGENT_REFRESH_EFFECT, "request_id": "request-1"}],
     }
 
 

@@ -17,6 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from supervaizer.contracts import (
+    AGENT_REFRESH_ACTION,
     API_VERSION,
     AgentMethodsContract,
     ControllerEndpoint,
@@ -27,6 +28,8 @@ from supervaizer.contracts import (
     V2A2UIResourceImportDocument,
     V2ActionRequest,
     V2ActionResult,
+    V2AgentMethod,
+    V2AgentMethods,
     V2AwaitingState,
     V2CaseSnapshot,
     V2DashboardWidgetDataRef,
@@ -262,7 +265,7 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert (
         "mission.agent.surface.scenario_builder" in registration.capabilities.surfaces
     )
-    assert "campaigns.sync" in registration.capabilities.actions
+    assert AGENT_REFRESH_ACTION in registration.capabilities.actions
     assert "resource.campaign_contacts.create" in registration.capabilities.actions
     assert "resource.campaign_contacts.delete" in registration.capabilities.actions
     assert "resource.contacts.import" in registration.capabilities.actions
@@ -452,6 +455,30 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         },
     }
     assert registration.capabilities.case_lanes[0].default is True
+
+
+def test_build_v2_agent_registration_derives_agent_method_actions() -> None:
+    registration = build_v2_agent_registration(
+        agent_id="hello",
+        agent_slug="hello-world",
+        display_name="Hello World",
+        agent_card_url="/.well-known/agents/v1/hello-world_agent.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        agent_methods=V2AgentMethods(
+            refresh=V2AgentMethod(method="hello_agent.refresh"),
+            custom={
+                "reindex": V2AgentMethod(method="hello_agent.reindex"),
+                "dry-run": V2AgentMethod(method="hello_agent.dry_run"),
+            },
+        ),
+    )
+
+    assert registration.capabilities.actions == [
+        AGENT_REFRESH_ACTION,
+        "agent.custom.reindex",
+        "agent.custom.dry-run",
+    ]
 
 
 def test_v2_workspace_binding_required_requires_mode() -> None:
@@ -671,6 +698,8 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     assert supervaizer.V2A2ATransport.__name__ == "V2A2ATransport"
     assert supervaizer.V2A2UIResourceImportDocument is V2A2UIResourceImportDocument
     assert supervaizer.V2ActionRequest is V2ActionRequest
+    assert supervaizer.V2AgentMethod is V2AgentMethod
+    assert supervaizer.V2AgentMethods is V2AgentMethods
     assert supervaizer.V2DashboardDefinition.__name__ == "V2DashboardDefinition"
     assert supervaizer.V2DashboardWidgetDataRef is V2DashboardWidgetDataRef
     assert supervaizer.V2DashboardWidgetDefinition is V2DashboardWidgetDefinition

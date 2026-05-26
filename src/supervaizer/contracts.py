@@ -13,11 +13,12 @@ the Supervaizer server/runtime surface.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 CONTROLLER_CONTRACT_VERSION = "1.0"
 API_VERSION = "v1"
@@ -28,6 +29,10 @@ SUPERVAIZER_V2_A2A_VERSION = "0.2.6"
 WORKSPACE_BINDING_OPTIONS_ACTION = "workspace_binding.options"
 WORKSPACE_BINDING_CREATE_ACTION = "workspace_binding.create"
 WORKSPACE_BINDING_CREATE_SURFACE = "workspace_binding.create"
+AGENT_REFRESH_ACTION = "agent.refresh"
+AGENT_REFRESH_EFFECT = "agent.refreshed"
+AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
+_AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class ContractModel(BaseModel):
@@ -310,6 +315,47 @@ class V2AgentCapabilities(ContractModel):
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
 
 
+class V2AgentMethod(ContractModel):
+    method: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    description: str | None = None
+    is_async: bool = False
+    timeout: int | None = 600
+
+
+class V2AgentMethods(ContractModel):
+    refresh: V2AgentMethod | None = None
+    custom: dict[str, V2AgentMethod] = Field(default_factory=dict)
+
+    @field_validator("custom")
+    @classmethod
+    def validate_custom_method_names(
+        cls, value: dict[str, V2AgentMethod]
+    ) -> dict[str, V2AgentMethod]:
+        for name in value:
+            if not _AGENT_CUSTOM_METHOD_KEY_RE.fullmatch(name):
+                raise ValueError(
+                    "agent custom method keys may only contain letters, numbers, "
+                    "underscores, and hyphens"
+                )
+        return value
+
+    @property
+    def action_ids(self) -> list[str]:
+        actions: list[str] = []
+        if self.refresh is not None:
+            actions.append(AGENT_REFRESH_ACTION)
+        actions.extend(f"{AGENT_CUSTOM_ACTION_PREFIX}{name}" for name in self.custom)
+        return actions
+
+    def method_for_action(self, action: str) -> V2AgentMethod | None:
+        if action == AGENT_REFRESH_ACTION:
+            return self.refresh
+        if action.startswith(AGENT_CUSTOM_ACTION_PREFIX):
+            return self.custom.get(action.removeprefix(AGENT_CUSTOM_ACTION_PREFIX))
+        return None
+
+
 class V2JobSyncPolicy(ContractModel):
     action: str = "job.sync"
     supported_statuses: list[str] = Field(default_factory=list)
@@ -524,6 +570,7 @@ def build_v2_agent_registration(
     datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
     dashboards: Iterable[V2DashboardDefinition | dict[str, Any]] = (),
     workspace_binding: V2WorkspaceBindingDefinition | dict[str, Any] | None = None,
+    agent_methods: V2AgentMethods | dict[str, Any] | None = None,
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
@@ -538,6 +585,7 @@ def build_v2_agent_registration(
     dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
     workspace_binding_definition = _workspace_binding(workspace_binding)
+    agent_method_definitions = _agent_methods(agent_methods)
     sync_policy = _job_policy(job_policy)
 
     capability_surfaces = _unique_strings([
@@ -553,6 +601,7 @@ def build_v2_agent_registration(
         *_dataset_action_ids(dataset_definitions),
         *(_job_sync_actions(sync_policy)),
         *_workspace_binding_action_ids(workspace_binding_definition),
+        *_agent_method_action_ids(agent_method_definitions),
     ])
 
     return SupervaizerV2AgentRegistrationContract(
@@ -623,6 +672,16 @@ def _workspace_binding(
     return V2WorkspaceBindingDefinition.model_validate(value)
 
 
+def _agent_methods(
+    value: V2AgentMethods | dict[str, Any] | None,
+) -> V2AgentMethods | None:
+    if value is None:
+        return None
+    if isinstance(value, V2AgentMethods):
+        return value
+    return V2AgentMethods.model_validate(value)
+
+
 def _unique_strings(values: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
@@ -670,6 +729,12 @@ def _job_sync_actions(job_policy: V2JobPolicy) -> list[str]:
     if job_policy.sync is None:
         return []
     return [job_policy.sync.action]
+
+
+def _agent_method_action_ids(agent_methods: V2AgentMethods | None) -> list[str]:
+    if agent_methods is None:
+        return []
+    return agent_methods.action_ids
 
 
 def _workspace_binding_action_ids(

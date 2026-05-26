@@ -98,6 +98,13 @@ T = TypeVar("T")
 SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 
 
+def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
+    def handler(request: Any) -> Any:
+        return agent.execute_v2_action_method(action, request)
+
+    return handler
+
+
 class ServerAbstract(SvBaseModel):
     """
     API Server for the Supervaize Controller.
@@ -445,6 +452,7 @@ class Server(ServerAbstract):
 
         # Store server instance on app state before building routers
         self.app.state.server = self  # <-- MOVED earlier (was after route mount)
+        self._register_agent_v2_method_handlers()
 
         # Activate API + A2A routes when supervisor account or local mode is set
         if self.supervisor_account or local_mode:
@@ -658,6 +666,15 @@ class Server(ServerAbstract):
         """Register a Supervaizer v2 action handler on this server."""
         register_v2_action_handler(self, action, handler, agent_slug=agent_slug)
         return handler
+
+    def _register_agent_v2_method_handlers(self) -> None:
+        for agent in self.agents:
+            for action in agent.v2_action_ids:
+                self.register_v2_action(
+                    action,
+                    _agent_v2_method_handler(agent, action),
+                    agent_slug=agent.slug,
+                )
 
     def v2_action(
         self, action: str, *, agent_slug: str | None = None
