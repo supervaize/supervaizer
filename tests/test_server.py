@@ -10,6 +10,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import asyncio
 import base64
 import json
 import os
@@ -369,6 +370,52 @@ def test_server_generated_api_key_is_exported_for_reload(
 
     assert server.api_key
     assert os.environ["SUPERVAIZER_API_KEY"] == server.api_key
+
+
+@pytest.mark.asyncio
+async def test_server_lifespan_cleans_up_background_resources(
+    agent_fixture: Agent,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: Any,
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    loop_servers: list[Server] = []
+
+    async def fake_scheduled_step_loop(server: Server) -> None:
+        loop_servers.append(server)
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    close_httpx_client = mocker.patch(
+        "supervaizer.server.close_httpx_client",
+        new=mocker.AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "supervaizer.server._run_scheduled_step_loop",
+        fake_scheduled_step_loop,
+    )
+
+    server = Server(
+        agents=[agent_fixture],
+        supervisor_account=None,
+        admin_interface=False,
+        host="localhost",
+        port=8001,
+        environment="test",
+        api_key="test-key",
+    )
+
+    async with server.app.router.lifespan_context(server.app):
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert loop_servers == [server]
+
+    await asyncio.wait_for(cancelled.wait(), timeout=1)
+    close_httpx_client.assert_awaited_once_with()
 
 
 def test_server_decrypt(server_fixture: Server) -> None:

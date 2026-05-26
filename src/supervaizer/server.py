@@ -16,7 +16,7 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
 from hashlib import sha256
 from typing import Any, ClassVar, TypeVar, cast
@@ -37,6 +37,7 @@ from rich import inspect
 
 from supervaizer.__version__ import VERSION
 from supervaizer.account import Account
+from supervaizer.account_service import close_httpx_client
 from supervaizer.agent import (
     Agent,
 )  # <-- MODIFIED: removed AdminIPAllowlistMiddleware, create_admin_routes imports
@@ -520,9 +521,24 @@ class Server(ServerAbstract):
         openapi_url = "/openapi.json"
 
         @asynccontextmanager
-        async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-            asyncio.create_task(_run_scheduled_step_loop(self))
-            yield
+        async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+            # Keep a task handle so shutdown can stop the scheduler cleanly.
+            scheduled_step_task = asyncio.create_task(
+                _run_scheduled_step_loop(self),
+                name="supervaizer-scheduled-step-loop",
+            )
+            try:
+                yield
+            finally:
+                # Let the scheduler observe cancellation instead of leaving a
+                # pending task attached to the event loop.
+                scheduled_step_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await scheduled_step_task
+
+                # The event client is process-wide; close it once the app has
+                # stopped accepting controller work.
+                await close_httpx_client()
 
         app = FastAPI(
             lifespan=_lifespan,

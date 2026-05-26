@@ -12,6 +12,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **FastAPI lifespan cleanup** — Controller shutdown now cancels and awaits the scheduled-step background loop, then closes the shared async HTTP event client.
+
+### Tests
+
+- `tests/test_server.py` — scheduler task cancellation and HTTP client cleanup during FastAPI lifespan shutdown.
+
 ## [1.1.1] - 2026-05-20
 
 ### Changed
