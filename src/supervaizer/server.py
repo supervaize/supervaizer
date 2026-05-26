@@ -16,7 +16,7 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime  # <-- REMOVED: Path (no longer needed)
 from hashlib import sha256
 from typing import Any, ClassVar, TypeVar, cast
@@ -76,6 +76,7 @@ from supervaizer.workspace_authorization import (
 insp = inspect
 
 T = TypeVar("T")
+SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 
 # Additional imports for server persistence
 
@@ -520,9 +521,29 @@ class Server(ServerAbstract):
         openapi_url = "/openapi.json"
 
         @asynccontextmanager
-        async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-            asyncio.create_task(_run_scheduled_step_loop(self))
-            yield
+        async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+            # Keep a task handle so shutdown can stop the scheduler cleanly.
+            scheduled_step_task = asyncio.create_task(
+                _run_scheduled_step_loop(self),
+                name="supervaizer-scheduled-step-loop",
+            )
+            try:
+                yield
+            finally:
+                # Give the scheduler a bounded chance to observe cancellation.
+                scheduled_step_task.cancel()
+                done, pending = await asyncio.wait(
+                    {scheduled_step_task},
+                    timeout=SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS,
+                )
+                if pending:
+                    log.warning(
+                        "[Scheduled step] Shutdown timed out while waiting for "
+                        "the scheduler task to stop"
+                    )
+                if done:
+                    with suppress(asyncio.CancelledError):
+                        await scheduled_step_task
 
         app = FastAPI(
             lifespan=_lifespan,

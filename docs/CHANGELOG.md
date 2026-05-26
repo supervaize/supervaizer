@@ -12,6 +12,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **FastAPI lifespan cleanup** — Controller shutdown now cancels the scheduled-step background loop and waits briefly for it to stop.
+
+### Tests
+
+- `tests/test_server.py` — scheduler task cancellation and bounded shutdown waiting during FastAPI lifespan shutdown.
+
 ## [1.1.1] - 2026-05-20
 
 ### Changed
