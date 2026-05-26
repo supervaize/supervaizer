@@ -37,7 +37,6 @@ from rich import inspect
 
 from supervaizer.__version__ import VERSION
 from supervaizer.account import Account
-from supervaizer.account_service import close_httpx_client
 from supervaizer.agent import (
     Agent,
 )  # <-- MODIFIED: removed AdminIPAllowlistMiddleware, create_admin_routes imports
@@ -77,6 +76,7 @@ from supervaizer.workspace_authorization import (
 insp = inspect
 
 T = TypeVar("T")
+SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 
 # Additional imports for server persistence
 
@@ -530,15 +530,20 @@ class Server(ServerAbstract):
             try:
                 yield
             finally:
-                # Let the scheduler observe cancellation instead of leaving a
-                # pending task attached to the event loop.
+                # Give the scheduler a bounded chance to observe cancellation.
                 scheduled_step_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await scheduled_step_task
-
-                # The event client is process-wide; close it once the app has
-                # stopped accepting controller work.
-                await close_httpx_client()
+                done, pending = await asyncio.wait(
+                    {scheduled_step_task},
+                    timeout=SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS,
+                )
+                if pending:
+                    log.warning(
+                        "[Scheduled step] Shutdown timed out while waiting for "
+                        "the scheduler task to stop"
+                    )
+                if done:
+                    with suppress(asyncio.CancelledError):
+                        await scheduled_step_task
 
         app = FastAPI(
             lifespan=_lifespan,
