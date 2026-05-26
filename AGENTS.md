@@ -5,6 +5,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 ## Working Rules
 
 - Prefer simple, typed Python changes that match existing FastAPI/Pydantic patterns.
+- Do not import from inside functions, methods, or local scopes unless it is absolutely required to avoid a concrete circular import, optional dependency, or startup-cost problem. Prefer module-level imports by default, and document the reason when a local import is unavoidable.
 - **No guessing / no implicit fallbacks:** when protocol versions, workspace identity, action/resource contracts, authentication, or transport configuration are missing or inconsistent, fail with a clear error that names the missing configuration. Do not infer another context, broaden scope, or silently fall back.
 - Use `just` recipes from this repo for local commands.
 - Use `uv` for Python environment and package operations.
@@ -31,6 +32,8 @@ Reference specific personas when requesting work:
 ## Learned User Preferences
 
 - When preparing a merge to `main` or a release, keep `docs/CHANGELOG.md` **Unreleased** accurate; on request, align listed dependency or tooling changes with the delta since the previous git tag (including `pyproject.toml`).
+- Prefer `docs/CHANGELOG.md` `Unreleased` entries grouped into `Added` / `Changed` / `Fixed` (instead of custom feature headings).
+- Dependabot PRs should target `develop`, not `main` (set `target-branch: "develop"` in `.github/dependabot.yml`).
 
 ## Learned Workspace Facts
 
@@ -80,7 +83,7 @@ Ask. Refusing to act is always safer than taking an action that bypasses these r
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **supervaizer** (6117 symbols, 11434 relationships, 278 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **supervaizer** (6225 symbols, 11375 relationships, 276 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

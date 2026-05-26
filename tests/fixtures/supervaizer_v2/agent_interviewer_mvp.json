@@ -46,7 +46,7 @@
         "job.start",
         "job.stop",
         "job.sync",
-        "campaigns.sync",
+        "agent.refresh",
         "artifact.get",
         "resource.campaigns.list",
         "resource.campaigns.create",

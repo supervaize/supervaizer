@@ -17,7 +17,7 @@ import os
 import sys
 import traceback
 from collections.abc import Callable
-from typing import Any, TextIO, TypeVar
+from typing import Any, TextIO, TypeVar, cast
 
 import demjson3
 from cryptography.hazmat.primitives import hashes
@@ -54,7 +54,10 @@ def configure_controller_logging(
     log.remove()
     if structured_logging_enabled():
         return log.add(
-            lambda message: _write_structured_log(message.record, sink),
+            lambda message: _write_structured_log(
+                cast(dict[str, Any], message.record),
+                sink,
+            ),
             level=log_level,
         )
     return log.add(

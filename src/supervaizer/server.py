@@ -16,15 +16,11 @@ import secrets
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
-from datetime import datetime  # <-- REMOVED: Path (no longer needed)
-from hashlib import sha256
+from contextlib import asynccontextmanager, suppress
 from typing import Any, ClassVar, TypeVar, cast
 from urllib.parse import urlunparse
 
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
@@ -32,7 +28,7 @@ from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLR
 from fastapi.security import APIKeyHeader
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from rich import inspect
 
 from supervaizer.__version__ import VERSION
@@ -53,7 +49,6 @@ from supervaizer.common import (
 from supervaizer.contracts import (
     API_VERSION,
     V2WorkspaceAuthorizationSettings,
-    controller_contract_info,
 )
 from supervaizer.instructions import display_instructions
 from supervaizer.protocol.a2a.controller import (
@@ -68,7 +63,31 @@ from supervaizer.routers import (
     create_public_router,
 )  # <-- ADDED
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
-from supervaizer.storage import StorageManager, load_running_entities_on_startup
+from supervaizer.scheduled_steps import (
+    _execute_scheduled_method as _execute_scheduled_method,
+    _run_scheduled_step_loop,
+)
+from supervaizer.server_config import (
+    _controller_key_fingerprint,
+    _env_bool as _env_bool,
+    _get_or_create_private_key,
+    _get_or_create_server_id,
+    _resolve_workspace_authorization_settings,
+)
+from supervaizer.server_info import (
+    ServerInfo as ServerInfo,
+    get_server_info_from_live as get_server_info_from_live,
+    get_server_info_from_storage as get_server_info_from_storage,
+    save_server_info_to_storage,
+)
+from supervaizer.server_registration import build_server_registration_info
+from supervaizer.storage import load_running_entities_on_startup
+from supervaizer.studio_handshake import (
+    apply_workspace_authorization_agent_bindings,
+    apply_workspace_authorization_handshake,
+    validate_registration_handshake,
+    validate_studio_a2a_workspace_authorization,
+)
 from supervaizer.workspace_authorization import (
     validate_workspace_authorization_settings,
 )
@@ -76,206 +95,14 @@ from supervaizer.workspace_authorization import (
 insp = inspect
 
 T = TypeVar("T")
-
-# Additional imports for server persistence
-
-
-def _get_or_create_server_id() -> str:
-    """Use SUPERVAIZER_SERVER_ID from env if set; else create uuid and set env."""
-    existing = os.getenv("SUPERVAIZER_SERVER_ID")
-    if existing and len(existing) > 5:
-        return existing
-    new_id = str(uuid.uuid4())
-    os.environ["SUPERVAIZER_SERVER_ID"] = new_id
-    return new_id
+SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 
 
-def _controller_key_fingerprint(api_key: str | None) -> str | None:
-    if not api_key:
-        return None
-    return sha256(api_key.encode("utf-8")).hexdigest()[:12]
+def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
+    def handler(request: Any) -> Any:
+        return agent.execute_v2_action_method(action, request)
 
-
-def _resolve_workspace_authorization_settings(
-    explicit_settings: V2WorkspaceAuthorizationSettings | dict[str, Any] | None,
-) -> V2WorkspaceAuthorizationSettings:
-    if explicit_settings is not None:
-        return V2WorkspaceAuthorizationSettings.model_validate(explicit_settings)
-    return V2WorkspaceAuthorizationSettings(
-        enabled=_env_bool("SUPERVAIZER_WORKSPACE_AUTH_REQUIRED", default=False),
-        issuer=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER") or None,
-        audience=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE") or None,
-        public_key_pem=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY") or None,
-        jwks_url=os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL") or None,
-        leeway_seconds=int(
-            os.getenv("SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS", "30")
-        ),
-    )
-
-
-def _env_bool(name: str, *, default: bool) -> bool:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _get_or_create_private_key() -> RSAPrivateKey:
-    """Use SUPERVAIZER_PRIVATE_KEY from env if set; else create key and set env."""
-    pem = os.getenv("SUPERVAIZER_PRIVATE_KEY")
-    if pem and len(pem) > 5:
-        try:
-            key = serialization.load_pem_private_key(
-                pem.encode("utf-8"),
-                password=None,
-                backend=default_backend(),
-            )
-            return cast(RSAPrivateKey, key)
-        except Exception as e:
-            log.warning(
-                f"[Server] Invalid SUPERVAIZER_PRIVATE_KEY, generating new key: {e}"
-            )
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend(),
-    )
-    pem_bytes = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    os.environ["SUPERVAIZER_PRIVATE_KEY"] = pem_bytes.decode("utf-8")
-    log.info("[Server] Generated new RSA private key and set SUPERVAIZER_PRIVATE_KEY")
-    return private_key
-
-
-class ServerInfo(BaseModel):
-    """Complete server information for storage."""
-
-    id: str = "server_instance"  # Fixed ID for singleton
-    host: str
-    port: int
-    api_version: str
-    environment: str
-    agents: list[dict[str, str]]
-    start_time: float
-    created_at: str
-    updated_at: str
-
-
-def save_server_info_to_storage(server_instance: "Server") -> None:
-    """Save server information to storage."""
-    try:
-        storage = StorageManager()
-
-        # Get agent information
-        agents = []
-        if hasattr(server_instance, "agents") and server_instance.agents:
-            for agent in server_instance.agents:
-                agents.append({
-                    "name": agent.name,
-                    "description": agent.description,
-                    "version": agent.version,
-                    "api_path": agent.path,
-                    "slug": agent.slug,
-                    "instructions_path": agent.instructions_path,
-                })
-
-        # Create server info
-        server_info = ServerInfo(
-            id="server_instance",
-            host=getattr(server_instance, "host", "N/A"),
-            port=getattr(server_instance, "port", 0),
-            api_version=API_VERSION,
-            environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
-            agents=agents,
-            start_time=time.time(),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
-        )
-
-        # Save to storage under the fixed singleton id so retrieval works
-        storage.save_object("ServerInfo", server_info.model_dump())
-
-        log.info(
-            f"[Server] Server info saved to storage: {server_info.host}:{server_info.port}"
-        )
-
-    except Exception as e:
-        log.error(f"[Server] Failed to save server info to storage: {e}")
-
-
-def get_server_info_from_storage() -> ServerInfo | None:
-    """Get server information from storage."""
-    storage = StorageManager()
-    server_data = storage.get_object_by_id("ServerInfo", "server_instance")
-
-    if server_data:
-        return ServerInfo.model_validate(server_data)
-    return None
-
-
-def get_server_info_from_live(server_instance: "Server") -> ServerInfo:
-    """Build ServerInfo from a live Server instance (for when storage has no ServerInfo, e.g. no persistence)."""
-    agents = []
-    if hasattr(server_instance, "agents") and server_instance.agents:
-        for agent in server_instance.agents:
-            agents.append({
-                "name": agent.name,
-                "description": agent.description,
-                "version": agent.version,
-                "api_path": agent.path,
-                "slug": agent.slug,
-                "instructions_path": agent.instructions_path,
-            })
-    start_time = getattr(server_instance, "_start_time", time.time())
-    return ServerInfo(
-        host=getattr(server_instance, "host", "N/A"),
-        port=getattr(server_instance, "port", 0),
-        api_version=API_VERSION,
-        environment=os.getenv("SUPERVAIZER_ENVIRONMENT", "development"),
-        agents=agents,
-        start_time=start_time,
-        created_at=datetime.now().isoformat(),
-        updated_at=datetime.now().isoformat(),
-    )
-
-
-def _execute_scheduled_method(method_path: str, params: dict) -> Any:
-    """Execute a method by its full dotted path (module.func)."""
-    module_name, func_name = method_path.rsplit(".", 1)
-    module = __import__(module_name, fromlist=[func_name])
-    method = getattr(module, func_name)
-    return method(**params)
-
-
-async def _run_scheduled_step_loop(server: "Server") -> None:
-    """Poll for due scheduled steps every 60 seconds and execute them."""
-    from supervaizer.case import Cases
-
-    while True:
-        await asyncio.sleep(60)
-        try:
-            cases = Cases()
-            due_steps = cases.get_due_scheduled_steps()
-            for _case, _step_index, update in due_steps:
-                if not update.scheduled_method:
-                    continue
-                try:
-                    object.__setattr__(update, "scheduled_status", "executing")
-                    log.info(f"[Scheduled step] Executing: {update.name}")
-                    _execute_scheduled_method(
-                        update.scheduled_method,
-                        update.scheduled_params or {},
-                    )
-                    object.__setattr__(update, "scheduled_status", "completed")
-                    log.info(f"[Scheduled step] Completed: {update.name}")
-                except Exception as exc:
-                    object.__setattr__(update, "scheduled_status", "failed")
-                    log.error(f"[Scheduled step] Failed: {update.name}: {exc}")
-        except Exception as exc:
-            log.error(f"[Scheduled step loop] Error: {exc}")
+    return handler
 
 
 class ServerAbstract(SvBaseModel):
@@ -520,9 +347,29 @@ class Server(ServerAbstract):
         openapi_url = "/openapi.json"
 
         @asynccontextmanager
-        async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-            asyncio.create_task(_run_scheduled_step_loop(self))
-            yield
+        async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+            # Keep a task handle so shutdown can stop the scheduler cleanly.
+            scheduled_step_task = asyncio.create_task(
+                _run_scheduled_step_loop(self),
+                name="supervaizer-scheduled-step-loop",
+            )
+            try:
+                yield
+            finally:
+                # Give the scheduler a bounded chance to observe cancellation.
+                scheduled_step_task.cancel()
+                done, pending = await asyncio.wait(
+                    {scheduled_step_task},
+                    timeout=SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS,
+                )
+                if pending:
+                    log.warning(
+                        "[Scheduled step] Shutdown timed out while waiting for "
+                        "the scheduler task to stop"
+                    )
+                if done:
+                    with suppress(asyncio.CancelledError):
+                        await scheduled_step_task
 
         app = FastAPI(
             lifespan=_lifespan,
@@ -605,6 +452,7 @@ class Server(ServerAbstract):
 
         # Store server instance on app state before building routers
         self.app.state.server = self  # <-- MOVED earlier (was after route mount)
+        self._register_agent_v2_method_handlers()
 
         # Activate API + A2A routes when supervisor account or local mode is set
         if self.supervisor_account or local_mode:
@@ -708,30 +556,7 @@ class Server(ServerAbstract):
     @property
     def registration_info(self) -> dict[str, Any]:
         """Get registration info for the server."""
-        assert self.public_key is not None, "Public key not initialized"
-        contract = controller_contract_info()
-        return {
-            "server_id": self.server_id,
-            "url": self.public_url,
-            "uri": self.uri,
-            "api_version": API_VERSION,
-            "controller_version": VERSION,
-            **contract,
-            "environment": self.environment,
-            "public_key": str(
-                self.public_key.public_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                ).decode("utf-8")
-            ),
-            "api_key": self.api_key,
-            "docs": {
-                "swagger": f"{self.public_url}{self.app.docs_url}",
-                "redoc": f"{self.public_url}{self.app.redoc_url}",
-                "openapi": f"{self.public_url}{self.app.openapi_url}",
-            },
-            "agents": [agent.registration_info for agent in self.agents],
-        }
+        return build_server_registration_info(self)
 
     def launch(self, log_level: str | None = "INFO") -> None:
         if log_level:
@@ -806,132 +631,20 @@ class Server(ServerAbstract):
         )
 
     def _validate_registration_handshake(self, result: ApiSuccess) -> None:
-        detail = result.detail if isinstance(result.detail, dict) else {}
-        response_object = detail.get("object")
-        if not isinstance(response_object, dict):
-            raise RuntimeError(
-                "Studio registration handshake failed: server.register response did not "
-                "include a response object. Studio-to-agent API key persistence could not "
-                "be verified."
-            )
-        handshake = response_object.get("supervaizer_handshake")
-        if not isinstance(handshake, dict):
-            response_keys = sorted(str(key) for key in response_object.keys())
-            raise RuntimeError(
-                "Studio registration handshake failed: server.register response did not "
-                "include supervaizer_handshake. Studio-to-agent API key persistence could "
-                "not be verified. Check that SUPERVAIZE_API_URL points to a Studio "
-                "instance that supports the Supervaizer v2 registration handshake. "
-                f"response_keys={response_keys}"
-            )
-        if handshake.get("controller_api_key_match") is True:
-            self._apply_workspace_authorization_handshake(handshake)
-            log.info(
-                "[Server launch] Studio registration handshake verified "
-                f"server_id={handshake.get('server_id')} "
-                f"controller_key_fingerprint={_controller_key_fingerprint(self.api_key)}"
-            )
-            return
-        raise RuntimeError(
-            "Studio registration handshake failed: Studio did not persist the controller API key "
-            f"for server_id={handshake.get('server_id')}. "
-            f"controller_key_fingerprint={_controller_key_fingerprint(self.api_key)} "
-            f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
-            f"reason={handshake.get('reason')}"
-        )
+        validate_registration_handshake(self, result)
 
     def _validate_studio_a2a_workspace_authorization(self) -> None:
-        if not self.a2a_endpoints or self.supervisor_account is None:
-            return
-        if self.workspace_authorization.enabled:
-            return
-        raise RuntimeError(
-            "Studio-registered Supervaizer v2 A2A requires workspace authorization. "
-            "Set SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true and configure "
-            "SUPERVAIZER_WORKSPACE_AUTH_ISSUER plus either "
-            "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY or SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL."
-        )
+        validate_studio_a2a_workspace_authorization(self)
 
     def _apply_workspace_authorization_handshake(
         self, handshake: dict[str, Any]
     ) -> None:
-        if not self.workspace_authorization.enabled:
-            return
-
-        workspace_authorization = handshake.get("workspace_authorization")
-        if not isinstance(workspace_authorization, dict):
-            raise RuntimeError(
-                "Studio registration handshake failed: workspace authorization is enabled "
-                "but supervaizer_handshake.workspace_authorization is missing."
-            )
-
-        audience = workspace_authorization.get("audience")
-        if not isinstance(audience, str) or not audience.strip():
-            raise RuntimeError(
-                "Studio registration handshake failed: workspace authorization is enabled "
-                "but supervaizer_handshake.workspace_authorization.audience is missing."
-            )
-
-        configured_audience = self.workspace_authorization.audience
-        if configured_audience and configured_audience != audience:
-            raise RuntimeError(
-                "Studio registration handshake failed: configured workspace authorization "
-                "audience does not match Studio's server audience."
-            )
-
-        self.workspace_authorization = self.workspace_authorization.model_copy(
-            update={"audience": audience}
-        )
-        agent_bindings = workspace_authorization.get("agents")
-        if not isinstance(agent_bindings, list):
-            raise RuntimeError(
-                "Studio registration handshake failed: workspace authorization is enabled "
-                "but supervaizer_handshake.workspace_authorization.agents is missing."
-            )
-        self._apply_workspace_authorization_agent_bindings(agent_bindings)
+        apply_workspace_authorization_handshake(self, handshake)
 
     def _apply_workspace_authorization_agent_bindings(
         self, agent_bindings: list[Any]
     ) -> None:
-        bindings_by_slug: dict[str, str] = {}
-        for binding in agent_bindings:
-            if not isinstance(binding, dict):
-                raise RuntimeError(
-                    "Studio registration handshake failed: workspace authorization agent "
-                    "binding must be an object."
-                )
-            agent_id = binding.get("id")
-            agent_slug = binding.get("slug")
-            if not isinstance(agent_id, str) or not agent_id.strip():
-                raise RuntimeError(
-                    "Studio registration handshake failed: workspace authorization agent "
-                    "binding is missing id."
-                )
-            if not isinstance(agent_slug, str) or not agent_slug.strip():
-                raise RuntimeError(
-                    "Studio registration handshake failed: workspace authorization agent "
-                    "binding is missing slug."
-                )
-            bindings_by_slug[agent_slug] = agent_id
-
-        missing_agents = []
-        for agent in self.agents:
-            studio_agent_id = bindings_by_slug.get(agent.slug)
-            if not studio_agent_id:
-                missing_agents.append(agent.slug)
-                continue
-            if agent.server_agent_id and agent.server_agent_id != studio_agent_id:
-                raise RuntimeError(
-                    "Studio registration handshake failed: workspace authorization agent "
-                    f"id mismatch for slug={agent.slug}."
-                )
-            agent.server_agent_id = studio_agent_id
-
-        if missing_agents:
-            raise RuntimeError(
-                "Studio registration handshake failed: workspace authorization did not "
-                f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
-            )
+        apply_workspace_authorization_agent_bindings(self, agent_bindings)
 
     def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""
@@ -953,6 +666,15 @@ class Server(ServerAbstract):
         """Register a Supervaizer v2 action handler on this server."""
         register_v2_action_handler(self, action, handler, agent_slug=agent_slug)
         return handler
+
+    def _register_agent_v2_method_handlers(self) -> None:
+        for agent in self.agents:
+            for action in agent.v2_action_ids:
+                self.register_v2_action(
+                    action,
+                    _agent_v2_method_handler(agent, action),
+                    agent_slug=agent.slug,
+                )
 
     def v2_action(
         self, action: str, *, agent_slug: str | None = None
