@@ -379,25 +379,47 @@ async def test_server_lifespan_cleans_up_background_resources(
     mocker: Any,
 ) -> None:
     monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
-    started = asyncio.Event()
-    cancelled = asyncio.Event()
     loop_servers: list[Server] = []
+    created_task_names: list[str | None] = []
 
-    async def fake_scheduled_step_loop(server: Server) -> None:
-        loop_servers.append(server)
-        started.set()
-        try:
-            await asyncio.Event().wait()
-        finally:
-            cancelled.set()
+    class FakeScheduledStepTask:
+        def __init__(self) -> None:
+            self.cancelled = False
+            self.awaited = False
+
+        def cancel(self) -> None:
+            self.cancelled = True
+
+        def __await__(self) -> Any:
+            async def _cancelled() -> None:
+                self.awaited = True
+                raise asyncio.CancelledError
+
+            return _cancelled().__await__()
+
+    scheduled_step_task = FakeScheduledStepTask()
+
+    def fake_create_task(
+        coro: object, *, name: str | None = None, **_kwargs: Any
+    ) -> FakeScheduledStepTask:
+        if hasattr(coro, "close"):
+            coro.close()
+        created_task_names.append(name)
+        return scheduled_step_task
 
     close_httpx_client = mocker.patch(
         "supervaizer.server.close_httpx_client",
         new=mocker.AsyncMock(),
     )
     monkeypatch.setattr(
-        "supervaizer.server._run_scheduled_step_loop",
-        fake_scheduled_step_loop,
+        Server.__init__.__globals__["asyncio"],
+        "create_task",
+        fake_create_task,
+    )
+    monkeypatch.setitem(
+        Server.__init__.__globals__,
+        "close_httpx_client",
+        close_httpx_client,
     )
 
     server = Server(
@@ -411,10 +433,11 @@ async def test_server_lifespan_cleans_up_background_resources(
     )
 
     async with server.app.router.lifespan_context(server.app):
-        await asyncio.wait_for(started.wait(), timeout=1)
-        assert loop_servers == [server]
+        assert created_task_names == ["supervaizer-scheduled-step-loop"]
+        assert scheduled_step_task.cancelled is False
 
-    await asyncio.wait_for(cancelled.wait(), timeout=1)
+    assert scheduled_step_task.cancelled is True
+    assert scheduled_step_task.awaited is True
     close_httpx_client.assert_awaited_once_with()
 
 
