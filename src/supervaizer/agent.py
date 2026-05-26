@@ -783,6 +783,17 @@ class Agent(AgentAbstract):
                 f"({expected_id!r}); omit id or use the expected value"
             )
 
+        v2_registration = supervaizer_v2_registration
+        if isinstance(v2_registration, dict):
+            v2_registration = SupervaizerV2AgentRegistrationContract.model_validate(
+                v2_registration
+            )
+        v2_method_declarations = v2_methods
+        if isinstance(v2_method_declarations, dict):
+            v2_method_declarations = V2AgentMethods.model_validate(
+                v2_method_declarations
+            )
+
         # Initialize using Pydantic's mechanism
         super().__init__(
             name=name,
@@ -803,8 +814,8 @@ class Agent(AgentAbstract):
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
             data_resources=data_resources or [],
-            supervaizer_v2_registration=supervaizer_v2_registration,
-            v2_methods=v2_methods,
+            supervaizer_v2_registration=v2_registration,
+            v2_methods=v2_method_declarations,
             **kwargs,
         )
 
