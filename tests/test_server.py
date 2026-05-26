@@ -10,6 +10,7 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import asyncio
 import base64
 import json
 import os
@@ -24,6 +25,7 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from rich import inspect
 
+import supervaizer.server as server_module
 from supervaizer import Server
 from supervaizer.__version__ import VERSION
 from supervaizer.agent import Agent
@@ -369,6 +371,144 @@ def test_server_generated_api_key_is_exported_for_reload(
 
     assert server.api_key
     assert os.environ["SUPERVAIZER_API_KEY"] == server.api_key
+
+
+@pytest.mark.asyncio
+async def test_server_lifespan_cancels_scheduled_step_task(
+    agent_fixture: Agent,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
+    created_task_names: list[str | None] = []
+    waited_tasks: list[set[object]] = []
+    waited_timeouts: list[float | None] = []
+
+    class FakeScheduledStepTask:
+        def __init__(self) -> None:
+            self.cancelled = False
+            self.awaited = False
+
+        def cancel(self) -> None:
+            self.cancelled = True
+
+        def __await__(self) -> Any:
+            async def _cancelled() -> None:
+                self.awaited = True
+                raise asyncio.CancelledError
+
+            return _cancelled().__await__()
+
+    scheduled_step_task = FakeScheduledStepTask()
+
+    def fake_create_task(
+        coro: object, *, name: str | None = None, **_kwargs: Any
+    ) -> FakeScheduledStepTask:
+        if hasattr(coro, "close"):
+            coro.close()
+        created_task_names.append(name)
+        return scheduled_step_task
+
+    async def fake_wait(
+        tasks: set[object], *, timeout: float | None = None
+    ) -> tuple[set[object], set[object]]:
+        waited_tasks.append(set(tasks))
+        waited_timeouts.append(timeout)
+        return set(tasks), set()
+
+    monkeypatch.setattr(
+        Server.__init__.__globals__["asyncio"],
+        "create_task",
+        fake_create_task,
+    )
+    monkeypatch.setattr(
+        Server.__init__.__globals__["asyncio"],
+        "wait",
+        fake_wait,
+    )
+
+    server = Server(
+        agents=[agent_fixture],
+        supervisor_account=None,
+        admin_interface=False,
+        host="localhost",
+        port=8001,
+        environment="test",
+        api_key="test-key",
+    )
+
+    async with server.app.router.lifespan_context(server.app):
+        assert created_task_names == ["supervaizer-scheduled-step-loop"]
+        assert scheduled_step_task.cancelled is False
+
+    assert scheduled_step_task.cancelled is True
+    assert scheduled_step_task.awaited is True
+    assert waited_tasks == [{scheduled_step_task}]
+    assert waited_timeouts == [server_module.SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS]
+
+
+@pytest.mark.asyncio
+async def test_server_lifespan_leaves_shutdown_after_scheduler_timeout(
+    agent_fixture: Agent,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
+
+    class PendingScheduledStepTask:
+        def __init__(self) -> None:
+            self.cancelled = False
+            self.awaited = False
+
+        def cancel(self) -> None:
+            self.cancelled = True
+
+        def __await__(self) -> Any:
+            async def _unexpected() -> None:
+                self.awaited = True
+                raise AssertionError("pending scheduler task should not be awaited")
+
+            return _unexpected().__await__()
+
+    pending_task = PendingScheduledStepTask()
+
+    def fake_create_task(
+        coro: object, *, name: str | None = None, **_kwargs: Any
+    ) -> PendingScheduledStepTask:
+        if hasattr(coro, "close"):
+            coro.close()
+        return pending_task
+
+    async def fake_wait(
+        tasks: set[object], *, timeout: float | None = None
+    ) -> tuple[set[object], set[object]]:
+        assert timeout == server_module.SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS
+        return set(), set(tasks)
+
+    monkeypatch.setattr(
+        Server.__init__.__globals__["asyncio"],
+        "create_task",
+        fake_create_task,
+    )
+    monkeypatch.setattr(
+        Server.__init__.__globals__["asyncio"],
+        "wait",
+        fake_wait,
+    )
+
+    server = Server(
+        agents=[agent_fixture],
+        supervisor_account=None,
+        admin_interface=False,
+        host="localhost",
+        port=8001,
+        environment="test",
+        api_key="test-key",
+    )
+
+    async with server.app.router.lifespan_context(server.app):
+        assert pending_task.cancelled is False
+
+    assert pending_task.cancelled is True
+    assert pending_task.awaited is False
 
 
 def test_server_decrypt(server_fixture: Server) -> None:

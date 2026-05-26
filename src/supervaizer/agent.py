@@ -14,6 +14,7 @@
 import json
 import re
 from enum import Enum
+from importlib import import_module
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -36,7 +37,12 @@ from slugify import slugify
 from supervaizer.__version__ import VERSION
 from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
-from supervaizer.contracts import SupervaizerV2AgentRegistrationContract
+from supervaizer.contracts import (
+    SupervaizerV2AgentRegistrationContract,
+    V2ActionRequest,
+    V2AgentMethod,
+    V2AgentMethods,
+)
 from supervaizer.data_resource import DataResource
 from supervaizer.event import JobStartConfirmationEvent
 from supervaizer.job import Job, JobContext, JobResponse
@@ -695,6 +701,11 @@ class AgentAbstract(SvBaseModel):
         default=None,
         description="Optional Supervaizer v2 registration contract for A2A/A2UI Studio integrations",
     )
+    v2_methods: V2AgentMethods | None = Field(
+        default=None,
+        description="Optional agent-level Supervaizer v2 method declarations",
+        exclude=True,
+    )
 
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
@@ -727,6 +738,7 @@ class Agent(AgentAbstract):
         supervaizer_v2_registration: SupervaizerV2AgentRegistrationContract
         | dict[str, Any]
         | None = None,
+        v2_methods: V2AgentMethods | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -771,6 +783,17 @@ class Agent(AgentAbstract):
                 f"({expected_id!r}); omit id or use the expected value"
             )
 
+        v2_registration = supervaizer_v2_registration
+        if isinstance(v2_registration, dict):
+            v2_registration = SupervaizerV2AgentRegistrationContract.model_validate(
+                v2_registration
+            )
+        v2_method_declarations = v2_methods
+        if isinstance(v2_method_declarations, dict):
+            v2_method_declarations = V2AgentMethods.model_validate(
+                v2_method_declarations
+            )
+
         # Initialize using Pydantic's mechanism
         super().__init__(
             name=name,
@@ -791,11 +814,13 @@ class Agent(AgentAbstract):
             max_execution_time=max_execution_time,
             custom_routes=custom_routes,
             data_resources=data_resources or [],
-            supervaizer_v2_registration=supervaizer_v2_registration,
+            supervaizer_v2_registration=v2_registration,
+            v2_methods=v2_method_declarations,
             **kwargs,
         )
 
         self._validate_supervaizer_v2_identity()
+        self._apply_v2_method_capabilities()
 
         seen_resource_names: set[str] = set()
         for r in self.data_resources:
@@ -820,6 +845,17 @@ class Agent(AgentAbstract):
                 "Supervaizer v2 registration agent.slug must match Agent.slug: "
                 f"{declared_slug!r} != {self.slug!r}"
             )
+
+    def _apply_v2_method_capabilities(self) -> None:
+        if self.supervaizer_v2_registration is None or self.v2_methods is None:
+            return
+        actions = [
+            *self.supervaizer_v2_registration.capabilities.actions,
+            *self.v2_methods.action_ids,
+        ]
+        self.supervaizer_v2_registration.capabilities.actions = list(
+            dict.fromkeys(actions)
+        )
 
     @property
     def slug(self) -> str:
@@ -974,6 +1010,37 @@ class Agent(AgentAbstract):
         if self.methods.custom:
             methods.extend(self.methods.custom.values())
         return {method.method for method in methods if method is not None}
+
+    @property
+    def v2_action_ids(self) -> list[str]:
+        if self.v2_methods is None:
+            return []
+        return self.v2_methods.action_ids
+
+    def v2_method_for_action(self, action: str) -> V2AgentMethod | None:
+        if self.v2_methods is None:
+            return None
+        return self.v2_methods.method_for_action(action)
+
+    def _declared_v2_method_paths(self) -> set[str]:
+        if self.v2_methods is None:
+            return set()
+        methods = [self.v2_methods.refresh, *self.v2_methods.custom.values()]
+        return {method.method for method in methods if method is not None}
+
+    def execute_v2_action_method(self, action: str, request: V2ActionRequest) -> Any:
+        agent_method = self.v2_method_for_action(action)
+        if agent_method is None:
+            raise ValueError(f"Agent v2 action is not declared on agent: {action}")
+        if agent_method.method not in self._declared_v2_method_paths():
+            raise ValueError(
+                f"Agent v2 method path is not declared on agent: {agent_method.method}"
+            )
+
+        module_name, func_name = agent_method.method.rsplit(".", 1)
+        module = import_module(module_name)
+        action_method = getattr(module, func_name)
+        return action_method(request=request, **agent_method.params)
 
     def job_start(
         self,

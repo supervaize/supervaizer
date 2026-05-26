@@ -78,6 +78,12 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "supervaizer.contracts",
         "SUPERVAIZER_V2_CONTRACT_VERSION",
     ),
+    "AGENT_CUSTOM_ACTION_PREFIX": (
+        "supervaizer.contracts",
+        "AGENT_CUSTOM_ACTION_PREFIX",
+    ),
+    "AGENT_REFRESH_ACTION": ("supervaizer.contracts", "AGENT_REFRESH_ACTION"),
+    "AGENT_REFRESH_EFFECT": ("supervaizer.contracts", "AGENT_REFRESH_EFFECT"),
     "WORKSPACE_BINDING_CREATE_ACTION": (
         "supervaizer.contracts",
         "WORKSPACE_BINDING_CREATE_ACTION",
@@ -123,6 +129,8 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2A2UISubmitDefinition": ("supervaizer.contracts", "V2A2UISubmitDefinition"),
     "V2AgentCapabilities": ("supervaizer.contracts", "V2AgentCapabilities"),
     "V2AgentIdentity": ("supervaizer.contracts", "V2AgentIdentity"),
+    "V2AgentMethod": ("supervaizer.contracts", "V2AgentMethod"),
+    "V2AgentMethods": ("supervaizer.contracts", "V2AgentMethods"),
     "V2ArtifactRef": ("supervaizer.contracts", "V2ArtifactRef"),
     "V2ArtifactTypeDefinition": (
         "supervaizer.contracts",
