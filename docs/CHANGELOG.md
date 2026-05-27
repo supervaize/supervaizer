@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-27
+
 ### Changed
 
 - **FastAPI lifespan cleanup** — Controller shutdown now cancels the scheduled-step background loop and waits briefly for it to stop.
