@@ -35,10 +35,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 663   |
+| ✅ Passed  | 672   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 136s  |
+| ⏱️ in      | 86s   |
 
 ## [1.1.1] - 2026-05-20
 

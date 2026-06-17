@@ -83,7 +83,7 @@ Ask. Refusing to act is always safer than taking an action that bypasses these r
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **supervaizer** (6225 symbols, 11375 relationships, 276 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **supervaizer** (6273 symbols, 11483 relationships, 281 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
