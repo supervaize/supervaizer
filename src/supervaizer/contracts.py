@@ -820,6 +820,14 @@ class V2ContextAssignment(ContractModel):
     job_id: str
     assigned_at: str  # ISO-8601, stamped by Studio
 
+    @model_validator(mode="after")
+    def _require_mission_id_for_mission_items(self) -> "V2ContextAssignment":
+        if any(item.scope == "mission" for item in self.items) and not self.mission_id:
+            raise ValueError(
+                "mission_id is required when the assignment contains mission-scoped items"
+            )
+        return self
+
 
 class V2SurfaceRequest(ContractModel):
     request_id: str

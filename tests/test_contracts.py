@@ -761,6 +761,38 @@ def test_v2_context_assignment_allows_empty_items() -> None:
     assert assignment.mission_id is None
 
 
+def test_v2_context_assignment_requires_mission_id_for_mission_items() -> None:
+    with pytest.raises(ValidationError, match="mission_id is required"):
+        V2ContextAssignment(
+            items=[
+                V2ContextAssignmentItem(
+                    ref="supervaize.context.mission.january-brief",
+                    version=3,
+                    scope="mission",
+                    title="January brief",
+                )
+            ],
+            job_id="job_1",
+            assigned_at="2026-07-02T09:00:00+00:00",
+        )
+
+
+def test_v2_context_assignment_workspace_items_do_not_require_mission_id() -> None:
+    assignment = V2ContextAssignment(
+        items=[
+            V2ContextAssignmentItem(
+                ref="supervaize.context.workspace.brand-voice",
+                version=1,
+                scope="workspace",
+                title="Brand voice",
+            )
+        ],
+        job_id="job_1",
+        assigned_at="2026-07-02T09:00:00+00:00",
+    )
+    assert assignment.mission_id is None
+
+
 def test_v2_context_assignment_item_rejects_unknown_scope() -> None:
     with pytest.raises(ValidationError):
         V2ContextAssignmentItem(
