@@ -822,7 +822,10 @@ class V2ContextAssignment(ContractModel):
 
     @model_validator(mode="after")
     def _require_mission_id_for_mission_items(self) -> "V2ContextAssignment":
-        if any(item.scope == "mission" for item in self.items) and not self.mission_id:
+        if (
+            any(item.scope == "mission" for item in self.items)
+            and not (self.mission_id or "").strip()
+        ):
             raise ValueError(
                 "mission_id is required when the assignment contains mission-scoped items"
             )

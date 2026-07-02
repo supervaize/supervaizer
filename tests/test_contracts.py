@@ -777,6 +777,23 @@ def test_v2_context_assignment_requires_mission_id_for_mission_items() -> None:
         )
 
 
+def test_v2_context_assignment_rejects_blank_mission_id_for_mission_items() -> None:
+    with pytest.raises(ValidationError, match="mission_id is required"):
+        V2ContextAssignment(
+            items=[
+                V2ContextAssignmentItem(
+                    ref="supervaize.context.mission.january-brief",
+                    version=3,
+                    scope="mission",
+                    title="January brief",
+                )
+            ],
+            mission_id="   ",
+            job_id="job_1",
+            assigned_at="2026-07-02T09:00:00+00:00",
+        )
+
+
 def test_v2_context_assignment_workspace_items_do_not_require_mission_id() -> None:
     assignment = V2ContextAssignment(
         items=[
