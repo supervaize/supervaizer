@@ -103,6 +103,10 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "supervaizer.contracts",
         "WORKSPACE_BINDING_OPTIONS_ACTION",
     ),
+    "V2_ACTION_CONTEXT_ASSIGN": (
+        "supervaizer.contracts",
+        "V2_ACTION_CONTEXT_ASSIGN",
+    ),
     "AgentMethodContract": ("supervaizer.contracts", "AgentMethodContract"),
     "AgentMethodsContract": ("supervaizer.contracts", "AgentMethodsContract"),
     "AgentRegistrationContract": ("supervaizer.contracts", "AgentRegistrationContract"),
@@ -150,6 +154,11 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2AwaitingState": ("supervaizer.contracts", "V2AwaitingState"),
     "V2CaseLaneDefinition": ("supervaizer.contracts", "V2CaseLaneDefinition"),
     "V2CaseSnapshot": ("supervaizer.contracts", "V2CaseSnapshot"),
+    "V2ContextAssignment": ("supervaizer.contracts", "V2ContextAssignment"),
+    "V2ContextAssignmentItem": (
+        "supervaizer.contracts",
+        "V2ContextAssignmentItem",
+    ),
     "V2DashboardDefinition": ("supervaizer.contracts", "V2DashboardDefinition"),
     "V2DashboardWidgetDataRef": (
         "supervaizer.contracts",
