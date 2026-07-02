@@ -804,6 +804,23 @@ class V2ActionRequest(ContractModel):
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
 
+V2_ACTION_CONTEXT_ASSIGN = "context.assign"
+
+
+class V2ContextAssignmentItem(ContractModel):
+    ref: str  # Studio ContextItem ref, e.g. "supervaize.context.mission.january-brief"
+    version: int  # ContextItem version at selection time
+    scope: str  # "workspace" | "mission"
+    title: str
+
+
+class V2ContextAssignment(ContractModel):
+    items: list[V2ContextAssignmentItem]  # empty list = explicit "no context"
+    mission_id: str | None = None
+    job_id: str
+    assigned_at: str  # ISO-8601, stamped by Studio
+
+
 class V2SurfaceRequest(ContractModel):
     request_id: str
     actor: V2ActorContext

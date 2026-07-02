@@ -375,6 +375,7 @@ Common action IDs:
 | `job.stop` | Stop or cancel agent work. |
 | `job.sync` | Return a convergent state snapshot for Studio. |
 | `step.awaiting.submit` | Submit operator input for a HITL step. |
+| `context.assign` | Assign a frozen Studio context selection to a job; agent fetches content via `ContextClient` and stores provenance (`ref`, `version`, `hash`, `synced_at`). |
 | `resource.<id>.<operation>` | Run a resource operation. |
 | `dataset.<id>.query` | Query an agent-owned dataset. |
 | `artifact.get` | Load artifact content by reference. |
