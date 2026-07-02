@@ -18,6 +18,7 @@ from pydantic import ConfigDict, Field, field_validator
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
+from supervaizer.context import ContextClient
 from supervaizer.telemetry import Telemetry
 
 if TYPE_CHECKING:
@@ -127,6 +128,11 @@ class Account(AccountAbstract):
             "accept": "application/json",
             "workspace": self.workspace_id,
         }
+
+    @property
+    def context(self) -> ContextClient:
+        """Client for Supervaize-managed runtime context."""
+        return ContextClient(self)
 
     @property
     def api_url_team(self) -> str:
