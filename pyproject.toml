@@ -8,7 +8,7 @@ authors = [
 ]
 dependencies = [
     "art>=6.5",
-    "cryptography>=48.0.0",
+    "cryptography>=49.0.0",
     "demjson3>=3.0.0",
     "deprecated>=1.3.0",
     "fastapi>=0.136.3",
@@ -52,9 +52,15 @@ supervaizer = "supervaizer.cli:app"
 deploy = [
     "boto3>=1.43.14",
     "docker>=7.0.0",
+<<<<<<< Updated upstream
     "google-cloud-artifact-registry>=1.21.0",
     "google-cloud-run>=0.16.0",
     "google-cloud-secret-manager>=2.28.0",
+=======
+    "google-cloud-artifact-registry>=1.22.0",
+    "google-cloud-run>=0.16.1",
+    "google-cloud-secret-manager>=2.29.0",
+>>>>>>> Stashed changes
 ]
 dev = [
     "boto3>=1.42.73",
