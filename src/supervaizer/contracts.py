@@ -804,6 +804,34 @@ class V2ActionRequest(ContractModel):
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
 
+V2_ACTION_CONTEXT_ASSIGN = "context.assign"
+
+
+class V2ContextAssignmentItem(ContractModel):
+    ref: str  # Studio ContextItem ref, e.g. "supervaize.context.mission.january-brief"
+    version: int  # ContextItem version at selection time
+    scope: Literal["workspace", "mission"]
+    title: str
+
+
+class V2ContextAssignment(ContractModel):
+    items: list[V2ContextAssignmentItem]  # empty list = explicit "no context"
+    mission_id: str | None = None
+    job_id: str
+    assigned_at: str  # ISO-8601, stamped by Studio
+
+    @model_validator(mode="after")
+    def _require_mission_id_for_mission_items(self) -> "V2ContextAssignment":
+        if (
+            any(item.scope == "mission" for item in self.items)
+            and not (self.mission_id or "").strip()
+        ):
+            raise ValueError(
+                "mission_id is required when the assignment contains mission-scoped items"
+            )
+        return self
+
+
 class V2SurfaceRequest(ContractModel):
     request_id: str
     actor: V2ActorContext
