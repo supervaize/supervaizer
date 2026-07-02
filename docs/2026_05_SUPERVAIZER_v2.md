@@ -375,11 +375,18 @@ Common action IDs:
 | `job.stop` | Stop or cancel agent work. |
 | `job.sync` | Return a convergent state snapshot for Studio. |
 | `step.awaiting.submit` | Submit operator input for a HITL step. |
+| `context.assign` | Assign a frozen Studio context selection to a job; agent fetches content via `ContextClient` and stores provenance (`ref`, `version`, `hash`, `synced_at`). |
 | `resource.<id>.<operation>` | Run a resource operation. |
 | `dataset.<id>.query` | Query an agent-owned dataset. |
 | `artifact.get` | Load artifact content by reference. |
 
 Action requests include `actor`, `workspace`, `mission_id`, `agent_slug`, `surface`, `action`, `input`, and optional correlation fields such as `job_id`, `case_id`, `step_id`, `draft_session_id`, and `idempotency_key`.
+
+### Context assignment semantics
+
+`context.assign` carries a `V2ContextAssignment` payload: the selected items (`ref`, `version`, `scope`, `title`), the `job_id`, an optional `mission_id`, and a Studio-stamped `assigned_at`. An empty `items` list is an explicit "no context" assignment, not an error.
+
+The payload intentionally contains references, not content. On receipt the agent fetches each item once through `ContextClient.open()` and freezes the returned content as its own snapshot with provenance (`ref`, `version`, content `hash`, `synced_at`). `ContextClient.open()` returns the item's current `version`; the agent MUST compare it against the assigned `version` and fail the whole assignment with an explicit error when they differ — the item changed between selection and sync, and the operator should re-assign. Agents must not silently store content under a version it does not match, and must not re-read Studio context during job execution; a new `context.assign` is the only refresh path.
 
 ## Sync and Offline Semantics
 

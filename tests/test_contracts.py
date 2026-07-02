@@ -32,6 +32,8 @@ from supervaizer.contracts import (
     V2AgentMethods,
     V2AwaitingState,
     V2CaseSnapshot,
+    V2ContextAssignment,
+    V2ContextAssignmentItem,
     V2DashboardWidgetDataRef,
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
@@ -45,6 +47,7 @@ from supervaizer.contracts import (
     V2VerifiedWorkspaceContext,
     V2WorkspaceAuthorizationSettings,
     V2WorkspaceBindingDefinition,
+    V2_ACTION_CONTEXT_ASSIGN,
     build_data_resource_context_headers,
     build_v2_agent_registration,
     controller_contract_info,
@@ -730,3 +733,88 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     )
     assert supervaizer.V2WorkspaceBindingDefinition is V2WorkspaceBindingDefinition
     assert supervaizer.build_v2_agent_registration is build_v2_agent_registration
+
+
+def test_v2_context_assignment_parses_items() -> None:
+    assignment = V2ContextAssignment(
+        items=[
+            V2ContextAssignmentItem(
+                ref="supervaize.context.mission.january-brief",
+                version=3,
+                scope="mission",
+                title="January brief",
+            )
+        ],
+        mission_id="mis_1",
+        job_id="job_1",
+        assigned_at="2026-07-02T09:00:00+00:00",
+    )
+    assert assignment.items[0].version == 3
+    assert V2_ACTION_CONTEXT_ASSIGN == "context.assign"
+
+
+def test_v2_context_assignment_allows_empty_items() -> None:
+    assignment = V2ContextAssignment(
+        items=[], job_id="job_1", assigned_at="2026-07-02T09:00:00+00:00"
+    )
+    assert assignment.items == []
+    assert assignment.mission_id is None
+
+
+def test_v2_context_assignment_requires_mission_id_for_mission_items() -> None:
+    with pytest.raises(ValidationError, match="mission_id is required"):
+        V2ContextAssignment(
+            items=[
+                V2ContextAssignmentItem(
+                    ref="supervaize.context.mission.january-brief",
+                    version=3,
+                    scope="mission",
+                    title="January brief",
+                )
+            ],
+            job_id="job_1",
+            assigned_at="2026-07-02T09:00:00+00:00",
+        )
+
+
+def test_v2_context_assignment_rejects_blank_mission_id_for_mission_items() -> None:
+    with pytest.raises(ValidationError, match="mission_id is required"):
+        V2ContextAssignment(
+            items=[
+                V2ContextAssignmentItem(
+                    ref="supervaize.context.mission.january-brief",
+                    version=3,
+                    scope="mission",
+                    title="January brief",
+                )
+            ],
+            mission_id="   ",
+            job_id="job_1",
+            assigned_at="2026-07-02T09:00:00+00:00",
+        )
+
+
+def test_v2_context_assignment_workspace_items_do_not_require_mission_id() -> None:
+    assignment = V2ContextAssignment(
+        items=[
+            V2ContextAssignmentItem(
+                ref="supervaize.context.workspace.brand-voice",
+                version=1,
+                scope="workspace",
+                title="Brand voice",
+            )
+        ],
+        job_id="job_1",
+        assigned_at="2026-07-02T09:00:00+00:00",
+    )
+    assert assignment.mission_id is None
+
+
+def test_v2_context_assignment_item_rejects_unknown_scope() -> None:
+    with pytest.raises(ValidationError):
+        V2ContextAssignmentItem(
+            ref="supervaize.context.mission.january-brief",
+            version=3,
+            scope="missions",
+            title="January brief",
+        )
