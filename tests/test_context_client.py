@@ -21,7 +21,7 @@ from supervaizer import (
 
 class _Response:
     def __init__(self, data: dict[str, Any]) -> None:
-        self._data = data
+        self._data: dict[str, Any] = data
 
     def raise_for_status(self) -> None:
         return None
@@ -34,7 +34,7 @@ def test_context_search_posts_to_workspace_context_search(
     account_fixture: Account, mocker: Any
 ) -> None:
     post = mocker.patch(
-        "supervaizer.context.httpx.post",
+        "supervaizer.context._sync_httpx_client.post",
         return_value=_Response({
             "query": "billing",
             "results": [
@@ -86,7 +86,7 @@ def test_context_open_posts_to_workspace_context_open(
     account_fixture: Account, mocker: Any
 ) -> None:
     post = mocker.patch(
-        "supervaizer.context.httpx.post",
+        "supervaizer.context._sync_httpx_client.post",
         return_value=_Response({
             "ref": "supervaize.context.workspace.billing",
             "title": "Billing",
@@ -127,10 +127,36 @@ def test_context_open_posts_to_workspace_context_open(
 def test_context_rejects_conflicting_workspace_id(
     account_fixture: Account, mocker: Any
 ) -> None:
-    post = mocker.patch("supervaizer.context.httpx.post")
+    post = mocker.patch("supervaizer.context._sync_httpx_client.post")
     client = ContextClient(account_fixture)
 
-    with pytest.raises(ValueError, match="does not match account.workspace_id"):
-        client.search(query="x", workspace_id="other-workspace")
+    with pytest.raises(
+        ValueError, match="expected_workspace_id .* does not match account.workspace_id"
+    ):
+        client.search(query="x", expected_workspace_id="other-workspace")
+
+    post.assert_not_called()
+
+
+def test_context_search_rejects_empty_mission_id(
+    account_fixture: Account, mocker: Any
+) -> None:
+    post = mocker.patch("supervaizer.context._sync_httpx_client.post")
+
+    with pytest.raises(ValueError, match="mission_id must be a non-empty string"):
+        context.search(account=account_fixture, query="billing", mission_id="")
+
+    post.assert_not_called()
+
+
+def test_context_open_rejects_empty_mission_id(
+    account_fixture: Account, mocker: Any
+) -> None:
+    post = mocker.patch("supervaizer.context._sync_httpx_client.post")
+
+    with pytest.raises(ValueError, match="mission_id must be a non-empty string"):
+        account_fixture.context.open(
+            ref="supervaize.context.workspace.billing", mission_id=" "
+        )
 
     post.assert_not_called()
