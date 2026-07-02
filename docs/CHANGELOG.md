@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-02
+
 ### Added
 
 - **`context.assign` contract** — New typed wire contract for assigning a frozen Studio context selection to a job: `V2ContextAssignment` (items, `mission_id`, `job_id`, `assigned_at`), `V2ContextAssignmentItem` (`ref`, `version`, `scope`, `title`), and the `V2_ACTION_CONTEXT_ASSIGN` action id in `supervaizer.contracts`, exported at package level. Additive only; dispatch uses the existing generic `Server.v2_action` machinery.
