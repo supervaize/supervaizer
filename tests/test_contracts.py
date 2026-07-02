@@ -759,3 +759,13 @@ def test_v2_context_assignment_allows_empty_items() -> None:
     )
     assert assignment.items == []
     assert assignment.mission_id is None
+
+
+def test_v2_context_assignment_item_rejects_unknown_scope() -> None:
+    with pytest.raises(ValidationError):
+        V2ContextAssignmentItem(
+            ref="supervaize.context.mission.january-brief",
+            version=3,
+            scope="missions",
+            title="January brief",
+        )

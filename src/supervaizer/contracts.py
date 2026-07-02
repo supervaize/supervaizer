@@ -810,7 +810,7 @@ V2_ACTION_CONTEXT_ASSIGN = "context.assign"
 class V2ContextAssignmentItem(ContractModel):
     ref: str  # Studio ContextItem ref, e.g. "supervaize.context.mission.january-brief"
     version: int  # ContextItem version at selection time
-    scope: str  # "workspace" | "mission"
+    scope: Literal["workspace", "mission"]
     title: str
 
 
