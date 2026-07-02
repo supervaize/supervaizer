@@ -14,6 +14,8 @@ import base64
 import json
 import threading
 import time
+from collections.abc import Iterable
+from typing import Any
 
 import jsonschema
 import pytest
@@ -97,6 +99,15 @@ def _authorized_a2a_headers(
         scopes=scopes,
     )
     return _a2a_workspace_headers(server, token)
+
+
+def _iter_routes(routes: Iterable[Any]) -> Iterable[Any]:
+    for route in routes:
+        yield route
+        original_router = getattr(route, "original_router", None)
+        nested_routes = getattr(original_router, "routes", None)
+        if nested_routes is not None:
+            yield from _iter_routes(nested_routes)
 
 
 def test_create_agent_card(agent_fixture: Agent) -> None:
@@ -430,7 +441,7 @@ def test_a2a_controller_requires_write_scope(server_fixture: Server) -> None:
 def test_a2a_events_remains_read_scoped(server_fixture: Server) -> None:
     route = next(
         route
-        for route in server_fixture.app.routes
+        for route in _iter_routes(server_fixture.app.routes)
         if getattr(route, "path", None) == "/a2a/events"
     )
     dependency = route.dependant.dependencies[0].call

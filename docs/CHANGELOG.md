@@ -12,6 +12,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`pyproject.toml` (since v1.3.0)** — Runtime lower bounds: FastAPI `>=0.139.0`, sse-starlette `>=3.4.5`, Typer `>=0.26.8`, Uvicorn `>=0.49.0`. **`deploy` extra:** boto3 `>=1.43.39`, google-cloud-run `>=0.16.1`, google-cloud-secret-manager `>=2.23.0`. **`dev` extra:** hatch `>=1.17.0`, pytest `>=9.1.1`, pytest-asyncio `>=1.4.0`, ruff `>=0.15.20`. Lock file refreshed via `uv lock`.
+
+### Fixed
+
+- **A2A event scope test** — `tests/test_a2a.py` now walks FastAPI included-router wrappers when locating `/a2a/events`, preserving the read-scope assertion under FastAPI `0.139.0`.
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 683   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 56s   |
+
+## [1.3.0] - 2026-07-02
+
 ### Added
 
 - **`context.assign` contract** — New typed wire contract for assigning a frozen Studio context selection to a job: `V2ContextAssignment` (items, `mission_id`, `job_id`, `assigned_at`), `V2ContextAssignmentItem` (`ref`, `version`, `scope`, `title`), and the `V2_ACTION_CONTEXT_ASSIGN` action id in `supervaizer.contracts`, exported at package level. Additive only; dispatch uses the existing generic `Server.v2_action` machinery.
