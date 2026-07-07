@@ -30,6 +30,7 @@ from supervaizer.common import log
 from supervaizer.contracts import API_VERSION
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.scheduled_steps import _execute_scheduled_method
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -531,8 +532,6 @@ def create_workbench_routes() -> APIRouter:
         request: Request, slug: str, job_id: str, case_id: str, step_index: int
     ) -> Response:
         """Execute a scheduled step immediately."""
-        from supervaizer.server import _execute_scheduled_method
-
         agent = get_agent_by_slug(request, slug)
 
         # Verify the job is owned by this agent before using the agent's
