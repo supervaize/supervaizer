@@ -24,6 +24,15 @@ All notable changes to this project will be documented in this file.
 - **Reduced sensitive data in logs** — Agent parameter values are no longer written to logs during parameter validation.
 - **Scheduled-step execution hardening** — The scheduler only runs methods declared by the agent that owns the step's job.
 
+### Tests
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 683   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 83s   |
+
 ## [1.3.1] - 2026-07-02
 
 ### Changed
