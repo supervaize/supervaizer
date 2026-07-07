@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-07-02
+
 ### Changed
 
 - **`pyproject.toml` (since v1.3.0)** — Runtime lower bounds: FastAPI `>=0.139.0`, sse-starlette `>=3.4.5`, Typer `>=0.26.8`, Uvicorn `>=0.49.0`. **`deploy` extra:** boto3 `>=1.43.39`, google-cloud-run `>=0.16.1`, google-cloud-secret-manager `>=2.23.0`. **`dev` extra:** hatch `>=1.17.0`, pytest `>=9.1.1`, pytest-asyncio `>=1.4.0`, ruff `>=0.15.20`. Lock file refreshed via `uv lock`.
@@ -25,7 +27,7 @@ All notable changes to this project will be documented in this file.
 | ✅ Passed  | 683   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 74s   |
+| ⏱️ in      | 56s   |
 
 ## [1.3.0] - 2026-07-02
 
