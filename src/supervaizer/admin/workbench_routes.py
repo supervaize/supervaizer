@@ -533,7 +533,7 @@ def create_workbench_routes() -> APIRouter:
         """Execute a scheduled step immediately."""
         from supervaizer.server import _execute_scheduled_method
 
-        get_agent_by_slug(request, slug)
+        agent = get_agent_by_slug(request, slug)
 
         case = Cases().get_case(case_id, job_id=job_id)
         if not case:
@@ -557,6 +557,7 @@ def create_workbench_routes() -> APIRouter:
                 _execute_scheduled_method(
                     update.scheduled_method,
                     update.scheduled_params or {},
+                    allowed_methods=agent._declared_method_paths(),
                 )
             object.__setattr__(update, "scheduled_status", "completed")
             return JSONResponse({

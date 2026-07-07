@@ -22,6 +22,14 @@ All notable changes to this project will be documented in this file.
 
 - **A2A event scope test** — `tests/test_a2a.py` now walks FastAPI included-router wrappers when locating `/a2a/events`, preserving the read-scope assertion under FastAPI `0.139.0`.
 
+### Security
+
+- **Constant-time API-key comparison** — `require_api_key` (`access/api_auth.py`) and `Server.verify_api_key` now compare the presented key with `hmac.compare_digest` instead of `==`, removing a timing side channel.
+- **Local mode binds loopback** — `supervaizer start --local` (which uses the well-known default `local-dev` API key) now binds `127.0.0.1` instead of `0.0.0.0` unless the operator sets a specific non-wildcard `--host`, so local test mode is no longer exposed on all network interfaces by default.
+- **Baseline security headers** — All HTTP responses now include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Strict-Transport-Security`, via a pure-ASGI middleware that does not buffer streaming/SSE responses.
+- **No decrypted parameter values in logs** — `validate-agent-parameters` no longer logs decrypted parameter values or full result payloads (only presence/counts and pass/fail), preventing secret leakage into logs at INFO level.
+- **Scheduled-step method allow-list** — `_execute_scheduled_method` now refuses any dotted path that is not one of the agent's declared method paths, closing an unsafe-reflection gadget in the scheduler and workbench execute-now path.
+
 ### Docs
 
 - **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
