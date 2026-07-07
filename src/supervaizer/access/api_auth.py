@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from collections.abc import Callable
 from typing import Annotated
@@ -61,7 +62,12 @@ def require_api_key(  # <-- ADDED
         live_server = getattr(getattr(request, "app", None), "state", None)
         live_server = getattr(live_server, "server", None) if live_server else None
         live_key = getattr(live_server, "api_key", None) if live_server else None
-        if live_key and x_api_key == live_key:
+        # Constant-time comparison to avoid a timing side channel on the key.
+        # Compare bytes so non-ASCII keys fail closed instead of raising
+        # TypeError (hmac.compare_digest rejects non-ASCII str inputs).
+        if live_key and hmac.compare_digest(
+            x_api_key.encode("utf-8"), live_key.encode("utf-8")
+        ):
             return {"scope": "write"}  # live server key always has full access
     log_access_denied_api(x_api_key, path, "invalid key")
     raise HTTPException(status_code=401, detail="Invalid or missing API key")

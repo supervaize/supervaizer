@@ -188,6 +188,12 @@ def start(
 
     if local:
         os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+        # Security: local test mode uses a well-known default API key
+        # ("local-dev"). Never expose that on all network interfaces — bind
+        # loopback unless the user chose a specific non-wildcard host.
+        if host in ("0.0.0.0", "::", ""):
+            host = "127.0.0.1"
+            os.environ["SUPERVAIZER_HOST"] = host
         # In local mode, force public_url to localhost unless the user
         # explicitly passed --public-url on the CLI.
         if not user_provided_public_url:

@@ -4,6 +4,5 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-
 VERSION = "1.3.1"
 __version__ = VERSION
