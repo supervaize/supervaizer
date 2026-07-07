@@ -47,19 +47,36 @@ def _execute_scheduled_method(
 async def _run_scheduled_step_loop(server: Server) -> None:
     """Poll for due scheduled steps and execute them."""
     from supervaizer.case import Cases
+    from supervaizer.job import Jobs
 
     while True:
         await asyncio.sleep(SCHEDULED_STEP_POLL_SECONDS)
         try:
             cases = Cases()
             due_steps = cases.get_due_scheduled_steps()
-            # Only agent-declared methods may be auto-invoked by the scheduler.
-            allowed_methods: set[str] = set()
-            for agent in server.agents:
-                allowed_methods |= agent._declared_method_paths()
+            # Per-agent declared-method allow-lists. A scheduled step may only
+            # invoke methods declared by the agent that owns its job, so a
+            # tampered/malformed step cannot reach another agent's methods.
+            agent_methods: dict[str, set[str]] = {
+                agent.name: agent._declared_method_paths() for agent in server.agents
+            }
+            all_declared: set[str] = set().union(*agent_methods.values())
+            jobs = Jobs()
             for _case, _step_index, update in due_steps:
                 if not update.scheduled_method:
                     continue
+                # Scope the allow-list to the owning job's agent.
+                owning_job = jobs.get_job(_case.job_id, include_persisted=True)
+                if owning_job is not None:
+                    allowed_methods = agent_methods.get(owning_job.agent_name, set())
+                else:
+                    # Owning job not resolvable: fall back to the union of all
+                    # declared methods (no weaker than pre-scoping) and warn.
+                    log.warning(
+                        "[Scheduled step] Could not resolve owning job for case "
+                        f"{_case.job_id}; using global allow-list"
+                    )
+                    allowed_methods = all_declared
                 try:
                     object.__setattr__(update, "scheduled_status", "executing")
                     log.info(f"[Scheduled step] Executing: {update.name}")

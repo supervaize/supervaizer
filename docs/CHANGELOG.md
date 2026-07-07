@@ -24,11 +24,14 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
-- **Constant-time API-key comparison** — `require_api_key` (`access/api_auth.py`) and `Server.verify_api_key` now compare the presented key with `hmac.compare_digest` instead of `==`, removing a timing side channel.
-- **Local mode binds loopback** — `supervaizer start --local` (which uses the well-known default `local-dev` API key) now binds `127.0.0.1` instead of `0.0.0.0` unless the operator sets a specific non-wildcard `--host`, so local test mode is no longer exposed on all network interfaces by default.
-- **Baseline security headers** — All HTTP responses now include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Strict-Transport-Security`, via a pure-ASGI middleware that does not buffer streaming/SSE responses.
-- **No decrypted parameter values in logs** — `validate-agent-parameters` no longer logs decrypted parameter values or full result payloads (only presence/counts and pass/fail), preventing secret leakage into logs at INFO level.
-- **Scheduled-step method allow-list** — `_execute_scheduled_method` now refuses any dotted path that is not one of the agent's declared method paths, closing an unsafe-reflection gadget in the scheduler and workbench execute-now path.
+Hardening changes from the security review (kept intentionally high-level; see
+`SECURITY.md` for the private vulnerability channel):
+
+- **Hardened API-key checks** — API keys are compared in constant time.
+- **Safer local test mode** — `supervaizer start --local` binds to loopback (`127.0.0.1`) by default instead of all interfaces; pass an explicit `--host` to override.
+- **Baseline security response headers** — Responses now set `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Strict-Transport-Security` (streaming/SSE-safe).
+- **Reduced sensitive data in logs** — Agent parameter values are no longer written to logs during parameter validation.
+- **Scheduled-step execution hardening** — The scheduler only runs methods declared by the agent that owns the step's job.
 
 ### Docs
 

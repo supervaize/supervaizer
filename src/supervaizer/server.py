@@ -27,6 +27,7 @@ from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
 from fastapi.security import APIKeyHeader
+from starlette.datastructures import MutableHeaders
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
 from pydantic import ConfigDict, Field, field_validator
@@ -126,8 +127,6 @@ class SecurityHeadersMiddleware:
 
         async def send_wrapper(message: Any) -> None:
             if message["type"] == "http.response.start":
-                from starlette.datastructures import MutableHeaders
-
                 headers = MutableHeaders(scope=message)
                 for name, value in _SECURITY_HEADERS:
                     if name not in headers:
