@@ -623,12 +623,19 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                         "encrypted_agent_parameters": f"Decryption failed: {e!s}"
                     },
                 }
-                log.info(f"📤 Agent {agent.name}: Decryption failed → {result}")
+                # Do not log the result payload: it can echo parameter data.
+                log.info(f"📤 Agent {agent.name}: Decryption failed")
                 return result
 
-        # Log the incoming request details
+        # Log the incoming request details.
+        # Never log decrypted parameter values (secrets); log only presence/count.
+        _param_count = (
+            len(agent_parameters) if isinstance(agent_parameters, dict) else 0
+        )
         log.info(
-            f"🔍 Agent {agent.name}: Incoming request - encrypted_params: {bool(encrypted_agent_parameters)}, parsed_params: {agent_parameters}"
+            f"🔍 Agent {agent.name}: Incoming request - "
+            f"encrypted_params: {bool(encrypted_agent_parameters)}, "
+            f"param_count: {_param_count}"
         )
 
         # Validate agent parameters
@@ -643,7 +650,12 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             "invalid_parameters": validation_result["invalid_parameters"],
         }
 
-        log.info(f"📤 Agent {agent.name}: Validation result → {result}")
+        # Log only the outcome, not the result payload (may contain values).
+        log.info(
+            f"📤 Agent {agent.name}: Validation "
+            f"{'passed' if validation_result['valid'] else 'failed'} "
+            f"({len(validation_result['errors'])} error(s))"
+        )
         return result
 
     @router.post(
