@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-07
+
 ### Added
 
 - **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
