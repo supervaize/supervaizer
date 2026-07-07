@@ -22,6 +22,10 @@ All notable changes to this project will be documented in this file.
 
 - **A2A event scope test** — `tests/test_a2a.py` now walks FastAPI included-router wrappers when locating `/a2a/events`, preserving the read-scope assertion under FastAPI `0.139.0`.
 
+### Docs
+
+- **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
+
 | Status     | Count |
 | ---------- | ----- |
 | ✅ Passed  | 683   |
