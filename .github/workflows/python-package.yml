@@ -1,5 +1,6 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# Documentation-only diffs (.md, .txt, docs/) skip unit tests but still run pre-commit.
 
 name: Python package
 
@@ -11,6 +12,68 @@ on:
   workflow_call:
 
 jobs:
+  change_scope:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_tests: ${{ steps.detect.outputs.skip_tests }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect documentation-only changes
+        id: detect
+        run: |
+          is_documentation_only_path() {
+            case "$1" in
+              *.md|*.MD|*.txt|*.TXT) return 0 ;;
+              docs/*|Documentation/*|documentation/*) return 0 ;;
+              changelog/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          # Reusable workflows and unknown events always run the full suite.
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            mapfile -t changed < <(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            before="${{ github.event.before }}"
+            if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+              echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            mapfile -t changed < <(git diff --name-only "$before" HEAD)
+          else
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          doc_only=true
+          for path in "${changed[@]}"; do
+            if ! is_documentation_only_path "$path"; then
+              doc_only=false
+              break
+            fi
+          done
+
+          if [ "$doc_only" = true ]; then
+            echo "skip_tests=true" >> "$GITHUB_OUTPUT"
+            echo "Documentation-only changes detected — unit tests will be skipped."
+          else
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
   pre-commit:
     runs-on: ubuntu-latest
     steps:
@@ -35,6 +98,7 @@ jobs:
           .github/workflows
 
   build:
+    needs: change_scope
     runs-on: ubuntu-latest
 
     strategy:
@@ -54,6 +118,13 @@ jobs:
           # Avoid parallel matrix jobs racing on the same Actions cache reservation
           cache-suffix: py-${{ matrix.python-version }}
       - name: Install dependencies
+        if: needs.change_scope.outputs.skip_tests != 'true'
         run: uv sync --frozen --extra dev --extra deploy
+      - name: Documentation-only changes — unit tests skipped
+        if: needs.change_scope.outputs.skip_tests == 'true'
+        run: |
+          echo "Only .md, .txt, or docs/ paths changed."
+          echo "Skipping pytest matrix."
       - name: Test with pytest
+        if: needs.change_scope.outputs.skip_tests != 'true'
         run: uv run pytest --no-cov
