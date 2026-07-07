@@ -60,23 +60,23 @@ async def _run_scheduled_step_loop(server: Server) -> None:
             agent_methods: dict[str, set[str]] = {
                 agent.name: agent._declared_method_paths() for agent in server.agents
             }
-            all_declared: set[str] = set().union(*agent_methods.values())
             jobs = Jobs()
             for _case, _step_index, update in due_steps:
                 if not update.scheduled_method:
                     continue
-                # Scope the allow-list to the owning job's agent.
+                # Scope the allow-list to the owning job's agent. If the owning
+                # job cannot be resolved, fail the step rather than falling back
+                # to a broader allow-list — an orphaned step must not be able to
+                # invoke another agent's methods.
                 owning_job = jobs.get_job(_case.job_id, include_persisted=True)
-                if owning_job is not None:
-                    allowed_methods = agent_methods.get(owning_job.agent_name, set())
-                else:
-                    # Owning job not resolvable: fall back to the union of all
-                    # declared methods (no weaker than pre-scoping) and warn.
+                if owning_job is None:
+                    object.__setattr__(update, "scheduled_status", "failed")
                     log.warning(
-                        "[Scheduled step] Could not resolve owning job for case "
-                        f"{_case.job_id}; using global allow-list"
+                        f"[Scheduled step] Skipping {update.name}: owning job "
+                        f"{_case.job_id} could not be resolved"
                     )
-                    allowed_methods = all_declared
+                    continue
+                allowed_methods = agent_methods.get(owning_job.agent_name, set())
                 try:
                     object.__setattr__(update, "scheduled_status", "executing")
                     log.info(f"[Scheduled step] Executing: {update.name}")
