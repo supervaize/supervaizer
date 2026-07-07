@@ -580,7 +580,11 @@ class Server(ServerAbstract):
             return True
 
         # Constant-time comparison to avoid a timing side channel on the key.
-        if not hmac.compare_digest(api_key or "", self.api_key):
+        # Compare bytes so non-ASCII keys fail closed instead of raising
+        # TypeError (hmac.compare_digest rejects non-ASCII str inputs).
+        if not hmac.compare_digest(
+            (api_key or "").encode("utf-8"), self.api_key.encode("utf-8")
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid API key",
