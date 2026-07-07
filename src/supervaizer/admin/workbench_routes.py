@@ -534,10 +534,10 @@ def create_workbench_routes() -> APIRouter:
         """Execute a scheduled step immediately."""
         agent = get_agent_by_slug(request, slug)
 
-        # Verify the job is owned by this agent before using the agent's
-        # method allow-list — otherwise a request could pair agent A's slug
-        # with a job/case belonging to agent B and execute against A's list.
-        if Jobs().get_job(job_id, agent_name=agent.name) is None:
+        # Verify the job and case are both owned by this agent before using
+        # the agent's method allow-list.
+        job = Jobs().get_job(job_id, agent_name=agent.name)
+        if job is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Job '{job_id}' not found for agent '{slug}'",
@@ -546,6 +546,11 @@ def create_workbench_routes() -> APIRouter:
         case = Cases().get_case(case_id, job_id=job_id)
         if not case:
             raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+        if case.id not in job.case_ids:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Case '{case_id}' not found for agent '{slug}'",
+            )
 
         if step_index < 0 or step_index >= len(case.updates):
             raise HTTPException(status_code=404, detail="Step not found")
