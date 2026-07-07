@@ -102,7 +102,9 @@ SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 # Baseline security response headers applied to every HTTP response.
 _SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     ("x-content-type-options", "nosniff"),
-    ("x-frame-options", "DENY"),
+    # SAMEORIGIN (not DENY) so the admin UI can embed its own same-origin
+    # instructions iframe while still blocking cross-origin framing.
+    ("x-frame-options", "SAMEORIGIN"),
     ("referrer-policy", "no-referrer"),
     ("strict-transport-security", "max-age=63072000; includeSubDomains"),
 )

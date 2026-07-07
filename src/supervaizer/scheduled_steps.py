@@ -10,6 +10,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from supervaizer.common import log
+from supervaizer.job import Jobs
 
 if TYPE_CHECKING:
     from supervaizer.server import Server
@@ -47,7 +48,6 @@ def _execute_scheduled_method(
 async def _run_scheduled_step_loop(server: Server) -> None:
     """Poll for due scheduled steps and execute them."""
     from supervaizer.case import Cases
-    from supervaizer.job import Jobs
 
     while True:
         await asyncio.sleep(SCHEDULED_STEP_POLL_SECONDS)
