@@ -12,6 +12,7 @@
 
 """Tests for workbench routes module."""
 
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -27,11 +28,14 @@ from supervaizer import (
     Case,
     CaseNodeUpdate,
     EntityStatus,
+    Job,
+    JobContext,
     Parameter,
     ParametersSetup,
 )
 from supervaizer.agent import AgentMethodField, FieldTypeEnum
 from supervaizer.case import Cases
+from supervaizer.job import Jobs
 
 
 @pytest.fixture
@@ -200,6 +204,63 @@ class TestWorkbenchHitlAnswer:
 
         assert response.status_code == 404
         assert "missing-case" in response.json()["detail"]
+
+
+class TestWorkbenchExecuteStep:
+    """Test scheduled-step execute-now ownership checks."""
+
+    def setup_method(self) -> None:
+        Cases().reset()
+        Jobs().reset()
+
+    def teardown_method(self) -> None:
+        Cases().reset()
+        Jobs().reset()
+
+    def test_execute_step_rejects_case_not_owned_by_slug_agent(
+        self,
+        test_client_with_agent: tuple[TestClient, str],
+        account_fixture: Account,
+    ) -> None:
+        client, agent_slug = test_client_with_agent
+        job_id = "shared-job-id"
+        owner_context = JobContext(
+            workspace_id="test-workspace",
+            job_id=job_id,
+            started_by="test-user",
+            started_at=datetime.now(UTC),
+            mission_id="owner-mission",
+            mission_name="Owner Mission",
+        )
+        other_context = owner_context.model_copy(
+            update={"mission_id": "other-mission", "mission_name": "Other Mission"}
+        )
+        owner_job = Job.new(job_context=owner_context, agent_name="Test Agent")
+        other_job = Job.new(job_context=other_context, agent_name="Other Agent")
+        assert owner_job.id == other_job.id
+
+        case = Case(
+            id="other-agent-case",
+            job_id=job_id,
+            account=account_fixture,
+            status=EntityStatus.IN_PROGRESS,
+            name="Other Agent Case",
+            description="Owned by a different agent",
+        )
+        case.updates = [
+            CaseNodeUpdate(
+                scheduled_at=datetime.now(UTC),
+                scheduled_status="pending",
+            )
+        ]
+        other_job.add_case_id(case.id)
+
+        response = client.post(
+            f"/manage/agents/{agent_slug}/workbench/jobs/{job_id}/steps/{case.id}/0/execute"
+        )
+
+        assert response.status_code == 404
+        assert case.updates[0].scheduled_status == "pending"
 
 
 class TestGetAgentBySlug:

@@ -11,6 +11,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+import hmac
 import os
 import secrets
 import time
@@ -26,6 +27,7 @@ from fastapi import FastAPI, HTTPException, Request, Security, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
 from fastapi.security import APIKeyHeader
+from starlette.datastructures import MutableHeaders
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
 from pydantic import ConfigDict, Field, field_validator
@@ -96,6 +98,44 @@ insp = inspect
 
 T = TypeVar("T")
 SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
+# Baseline security response headers applied to every HTTP response.
+_SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
+    ("x-content-type-options", "nosniff"),
+    # SAMEORIGIN (not DENY) so the admin UI can embed its own same-origin
+    # instructions iframe while still blocking cross-origin framing.
+    ("x-frame-options", "SAMEORIGIN"),
+    ("referrer-policy", "no-referrer"),
+    ("strict-transport-security", "max-age=63072000; includeSubDomains"),
+)
+
+
+class SecurityHeadersMiddleware:
+    """Pure-ASGI middleware that injects baseline security headers.
+
+    It only rewrites the ``http.response.start`` headers and never touches the
+    response body, so it is safe for streaming/SSE responses (unlike a
+    ``BaseHTTPMiddleware``). WebSocket and lifespan scopes pass through
+    untouched. Existing headers are preserved (``setdefault`` semantics).
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message: Any) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in _SECURITY_HEADERS:
+                    if name not in headers:
+                        headers[name] = value
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
 def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
@@ -402,6 +442,12 @@ class Server(ServerAbstract):
             openapi_url=openapi_url,
         )
 
+        # Baseline security response headers (clickjacking, MIME sniffing,
+        # referrer leakage, TLS downgrade). Implemented as a lightweight ASGI
+        # middleware that only touches response-start headers, so it does not
+        # buffer streaming/SSE responses.
+        app.add_middleware(SecurityHeadersMiddleware)
+
         # Add exception handler for 422 validation errors
         @app.exception_handler(RequestValidationError)
         async def validation_exception_handler(
@@ -534,7 +580,12 @@ class Server(ServerAbstract):
             # API key authentication is disabled
             return True
 
-        if api_key != self.api_key:
+        # Constant-time comparison to avoid a timing side channel on the key.
+        # Compare bytes so non-ASCII keys fail closed instead of raising
+        # TypeError (hmac.compare_digest rejects non-ASCII str inputs).
+        if not hmac.compare_digest(
+            (api_key or "").encode("utf-8"), self.api_key.encode("utf-8")
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid API key",

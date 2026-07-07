@@ -30,6 +30,7 @@ from supervaizer.common import log
 from supervaizer.contracts import API_VERSION
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.scheduled_steps import _execute_scheduled_method
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -531,13 +532,25 @@ def create_workbench_routes() -> APIRouter:
         request: Request, slug: str, job_id: str, case_id: str, step_index: int
     ) -> Response:
         """Execute a scheduled step immediately."""
-        from supervaizer.server import _execute_scheduled_method
+        agent = get_agent_by_slug(request, slug)
 
-        get_agent_by_slug(request, slug)
+        # Verify the job and case are both owned by this agent before using
+        # the agent's method allow-list.
+        job = Jobs().get_job(job_id, agent_name=agent.name)
+        if job is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Job '{job_id}' not found for agent '{slug}'",
+            )
 
         case = Cases().get_case(case_id, job_id=job_id)
         if not case:
             raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+        if case.id not in job.case_ids:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Case '{case_id}' not found for agent '{slug}'",
+            )
 
         if step_index < 0 or step_index >= len(case.updates):
             raise HTTPException(status_code=404, detail="Step not found")
@@ -557,6 +570,7 @@ def create_workbench_routes() -> APIRouter:
                 _execute_scheduled_method(
                     update.scheduled_method,
                     update.scheduled_params or {},
+                    allowed_methods=agent._declared_method_paths(),
                 )
             object.__setattr__(update, "scheduled_status", "completed")
             return JSONResponse({
