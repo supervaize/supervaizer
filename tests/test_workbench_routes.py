@@ -30,6 +30,7 @@ from supervaizer import (
     EntityStatus,
     Job,
     JobContext,
+    JobResponse,
     Parameter,
     ParametersSetup,
 )
@@ -204,6 +205,46 @@ class TestWorkbenchHitlAnswer:
 
         assert response.status_code == 404
         assert "missing-case" in response.json()["detail"]
+
+
+class TestWorkbenchStartJob:
+    """Test workbench job startup and parameter merging."""
+
+    def setup_method(self) -> None:
+        Jobs().reset()
+
+    def teardown_method(self) -> None:
+        Jobs().reset()
+
+    def test_start_job_uses_environment_parameter_fallback(
+        self,
+        test_client_with_agent: tuple[TestClient, str],
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: MockerFixture,
+    ) -> None:
+        client, agent_slug = test_client_with_agent
+        monkeypatch.setenv("API_KEY", "from-env")
+        execute = mocker.patch.object(
+            Agent,
+            "_execute",
+            return_value=JobResponse(
+                job_id="workbench-job",
+                status=EntityStatus.COMPLETED,
+                message="done",
+            ),
+        )
+
+        response = client.post(
+            f"/manage/agents/{agent_slug}/workbench/start",
+            json={"parameters": {}, "fields": {"how_many": 3}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "STARTING"
+        execute.assert_called_once()
+        params = execute.call_args.args[1]
+        assert params["fields"] == {"how_many": 3}
+        assert params["agent_parameters"] == [{"name": "API_KEY", "value": "from-env"}]
 
 
 class TestWorkbenchExecuteStep:
