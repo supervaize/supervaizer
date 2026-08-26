@@ -38,7 +38,9 @@ from supervaizer.contracts import (
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
     V2Effect,
+    V2JobSetupPolicy,
     V2JobStateSnapshot,
+    V2JobSyncPolicy,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
     V2ResourceFieldDefinition,
@@ -545,12 +547,79 @@ def test_v2_action_request_and_result_fixture() -> None:
     ]
 
 
+def test_v2_job_setup_policy_round_trips_through_registration_builder() -> None:
+    registration = build_v2_agent_registration(
+        agent_id="agent-1",
+        agent_slug="agent-1",
+        display_name="Agent 1",
+        agent_card_url="/.well-known/agent.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="test.0",
+        job_policy={
+            "setup": {
+                "preview_action": "job.start.preview",
+                "start_action": "job.start",
+                "submit_action": "step.awaiting.submit",
+                "action_scopes": ["workspace", "job", "case", "step"],
+            }
+        },
+    )
+    payload = registration.model_dump(mode="json")
+    round_trip = SupervaizerV2AgentRegistrationContract.model_validate(payload)
+
+    assert "setup" not in payload["capabilities"]
+    assert round_trip.job_policy.setup is not None
+    assert round_trip.job_policy.setup.action_scopes == [
+        "workspace",
+        "job",
+        "case",
+        "step",
+    ]
+    assert set(round_trip.capabilities.actions) >= {
+        "job.start.preview",
+        "job.start",
+        "step.awaiting.submit",
+    }
+
+
+def test_v2_job_setup_policy_declares_no_scopes_by_default() -> None:
+    policy = V2JobSetupPolicy()
+
+    assert policy.action_scopes == []
+
+
+def test_v2_job_setup_policy_rejects_blank_action_ids() -> None:
+    for field in ("preview_action", "start_action", "submit_action"):
+        with pytest.raises(ValidationError):
+            V2JobSetupPolicy.model_validate({field: ""})
+        with pytest.raises(ValidationError):
+            V2JobSetupPolicy.model_validate({field: "   "})
+
+
+def test_v2_job_sync_policy_rejects_blank_action_id() -> None:
+    with pytest.raises(ValidationError):
+        V2JobSyncPolicy.model_validate({"action": ""})
+
+
 def test_v2_action_result_validates_replay_safety() -> None:
     with pytest.raises(ValidationError):
         V2ActionResult.model_validate({
             "status": "ok",
             "replay_safety": {"dedupe_keys": ["job-1"], "convergent": "sometimes"},
         })
+
+
+def test_v2_action_result_requires_setup_plan_mapping() -> None:
+    result = V2ActionResult.model_validate({
+        "status": "ok",
+        "setup_plan": {"agent_descriptor": {"campaign_template_id": "opaque-id"}},
+    })
+
+    assert result.setup_plan == {
+        "agent_descriptor": {"campaign_template_id": "opaque-id"}
+    }
+    with pytest.raises(ValidationError):
+        V2ActionResult.model_validate({"status": "ok", "setup_plan": ["invalid"]})
 
 
 def test_v2_surface_request_and_result_models() -> None:

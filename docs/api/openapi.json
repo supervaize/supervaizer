@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Supervaize API",
-    "description": "API version: v1  Controller version: 0.20.1\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
+    "description": "API version: v1  Controller version: 1.3.1\n\nAPI for controlling and managing Supervaize agents. \n\nMore information at [https://doc.supervaize.com](https://doc.supervaize.com)\n\n## Authentication\n\nSome endpoints require API key authentication. Protected endpoints expect the API key in the X-API-Key header.\n\n[Swagger](/docs)\n[Redoc](/redoc)\n[OpenAPI](/openapi.json)\n",
     "termsOfService": "https://supervaize.com/terms/",
     "contact": {
       "name": "Support Team",
@@ -1768,17 +1768,35 @@
         "summary": "A2A JSON-RPC Controller",
         "description": "Dispatches Supervaizer v2 controller methods over A2A JSON-RPC.",
         "operationId": "post_a2a_controller_a2a_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
                 "type": "object",
+                "additionalProperties": true,
                 "title": "Body"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -1786,8 +1804,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Post A2A Controller A2A Post"
                 }
               }
@@ -1815,12 +1833,40 @@
         "summary": "A2A SSE Event Stream",
         "description": "Streams Supervaizer v2 controller effects over Server-Sent Events.",
         "operationId": "get_a2a_events_a2a_events_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -3973,17 +4019,6 @@
               }
             ],
             "title": "Server Agent Onboarding Status"
-          },
-          "server_encrypted_parameters": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Server Encrypted Parameters"
           }
         },
         "type": "object",
@@ -4152,7 +4187,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-05-15T20:25:32.352375"
+            "default": "2026-08-26T17:21:02.106370"
           },
           "status_code": {
             "type": "integer",
@@ -4317,7 +4352,7 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metadata",
-            "description": "Agent-provided domain metadata (e.g. campaign context)"
+            "description": "Agent-provided domain metadata (e.g. source object context)"
           }
         },
         "type": "object",

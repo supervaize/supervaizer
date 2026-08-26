@@ -1,10 +1,6 @@
 # Model Reference extra
 
-
-> **Created:** 2025-08-08
-> **Updated:** 2026-05-16
-
-**Version:** 0.20.1
+**Version:** 1.3.1
 
 ### `common.SvBaseModel`
 
@@ -47,7 +43,7 @@ Base model for agent job context parameters
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `job_context` | `JobContext` | **required** |  |
-| `job_fields` | `Dict[str, Any]` | **required** |  |
+| `job_fields` | `dict[str, Any]` | **required** |  |
 
 ### `agent.AgentMethodParams`
 
@@ -55,7 +51,7 @@ Method parameters for agent operations.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `params` | `Dict[str, Any]` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `params` | `dict[str, Any]` | — | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
 
 ### `agent.AgentMethods`
 
@@ -94,11 +90,10 @@ Response model for agent endpoints - values provided by Agent.registration_info
 | `description` | `str` | **required** |  |
 | `tags` | `list[str]` | `None` |  |
 | `methods` | `AgentMethods` | `None` |  |
-| `parameters_setup` | `typing.List[typing.Dict[str, typing.Any]]` | `None` |  |
+| `parameters_setup` | `list[dict[str, typing.Any]]` | `None` |  |
 | `server_agent_id` | `str` | `None` |  |
 | `server_agent_status` | `str` | `None` |  |
 | `server_agent_onboarding_status` | `str` | `None` |  |
-| `server_encrypted_parameters` | `str` | `None` |  |
 
 ### `case.CaseNodes`
 
@@ -108,7 +103,7 @@ Response model for agent endpoints - values provided by Agent.registration_info
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `nodes` | `List[case.CaseNode]` | [] |  |
+| `nodes` | `list[case.CaseNode]` | [] |  |
 
 ### `data_resource.DataResource`
 
@@ -145,12 +140,14 @@ Example::
 | `fields` | `list[data_resource.DataResourceField]` | — |  |
 | `read_only` | `bool` | False |  |
 | `importable` | `bool` | False | Enables CSV bulk import route |
-| `on_list` | `typing.Callable[..., list[dict[str, typing.Any]]]` | `None` |  |
-| `on_get` | `typing.Callable[..., dict[str, typing.Any] | None]` | `None` |  |
-| `on_create` | `typing.Callable[..., dict[str, typing.Any]]` | `None` |  |
-| `on_update` | `typing.Callable[..., dict[str, typing.Any] | None]` | `None` |  |
-| `on_delete` | `typing.Callable[..., bool]` | `None` |  |
-| `on_import` | `typing.Callable[..., dict[str, typing.Any]]` | `None` |  |
+| `scope` | `Literal['workspace', 'mission', 'job']` | 'workspace' | Studio context boundary for this resource. |
+| `requires_context` | `list[str]` | — | Context keys Studio must send for resource access control. |
+| `on_list` | `collections.abc.Callable[..., list[dict[str, typing.Any]]]` | `None` |  |
+| `on_get` | `collections.abc.Callable[..., dict[str, typing.Any] | None]` | `None` |  |
+| `on_create` | `collections.abc.Callable[..., dict[str, typing.Any]]` | `None` |  |
+| `on_update` | `collections.abc.Callable[..., dict[str, typing.Any] | None]` | `None` |  |
+| `on_delete` | `collections.abc.Callable[..., bool]` | `None` |  |
+| `on_import` | `collections.abc.Callable[..., dict[str, typing.Any]]` | `None` |  |
 
 ### `job.Job`
 
@@ -226,6 +223,56 @@ _No additional fields beyond parent class._
 | `job_policy` | `V2JobPolicy` | — |  |
 | `resources` | `list[contracts.V2ResourceDefinition]` | — |  |
 | `datasets` | `list[contracts.V2DatasetDefinition]` | — |  |
+| `dashboards` | `list[contracts.V2DashboardDefinition]` | — |  |
+| `workspace_binding` | `V2WorkspaceBindingDefinition` | `None` |  |
+
+### `contracts.V2ActionRequest`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `request_id` | `str` | **required** |  |
+| `actor` | `V2ActorContext` | **required** |  |
+| `workspace` | `V2WorkspaceContext` | **required** |  |
+| `mission_id` | `str` | **required** |  |
+| `agent_slug` | `str` | **required** |  |
+| `surface` | `str` | **required** |  |
+| `action` | `str` | **required** |  |
+| `input` | `dict[str, Any]` | — |  |
+| `idempotency_key` | `str` | `None` |  |
+| `draft_session_id` | `str` | `None` |  |
+| `job_id` | `str` | `None` |  |
+| `case_id` | `str` | `None` |  |
+| `step_id` | `str` | `None` |  |
+| `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
+
+### `contracts.V2AgentMethod`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `method` | `str` | **required** |  |
+| `params` | `dict[str, Any]` | — |  |
+| `description` | `str` | `None` |  |
+| `is_async` | `bool` | False |  |
+| `timeout` | `int` | 600 |  |
+
+### `contracts.V2AgentMethods`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `refresh` | `V2AgentMethod` | `None` |  |
+| `custom` | `dict[str, contracts.V2AgentMethod]` | — |  |
 
 ### `case.Case`
 
@@ -247,11 +294,11 @@ _No additional fields beyond parent class._
 | `account` | `ForwardRef('Account')` | **required** |  |
 | `description` | `str` | **required** |  |
 | `status` | `<enum 'EntityStatus'>` | **required** |  |
-| `updates` | `List[case.CaseNodeUpdate]` | [] |  |
+| `updates` | `list[case.CaseNodeUpdate]` | [] |  |
 | `total_cost` | `float` | 0.0 |  |
-| `final_delivery` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `final_delivery` | `dict[str, typing.Any]` | `None` |  |
 | `finished_at` | `datetime` | `None` |  |
-| `metadata` | `Dict[str, Any]` | — | Agent-provided domain metadata (e.g. contact context) |
+| `metadata` | `dict[str, Any]` | — | Agent-provided domain metadata (e.g. contact context) |
 
 ### `case.CaseNode`
 
@@ -284,14 +331,74 @@ Returns:
 | `index` | `int` | `None` |  |
 | `cost` | `float` | `None` |  |
 | `name` | `str` | `None` |  |
-| `payload` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `payload` | `dict[str, typing.Any]` | `None` |  |
 | `is_final` | `bool` | False |  |
 | `upsert` | `bool` | False |  |
 | `error` | `str` | `None` |  |
 | `scheduled_at` | `datetime` | `None` |  |
 | `scheduled_method` | `str` | `None` |  |
-| `scheduled_params` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `scheduled_params` | `dict[str, typing.Any]` | `None` |  |
 | `scheduled_status` | `str` | `None` |  |
+
+### `context.ContextCitation`
+
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `ref` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `source_type` | `str` | **required** |  |
+| `version` | `int` | **required** |  |
+
+### `context.ContextOpenResponse`
+
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `ref` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `scope` | `Literal['workspace', 'mission']` | **required** |  |
+| `source_type` | `str` | **required** |  |
+| `version` | `int` | **required** |  |
+| `instructions` | `str` | '' |  |
+| `tags` | `list[str]` | — |  |
+| `content` | `str` | **required** |  |
+| `citations` | `list[context.ContextCitation]` | — |  |
+
+### `context.ContextSearchResponse`
+
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `query` | `str` | **required** |  |
+| `results` | `list[context.ContextSearchResult]` | — |  |
+
+### `context.ContextSearchResult`
+
+**Inherits from:** [`common.SvBaseModel`](#commonsvbasemodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `ref` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `scope` | `Literal['workspace', 'mission']` | **required** |  |
+| `source_type` | `str` | **required** |  |
+| `version` | `int` | **required** |  |
+| `tags` | `list[str]` | — |  |
+| `excerpt` | `str` | '' |  |
+| `score` | `int` | 0 |  |
+| `citation` | `ContextCitation` | `None` |  |
 
 ### `contracts.AgentMethodContract`
 
@@ -435,6 +542,8 @@ Canonical controller surface advertised by a Supervaizer server.
 | `read_only` | `bool` | False |  |
 | `importable` | `bool` | False |  |
 | `operations` | `dict[str, bool]` | — |  |
+| `scope` | `Literal['workspace', 'mission', 'job']` | 'workspace' |  |
+| `requires_context` | `list[str]` | — |  |
 
 ### `contracts.DataResourceFieldContract`
 
@@ -493,6 +602,7 @@ Minimal schema for server.register details.
 | `url` | `str` | **required** |  |
 | `uri` | `str` | **required** |  |
 | `api_version` | `str` | **required** |  |
+| `controller_version` | `str` | `None` |  |
 | `environment` | `str` | `None` |  |
 | `agents` | `list[contracts.AgentRegistrationContract]` | — |  |
 
@@ -532,7 +642,7 @@ Minimal schema for server.register details.
 | `sse` | `bool` | True |  |
 | `push_notifications` | `bool` | False |  |
 
-### `contracts.V2ActionRequest`
+### `contracts.V2A2UIResourceImportColumn`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
 
@@ -540,19 +650,41 @@ Minimal schema for server.register details.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `request_id` | `str` | **required** |  |
-| `actor` | `V2ActorContext` | **required** |  |
-| `workspace` | `V2WorkspaceContext` | **required** |  |
-| `mission_id` | `str` | **required** |  |
-| `agent_slug` | `str` | **required** |  |
-| `surface` | `str` | **required** |  |
+| `id` | `str` | **required** |  |
+| `label` | `str` | `None` |  |
+| `type` | `str` | 'string' |  |
+| `required` | `bool` | False |  |
+
+### `contracts.V2A2UIResourceImportDocument`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+A2UI-shaped resource import surface consumed by Studio.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `Literal['ResourceImport']` | 'ResourceImport' |  |
+| `id` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `resource` | `str` | **required** |  |
+| `accepted_formats` | `list[Literal['csv', 'xlsx']]` | — |  |
+| `fields` | `list[contracts.V2ResourceFieldDefinition]` | — |  |
+| `columns` | `list[contracts.V2A2UIResourceImportColumn]` | — |  |
+| `submit` | `V2A2UISubmitDefinition` | **required** |  |
+| `state` | `dict[str, Any]` | — |  |
+
+### `contracts.V2A2UISubmitDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
 | `action` | `str` | **required** |  |
-| `input` | `dict[str, Any]` | — |  |
-| `idempotency_key` | `str` | `None` |  |
-| `draft_session_id` | `str` | `None` |  |
-| `job_id` | `str` | `None` |  |
-| `case_id` | `str` | `None` |  |
-| `step_id` | `str` | `None` |  |
+| `label` | `str` | `None` |  |
 
 ### `contracts.V2ActionResult`
 
@@ -564,6 +696,9 @@ Minimal schema for server.register details.
 |---|---|---|---|
 | `status` | `Literal['ok', 'error']` | **required** |  |
 | `effects` | `list[contracts.V2Effect]` | — |  |
+| `job_state` | `ForwardRef('V2JobStateSnapshot | None')` | `None` |  |
+| `replay_safety` | `V2ReplaySafetyMetadata` | `None` |  |
+| `setup_plan` | `dict[str, typing.Any]` | `None` |  |
 
 ### `contracts.V2ActorContext`
 
@@ -677,7 +812,86 @@ Minimal schema for server.register details.
 | `title` | `str` | `None` |  |
 | `status` | `str` | `None` |  |
 | `external_id` | `str` | `None` |  |
+| `metadata` | `dict[str, Any]` | — |  |
 | `steps` | `list[contracts.V2StepSnapshot]` | — |  |
+
+### `contracts.V2ContextAssignment`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `items` | `list[contracts.V2ContextAssignmentItem]` | **required** |  |
+| `mission_id` | `str` | `None` |  |
+| `job_id` | `str` | **required** |  |
+| `assigned_at` | `str` | **required** |  |
+
+### `contracts.V2ContextAssignmentItem`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `ref` | `str` | **required** |  |
+| `version` | `int` | **required** |  |
+| `scope` | `Literal['workspace', 'mission']` | **required** |  |
+| `title` | `str` | **required** |  |
+
+### `contracts.V2DashboardDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** |  |
+| `label` | `str` | **required** |  |
+| `surface` | `str` | 'mission.analytics' |  |
+| `widgets` | `list[contracts.V2DashboardWidgetDefinition]` | — |  |
+
+### `contracts.V2DashboardWidgetDataRef`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `mode` | `Literal['ref', 'action', 'inline']` | 'ref' |  |
+| `datasetId` | `str` | `None` |  |
+| `action` | `str` | `None` |  |
+| `input` | `dict[str, Any]` | — |  |
+| `values` | `list[dict[str, typing.Any]]` \| `dict[str, typing.Any]` | `None` |  |
+
+### `contracts.V2DashboardWidgetDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `data` | `V2DashboardWidgetDataRef` | `None` |  |
+| `layout` | `dict[str, Any]` | — |  |
+| `visualization` | `V2DashboardWidgetVisualization` | — |  |
+
+### `contracts.V2DashboardWidgetVisualization`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `Literal['table', 'metric', 'vega-lite', 'custom']` | 'table' |  |
+| `spec` | `dict[str, typing.Any]` | `None` |  |
 
 ### `contracts.V2DatasetDefinition`
 
@@ -690,6 +904,7 @@ Minimal schema for server.register details.
 | `id` | `str` | **required** |  |
 | `label` | `str` | **required** |  |
 | `auto_surface` | `bool` | False |  |
+| `display` | `V2ResourceDisplayDefinition` | `None` |  |
 
 ### `contracts.V2Effect`
 
@@ -700,6 +915,23 @@ Minimal schema for server.register details.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `type` | `str` | **required** |  |
+| `job_id` | `str` | `None` |  |
+| `case_id` | `str` | `None` |  |
+| `step_id` | `str` | `None` |  |
+| `resource` | `str` | `None` |  |
+| `dataset` | `str` | `None` |  |
+| `artifact_id` | `str` | `None` |  |
+| `status` | `str` | `None` |  |
+| `message` | `str` | `None` |  |
+| `count` | `int` | `None` |  |
+| `item` | `dict[str, typing.Any]` | `None` |  |
+| `items` | `list[dict[str, typing.Any]]` | `None` |  |
+| `rows` | `list[dict[str, typing.Any]]` | `None` |  |
+| `errors` | `list[dict[str, typing.Any]]` | `None` |  |
+| `gaps` | `list[dict[str, typing.Any]]` | `None` |  |
+| `summary` | `dict[str, typing.Any]` | `None` |  |
+| `case` | `dict[str, typing.Any]` | `None` |  |
+| `data` | `dict[str, typing.Any]` | `None` |  |
 
 ### `contracts.V2JobPolicy`
 
@@ -713,6 +945,23 @@ Minimal schema for server.register details.
 | `offline_start_policy` | `Literal['block']` | 'block' |  |
 | `offline_running_policy` | `Literal['fail_in_studio']` | 'fail_in_studio' |  |
 | `sync` | `V2JobSyncPolicy` | `None` |  |
+| `setup` | `V2JobSetupPolicy` | `None` |  |
+
+### `contracts.V2JobSetupPolicy`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Generic agent-declared job setup actions.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `preview_action` | `str` | 'job.start.preview' |  |
+| `start_action` | `str` | 'job.start' |  |
+| `submit_action` | `str` | 'step.awaiting.submit' |  |
+| `action_scopes` | `list[Literal['workspace', 'job', 'case', 'step']]` | — |  |
+| `plan` | `dict[str, typing.Any]` | `None` |  |
 
 ### `contracts.V2JobSnapshot`
 
@@ -739,7 +988,7 @@ Minimal schema for server.register details.
 | `type` | `Literal['fresh_start', 'external']` | **required** |  |
 | `external_ref` | `str` | `None` |  |
 | `previous_job_id` | `str` | `None` |  |
-| `target_type` | `str` | `None` |  |
+| `target_type` | `str` | `None` | Agent-declared business object type for external sources (e.g. project). Open vocabulary unlike protocol-fixed fields such as step activity. |
 
 ### `contracts.V2JobStateSnapshot`
 
@@ -775,18 +1024,19 @@ Minimal schema for server.register details.
 | `external_version` | `str` | `None` |  |
 | `sync_cursor` | `str` | `None` |  |
 | `observed_at` | `str` | `None` |  |
-| `job_state` | `V2JobStateSnapshot` | `None` |  |
 
 ### `contracts.V2MountedResourceViewDefinition`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
 
+Agent override that mounts an A2UI surface on a full resource view.
+
 #### Model Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `view` | `str` | **required** |  |
-| `surface` | `str` | **required** |  |
+| `view` | `str` | **required** | Generated resource view replaced by the mount (e.g. import, edit). |
+| `surface` | `str` | **required** | Registered A2UI surface id served for this resource view. |
 
 ### `contracts.V2ProtocolVersions`
 
@@ -825,6 +1075,8 @@ Minimal schema for server.register details.
 | `id` | `str` | **required** |  |
 | `label` | `str` | **required** |  |
 | `auto_surface` | `bool` | False |  |
+| `scope` | `Literal['workspace', 'mission', 'job']` | 'workspace' |  |
+| `requires_context` | `list[str]` | — |  |
 | `operations` | `list[str]` | — |  |
 | `display` | `V2ResourceDisplayDefinition` | `None` |  |
 | `fields` | `list[contracts.V2ResourceFieldDefinition]` | — |  |
@@ -906,6 +1158,7 @@ Minimal schema for server.register details.
 | `job_id` | `str` | `None` |  |
 | `case_id` | `str` | `None` |  |
 | `step_id` | `str` | `None` |  |
+| `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
 
 ### `contracts.V2SurfaceResult`
 
@@ -919,6 +1172,78 @@ Minimal schema for server.register details.
 | `a2ui_version` | `str` | `None` |  |
 | `a2ui_catalog_version` | `str` | `None` |  |
 | `document` | `dict[str, Any]` | — |  |
+
+### `contracts.V2VerifiedWorkspaceContext`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `grant_id` | `str` | **required** |  |
+| `workspace_id` | `str` | **required** |  |
+| `workspace_slug` | `str` | `None` |  |
+| `agent_id` | `str` | **required** |  |
+| `agent_slug` | `str` | **required** |  |
+| `server_id` | `str` | **required** |  |
+| `scopes` | `list[str]` | — |  |
+| `agent_workspace_ref` | `str` | `None` |  |
+
+### `contracts.V2WorkspaceAuthorizationSettings`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `bool` | False |  |
+| `issuer` | `str` | `None` |  |
+| `audience` | `str` | `None` |  |
+| `public_key_pem` | `str` | `None` |  |
+| `jwks_url` | `str` | `None` |  |
+| `leeway_seconds` | `int` | 30 |  |
+
+### `contracts.V2WorkspaceBindingCreateDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `surface` | `str` | 'workspace_binding.create' |  |
+| `action` | `str` | 'workspace_binding.create' |  |
+| `fields` | `list[contracts.V2ResourceFieldDefinition]` | — |  |
+
+### `contracts.V2WorkspaceBindingDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `required` | `bool` | False |  |
+| `modes` | `list[Literal['bind_existing', 'create_and_bind']]` | — |  |
+| `reference_label` | `str` | 'Agent workspace reference' |  |
+| `reference_help` | `str` | 'Select or create the agent-side record this Studio workspace may access.' |  |
+| `reference_placeholder` | `str` | 'Example: workspace-prod' |  |
+| `existing` | `V2WorkspaceBindingExistingDefinition` | `None` |  |
+| `create` | `V2WorkspaceBindingCreateDefinition` | `None` |  |
+
+### `contracts.V2WorkspaceBindingExistingDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `action` | `str` | 'workspace_binding.options' |  |
+| `value_field` | `str` | 'agent_workspace_ref' |  |
+| `label_field` | `str` | 'display_name' |  |
 
 ### `contracts.V2WorkspaceContext`
 
@@ -946,6 +1271,7 @@ Studio request context passed to DataResource callbacks.
 | `mission_id` | `str` | `None` |  |
 | `agent_slug` | `str` | **required** |  |
 | `request_id` | `str` | `None` |  |
+| `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
 
 ### `data_resource.DataResourceField`
 
@@ -978,7 +1304,7 @@ Deployment plan containing all actions to be taken.
 | `environment` | `str` | **required** |  |
 | `region` | `str` | **required** |  |
 | `project_id` | `str` | `None` |  |
-| `actions` | `List[deploy.drivers.base.ResourceAction]` | [] |  |
+| `actions` | `list[deploy.drivers.base.ResourceAction]` | [] |  |
 | `total_cost_estimate` | `str` | `None` |  |
 | `estimated_duration` | `str` | `None` |  |
 | `current_image` | `str` | `None` |  |
@@ -986,8 +1312,8 @@ Deployment plan containing all actions to be taken.
 | `current_status` | `str` | `None` |  |
 | `target_image` | `str` | **required** |  |
 | `target_port` | `int` | 8000 |  |
-| `target_env_vars` | `Dict[str, str]` | {} |  |
-| `target_secrets` | `Dict[str, str]` | {} |  |
+| `target_env_vars` | `dict[str, str]` | {} |  |
+| `target_secrets` | `dict[str, str]` | {} |  |
 
 ### `deploy.drivers.base.DeploymentResult`
 
@@ -1004,7 +1330,7 @@ Result of a deployment operation.
 | `health_status` | `str` | 'unknown' |  |
 | `deployment_time` | `float` | `None` |  |
 | `error_message` | `str` | `None` |  |
-| `error_details` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `error_details` | `dict[str, typing.Any]` | `None` |  |
 
 ### `deploy.state.DeploymentState`
 
@@ -1029,7 +1355,7 @@ Deployment state model.
 | `port` | `int` | 8000 | Application port |
 | `api_key_generated` | `bool` | False | Whether API key was generated |
 | `rsa_key_generated` | `bool` | False | Whether RSA key was generated |
-| `provider_data` | `Dict[str, Any]` | — | Platform-specific data |
+| `provider_data` | `dict[str, Any]` | — | Platform-specific data |
 
 ### `deploy.drivers.base.ResourceAction`
 
@@ -1042,7 +1368,7 @@ Represents an action to be taken on a resource.
 | `resource_name` | `str` | **required** |  |
 | `description` | `str` | **required** |  |
 | `cost_estimate` | `str` | `None` |  |
-| `metadata` | `typing.Dict[str, typing.Any]` | `None` |  |
+| `metadata` | `dict[str, typing.Any]` | `None` |  |
 
 ### `deploy.health.HealthCheckConfig`
 
@@ -1056,7 +1382,7 @@ Configuration for health check operations.
 | `max_delay` | `float` | 30.0 |  |
 | `backoff_multiplier` | `float` | 2.0 |  |
 | `success_threshold` | `int` | 1 |  |
-| `endpoints` | `typing.List[str]` | `None` |  |
+| `endpoints` | `list[str]` | `None` |  |
 
 ### `deploy.health.HealthCheckResult`
 
@@ -1079,11 +1405,11 @@ Result of a health check operation.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `source` | `Dict[str, Any]` | **required** |  |
+| `source` | `dict[str, Any]` | **required** |  |
 | `account` | `Any` | **required** |  |
 | `type` | `<enum 'EventType'>` | **required** |  |
 | `object_type` | `str` | **required** |  |
-| `details` | `Dict[str, Any]` | **required** |  |
+| `details` | `dict[str, Any]` | **required** |  |
 
 ### `event.AgentRegisterEvent`
 
@@ -1159,7 +1485,7 @@ _No additional fields beyond parent class._
 | `created_at` | `datetime` | `None` |  |
 | `agent_parameters` | `list[dict[str, typing.Any]]` | `None` |  |
 | `case_ids` | `list[str]` | [] |  |
-| `metadata` | `dict[str, Any]` | — | Agent-provided domain metadata (e.g. campaign context) |
+| `metadata` | `dict[str, Any]` | — | Agent-provided domain metadata (e.g. source object context) |
 
 ### `job.JobInstructions`
 
@@ -1236,7 +1562,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 5, 15, 20, 25, 31, 892520) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 8, 26, 17, 21, 1, 586513) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1252,7 +1578,7 @@ Request model for re-sending the server registration event.
 | `reason` | `str` | `None` |  |
 | `requested_at` | `str` | `None` |  |
 
-### `server.ServerInfo`
+### `server_info.ServerInfo`
 
 Complete server information for storage.
 
@@ -1263,7 +1589,7 @@ Complete server information for storage.
 | `port` | `int` | **required** |  |
 | `api_version` | `str` | **required** |  |
 | `environment` | `str` | **required** |  |
-| `agents` | `List[Dict[str, str]]` | **required** |  |
+| `agents` | `list[dict[str, str]]` | **required** |  |
 | `start_time` | `float` | **required** |  |
 | `created_at` | `str` | **required** |  |
 | `updated_at` | `str` | **required** |  |
@@ -1278,7 +1604,30 @@ A base class for creating Pydantic models.
 | `type` | `<enum 'TelemetryType'>` | **required** |  |
 | `category` | `<enum 'TelemetryCategory'>` | **required** |  |
 | `severity` | `<enum 'TelemetrySeverity'>` | **required** |  |
-| `details` | `Dict[str, Any]` | **required** |  |
+| `details` | `dict[str, Any]` | **required** |  |
+
+### `workspace_authorization.WorkspaceAuthorizationClaims`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `iss` | `str` | **required** |  |
+| `aud` | `str` \| `list[str]` | **required** |  |
+| `sub` | `str` | `None` |  |
+| `grant_id` | `str` | **required** |  |
+| `workspace_id` | `str` | **required** |  |
+| `workspace_slug` | `str` | `None` |  |
+| `agent_id` | `str` | **required** |  |
+| `agent_slug` | `str` | **required** |  |
+| `server_id` | `str` | **required** |  |
+| `scopes` | `list[str]` | — |  |
+| `agent_workspace_ref` | `str` | `None` |  |
+| `iat` | `int` | `None` |  |
+| `exp` | `int` | **required** |  |
+| `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-05-15 20:25:31*
+*Uploaded on 2026-08-26 17:21:01*
