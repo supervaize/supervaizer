@@ -1,10 +1,6 @@
 # Model Reference Core
 
-
-> **Created:** 2025-08-09
-> **Updated:** 2026-05-16
-
-**Version:** 0.20.1
+**Version:** 1.3.1
 
 ### `account.Account`
 
@@ -114,7 +110,7 @@ _No additional fields beyond parent class._
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | `str` | **required** | Display name of the agent |
-| `id` | `str` | **required** | Unique ID generated from name |
+| `id` | `str` | **required** | Stable ID derived from name via shortuuid.uuid(name=...). Renaming the agent changes this value. |
 | `author` | `str` | `None` | Author of the agent |
 | `developer` | `str` | `None` | Developer of the controller integration |
 | `maintainer` | `str` | `None` | Maintainer of the integration |
@@ -128,13 +124,13 @@ _No additional fields beyond parent class._
 | `server_agent_id` | `str` | `None` | ID assigned by server - Do not set this manually |
 | `server_agent_status` | `str` | `None` | Current status on server - Do not set this manually |
 | `server_agent_onboarding_status` | `str` | `None` | Onboarding status - Do not set this manually |
-| `server_encrypted_parameters` | `str` | `None` | Encrypted parameters from server - Do not set this manually |
 | `max_execution_time` | `int` | 3600 | Maximum execution time in seconds, defaults to 1 hour |
 | `supervaize_instructions_template_path` | `str` | `None` | Optional path to a custom template file for supervaize_instructions.html page |
 | `instructions_path` | `str` | 'supervaize_instructions.html' | Path where the supervaize instructions page is served (relative to agent path) |
 | `custom_routes` | `Any` | `None` | Optional FastAPI APIRouter; mounted on the API app at /api/agents/{slug}/... |
 | `data_resources` | `list[data_resource.DataResource]` | — | Data resources this agent exposes for Studio CRUD access |
 | `supervaizer_v2_registration` | `SupervaizerV2AgentRegistrationContract` | `None` | Optional Supervaizer v2 registration contract for A2A/A2UI Studio integrations |
+| `v2_methods` | `V2AgentMethods` | `None` | Optional agent-level Supervaizer v2 method declarations |
 
 ### `agent.AgentMethod`
 
@@ -187,8 +183,8 @@ Attributes:
 |---|---|---|---|
 | `name` | `str` | **required** | The name of the method |
 | `method` | `str` | **required** | The name of the method in the project's codebase that will be called with the provided parameters |
-| `params` | `typing.Dict[str, typing.Any]` | `None` | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
-| `fields` | `typing.List[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
+| `params` | `dict[str, typing.Any]` | `None` | A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs |
+| `fields` | `list[supervaizer.agent.AgentMethodField]` | `None` | A list of field specifications for generating forms/UI, following the django.forms.fields definition |
 | `description` | `str` | `None` | Optional description of what the method does |
 | `is_async` | `bool` | False | Whether the method is asynchronous |
 | `timeout` | `int` | 600 | Maximum automatic job duration in seconds. Use None for jobs that must run until Studio stops them manually. |
@@ -316,7 +312,7 @@ ParametersSetup.from_list([
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `definitions` | `Dict[str, parameter.Parameter]` | **required** | A dictionary of Parameters, where the key is the parameter name and the value is the parameter object. |
+| `definitions` | `dict[str, parameter.Parameter]` | **required** | A dictionary of Parameters, where the key is the parameter name and the value is the parameter object. |
 
 ### `parameter.Parameter`
 
@@ -403,7 +399,7 @@ public_url: full url (including scheme and port) to use for outbound connections
 | `environment` | `str` | **required** | Environment name (e.g., dev, staging, prod) |
 | `mac_addr` | `str` | **required** | MAC address to use for server identification |
 | `debug` | `bool` | **required** | Whether to enable debug mode |
-| `agents` | `List[agent.Agent]` | **required** | List of agents to register with the server |
+| `agents` | `list[agent.Agent]` | **required** | List of agents to register with the server |
 | `app` | `FastAPI` | **required** | FastAPI application instance |
 | `reload` | `bool` | **required** | Whether to enable auto-reload |
 | `supervisor_account` | `Account` | `None` | Account of the supervisor - can be created at supervaize.com |
@@ -413,6 +409,7 @@ public_url: full url (including scheme and port) to use for outbound connections
 | `public_url` | `str` | `None` | Public including scheme and port to use for inbound connections |
 | `api_key` | `str` | `None` | Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated |
 | `api_key_header` | `APIKeyHeader` | `None` | API key header for authentication |
+| `workspace_authorization` | `V2WorkspaceAuthorizationSettings` | — | Optional Studio-signed workspace authorization verifier settings |
 
 #### Examples
 
@@ -446,4 +443,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-05-15 20:25:31*
+*Uploaded on 2026-08-26 17:21:01*
