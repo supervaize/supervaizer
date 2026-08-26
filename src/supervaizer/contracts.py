@@ -361,14 +361,6 @@ class V2JobSyncPolicy(ContractModel):
     supported_statuses: list[str] = Field(default_factory=list)
 
 
-class V2JobPolicy(ContractModel):
-    default_timeout_seconds: int | None = None
-    offline_start_policy: Literal["block"] = "block"
-    offline_running_policy: Literal["fail_in_studio"] = "fail_in_studio"
-    sync: V2JobSyncPolicy | None = None
-    setup: "V2JobSetupPolicy | None" = None
-
-
 class V2JobSetupPolicy(ContractModel):
     """Generic agent-declared job setup actions."""
 
@@ -376,9 +368,17 @@ class V2JobSetupPolicy(ContractModel):
     start_action: str = "job.start"
     submit_action: str = "step.awaiting.submit"
     action_scopes: list[Literal["workspace", "job", "case", "step"]] = Field(
-        default_factory=lambda: ["workspace", "job", "case", "step"]
+        default_factory=list
     )
     plan: dict[str, Any] | None = None
+
+
+class V2JobPolicy(ContractModel):
+    default_timeout_seconds: int | None = None
+    offline_start_policy: Literal["block"] = "block"
+    offline_running_policy: Literal["fail_in_studio"] = "fail_in_studio"
+    sync: V2JobSyncPolicy | None = None
+    setup: V2JobSetupPolicy | None = None
 
 
 class V2ResourceDisplayDefinition(ContractModel):
@@ -599,7 +599,7 @@ def build_v2_agent_registration(
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
     workspace_binding_definition = _workspace_binding(workspace_binding)
     agent_method_definitions = _agent_methods(agent_methods)
-    sync_policy = _job_policy(job_policy)
+    job_policy_definition = _job_policy(job_policy)
 
     capability_surfaces = _unique_strings([
         *surfaces,
@@ -612,8 +612,8 @@ def build_v2_agent_registration(
         *actions,
         *_resource_action_ids(resource_definitions),
         *_dataset_action_ids(dataset_definitions),
-        *(_job_sync_actions(sync_policy)),
-        *(_job_setup_actions(sync_policy)),
+        *_job_sync_actions(job_policy_definition),
+        *_job_setup_actions(job_policy_definition),
         *_workspace_binding_action_ids(workspace_binding_definition),
         *_agent_method_action_ids(agent_method_definitions),
     ])
@@ -645,7 +645,7 @@ def build_v2_agent_registration(
             case_lanes=_contract_list(case_lanes, V2CaseLaneDefinition),
             artifact_types=_contract_list(artifact_types, V2ArtifactTypeDefinition),
         ),
-        job_policy=sync_policy,
+        job_policy=job_policy_definition,
         resources=resource_definitions,
         datasets=dataset_definitions,
         dashboards=dashboard_definitions,

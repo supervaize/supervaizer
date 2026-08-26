@@ -38,6 +38,7 @@ from supervaizer.contracts import (
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
     V2Effect,
+    V2JobSetupPolicy,
     V2JobStateSnapshot,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
@@ -578,6 +579,12 @@ def test_v2_job_setup_policy_round_trips_through_registration_builder() -> None:
         "job.start",
         "step.awaiting.submit",
     }
+
+
+def test_v2_job_setup_policy_declares_no_scopes_by_default() -> None:
+    policy = V2JobSetupPolicy()
+
+    assert policy.action_scopes == []
 
 
 def test_v2_action_result_validates_replay_safety() -> None:
