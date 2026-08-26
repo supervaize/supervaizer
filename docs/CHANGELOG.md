@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
 
 - **Generic job setup contract** — New `V2JobSetupPolicy` on `V2JobPolicy.setup` lets an agent declare the actions Studio may use to preview, start, and submit a job setup (`preview_action`, `start_action`, `submit_action`, defaulting to `job.start.preview`, `job.start`, and `step.awaiting.submit`), the contexts those actions apply to (`action_scopes`), and an opaque `plan` payload. Declared actions are folded into the registration's capability action list. `V2ActionResult.setup_plan` carries the agent's plan back to Studio. `V2JobSetupPolicy` is exported at package level. Additive only; agents that omit `setup` are unaffected.
 
-  `action_scopes` defaults to an empty list: an agent that opts in with `setup: {}` declares no scopes rather than claiming all of `workspace`, `job`, `case`, and `step`. This matches `V2JobSyncPolicy.supported_statuses` and avoids advertising context support the agent never configured.
+  `action_scopes` defaults to an empty list: an agent that opts in with `setup: {}` declares no scopes rather than claiming all of `workspace`, `job`, `case`, and `step`. This matches `V2JobSyncPolicy.supported_statuses` and avoids advertising context support the agent never configured. The three action ids are validated as non-blank, so a blank id is rejected at registration instead of being silently dropped from `capabilities.actions` while still appearing in the serialized `job_policy.setup`. The same validation was applied to `V2JobSyncPolicy.action`, which had the identical gap.
 
 - **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
 
@@ -36,7 +36,7 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 688   |
+| ✅ Passed  | 690   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 59s   |

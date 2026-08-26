@@ -360,6 +360,13 @@ class V2JobSyncPolicy(ContractModel):
     action: str = "job.sync"
     supported_statuses: list[str] = Field(default_factory=list)
 
+    @field_validator("action")
+    @classmethod
+    def validate_action_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("job sync policy action must be a non-empty action id")
+        return value
+
 
 class V2JobSetupPolicy(ContractModel):
     """Generic agent-declared job setup actions."""
@@ -371,6 +378,13 @@ class V2JobSetupPolicy(ContractModel):
         default_factory=list
     )
     plan: dict[str, Any] | None = None
+
+    @field_validator("preview_action", "start_action", "submit_action")
+    @classmethod
+    def validate_action_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("job setup policy actions must be non-empty action ids")
+        return value
 
 
 class V2JobPolicy(ContractModel):

@@ -40,6 +40,7 @@ from supervaizer.contracts import (
     V2Effect,
     V2JobSetupPolicy,
     V2JobStateSnapshot,
+    V2JobSyncPolicy,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
     V2ResourceFieldDefinition,
@@ -585,6 +586,19 @@ def test_v2_job_setup_policy_declares_no_scopes_by_default() -> None:
     policy = V2JobSetupPolicy()
 
     assert policy.action_scopes == []
+
+
+def test_v2_job_setup_policy_rejects_blank_action_ids() -> None:
+    for field in ("preview_action", "start_action", "submit_action"):
+        with pytest.raises(ValidationError):
+            V2JobSetupPolicy.model_validate({field: ""})
+        with pytest.raises(ValidationError):
+            V2JobSetupPolicy.model_validate({field: "   "})
+
+
+def test_v2_job_sync_policy_rejects_blank_action_id() -> None:
+    with pytest.raises(ValidationError):
+        V2JobSyncPolicy.model_validate({"action": ""})
 
 
 def test_v2_action_result_validates_replay_safety() -> None:
