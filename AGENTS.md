@@ -4,6 +4,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 
 ## Working Rules
 
+- Use the shared [RUNWAIZE domain glossary](../glossary.md) as the canonical terminology reference.
 - Prefer simple, typed Python changes that match existing FastAPI/Pydantic patterns.
 - Do not import from inside functions, methods, or local scopes unless it is absolutely required to avoid a concrete circular import, optional dependency, or startup-cost problem. Prefer module-level imports by default, and document the reason when a local import is unavoidable.
 - **No guessing / no implicit fallbacks:** when protocol versions, workspace identity, action/resource contracts, authentication, or transport configuration are missing or inconsistent, fail with a clear error that names the missing configuration. Do not infer another context, broaden scope, or silently fall back.
@@ -83,7 +84,7 @@ Ask. Refusing to act is always safer than taking an action that bypasses these r
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **supervaizer** (6281 symbols, 11689 relationships, 286 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **supervaizer** (4857 symbols, 9137 relationships, 286 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -92,8 +93,9 @@ This project is indexed by GitNexus as **supervaizer** (6281 symbols, 11689 rela
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
 ## Never Do
 

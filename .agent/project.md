@@ -6,13 +6,6 @@ Supervaizer is the open-source controller library and FastAPI server that AI age
 
 This repo is public and packaged for external users, so API compatibility, typed payloads, generated documentation, and clear tests matter more than local convenience.
 
-## Local Glossary / Terminology
-
-- **Controller**: The Supervaizer FastAPI service embedded with or run alongside an AI agent.
-- **Studio**: The Supervaize SaaS platform that receives registration/events and operates mapped agents.
-- **Mapped agent**: An agent capability exposed through Supervaizer for Studio control.
-- **Registration payload**: The `server.register` payload consumed by Studio.
-
 ## Data Sensitivity Notes
 
 - Do not log or commit API keys, server secrets, workspace tokens, or customer data.
