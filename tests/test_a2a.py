@@ -464,9 +464,14 @@ def test_a2a_controller_dispatches_registered_v2_action(
 
     def start_job(request: V2ActionRequest) -> V2ActionResult:
         assert request.action == "job.start"
+        assert request.mission_id == "mission-1"
+        assert request.job_id == "job-123"
+        assert request.case_id == "case-123"
+        assert request.step_id == "step-123"
         return V2ActionResult(
             status="ok",
             effects=[V2Effect(type="job.created", job_id="job-123")],
+            setup_plan={"agent_descriptor": {"campaign_template_id": "opaque-id"}},
         )
 
     register_v2_action_handler(server_fixture, "job.start", start_job)
@@ -479,7 +484,8 @@ def test_a2a_controller_dispatches_registered_v2_action(
             "jsonrpc": "2.0",
             "id": "rpc-3",
             "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
-            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug)
+            | {"job_id": "job-123", "case_id": "case-123", "step_id": "step-123"},
         },
     )
 
@@ -490,6 +496,9 @@ def test_a2a_controller_dispatches_registered_v2_action(
     assert payload["result"]["effects"] == [
         {"type": "job.created", "job_id": "job-123"}
     ]
+    assert payload["result"]["setup_plan"] == {
+        "agent_descriptor": {"campaign_template_id": "opaque-id"}
+    }
 
 
 def test_a2a_workspace_authorization_missing_token_blocks_action_handler(

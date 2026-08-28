@@ -360,12 +360,39 @@ class V2JobSyncPolicy(ContractModel):
     action: str = "job.sync"
     supported_statuses: list[str] = Field(default_factory=list)
 
+    @field_validator("action")
+    @classmethod
+    def validate_action_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("job sync policy action must be a non-empty action id")
+        return value
+
+
+class V2JobSetupPolicy(ContractModel):
+    """Generic agent-declared job setup actions."""
+
+    preview_action: str = "job.start.preview"
+    start_action: str = "job.start"
+    submit_action: str = "step.awaiting.submit"
+    action_scopes: list[Literal["workspace", "job", "case", "step"]] = Field(
+        default_factory=list
+    )
+    plan: dict[str, Any] | None = None
+
+    @field_validator("preview_action", "start_action", "submit_action")
+    @classmethod
+    def validate_action_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("job setup policy actions must be non-empty action ids")
+        return value
+
 
 class V2JobPolicy(ContractModel):
     default_timeout_seconds: int | None = None
     offline_start_policy: Literal["block"] = "block"
     offline_running_policy: Literal["fail_in_studio"] = "fail_in_studio"
     sync: V2JobSyncPolicy | None = None
+    setup: V2JobSetupPolicy | None = None
 
 
 class V2ResourceDisplayDefinition(ContractModel):
@@ -586,7 +613,7 @@ def build_v2_agent_registration(
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
     workspace_binding_definition = _workspace_binding(workspace_binding)
     agent_method_definitions = _agent_methods(agent_methods)
-    sync_policy = _job_policy(job_policy)
+    job_policy_definition = _job_policy(job_policy)
 
     capability_surfaces = _unique_strings([
         *surfaces,
@@ -599,7 +626,8 @@ def build_v2_agent_registration(
         *actions,
         *_resource_action_ids(resource_definitions),
         *_dataset_action_ids(dataset_definitions),
-        *(_job_sync_actions(sync_policy)),
+        *_job_sync_actions(job_policy_definition),
+        *_job_setup_actions(job_policy_definition),
         *_workspace_binding_action_ids(workspace_binding_definition),
         *_agent_method_action_ids(agent_method_definitions),
     ])
@@ -631,7 +659,7 @@ def build_v2_agent_registration(
             case_lanes=_contract_list(case_lanes, V2CaseLaneDefinition),
             artifact_types=_contract_list(artifact_types, V2ArtifactTypeDefinition),
         ),
-        job_policy=sync_policy,
+        job_policy=job_policy_definition,
         resources=resource_definitions,
         datasets=dataset_definitions,
         dashboards=dashboard_definitions,
@@ -729,6 +757,16 @@ def _job_sync_actions(job_policy: V2JobPolicy) -> list[str]:
     if job_policy.sync is None:
         return []
     return [job_policy.sync.action]
+
+
+def _job_setup_actions(job_policy: V2JobPolicy) -> list[str]:
+    if job_policy.setup is None:
+        return []
+    return [
+        job_policy.setup.preview_action,
+        job_policy.setup.start_action,
+        job_policy.setup.submit_action,
+    ]
 
 
 def _agent_method_action_ids(agent_methods: V2AgentMethods | None) -> list[str]:
@@ -880,6 +918,7 @@ class V2ActionResult(ContractModel):
     effects: list[V2Effect] = Field(default_factory=list)
     job_state: V2JobStateSnapshot | None = None
     replay_safety: V2ReplaySafetyMetadata | None = None
+    setup_plan: dict[str, Any] | None = None
 
 
 class V2SurfaceResult(ContractModel):
