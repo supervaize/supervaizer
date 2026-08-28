@@ -175,6 +175,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2DatasetDefinition": ("supervaizer.contracts", "V2DatasetDefinition"),
     "V2Effect": ("supervaizer.contracts", "V2Effect"),
     "V2JobPolicy": ("supervaizer.contracts", "V2JobPolicy"),
+    "V2JobSetupPolicy": ("supervaizer.contracts", "V2JobSetupPolicy"),
     "V2JobSyncPolicy": ("supervaizer.contracts", "V2JobSyncPolicy"),
     "V2JobSnapshot": ("supervaizer.contracts", "V2JobSnapshot"),
     "V2JobSource": ("supervaizer.contracts", "V2JobSource"),

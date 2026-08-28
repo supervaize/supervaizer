@@ -12,6 +12,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Generic job setup contract** — New `V2JobSetupPolicy` on `V2JobPolicy.setup` lets an agent declare the actions Studio may use to preview, start, and submit a job setup (`preview_action`, `start_action`, `submit_action`, defaulting to `job.start.preview`, `job.start`, and `step.awaiting.submit`), the contexts those actions apply to (`action_scopes`), and an opaque `plan` payload. Declared actions are folded into the registration's capability action list. `V2ActionResult.setup_plan` carries the agent's plan back to Studio. `V2JobSetupPolicy` is exported at package level. Additive only; agents that omit `setup` are unaffected.
+
+  `action_scopes` defaults to an empty list: an agent that opts in with `setup: {}` declares no scopes rather than claiming all of `workspace`, `job`, `case`, and `step`. This matches `V2JobSyncPolicy.supported_statuses` and avoids advertising context support the agent never configured. The three action ids are validated as non-blank, so a blank id is rejected at registration instead of being silently dropped from `capabilities.actions` while still appearing in the serialized `job_policy.setup`. The same validation was applied to `V2JobSyncPolicy.action`, which had the identical gap.
+
+### Changed
+
+- **Regenerated model reference and OpenAPI** — `docs/model_reference/` and `docs/api/openapi.json` were rebuilt from the current models, picking up the job setup contract along with accumulated drift since `0.20.1`. `V2JobSetupPolicy` is now declared before `V2JobPolicy` so the public reference renders the real type instead of a `ForwardRef`.
+
 ## [1.4.0] - 2026-07-07
 
 ### Added
