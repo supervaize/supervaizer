@@ -18,11 +18,15 @@ All notable changes to this project will be documented in this file.
 
   `action_scopes` defaults to an empty list: an agent that opts in with `setup: {}` declares no scopes rather than claiming all of `workspace`, `job`, `case`, and `step`. This matches `V2JobSyncPolicy.supported_statuses` and avoids advertising context support the agent never configured. The three action ids are validated as non-blank, so a blank id is rejected at registration instead of being silently dropped from `capabilities.actions` while still appearing in the serialized `job_policy.setup`. The same validation was applied to `V2JobSyncPolicy.action`, which had the identical gap.
 
-- **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
-
 ### Changed
 
 - **Regenerated model reference and OpenAPI** — `docs/model_reference/` and `docs/api/openapi.json` were rebuilt from the current models, picking up the job setup contract along with accumulated drift since `0.20.1`. `V2JobSetupPolicy` is now declared before `V2JobPolicy` so the public reference renders the real type instead of a `ForwardRef`.
+
+## [1.4.0] - 2026-07-07
+
+### Added
+
+- **Security & performance review summary** — Added `docs/2026_07_SECURITY_REVIEW.md`, a non-actionable high-level summary of a full-source security and performance/scalability review (posture, verified-sound controls, severity counts, and remediation themes). Per `SECURITY.md`, detailed findings (locations, attack scenarios, remediation specifics) are handled through the private vulnerability channel and are intentionally omitted from the public repository.
 
 ### Fixed
 
@@ -36,10 +40,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 690   |
+| ✅ Passed  | 683   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 59s   |
+| ⏱️ in      | 83s   |
 
 ## [1.3.1] - 2026-07-02
 
