@@ -56,16 +56,28 @@ jobs:
           if echo "$MSG" | grep -qi '\[MAJOR\]'; then PART="major"
           elif echo "$MSG" | grep -qi '\[MINOR\]'; then PART="minor"
           elif echo "$MSG" | grep -qi '\[PATCH\]'; then PART="patch"
-          else PART="minor"
+          else
+            echo "No [MAJOR]/[MINOR]/[PATCH] token — skip bump, publish current version"
+            echo "part=skip" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "Bump type: $PART"
           echo "part=$PART" >> "$GITHUB_OUTPUT"
 
-      - name: Bump version and rotate CHANGELOG
+      - name: Sync with origin/main
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git pull --rebase origin main
+
+      - name: Bump version and rotate CHANGELOG
+        if: steps.bump-type.outputs.part != 'skip'
+        run: |
+          HEAD_MSG="$(git log -1 --format=%s)"
+          if echo "$HEAD_MSG" | grep -q 'chore(release):'; then
+            echo "HEAD is already a release commit after pull — skip bump"
+            exit 0
+          fi
           bump-my-version bump ${{ steps.bump-type.outputs.part }} \
             --config-file pyproject.toml \
             --verbose
@@ -78,9 +90,10 @@ jobs:
         run: hatch build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist/
+          skip-existing: true
 
       - name: Create or update GitHub release
         env:

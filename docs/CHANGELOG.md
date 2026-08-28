@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **PyPI publish (Metadata 2.5)** — Pin `pypa/gh-action-pypi-publish` to v1.14.2 so hatchling ≥1.32 wheels upload. Skip version bump unless the triggering commit has `[MAJOR]`/`[MINOR]`/`[PATCH]`.
+
 ## [1.5.0] - 2026-08-28
 
 ### Added
