@@ -12,6 +12,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **PyPI publish (Metadata 2.5)** — Pin `pypa/gh-action-pypi-publish` to v1.14.2 so hatchling ≥1.32 wheels upload. Skip version bump unless the triggering commit has `[MAJOR]`/`[MINOR]`/`[PATCH]`.
+
+## [1.5.0] - 2026-08-28
+
 ### Added
 
 - **Generic job setup contract** — New `V2JobSetupPolicy` on `V2JobPolicy.setup` lets an agent declare the actions Studio may use to preview, start, and submit a job setup (`preview_action`, `start_action`, `submit_action`, defaulting to `job.start.preview`, `job.start`, and `step.awaiting.submit`), the contexts those actions apply to (`action_scopes`), and an opaque `plan` payload. Declared actions are folded into the registration's capability action list. `V2ActionResult.setup_plan` carries the agent's plan back to Studio. `V2JobSetupPolicy` is exported at package level. Additive only; agents that omit `setup` are unaffected.
