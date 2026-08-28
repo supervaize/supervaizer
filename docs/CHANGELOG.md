@@ -12,10 +12,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-
-- **PyPI publish (Metadata 2.5)** — Pin `pypa/gh-action-pypi-publish` to v1.14.2 so hatchling ≥1.32 wheels upload. Skip version bump unless the triggering commit has `[MAJOR]`/`[MINOR]`/`[PATCH]`.
-
 ## [1.5.0] - 2026-08-28
 
 ### Added
@@ -27,6 +23,21 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **Regenerated model reference and OpenAPI** — `docs/model_reference/` and `docs/api/openapi.json` were rebuilt from the current models, picking up the job setup contract along with accumulated drift since `0.20.1`. `V2JobSetupPolicy` is now declared before `V2JobPolicy` so the public reference renders the real type instead of a `ForwardRef`.
+
+### Fixed
+
+- **PyPI publish (Metadata 2.5)** — Pin `pypa/gh-action-pypi-publish` to v1.14.2 so hatchling ≥1.32 wheels upload. Skip version bump unless the triggering commit has `[MAJOR]`/`[MINOR]`/`[PATCH]`.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 691   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 65s   |
 
 ## [1.4.0] - 2026-07-07
 
