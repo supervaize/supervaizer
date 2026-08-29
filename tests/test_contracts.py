@@ -26,8 +26,10 @@ from supervaizer.contracts import (
     ServerRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
     V2A2UIResourceImportDocument,
+    V2ActionDefinition,
     V2ActionRequest,
     V2ActionResult,
+    V2AgentCapabilities,
     V2AgentMethod,
     V2AgentMethods,
     V2AwaitingState,
@@ -43,6 +45,7 @@ from supervaizer.contracts import (
     V2JobSyncPolicy,
     V2JobSyncResult,
     V2ReplaySafetyMetadata,
+    V2ResourceDefinition,
     V2ResourceFieldDefinition,
     V2SurfaceRequest,
     V2SurfaceResult,
@@ -270,11 +273,12 @@ def test_v2_agent_interviewer_registration_fixture() -> None:
     assert (
         "mission.agent.surface.scenario_builder" in registration.capabilities.surfaces
     )
-    assert AGENT_REFRESH_ACTION in registration.capabilities.actions
-    assert "resource.campaign_contacts.create" in registration.capabilities.actions
-    assert "resource.campaign_contacts.delete" in registration.capabilities.actions
-    assert "resource.contacts.import" in registration.capabilities.actions
-    assert "resource.scenarios.update" in registration.capabilities.actions
+    action_ids = [action.id for action in registration.capabilities.actions]
+    assert AGENT_REFRESH_ACTION in action_ids
+    assert "resource.campaign_contacts.create" in action_ids
+    assert "resource.campaign_contacts.delete" in action_ids
+    assert "resource.contacts.import" in action_ids
+    assert "resource.scenarios.update" in action_ids
     assert any(
         lane.id == "work" and lane.default
         for lane in registration.capabilities.case_lanes
@@ -423,15 +427,18 @@ def test_build_v2_agent_registration_derives_capabilities() -> None:
         "mission.analytics",
         "workspace_binding.create",
     ]
-    assert registration.capabilities.actions == [
-        "job.start",
-        "step.awaiting.submit",
-        "resource.contacts.list",
-        "resource.contacts.create",
-        "dataset.campaign_progress.query",
-        "job.sync",
-        "workspace_binding.options",
-        "workspace_binding.create",
+    assert [
+        (action.id, action.mutating, action.scope)
+        for action in registration.capabilities.actions
+    ] == [
+        ("job.start", True, "job"),
+        ("step.awaiting.submit", True, "job"),
+        ("resource.contacts.list", True, "workspace"),
+        ("resource.contacts.create", True, "workspace"),
+        ("dataset.campaign_progress.query", False, "workspace"),
+        ("job.sync", True, "job"),
+        ("workspace_binding.options", True, "workspace"),
+        ("workspace_binding.create", True, "workspace"),
     ]
     assert registration.workspace_binding is not None
     assert registration.workspace_binding.existing is not None
@@ -479,11 +486,102 @@ def test_build_v2_agent_registration_derives_agent_method_actions() -> None:
         ),
     )
 
-    assert registration.capabilities.actions == [
+    assert [action.id for action in registration.capabilities.actions] == [
         AGENT_REFRESH_ACTION,
         "agent.custom.reindex",
         "agent.custom.dry-run",
     ]
+
+
+def test_v2_capabilities_coerce_bare_action_strings() -> None:
+    """A legacy `list[str]` keeps today's meaning: mutating and job-scoped."""
+    capabilities = V2AgentCapabilities.model_validate({"actions": ["job.start"]})
+
+    assert capabilities.actions == [
+        V2ActionDefinition(id="job.start", mutating=True, scope="job")
+    ]
+    assert capabilities.model_dump()["actions"] == [
+        {"id": "job.start", "mutating": True, "scope": "job"}
+    ]
+
+
+def test_v2_capabilities_reject_blank_action_id() -> None:
+    with pytest.raises(ValidationError, match="non-empty id"):
+        V2AgentCapabilities.model_validate({"actions": [" "]})
+
+
+def test_v2_declared_action_overrides_derived_metadata() -> None:
+    """An explicit definition wins over the metadata derived from its parent."""
+    registration = build_v2_agent_registration(
+        agent_id="agent-1",
+        agent_slug="agent",
+        display_name="Agent",
+        agent_card_url="/card.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        actions=[
+            V2ActionDefinition(
+                id="resource.invoices.reconcile", mutating=True, scope="job"
+            )
+        ],
+        resources=[
+            V2ResourceDefinition(
+                id="invoices",
+                label="Invoices",
+                scope="workspace",
+                operations=["reconcile"],
+            )
+        ],
+    )
+
+    reconcile = next(
+        action
+        for action in registration.capabilities.actions
+        if action.id == "resource.invoices.reconcile"
+    )
+    assert reconcile.scope == "job"
+    assert len(registration.capabilities.actions) == 1
+
+
+def test_v2_bare_action_string_defers_to_derived_metadata() -> None:
+    """A bare id declares no metadata, so the setup policy's derivation wins."""
+    registration = build_v2_agent_registration(
+        agent_id="agent-1",
+        agent_slug="agent",
+        display_name="Agent",
+        agent_card_url="/card.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        actions=["job.start.preview", "job.start"],
+        job_policy={"setup": {}},
+    )
+
+    assert [
+        (action.id, action.mutating) for action in registration.capabilities.actions
+    ] == [
+        ("job.start.preview", False),
+        ("job.start", True),
+        ("step.awaiting.submit", True),
+    ]
+
+
+def test_v2_awaiting_state_is_not_reopenable_by_default() -> None:
+    awaiting = V2AwaitingState.model_validate({
+        "reason": "Review campaign setup",
+        "surface": "case.step.awaiting",
+        "action": "step.awaiting.submit",
+    })
+
+    assert awaiting.reopenable is False
+    assert (
+        V2AwaitingState.model_validate({
+            "reason": "Review campaign setup",
+            "surface": "case.step.awaiting",
+            "action": "step.awaiting.submit",
+            "reopenable": True,
+        }).reopenable
+        is True
+    )
 
 
 def test_v2_workspace_binding_required_requires_mode() -> None:
@@ -575,11 +673,17 @@ def test_v2_job_setup_policy_round_trips_through_registration_builder() -> None:
         "case",
         "step",
     ]
-    assert set(round_trip.capabilities.actions) >= {
-        "job.start.preview",
-        "job.start",
-        "step.awaiting.submit",
+    mutating_by_id = {
+        action.id: action.mutating for action in round_trip.capabilities.actions
     }
+    assert (
+        mutating_by_id.items()
+        >= {
+            "job.start.preview": False,
+            "job.start": True,
+            "step.awaiting.submit": True,
+        }.items()
+    )
 
 
 def test_v2_job_setup_policy_declares_no_scopes_by_default() -> None:

@@ -308,11 +308,49 @@ class V2ArtifactTypeDefinition(ContractModel):
     renderer_surface: str | None = None
 
 
+class V2ActionDefinition(ContractModel):
+    """Declared metadata for one invokable agent action.
+
+    Consumers authorize, group and filter actions from these fields. They must
+    never be inferred from the identifier string: `id` is caller-supplied on
+    invocation, so pattern-matching it turns an authorization decision into
+    something the caller controls.
+    """
+
+    id: str = Field(description="Action identifier used to invoke the action.")
+    mutating: bool = Field(
+        default=True,
+        description=(
+            "Whether invoking the action changes agent-side state. "
+            "Defaults to True so an undeclared action requires write permission."
+        ),
+    )
+    scope: Literal["workspace", "mission", "job"] = Field(
+        default="job",
+        description="Context the action operates within.",
+    )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("action definitions must have a non-empty id")
+        return value
+
+
 class V2AgentCapabilities(ContractModel):
     surfaces: list[str] = Field(default_factory=list)
-    actions: list[str] = Field(default_factory=list)
+    actions: list[V2ActionDefinition] = Field(default_factory=list)
     case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
+
+    @field_validator("actions", mode="before")
+    @classmethod
+    def coerce_action_strings(cls, value: Any) -> Any:
+        """Accept the legacy `list[str]` form; a bare id keeps the safe defaults."""
+        if not isinstance(value, list):
+            return value
+        return [{"id": item} if isinstance(item, str) else item for item in value]
 
 
 class V2AgentMethod(ContractModel):
@@ -485,6 +523,7 @@ class V2DatasetDefinition(ContractModel):
     id: str
     label: str
     auto_surface: bool = False
+    scope: Literal["workspace", "mission", "job"] = "workspace"
     display: V2ResourceDisplayDefinition | None = None
 
 
@@ -592,7 +631,7 @@ def build_v2_agent_registration(
     controller_url: str,
     a2ui_catalog_version: str,
     surfaces: Iterable[str] = (),
-    actions: Iterable[str] = (),
+    actions: Iterable[str | V2ActionDefinition | dict[str, Any]] = (),
     resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
     datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
     dashboards: Iterable[V2DashboardDefinition | dict[str, Any]] = (),
@@ -622,15 +661,19 @@ def build_v2_agent_registration(
         *_dashboard_surface_ids(dashboard_definitions),
         *_workspace_binding_surface_ids(workspace_binding_definition),
     ])
-    capability_actions = _unique_strings([
-        *actions,
-        *_resource_action_ids(resource_definitions),
-        *_dataset_action_ids(dataset_definitions),
-        *_job_sync_actions(job_policy_definition),
-        *_job_setup_actions(job_policy_definition),
-        *_workspace_binding_action_ids(workspace_binding_definition),
-        *_agent_method_action_ids(agent_method_definitions),
-    ])
+    declared_actions = list(actions)
+    capability_actions = _merge_actions(
+        declared=_declared_actions(declared_actions),
+        derived=[
+            *_resource_actions(resource_definitions),
+            *_dataset_actions(dataset_definitions),
+            *_job_sync_actions(job_policy_definition),
+            *_job_setup_actions(job_policy_definition),
+            *_workspace_binding_actions(workspace_binding_definition),
+            *_agent_method_actions(agent_method_definitions),
+        ],
+        bare_ids={action for action in declared_actions if isinstance(action, str)},
+    )
 
     return SupervaizerV2AgentRegistrationContract(
         agent=V2AgentIdentity(
@@ -741,51 +784,111 @@ def _dashboard_surface_ids(dashboards: Iterable[V2DashboardDefinition]) -> list[
     return [dashboard.surface for dashboard in dashboards]
 
 
-def _resource_action_ids(resources: Iterable[V2ResourceDefinition]) -> list[str]:
+def _declared_actions(
+    actions: Iterable[str | V2ActionDefinition | dict[str, Any]],
+) -> list[V2ActionDefinition]:
     return [
-        f"resource.{resource.id}.{operation}"
+        action
+        if isinstance(action, V2ActionDefinition)
+        else V2ActionDefinition.model_validate(
+            {"id": action} if isinstance(action, str) else action
+        )
+        for action in actions
+    ]
+
+
+def _resource_actions(
+    resources: Iterable[V2ResourceDefinition],
+) -> list[V2ActionDefinition]:
+    # Resource operations are freeform ids, so mutability cannot be derived from
+    # them: declare the action explicitly in `actions` to mark one read-only.
+    return [
+        V2ActionDefinition(
+            id=f"resource.{resource.id}.{operation}",
+            mutating=True,
+            scope=resource.scope,
+        )
         for resource in resources
         for operation in resource.operations
     ]
 
 
-def _dataset_action_ids(datasets: Iterable[V2DatasetDefinition]) -> list[str]:
-    return [f"dataset.{dataset.id}.query" for dataset in datasets]
-
-
-def _job_sync_actions(job_policy: V2JobPolicy) -> list[str]:
-    if job_policy.sync is None:
-        return []
-    return [job_policy.sync.action]
-
-
-def _job_setup_actions(job_policy: V2JobPolicy) -> list[str]:
-    if job_policy.setup is None:
-        return []
+def _dataset_actions(
+    datasets: Iterable[V2DatasetDefinition],
+) -> list[V2ActionDefinition]:
     return [
-        job_policy.setup.preview_action,
-        job_policy.setup.start_action,
-        job_policy.setup.submit_action,
+        V2ActionDefinition(
+            id=f"dataset.{dataset.id}.query",
+            mutating=False,
+            scope=dataset.scope,
+        )
+        for dataset in datasets
     ]
 
 
-def _agent_method_action_ids(agent_methods: V2AgentMethods | None) -> list[str]:
+def _job_sync_actions(job_policy: V2JobPolicy) -> list[V2ActionDefinition]:
+    if job_policy.sync is None:
+        return []
+    return [V2ActionDefinition(id=job_policy.sync.action, mutating=True, scope="job")]
+
+
+def _job_setup_actions(job_policy: V2JobPolicy) -> list[V2ActionDefinition]:
+    setup = job_policy.setup
+    if setup is None:
+        return []
+    return [
+        V2ActionDefinition(id=setup.preview_action, mutating=False, scope="job"),
+        V2ActionDefinition(id=setup.start_action, mutating=True, scope="job"),
+        V2ActionDefinition(id=setup.submit_action, mutating=True, scope="job"),
+    ]
+
+
+def _agent_method_actions(
+    agent_methods: V2AgentMethods | None,
+) -> list[V2ActionDefinition]:
     if agent_methods is None:
         return []
-    return agent_methods.action_ids
+    return [
+        V2ActionDefinition(id=action_id, mutating=True, scope="job")
+        for action_id in agent_methods.action_ids
+    ]
 
 
-def _workspace_binding_action_ids(
+def _workspace_binding_actions(
     workspace_binding: V2WorkspaceBindingDefinition | None,
-) -> list[str]:
+) -> list[V2ActionDefinition]:
     if workspace_binding is None:
         return []
-    action_ids: list[str] = []
-    if workspace_binding.existing is not None:
-        action_ids.append(workspace_binding.existing.action)
-    if workspace_binding.create is not None:
-        action_ids.append(workspace_binding.create.action)
-    return action_ids
+    bindings = [workspace_binding.existing, workspace_binding.create]
+    return [
+        V2ActionDefinition(id=binding.action, mutating=True, scope="workspace")
+        for binding in bindings
+        if binding is not None
+    ]
+
+
+def _merge_actions(
+    declared: list[V2ActionDefinition],
+    derived: list[V2ActionDefinition],
+    bare_ids: set[str],
+) -> list[V2ActionDefinition]:
+    """Merge explicitly declared actions with the ones derived from definitions.
+
+    First mention fixes the order. A bare id string in ``actions`` declares no
+    metadata, so it defers to the definition it was derived from; an explicit
+    ``V2ActionDefinition`` overrides the derived one.
+    """
+    pending_bare = set(bare_ids)
+    resolved: dict[str, V2ActionDefinition] = {}
+    for action in declared:
+        resolved.setdefault(action.id, action)
+    for action in derived:
+        if action.id not in resolved:
+            resolved[action.id] = action
+        elif action.id in pending_bare:
+            resolved[action.id] = action
+            pending_bare.discard(action.id)
+    return list(resolved.values())
 
 
 def _workspace_binding_surface_ids(
@@ -948,6 +1051,13 @@ class V2AwaitingState(ContractModel):
     surface: str
     action: str
     fields: list[V2AwaitingFieldDefinition] = Field(default_factory=list)
+    reopenable: bool = Field(
+        default=False,
+        description=(
+            "Whether an already-answered step may be reopened and resubmitted "
+            "with edited values."
+        ),
+    )
 
 
 class V2StepSnapshot(ContractModel):
