@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 1.3.1
+**Version:** 1.5.0
 
 ### `common.SvBaseModel`
 
@@ -225,6 +225,25 @@ _No additional fields beyond parent class._
 | `datasets` | `list[contracts.V2DatasetDefinition]` | — |  |
 | `dashboards` | `list[contracts.V2DashboardDefinition]` | — |  |
 | `workspace_binding` | `V2WorkspaceBindingDefinition` | `None` |  |
+
+### `contracts.V2ActionDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Declared metadata for one invokable agent action.
+
+Consumers authorize, group and filter actions from these fields. They must
+never be inferred from the identifier string: `id` is caller-supplied on
+invocation, so pattern-matching it turns an authorization decision into
+something the caller controls.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** | Action identifier used to invoke the action. |
+| `mutating` | `bool` | True | Whether invoking the action changes agent-side state. Defaults to True so an undeclared action requires write permission. |
+| `scope` | `Literal['workspace', 'mission', 'job']` | 'job' | Context the action operates within. |
 
 ### `contracts.V2ActionRequest`
 
@@ -719,7 +738,7 @@ A2UI-shaped resource import surface consumed by Studio.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `surfaces` | `list[str]` | — |  |
-| `actions` | `list[str]` | — |  |
+| `actions` | `list[contracts.V2ActionDefinition]` | — |  |
 | `case_lanes` | `list[contracts.V2CaseLaneDefinition]` | — |  |
 | `artifact_types` | `list[contracts.V2ArtifactTypeDefinition]` | — |  |
 
@@ -786,6 +805,7 @@ A2UI-shaped resource import surface consumed by Studio.
 | `surface` | `str` | **required** |  |
 | `action` | `str` | **required** |  |
 | `fields` | `list[contracts.V2AwaitingFieldDefinition]` | — |  |
+| `reopenable` | `bool` | False | Whether an already-answered step may be reopened and resubmitted with edited values. |
 
 ### `contracts.V2CaseLaneDefinition`
 
@@ -904,6 +924,7 @@ A2UI-shaped resource import surface consumed by Studio.
 | `id` | `str` | **required** |  |
 | `label` | `str` | **required** |  |
 | `auto_surface` | `bool` | False |  |
+| `scope` | `Literal['workspace', 'mission', 'job']` | 'workspace' |  |
 | `display` | `V2ResourceDisplayDefinition` | `None` |  |
 
 ### `contracts.V2Effect`
@@ -1562,7 +1583,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 8, 26, 17, 21, 1, 586513) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 8, 29, 19, 33, 55, 605372) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1630,4 +1651,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-08-26 17:21:01*
+*Uploaded on 2026-08-29 19:33:55*
