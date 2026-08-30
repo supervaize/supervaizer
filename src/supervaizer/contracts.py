@@ -661,9 +661,8 @@ def build_v2_agent_registration(
         *_dashboard_surface_ids(dashboard_definitions),
         *_workspace_binding_surface_ids(workspace_binding_definition),
     ])
-    declared_actions = list(actions)
     capability_actions = _merge_actions(
-        declared=_declared_actions(declared_actions),
+        declared=actions,
         derived=[
             *_resource_actions(resource_definitions),
             *_dataset_actions(dataset_definitions),
@@ -672,7 +671,6 @@ def build_v2_agent_registration(
             *_workspace_binding_actions(workspace_binding_definition),
             *_agent_method_actions(agent_method_definitions),
         ],
-        bare_ids={action for action in declared_actions if isinstance(action, str)},
     )
 
     return SupervaizerV2AgentRegistrationContract(
@@ -784,19 +782,6 @@ def _dashboard_surface_ids(dashboards: Iterable[V2DashboardDefinition]) -> list[
     return [dashboard.surface for dashboard in dashboards]
 
 
-def _declared_actions(
-    actions: Iterable[str | V2ActionDefinition | dict[str, Any]],
-) -> list[V2ActionDefinition]:
-    return [
-        action
-        if isinstance(action, V2ActionDefinition)
-        else V2ActionDefinition.model_validate(
-            {"id": action} if isinstance(action, str) else action
-        )
-        for action in actions
-    ]
-
-
 def _resource_actions(
     resources: Iterable[V2ResourceDefinition],
 ) -> list[V2ActionDefinition]:
@@ -868,26 +853,36 @@ def _workspace_binding_actions(
 
 
 def _merge_actions(
-    declared: list[V2ActionDefinition],
-    derived: list[V2ActionDefinition],
-    bare_ids: set[str],
+    declared: Iterable[str | V2ActionDefinition | dict[str, Any]],
+    derived: Iterable[V2ActionDefinition],
 ) -> list[V2ActionDefinition]:
     """Merge explicitly declared actions with the ones derived from definitions.
 
     First mention fixes the order. A bare id string in ``actions`` declares no
     metadata, so it defers to the definition it was derived from; an explicit
-    ``V2ActionDefinition`` overrides the derived one.
+    ``V2ActionDefinition`` overrides the derived one. Precedence is about
+    metadata, not position: an id declared both ways within ``actions`` keeps the
+    explicit metadata wherever the two appear, and the earlier mention still
+    fixes the order.
     """
-    pending_bare = set(bare_ids)
     resolved: dict[str, V2ActionDefinition] = {}
-    for action in declared:
-        resolved.setdefault(action.id, action)
+    bare_ids: set[str] = set()
+    for entry in declared:
+        is_bare = isinstance(entry, str)
+        action = V2ActionDefinition.model_validate({"id": entry} if is_bare else entry)
+        if action.id not in resolved:
+            resolved[action.id] = action
+            if is_bare:
+                bare_ids.add(action.id)
+        elif not is_bare and action.id in bare_ids:
+            resolved[action.id] = action
+            bare_ids.discard(action.id)
     for action in derived:
         if action.id not in resolved:
             resolved[action.id] = action
-        elif action.id in pending_bare:
+        elif action.id in bare_ids:
             resolved[action.id] = action
-            pending_bare.discard(action.id)
+            bare_ids.discard(action.id)
     return list(resolved.values())
 
 

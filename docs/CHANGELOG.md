@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 
   The builder derives the metadata from the definition each action comes from: resource actions take `V2ResourceDefinition.scope`, dataset queries are `mutating=False`, `V2JobSetupPolicy.preview_action` is `mutating=False`, and workspace binding actions are `workspace`-scoped. Resource operation ids are freeform, so operations stay `mutating=True` unless the agent declares otherwise.
 
-  Metadata precedence is explicit > derived > bare: an explicit `V2ActionDefinition` in `actions=` overrides the derived metadata — that is how a job-scoped `resource.invoice.reconcile` on a workspace-scoped resource is declared — while a bare id string declares nothing and defers to the definition it was derived from. First mention fixes the order in either case.
+  Metadata precedence is explicit > derived > bare: an explicit `V2ActionDefinition` in `actions=` overrides the derived metadata — that is how a job-scoped `resource.invoice.reconcile` on a workspace-scoped resource is declared — while a bare id string declares nothing and defers to the definition it was derived from. Precedence is about metadata, not position: an id declared both ways within `actions=` keeps the explicit metadata regardless of which form comes first, and the earlier mention still fixes the order.
 
 - **`V2DatasetDefinition.scope`** — Mirrors `V2ResourceDefinition.scope` (`workspace` / `mission` / `job`, defaulting to `workspace`) so dataset query actions carry a declared scope rather than an assumed one.
 

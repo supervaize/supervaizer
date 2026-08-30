@@ -543,6 +543,38 @@ def test_v2_declared_action_overrides_derived_metadata() -> None:
     assert len(registration.capabilities.actions) == 1
 
 
+@pytest.mark.parametrize("bare_first", [False, True])
+def test_v2_mixed_action_forms_keep_explicit_metadata(bare_first: bool) -> None:
+    """An id declared both ways keeps the explicit metadata, in either order."""
+    explicit = V2ActionDefinition(
+        id="resource.invoices.reconcile", mutating=False, scope="job"
+    )
+    declared: list[str | V2ActionDefinition] = (
+        ["resource.invoices.reconcile", explicit]
+        if bare_first
+        else [explicit, "resource.invoices.reconcile"]
+    )
+    registration = build_v2_agent_registration(
+        agent_id="agent-1",
+        agent_slug="agent",
+        display_name="Agent",
+        agent_card_url="/card.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        actions=declared,
+        resources=[
+            V2ResourceDefinition(
+                id="invoices",
+                label="Invoices",
+                scope="workspace",
+                operations=["reconcile"],
+            )
+        ],
+    )
+
+    assert registration.capabilities.actions == [explicit]
+
+
 def test_v2_bare_action_string_defers_to_derived_metadata() -> None:
     """A bare id declares no metadata, so the setup policy's derivation wins."""
     registration = build_v2_agent_registration(
