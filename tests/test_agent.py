@@ -1273,7 +1273,9 @@ def test_agent_v2_methods_are_added_to_v2_capabilities() -> None:
     )
 
     assert agent.supervaizer_v2_registration is not None
-    assert agent.supervaizer_v2_registration.capabilities.actions == [
+    assert [
+        action.id for action in agent.supervaizer_v2_registration.capabilities.actions
+    ] == [
         "job.sync",
         AGENT_REFRESH_ACTION,
     ]
