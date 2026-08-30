@@ -26,6 +26,17 @@ All notable changes to this project will be documented in this file.
 
 - **`V2AwaitingState.reopenable`** — Declares whether an already-answered awaiting step may be reopened and resubmitted with edited values. Defaults to `False`; previously consumers inferred this from a substring of `surface`.
 
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 698   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 67s   |
+
 ## [1.5.0] - 2026-08-28
 
 ### Added
