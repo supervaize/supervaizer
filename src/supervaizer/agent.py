@@ -39,6 +39,7 @@ from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
 from supervaizer.contracts import (
     SupervaizerV2AgentRegistrationContract,
+    V2ActionDefinition,
     V2ActionRequest,
     V2AgentMethod,
     V2AgentMethods,
@@ -849,13 +850,16 @@ class Agent(AgentAbstract):
     def _apply_v2_method_capabilities(self) -> None:
         if self.supervaizer_v2_registration is None or self.v2_methods is None:
             return
-        actions = [
-            *self.supervaizer_v2_registration.capabilities.actions,
-            *self.v2_methods.action_ids,
+        declared = self.supervaizer_v2_registration.capabilities.actions
+        known_ids = {action.id for action in declared}
+        self.supervaizer_v2_registration.capabilities.actions = [
+            *declared,
+            *(
+                V2ActionDefinition(id=action_id, mutating=True, scope="job")
+                for action_id in dict.fromkeys(self.v2_methods.action_ids)
+                if action_id not in known_ids
+            ),
         ]
-        self.supervaizer_v2_registration.capabilities.actions = list(
-            dict.fromkeys(actions)
-        )
 
     @property
     def slug(self) -> str:

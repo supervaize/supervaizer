@@ -47,6 +47,9 @@ Reference specific personas when requesting work:
 - In the matrix **build** job, `astral-sh/setup-uv` sets `cache-suffix: py-${{ matrix.python-version }}` so parallel Python versions do not race on the same GitHub Actions cache reservation.
 - `@singleton` (from `supervaizer.common`) replaces the decorated class name with a function at import time; modules that annotate with that class in unions (e.g. `StorageManager | None` in `storage.py`) need `from __future__ import annotations` or class-body evaluation raises `TypeError`.
 - `UTC` lives on the `datetime` module (`from datetime import UTC`), not on `datetime.datetime`; use `datetime.now(UTC)`, not `datetime.now(datetime.UTC)` (the latter raises `AttributeError` at runtime).
+- `just ship` bumps version in CI after merge to `main`, not in the ship PR itself; the publish job waits on GitHub Environment `pypi` approval; bump lands as `chore(release): vX.Y.Z`. After that, `just ship-reconcile` merges `main` back into `develop`.
+- Do not re-run a failed `publish-pypi` workflow after the bump commit is already on `main` — it would bump again. Pushing other commits to `main` also retriggers publish with the default minor bump.
+- hatchling ≥1.32 emits Metadata-Version 2.5; `pypa/gh-action-pypi-publish` must be ≥v1.14.2, pinned to the peeled tag commit SHA (not the annotated-tag object SHA).
 
 ## Security and Supply-Chain Rules
 

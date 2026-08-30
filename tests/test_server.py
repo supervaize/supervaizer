@@ -1113,9 +1113,10 @@ class TestServerLocalMode:
             capabilities = card_response.json()["supervaizer"]["v2"]["capabilities"]
             assert "case.step.awaiting" in capabilities["surfaces"]
             assert "mission.agent.resource.hello_messages" in capabilities["surfaces"]
-            assert "job.sync" in capabilities["actions"]
-            assert "step.awaiting.submit" in capabilities["actions"]
-            assert "resource.hello_messages.list" in capabilities["actions"]
+            action_ids = [action["id"] for action in capabilities["actions"]]
+            assert "job.sync" in action_ids
+            assert "step.awaiting.submit" in action_ids
+            assert "resource.hello_messages.list" in action_ids
 
             surface_response = client.post(
                 "/a2a",
