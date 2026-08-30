@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-30
+
 ### Added
 
 - **Declared action scope and mutability (#92)** — `V2AgentCapabilities.actions` is now `list[V2ActionDefinition]` instead of an opaque `list[str]`. Each action declares `id`, `mutating` (does invoking it change agent-side state?), and `scope` (`workspace` / `mission` / `job`), so a consumer can authorize and group actions without pattern-matching the identifier. `id` is caller-supplied at invocation time, so deriving an authorization decision from it puts that decision in the caller's hands.
