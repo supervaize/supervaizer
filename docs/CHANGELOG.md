@@ -12,6 +12,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Declared action scope and mutability (#92)** — `V2AgentCapabilities.actions` is now `list[V2ActionDefinition]` instead of an opaque `list[str]`. Each action declares `id`, `mutating` (does invoking it change agent-side state?), and `scope` (`workspace` / `mission` / `job`), so a consumer can authorize and group actions without pattern-matching the identifier. `id` is caller-supplied at invocation time, so deriving an authorization decision from it puts that decision in the caller's hands.
+
+  Plain strings are still accepted everywhere a list of actions is taken — in `build_v2_agent_registration(actions=...)` and when validating a registration payload — and coerce to `mutating=True, scope="job"`, the fail-closed reading that matches today's behaviour. Only the serialized form changes: `capabilities.actions` now emits objects. Consumers must accept both, because agents pinned to older Supervaizer releases keep sending bare strings. No protocol version discriminates the two shapes: `versions.a2ui_version` and `versions.a2a_version` cover the surface catalog and the A2A protocol, not the registration payload.
+
+  The builder derives the metadata from the definition each action comes from: resource actions take `V2ResourceDefinition.scope`, dataset queries are `mutating=False`, `V2JobSetupPolicy.preview_action` is `mutating=False`, and workspace binding actions are `workspace`-scoped. Resource operation ids are freeform, so operations stay `mutating=True` unless the agent declares otherwise.
+
+  Metadata precedence is explicit > derived > bare: an explicit `V2ActionDefinition` in `actions=` overrides the derived metadata — that is how a job-scoped `resource.invoice.reconcile` on a workspace-scoped resource is declared — while a bare id string declares nothing and defers to the definition it was derived from. Precedence is about metadata, not position: an id declared both ways within `actions=` keeps the explicit metadata regardless of which form comes first, and the earlier mention still fixes the order.
+
+- **`V2DatasetDefinition.scope`** — Mirrors `V2ResourceDefinition.scope` (`workspace` / `mission` / `job`, defaulting to `workspace`) so dataset query actions carry a declared scope rather than an assumed one.
+
+- **`V2AwaitingState.reopenable`** — Declares whether an already-answered awaiting step may be reopened and resubmitted with edited values. Defaults to `False`; previously consumers inferred this from a substring of `surface`.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 698   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 67s   |
+
 ## [1.5.0] - 2026-08-28
 
 ### Added

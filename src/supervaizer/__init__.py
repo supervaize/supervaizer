@@ -138,6 +138,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "V2A2UIResourceImportDocument",
     ),
     "V2A2UISubmitDefinition": ("supervaizer.contracts", "V2A2UISubmitDefinition"),
+    "V2ActionDefinition": ("supervaizer.contracts", "V2ActionDefinition"),
     "V2AgentCapabilities": ("supervaizer.contracts", "V2AgentCapabilities"),
     "V2AgentIdentity": ("supervaizer.contracts", "V2AgentIdentity"),
     "V2AgentMethod": ("supervaizer.contracts", "V2AgentMethod"),
