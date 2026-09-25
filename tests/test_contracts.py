@@ -12,6 +12,7 @@ import importlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -47,6 +48,7 @@ from supervaizer.contracts import (
     V2ReplaySafetyMetadata,
     V2ResourceDefinition,
     V2ResourceFieldDefinition,
+    V2SurfaceDefinition,
     V2SurfaceRequest,
     V2SurfaceResult,
     V2VerifiedWorkspaceContext,
@@ -597,6 +599,132 @@ def test_v2_bare_action_string_defers_to_derived_metadata() -> None:
     ]
 
 
+def _minimal_registration(**kwargs: Any) -> SupervaizerV2AgentRegistrationContract:
+    return build_v2_agent_registration(
+        agent_id="agent-1",
+        agent_slug="agent",
+        display_name="Agent",
+        agent_card_url="/card.json",
+        controller_url="/a2a",
+        a2ui_catalog_version="supervaizer-v2-local.0",
+        **kwargs,
+    )
+
+
+def test_v2_surface_definitions_ride_alongside_string_surface_ids() -> None:
+    """Described surfaces keep `surfaces` a list of ids and add display text beside it."""
+    registration = _minimal_registration(
+        surfaces=[
+            "job.start",
+            V2SurfaceDefinition(
+                id="mission.agent.overview",
+                label="Overview",
+                description="Start here to see what the agent manages.",
+            ),
+            {"id": "job.start", "label": "New job"},
+            {"id": "case.step.detail"},
+            # A derived auto surface can be described by declaring it explicitly.
+            {
+                "id": "mission.agent.resource.contacts",
+                "description": "People the agent talks to.",
+            },
+        ],
+        resources=[
+            V2ResourceDefinition(
+                id="contacts", label="Contacts", auto_surface=True, operations=["list"]
+            )
+        ],
+    )
+
+    capabilities = registration.model_dump(mode="json")["capabilities"]
+    assert capabilities["surfaces"] == [
+        "job.start",
+        "mission.agent.overview",
+        "case.step.detail",
+        "mission.agent.resource.contacts",
+    ]
+    assert capabilities["surface_definitions"] == [
+        {
+            "id": "mission.agent.overview",
+            "label": "Overview",
+            "description": "Start here to see what the agent manages.",
+        },
+        {"id": "job.start", "label": "New job"},
+        {
+            "id": "mission.agent.resource.contacts",
+            "description": "People the agent talks to.",
+        },
+    ]
+
+
+def test_v2_undescribed_registration_serializes_unchanged() -> None:
+    """No display text declared: no `surface_definitions` key, no action text keys."""
+    registration = _minimal_registration(
+        surfaces=["job.start", {"id": "case.step.detail", "label": "  "}],
+        actions=["job.start"],
+    )
+
+    capabilities = registration.model_dump(mode="json")["capabilities"]
+    assert "surface_definitions" not in capabilities
+    assert capabilities["surfaces"] == ["job.start", "case.step.detail"]
+    assert capabilities["actions"] == [
+        {"id": "job.start", "mutating": True, "scope": "job"}
+    ]
+
+
+def test_v2_action_definition_serializes_display_text_when_set() -> None:
+    registration = _minimal_registration(
+        actions=[
+            {
+                "id": "campaign.launch",
+                "mutating": True,
+                "scope": "job",
+                "label": " Launch ",
+                "description": "Start calling the enrolled contacts.",
+            }
+        ],
+    )
+
+    assert registration.model_dump(mode="json")["capabilities"]["actions"] == [
+        {
+            "id": "campaign.launch",
+            "mutating": True,
+            "scope": "job",
+            "label": "Launch",
+            "description": "Start calling the enrolled contacts.",
+        }
+    ]
+
+
+@pytest.mark.parametrize("model", [V2SurfaceDefinition, V2ActionDefinition])
+@pytest.mark.parametrize("field", ["label", "description"])
+def test_v2_display_text_is_capped(model: type, field: str) -> None:
+    assert getattr(model(id="x", **{field: "a" * 300}), field) == "a" * 300
+    with pytest.raises(ValidationError, match="at most 300 characters"):
+        model(id="x", **{field: "a" * 301})
+
+
+def test_v2_surface_definitions_must_describe_declared_surfaces() -> None:
+    with pytest.raises(ValidationError, match="undeclared surface 'job.details'"):
+        V2AgentCapabilities.model_validate({
+            "surfaces": ["job.start"],
+            "surface_definitions": [{"id": "job.details", "label": "Details"}],
+        })
+    with pytest.raises(ValidationError, match="describes surface 'job.start' twice"):
+        V2AgentCapabilities.model_validate({
+            "surfaces": ["job.start"],
+            "surface_definitions": [
+                {"id": "job.start", "label": "Start"},
+                {"id": "job.start", "description": "Start a job."},
+            ],
+        })
+
+
+def test_v2_surface_definition_rejects_blank_id() -> None:
+    with pytest.raises(ValidationError, match="non-empty id"):
+        _minimal_registration(surfaces=[{"id": " ", "label": "Nothing"}])
+
+
 def test_v2_awaiting_state_is_not_reopenable_by_default() -> None:
     awaiting = V2AwaitingState.model_validate({
         "reason": "Review campaign setup",
@@ -930,6 +1058,7 @@ def test_v2_contract_models_are_public_sdk_exports() -> None:
     assert supervaizer.V2ResourceFieldOptionsSource.__name__ == (
         "V2ResourceFieldOptionsSource"
     )
+    assert supervaizer.V2SurfaceDefinition is V2SurfaceDefinition
     assert supervaizer.V2SurfaceRequest is V2SurfaceRequest
     assert supervaizer.V2SurfaceResult is V2SurfaceResult
     assert supervaizer.V2VerifiedWorkspaceContext is V2VerifiedWorkspaceContext

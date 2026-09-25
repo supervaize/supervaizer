@@ -382,6 +382,38 @@ Common action IDs:
 
 Action requests include `actor`, `workspace`, `mission_id`, `agent_slug`, `surface`, `action`, `input`, and optional correlation fields such as `job_id`, `case_id`, `step_id`, `draft_session_id`, and `idempotency_key`.
 
+### Display text
+
+Surfaces and actions may carry an optional `label` (a caption) and `description` (plain-language help text, such as a tooltip), so Studio can show the agent's own wording on the buttons it renders for them. Both are plain text, at most 300 characters, and display only: they are never an authorization input.
+
+```python
+registration = build_v2_agent_registration(
+    ...,
+    surfaces=[
+        "case.step.detail",
+        {
+            "id": "mission.agent.overview",
+            "label": "Overview",
+            "description": "Summary of what this agent manages for the mission.",
+        },
+    ],
+    actions=[
+        {
+            "id": "job.stop",
+            "mutating": True,
+            "scope": "job",
+            "label": "Stop",
+            "description": "Stop the job; work already done is kept.",
+        },
+    ],
+)
+```
+
+- `capabilities.surfaces` stays a list of id strings. Surface text is serialized in the sibling list `capabilities.surface_definitions` (`V2SurfaceDefinition`: `id`, `label`, `description`), at most one entry per declared id.
+- Action text is serialized on each `capabilities.actions` entry.
+- Unset text is omitted, so a registration without text serializes as before.
+- An auto-derived surface such as `mission.agent.resource.<id>` is described by declaring it explicitly in `surfaces=`. An explicit `V2ActionDefinition` still replaces derived metadata, so restate `mutating` and `scope` when adding text to a derived action.
+
 ### Context assignment semantics
 
 `context.assign` carries a `V2ContextAssignment` payload: the selected items (`ref`, `version`, `scope`, `title`), the `job_id`, an optional `mission_id`, and a Studio-stamped `assigned_at`. An empty `items` list is an explicit "no context" assignment, not an error.
