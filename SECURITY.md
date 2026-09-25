@@ -11,23 +11,26 @@ We will acknowledge receipt within 72 hours and provide an initial assessment wi
 
 ## Supported versions
 
+Only the latest 1.x release receives security fixes.
+
 | Version | Supported |
 |---------|-----------|
-| 0.19.x  | ✅        |
-| < 0.19  | ❌        |
+| 1.x (latest) | ✅   |
+| < 1.0   | ❌        |
 
 ## Supply-chain posture
 
 This repository implements the following controls:
 
-- Branch protection via GitHub rulesets on `main` (enforced on admins)
-- Required CI status checks before merge
+- Branch rulesets on the default branch (`develop`) block deletion and force-pushes; `main` receives only release PRs created by `just ship`
+- CI (lint, type check, tests, OSV-Scanner) runs on pull requests
 - Secret scanning with push protection
-- Dependabot security updates with a cooldown window on new releases
-- `uv sync --frozen` enforced in CI (lockfile cannot silently change)
+- Dependabot security updates, with a cooldown window on new releases for version updates
+- `uv sync --frozen` in the test and lint jobs (lockfile cannot silently change)
 - Trusted Publishing (OIDC) for PyPI releases — no long-lived publish tokens
-- Required reviewer approval on the `pypi` environment before publish secrets are exposed
+- Required reviewer approval on the `pypi` GitHub environment before the publish job runs
 - Third-party GitHub Actions pinned to commit SHAs
-- OSV-Scanner in CI (daily + on every PR targeting `main` or `develop`) against the OSV.dev malicious package index
+- OSV-Scanner in CI (daily, plus every push and PR on `main` and `develop`) against the OSV.dev vulnerability database
+- Tag protection ruleset on `v*` release tags
 
 If you observe a deviation from this posture, please report it via the private channel above.

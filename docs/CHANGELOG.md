@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## TODO
-
-- Review and test feature/data-persistence
-- Complete feature/smart-install implementation
-  - agent_simple:job_start:74 - AGENT ExampleAgent: Received kwargs: {'action': 'start', 'fields': {'How many times to say hello': '3'}, 'context': JobContext(workspace_id='odm', job_id='01KGM75NQ76AWBAXHXERW8FKHW', started_by='alp', started_at=datetime.datetime(2026, 2, 4, 11, 39, 0, 712598, tzinfo=TzInfo(0)), mission_id='01KGG50ZMFYMHG9N5FGCACF0XA', mission_name='Operate Agent Hello World AI Agent', mission_context=None, job_instructions=JobInstructions(max_cases=None, max_duration=None, max_cost=None, stop_on_warning=False, stop_on_error=True, job_start_time=None)), 'agent_parameters': [{'name': 'SIMPLE AGENT PARAMETER', 'team_id': 2, 'description': 'Setup agent parameter in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': False, 'is_required': False}, {'name': 'SIMPLE AGENT SECRET', 'team_id': 2, 'description': 'Setup agent secret in this workspace', 'is_environment': True, 'value': '123456', 'is_secret': True, 'is_required': False}]}
-
 ## [Unreleased]
+
+### Changed
+
+- **Documentation audit** — README, AGENTS.md, CONTRIBUTING.md, SECURITY.md, and `docs/` verified against the 1.6.0 code. Fixed: admin UI path and access model (`/manage`, Tailscale-gated, `ADMIN_ALLOWED_IPS` removed), the README v2 sample (`mission_id`, explicit `V2ActionDefinition`), Studio connection (`Account` wiring and the `SUPERVAIZER_WORKSPACE_AUTH_*` launch requirement), CLI reference (actual `deploy` options, non-functional `--reload`/`--debug`), persistence (the singleton ignores `db_path`; no `CachingMiddleware`), workspace authorization (`WorkspaceAuthorizationClaims`, exact bootstrap ids, env vars), CONTRIBUTING (mypy path, 88 columns, gitmoji commits, PRs target `develop`), and SECURITY (supported versions, actual branch rulesets). `docs/2025_08_ADMIN_README.md` and `docs/2025_08_REST_API.md` rewritten; `docs/2025_10_LOCAL_TESTING.md` marked legacy; RFC statuses updated; `GEMINI.md` and `.cursorrules` now point to `AGENTS.md`.
+
+### Removed
+
+- `docs/2025_04_API_REFERENCE.md` (v1 examples that no longer run), `docs/2025_08_PROTOCOLS.md` (subset of `2026_05_PROTOCOLS.md`), `docs/superpowers/` plans (shipped or removed features), and the CHANGELOG `TODO` block. `docs/2025_08_PARAMETER_VALIDATION_IMPLEMENTATION.md` trimmed to `docs/2025_08_PARAMETER_VALIDATION.md`.
 
 ## [1.6.0] - 2026-08-30
 
@@ -403,7 +405,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Async control-event HTTP client** — `account_service.send_event`, `Account` event helpers, and case event-reporting methods now use `httpx.AsyncClient` and must be awaited in async agents. Explicit `_sync` shims remain for CLI, startup, and synchronous controller methods. See [RFC: async-control-event-http-client](/docs/rfc/async-control-event-http-client.md) for details.
+- **Async control-event HTTP client** — `account_service.send_event`, `Account` event helpers, and case event-reporting methods now use `httpx.AsyncClient` and must be awaited in async agents. Explicit `_sync` shims remain for CLI, startup, and synchronous controller methods. See [RFC-002](rfc/2026_04_002-async-http-client.md) for details.
 
 ### Tests
 

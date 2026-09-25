@@ -2,9 +2,9 @@
 
 
 > **Created:** 2025-10-06
-> **Updated:** 2026-03-23
+> **Updated:** 2026-09-25
 
-**Status:** Revised Draft (v1 – Fully Automated)
+**Status:** Partially implemented (0.10.0). `plan`, `local`, `up`, `down`, `status`, `clean` exist; image push, rollback, `--rsa-key-path`, and `SV_RSA_PRIVATE_KEY_PATH` were never implemented. `2025_08_CLI.md` documents current behaviour; this RFC records the design.
 
 ## Abstract
 
@@ -85,7 +85,7 @@ Set for all platforms:
 - `SUPERVAIZER_PORT` = `--port`
 - `SV_LOG_LEVEL=INFO` (default)
 - `SUPERVAIZER_API_KEY` – stored in provider secret store (generated if `--generate-api-key`)
-- `ADMIN_ALLOWED_IPS` (optional) – comma-separated IPv4/IPv6 addresses and/or CIDR ranges allowed to access the `/admin` web UI; if unset or empty, all IPs are allowed (see `../2025_08_ADMIN_README.md`). Uses the first hop in `X-Forwarded-For` when present.
+- `TRUSTED_PROXIES` (optional) – comma-separated CIDRs of reverse proxies whose `X-Forwarded-For` may be trusted. The `/manage` admin UI is reachable only from Tailscale addresses (see `../2025_08_ADMIN_README.md`); `ADMIN_ALLOWED_IPS` was removed in 0.15.0.
 - **RSA** (choose one):
   - `SV_RSA_PRIVATE_KEY` (secret value), or
   - `SV_RSA_PRIVATE_KEY_PATH` (if platform supports volumes)
