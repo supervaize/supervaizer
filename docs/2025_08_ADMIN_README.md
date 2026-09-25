@@ -1,309 +1,77 @@
 # Supervaizer Admin Interface
 
-
 > **Created:** 2025-08-05
-> **Updated:** 2026-03-23
+> **Updated:** 2026-09-25
 
-A lightweight web-based admin interface for managing WorkflowEntity objects (Jobs and Cases) using FastAPI, TinyDB, and HTMX.
+A web UI mounted at `/manage` for inspecting Jobs and Cases, watching server and agent status, and exercising agents through a per-agent workbench. Built with FastAPI, Jinja templates, TinyDB, and HTMX/Alpine/Tailwind loaded from CDNs.
 
-## Features
-
-### 🎯 **Core Functionality**
-
-- **Dashboard**: Real-time system statistics and health monitoring
-- **Job Management**: Create, view, update, and delete jobs
-- **Case Management**: Manage workflow cases and their status
-- **Agent Monitoring**: View agent status and performance metrics
-- **Live Console**: Real-time logging and system monitoring
-- **Advanced Filtering**: Search and filter entities by various criteria
-- **Responsive Design**: Works on desktop and mobile devices
-
-### 🔐 **Security**
-
-- **API Key Required**: Admin interface requires a valid API key
-- **Authentication**: Add `X-API-Key` header to requests
-- **Secure Access**: All admin endpoints are protected
-- **IP allowlist (deployment)**: Set environment variable `ADMIN_ALLOWED_IPS` to restrict which client IPs may access the `/admin` web UI (including static assets and WebSocket upgrades). Comma-separated IPv4/IPv6 addresses and optional CIDR ranges (e.g. `10.0.0.0/8, 203.0.113.4`). If unset or empty, all IPs are allowed. The effective client IP is taken from the first value in `X-Forwarded-For` when present (typical behind a reverse proxy); otherwise the direct peer address is used. Ensure your proxy sets or overwrites `X-Forwarded-For` correctly so the allowlist matches real clients.
-
-### 📊 **Dashboard**
-
-- **System Statistics**: Real-time counts of jobs and cases by status
-- **Recent Activity**: Timeline of recent entity updates
-- **System Status**: Database connection and health monitoring
-
-## Installation & Setup
-
-### 1. **Dependencies**
-
-The admin interface requires the following dependencies (automatically installed):
-
-```bash
-uv add jinja2  # Template rendering
-# TinyDB is already included in the base project
-```
-
-### 2. **Integration**
-
-The admin interface is automatically integrated when creating a Server instance:
+## Enabling
 
 ```python
-from supervaizer.server import Server
-from supervaizer.agent import Agent
+from supervaizer import Agent, Server
 
-# Create server with admin interface enabled
-server = Server(
-    agents=[your_agents],
-    api_key="your-secure-api-key-here"  # Enables admin interface
-)
-
-# Admin routes are automatically mounted at /admin
+server = Server(agents=[my_agent], admin_interface=True)  # default: True
 server.launch()
 ```
 
-### 3. **Access**
+At launch the server logs `Deploy admin interface @ <public_url>/manage`. The mount also requires an API key, which is always present: `SUPERVAIZER_API_KEY`, an auto-generated key, or `local-dev` in local mode.
 
-- **Base URL**: `http://localhost:8000/admin/`
-- **Authentication**: Add header `X-API-Key: your-api-key`
-- **Dashboard**: `http://localhost:8000/admin/`
-- **Jobs Management**: `http://localhost:8000/admin/jobs`
-- **Cases Management**: `http://localhost:8000/admin/cases`
+## Access Model
 
-## Architecture
+The whole `/manage` router (HTTP and WebSocket) is gated by `require_tailscale`. No API key is involved.
 
-### 📁 **File Structure**
+- The client IP must be in the Tailscale CGNAT range `100.64.0.0/10`.
+- In local mode (`supervaizer start --local`, which sets `SUPERVAIZER_LOCAL_MODE=true`) loopback addresses are also allowed.
+- Behind a reverse proxy, `X-Forwarded-For` is trusted only when the direct peer is listed in `TRUSTED_PROXIES` (comma-separated CIDRs). Otherwise the peer address is used, so an untrusted proxy is denied.
+- Denied requests return HTTP 403 and are logged at `WARNING` with IP, path, and reason.
 
-```
-src/supervaizer/admin/
-├── routes.py              # FastAPI routes and API endpoints
-└── templates/
-    ├── base.html          # Base template with layout
-    ├── dashboard.html     # Dashboard page
-    ├── jobs_list.html     # Jobs management page
-    ├── jobs_table.html    # Jobs table (HTMX partial)
-    ├── cases_list.html    # Cases management page
-    ├── cases_table.html   # Cases table (HTMX partial)
-    ├── job_detail.html    # Job detail modal
-    ├── case_detail.html   # Case detail modal
-    └── recent_activity.html # Recent activity partial
-```
+`SUPERVAIZER_API_KEY` protects `/api/*` and `/a2a`, not `/manage`. `ADMIN_ALLOWED_IPS` and the old `/admin` prefix were removed in 0.15.0. See [2025_08_REST_API.md](2025_08_REST_API.md) for the full surface table.
 
-### 🗄️ **Data Storage**
+## Pages
 
-- **Backend**: TinyDB (JSON file-based database)
-- **Storage Manager**: Uses existing `StorageManager` from `storage.py`
-- **Collections**: Separate tables for "Job" and "Case" entities
-- **Relationships**: Foreign key references (Job.case_ids, Case.job_id)
+| URL | Purpose |
+| --- | --- |
+| `/manage/` | Dashboard: job and case counts by status, storage info, recent activity (last 5 jobs and cases) |
+| `/manage/jobs` | Job list with filters (`status`, `agent_name`, `search`, `sort`, `limit`, `skip`), details modal, status update, delete |
+| `/manage/cases` | Case list with filters (`status`, `job_id`, `search`, `sort`), cost per case, link to parent job |
+| `/manage/server` | Server identity, registration state, public URL |
+| `/manage/agents` | Registered agents and their methods |
+| `/manage/agents/{slug}/workbench` | Workbench: start a job, follow cases and steps, answer HITL prompts, execute, cancel, or schedule steps, live console over WebSocket |
+| `/manage/job-start-test` | Manual job-start form for testing |
+| `/manage/console` | Live log console fed by `/manage/log-stream` (server-sent events) |
 
-### 🔧 **Technical Stack**
+Job and case lists auto-refresh every 30 seconds. Jobs are created through the workbench or the API, not from the job list.
 
-- **Backend**: FastAPI with async/await support
-- **Database**: TinyDB for lightweight persistence
-- **Templates**: Jinja2 for server-side rendering
-- **Frontend**: HTMX + Alpine.js + Tailwind CSS
-- **Authentication**: API Key header-based
+## Endpoints Under `/manage/api`
 
-## API Endpoints
+JSON:
 
-### 📱 **Page Routes**
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/manage/api/stats` | Dashboard counters |
+| GET | `/manage/api/server/status` | Server and registration status |
+| POST | `/manage/api/server/register` | Trigger Studio registration |
+| GET | `/manage/api/agents`, `/manage/api/agents/{slug}` | Agent details |
+| POST | `/manage/api/jobs/{job_id}/status`, `/manage/api/cases/{case_id}/status` | Body `{"status": "<EntityStatus>"}` |
+| DELETE | `/manage/api/jobs/{job_id}` | Delete a job and its cases |
+| DELETE | `/manage/api/cases/{case_id}` | Delete a case |
+| POST | `/manage/api/console/execute` | Run a console command |
 
-- `GET /admin/` - Dashboard page
-- `GET /admin/jobs` - Jobs management page
-- `GET /admin/cases` - Cases management page
+HTML fragments for HTMX (not JSON): `GET /manage/api/jobs`, `/manage/api/jobs/{job_id}`, `/manage/api/cases`, `/manage/api/cases/{case_id}`, `/manage/api/recent-activity`.
 
-### 🔌 **API Routes**
+Workbench routes live under `/manage/agents/{slug}/workbench/...` (start, stop, status, answer, execute, cancel, schedule, jobs, console). `/manage/test-log`, `/manage/test-loguru`, and `/manage/debug-queue` are development helpers.
 
-- `GET /admin/api/stats` - System statistics
-- `GET /admin/api/jobs` - Jobs list with filtering/pagination
-- `GET /admin/api/jobs/{id}` - Job details
-- `GET /admin/api/cases` - Cases list with filtering/pagination
-- `GET /admin/api/cases/{id}` - Case details
-- `POST /admin/api/jobs/{id}/status` - Update job status
-- `POST /admin/api/cases/{id}/status` - Update case status
-- `DELETE /admin/api/jobs/{id}` - Delete job (and related cases)
-- `DELETE /admin/api/cases/{id}` - Delete case
-- `GET /admin/api/recent-activity` - Recent activity feed
+## Storage
 
-## Usage Examples
-
-### 🚀 **Basic Setup**
-
-```python
-#!/usr/bin/env python3
-from supervaizer.server import Server
-from supervaizer.agent import Agent
-
-# Create demo agent
-demo_agent = Agent(
-    name="demo_agent",
-    description="Demo agent for testing"
-)
-
-# Create server with admin interface
-server = Server(
-    agents=[demo_agent],
-    host="127.0.0.1",
-    port=8000,
-    api_key="my-secret-admin-key"
-)
-
-print("Admin interface: http://127.0.0.1:8000/admin/")
-print("API Key: my-secret-admin-key")
-server.launch()
-```
-
-### 🔍 **Filtering Examples**
-
-```bash
-# Filter jobs by status
-GET /admin/api/jobs?status=completed
-
-# Filter by agent name
-GET /admin/api/jobs?agent_name=demo_agent
-
-# Search jobs
-GET /admin/api/jobs?search=important
-
-# Combined filters with pagination
-GET /admin/api/jobs?status=in_progress&agent_name=demo&limit=25&skip=0
-
-# Filter cases by parent job
-GET /admin/api/cases?job_id=12345
-
-# Sort by creation date (descending)
-GET /admin/api/cases?sort=-created_at
-```
-
-### 🔄 **Status Updates**
-
-```bash
-# Update job status
-POST /admin/api/jobs/12345/status
-Content-Type: application/json
-X-API-Key: your-api-key
-
-{"status": "completed"}
-
-# Update case status
-POST /admin/api/cases/67890/status
-Content-Type: application/json
-X-API-Key: your-api-key
-
-{"status": "failed"}
-```
-
-## Features in Detail
-
-### 📊 **Dashboard**
-
-- **Job Statistics**: Total, running, completed, failed jobs
-- **Case Statistics**: Total, running, completed, failed cases
-- **System Info**: Database name, status, collection count
-- **Recent Activity**: Last 10 entity updates with clickable details
-
-### 👨‍💼 **Jobs Management**
-
-- **List View**: Paginated table with job details
-- **Filtering**: By status, agent name, search terms
-- **Sorting**: By created date, name, status
-- **Actions**: View details, update status, delete (with cascading case deletion)
-- **Details Modal**: Complete job information including context and related cases
-
-### 📁 **Cases Management**
-
-- **List View**: Paginated table with case details
-- **Filtering**: By status, parent job, search terms
-- **Cost Tracking**: Display total cost per case
-- **Parent Relations**: Direct links to parent jobs
-- **Details Modal**: Complete case information including nodes, updates, and final delivery
-
-### ⚡ **Real-time Features**
-
-- **Auto-refresh**: Optional auto-refresh for live monitoring
-- **Toast Notifications**: Success/error feedback for actions
-- **Dynamic Loading**: HTMX partial updates without page reloads
-- **Modal System**: Overlay details without navigation
-
-## Security Considerations
-
-### 🔐 **Authentication**
-
-- **API Key Required**: All admin endpoints require valid API key
-- **Environment Variables**: Use `SUPERVAIZER_API_KEY` environment variable
-- **Auto-generation**: Falls back to auto-generated key with warning
-
-### 🛡️ **Best Practices**
-
-- **Strong API Keys**: Use long, random API keys in production
-- **Environment Isolation**: Keep development and production keys separate
-- **Access Logging**: All admin actions are logged
-- **Input Validation**: All inputs are validated on server side
+Jobs and Cases are `WorkflowEntity` objects stored through `StorageManager` in TinyDB tables `Job` and `Case`. Storage is in-memory unless `SUPERVAIZER_PERSISTENCE=true` (or `supervaizer start --persist`), in which case data is written under `DATA_STORAGE_PATH` (default `./data`). See [2025_08_PERSISTENCE.md](2025_08_PERSISTENCE.md).
 
 ## Troubleshooting
 
-### ❗ **Common Issues**
+| Symptom | Cause |
+| --- | --- |
+| 403 on `/manage` from your laptop | Client IP is not a Tailscale address and local mode is off |
+| 403 behind a proxy | The proxy is not listed in `TRUSTED_PROXIES`, so the forwarded IP is ignored |
+| 404 on `/manage` | `admin_interface=False` |
+| Empty lists after restart | Persistence is off; set `SUPERVAIZER_PERSISTENCE=true` |
 
-**Admin interface not accessible:**
-
-- Ensure API key is set (`SUPERVAIZER_API_KEY` environment variable)
-- Check X-API-Key header is included in requests
-- Verify server is running with admin routes enabled
-
-**Templates not loading:**
-
-- Check template directory path in `routes.py`
-- Ensure all template files exist in `src/supervaizer/admin/templates/`
-
-**Database errors:**
-
-- Verify TinyDB file permissions
-- Check `DATA_STORAGE_PATH` environment variable
-- Ensure storage directory exists and is writable
-
-**HTMX not working:**
-
-- Check browser console for JavaScript errors
-- Verify HTMX script is loading from CDN
-- Ensure proper HTMX attributes in templates
-
-### 🔧 **Development Tips**
-
-- Use `debug=True` for detailed error messages
-- Check FastAPI auto-generated docs at `/docs`
-- Monitor server logs for admin route registration
-- Use browser dev tools to inspect HTMX requests
-
-## Future Enhancements
-
-### 🚀 **Planned Features**
-
-- **Mission Management**: Add CRUD for Mission entities
-- **Bulk Operations**: Multi-select actions for batch operations
-- **Export/Import**: JSON/CSV export of entity data
-- **Advanced Search**: Full-text search across all fields
-- **Audit Trail**: Track all changes with timestamps and user info
-- **Real-time WebSocket**: Live updates without polling
-- **Role-based Access**: Different permission levels
-- **Custom Dashboards**: Configurable widgets and metrics
-
-### 🎨 **UI Improvements**
-
-- **Dark Mode**: Toggle between light/dark themes
-- **Mobile Optimization**: Better responsive design for mobile devices
-- **Accessibility**: WCAG compliance improvements
-- **Performance**: Virtual scrolling for large datasets
-
----
-
-## Quick Test
-
-Run the test script to verify everything works:
-
-```bash
-uv run python tools/test_admin.py
-```
-
-Then visit `http://127.0.0.1:8000/admin/` with API key `test-admin-key-123` in the `X-API-Key` header.
-
----
-
-_For more information, see the main project documentation and API reference._
+Quick local check: `supervaizer start --local`, then open `http://127.0.0.1:8000/manage/`.

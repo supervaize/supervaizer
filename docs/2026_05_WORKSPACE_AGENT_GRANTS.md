@@ -1,9 +1,9 @@
 # Workspace Agent Grants
 
 > **Created:** 2026-05-18
-> **Updated:** 2026-05-22
+> **Updated:** 2026-09-25
 
-This document plans the Supervaizer v2 authorization model for shared agents.
+This document describes the Supervaizer v2 authorization model for shared agents. The SDK side is implemented in `supervaizer.workspace_authorization`; Studio owns grants and token minting.
 
 The problem is not routing. A workspace slug can route a request, but it cannot prove that the workspace approved the agent. If agents accept `tenant_slug` or `workspace_slug` as authority, an agent developer could simulate Studio calls for another workspace and read or mutate agent-side data without that workspace's approval.
 
@@ -85,15 +85,17 @@ Agents may not have persistent local memory. The grant model must therefore be s
 
 Studio stores the grant. Studio signs a short-lived token. The agent verifies the token on every request and builds trusted request context only for that request.
 
-The agent needs only stable trust material:
+The agent needs only stable trust material, configured through environment variables:
 
-- Studio issuer URL
-- Studio signing public key or JWKS URL
-- expected `server_id`
-- expected `agent_id` or `agent_slug`
-- optional `SUPERVAIZER_API_KEY`
+| Variable | Purpose |
+| --- | --- |
+| `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED` | `true` enables verification (default `false`) |
+| `SUPERVAIZER_WORKSPACE_AUTH_ISSUER` | Expected `iss` (Studio issuer URL) |
+| `SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY` or `SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL` | Ed25519 public key (PEM) or JWKS endpoint |
+| `SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE` | Optional expected `aud` override |
+| `SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS` | Clock skew tolerance, default 30 |
 
-The agent does not need to store grants locally.
+When A2A endpoints are enabled and the controller registers with Studio, `Server.launch()` refuses to start unless `REQUIRED=true`, `ISSUER`, and one key source are set. Local mode (`supervaizer start --local`) skips this check. The agent does not need to store grants locally.
 
 ## Token Shape
 
@@ -110,12 +112,12 @@ Recommended claims:
   "workspace_id": "01WORKSPACE",
   "workspace_slug": "recipient-workspace",
   "agent_id": "01AGENT",
-  "agent_slug": "agent-interviewer",
+  "agent_slug": "my-agent",
   "server_id": "01SERVER",
   "scopes": [
     "supervaizer/surface.load",
     "supervaizer/action.invoke",
-    "resource.campaigns.list",
+    "resource.contacts.list",
     "job.start"
   ],
   "agent_workspace_ref": "01AGENTWORKSPACE",
@@ -161,9 +163,9 @@ does not name agent-specific concepts such as tenant, account, or project.
 }
 ```
 
-Supervaizer treats these as bootstrap capabilities:
+Supervaizer treats exactly two actions and one surface as bootstrap capabilities:
 
-- `workspace_binding.*` actions may run before the workspace grant exists.
+- `workspace_binding.options` and `workspace_binding.create` may run before the workspace grant exists; custom ids configured in `existing.action` or `create.action` are not exempt.
 - `workspace_binding.options` lists existing agent-side records that can be bound.
 - `workspace_binding.create` creates a new agent-side record and returns the
   `agent_workspace_ref` Studio should store on the grant.
@@ -235,27 +237,28 @@ For `surface.load`, `action.invoke`, resource operations, dataset queries, `job.
 
 ### 5. SDK Verification
 
-Supervaizer verifies the token and creates trusted request context:
+Supervaizer verifies the token (`EdDSA` only, `X-Supervaize-Workspace-Authorization: Bearer <token>`) and exposes the verified claims to handlers as `WorkspaceAuthorizationClaims`:
 
 ```text
-WorkspaceContext
+WorkspaceAuthorizationClaims
+- iss, aud, sub, iat, exp, jti
 - grant_id
 - workspace_id
-- workspace_slug
+- workspace_slug (informational)
 - agent_id
 - agent_slug
 - server_id
-- scopes
-- agent_workspace_ref
+- scopes (non-empty)
+- agent_workspace_ref (optional)
 ```
 
-Handlers use this context. They must not trust raw `workspace_slug`, `tenant_slug`, or caller-provided resource filters as authorization.
+Handlers use these claims. They must not trust raw `workspace_slug`, `tenant_slug`, or caller-provided resource filters as authorization.
 
 ## Revocation
 
-The MVP should use short-lived tokens, ideally 5 to 15 minutes.
+Tokens are short-lived, ideally 5 to 15 minutes.
 
-Revoked or suspended grants stop working when existing tokens expire. For high-risk operations, Studio or the SDK can add introspection:
+Revoked or suspended grants stop working when existing tokens expire. The SDK does not introspect grants; for high-risk operations Studio may add introspection before minting or forwarding a token:
 
 - `job.start`
 - resource imports
@@ -305,17 +308,17 @@ Minimum snapshot:
 
 ```json
 {
-  "agent_name": "agent_interviewer",
-  "agent_slug": "agent-interviewer",
+  "agent_name": "My Agent",
+  "agent_slug": "my-agent",
   "server_id": "01SERVER",
-  "agent_version": "2.66.0",
+  "agent_version": "1.0.0",
   "supervaizer_contract_version": 2,
   "a2a_version": "0.2.6",
   "a2ui_version": "v0.8",
-  "a2ui_catalog_version": "agent-interviewer.2026-05-18",
-  "scopes": ["job.start", "resource.campaigns.list"],
-  "resources": ["campaigns", "contacts"],
-  "datasets": ["campaign_progress"],
+  "a2ui_catalog_version": "my-agent.2026-05-18",
+  "scopes": ["job.start", "resource.contacts.list"],
+  "resources": ["contacts"],
+  "datasets": ["progress_metrics"],
   "accepted_by_user_id": "01USER",
   "accepted_at": "2026-05-18T11:30:00Z"
 }
@@ -342,61 +345,15 @@ After revocation:
 
 No fallback to a fresh grant should occur without a new explicit acceptance.
 
-## Agent Interviewer Application
+## Agent-Side Data Access
 
-For `agent_interviewer`, the verified workspace context should drive tenant access.
-
-Recommended behavior:
-
-- campaign listing requires a valid workspace grant token
-- campaign listing returns only campaigns owned by the verified agent workspace reference
-- campaign listing still filters to `is_supervaize=true`
-- `job.start` requires `job.start` scope
-- contact import requires the campaign/contact import scope
-- Supabase database or tenant selection must be derived from verified context, not from raw request slug
-
-If the token is valid but no agent-side workspace binding exists, the agent should fail clearly:
+Agent handlers derive tenant or data-store selection from the verified claims (`workspace_id`, `grant_id`, `agent_workspace_ref`), never from a raw request slug. If the token is valid but no agent-side workspace binding exists, fail clearly:
 
 ```text
 Workspace is authorized in Studio but has no agent-side workspace binding.
 ```
 
-It should not fall back to slug matching.
-
-## Cross-Repo Implementation Plan
-
-### Supervaizer SDK
-
-- Add a workspace authorization token verifier.
-- Add typed request context for verified workspace grants.
-- Add scope checks for A2A methods, actions, resources, datasets, artifacts, and sync.
-- Add clear SDK errors for missing, expired, invalid, wrong-audience, wrong-agent, wrong-server, and missing-scope tokens.
-- Add tests that prove handlers are not called when verification fails.
-- Document that slugs are display and routing hints, not authorization.
-
-### Studio
-
-- Add `WorkspaceAgentGrant`.
-- Create grants only from recipient workspace admin acceptance.
-- Allow only workspace admins and agent-manager users to accept a shared agent.
-- Add target-workspace UI states for available, accepted, revoked, and suspended agents.
-- Add an acceptance screen that explains publisher, server identity, version, contract, scopes, resources, datasets, and data-access impact.
-- Store status, scopes, server id, agent id, workspace id, accepted actor, accepted timestamp, acceptance snapshot, revocation actor, revocation timestamp, and optional agent workspace binding.
-- Require re-acceptance when requested scopes or contract fingerprint expand.
-- Revoke grants when the target workspace removes the agent.
-- Expose a signing key or JWKS that agents can verify.
-- Mint short-lived workspace authorization tokens for Studio-to-agent calls.
-- Attach tokens to A2A calls, resource calls, dataset calls, artifact calls, `job.start`, and `job.sync`.
-- Fail clearly when no accepted grant exists for the workspace and agent.
-- Fail clearly when a grant is revoked, suspended, missing scope, or missing agent workspace binding.
-
-### Agent Interviewer
-
-- Stop trusting raw tenant or workspace slug for data access.
-- Resolve Supabase tenant/database context from verified workspace grant context.
-- Keep campaign filtering strict: verified tenant plus `is_supervaize=true`.
-- Require explicit scopes for campaign listing, campaign start, contact import, HITL submit, datasets, and artifacts.
-- Add tests for accepted grant, missing grant, wrong workspace, revoked grant, missing scope, and missing workspace binding.
+Do not fall back to slug matching.
 
 ## Failure Policy
 
@@ -428,50 +385,10 @@ Studio should surface these failures to operators as configuration or authorizat
 - A valid workspace token for one agent cannot access another agent.
 - An agent without local persistence can still verify every request.
 - Revoked grants stop authorizing requests after token expiry, and immediately for operations that use introspection.
-- Studio and agent_interviewer show clear errors for missing grant, missing scope, and missing workspace binding.
+- Studio and agents show clear errors for missing grant, missing scope, and missing workspace binding.
 
-## Current Implementation Notes
+## Server Identity and Startup
 
-As of 2026-05-22, the implementation has moved beyond this plan in the local
-Runwaize repos:
-
-- Studio stores explicit workspace-agent acceptance and revocation state,
-  including who accepted the agent and when.
-- Studio mints workspace authorization tokens for v2 calls and Supervaizer
-  verifies them before dispatching workspace-scoped handlers.
-- Agent Interviewer requires verified workspace context for v2 resources,
-  datasets, job start, sync, HITL, and artifacts. It must not resolve access
-  from raw `workspace_slug` or `tenant_slug`.
-- Agent-side workspace binding is generic in the v2 contract. Agent Interviewer
-  maps the generic `agent_workspace_ref` to its tenant configuration record,
-  but that tenant terminology is not exposed as a protocol requirement.
-- Bootstrap binding actions are allowed before a workspace grant exists, but
-  only under normal Studio-to-agent transport authentication. Every other
-  workspace-scoped operation fails closed without a valid workspace token.
-
-Important learning from local restarts and multi-instance concerns:
-
-- A grant must not be bound to an ephemeral process instance id. Use the
-  registered Studio server identity from `server.register.details.server_id`
-  and let registration refresh update the server record transparently.
-- Agent developers should not have to manually set Studio server ids. If the
-  effective registered server identity changes, Studio should refresh the
-  association or offer an explicit reset/refresh action to the operator.
-- Registration handshake failures must be startup failures, not latent runtime
-  failures. The agent should fail to start when Studio did not persist the
-  effective controller API key or when the handshake response is missing the
-  data required to verify Studio-to-agent calls.
-- Contract fingerprint checks should distinguish expanding changes from
-  harmless refreshes. Requiring manual reacceptance on every Studio restart is
-  too strict and creates operational noise.
-
-Open product decisions:
-
-- Which registration changes automatically refresh an accepted grant, and which
-  require explicit reacceptance?
-- Should revocation immediately cancel running jobs, mark them failed in
-  Studio, or only block new calls while preserving active agent-side work?
-- How should Studio present stale accepted grants when a server is replaced by
-  a new deployment with the same public URL and agent identity?
-- Should high-risk operations introspect grant status on every call, or is
-  short-lived token expiry sufficient for the MVP?
+- A grant is bound to the registered Studio server identity (`server.register.details.server_id`), never to an ephemeral process instance id. The SDK takes it from `SUPERVAIZER_SERVER_ID` and generates a new UUID per process when unset, so deployments must set `SUPERVAIZER_SERVER_ID` (and `SUPERVAIZER_PRIVATE_KEY`) to keep identity stable across restarts and instances.
+- Registration handshake failures are startup failures, not latent runtime failures. The agent must fail to start when Studio did not persist the effective controller API key or when the handshake response lacks the data needed to verify Studio-to-agent calls.
+- Contract fingerprint checks distinguish expanding changes (new scopes, new data access) from harmless refreshes. Only expanding changes require explicit reacceptance.
