@@ -442,6 +442,7 @@ class V2AgentCapabilities(ContractModel):
     def validate_surface_definitions(self) -> V2AgentCapabilities:
         declared = set(self.surfaces)
         described: set[str] = set()
+        with_text: list[V2SurfaceDefinition] = []
         for definition in self.surface_definitions:
             if definition.id not in declared:
                 raise ValueError(
@@ -452,6 +453,11 @@ class V2AgentCapabilities(ContractModel):
                     f"surface_definitions describes surface {definition.id!r} twice"
                 )
             described.add(definition.id)
+            if definition.label is not None or definition.description is not None:
+                with_text.append(definition)
+        # A definition with no text says nothing, and keeping it would serialize a
+        # non-empty `surface_definitions` for an agent that declares no display text.
+        self.surface_definitions = with_text
         return self
 
 

@@ -725,6 +725,19 @@ def test_v2_surface_definition_rejects_blank_id() -> None:
         _minimal_registration(surfaces=[{"id": " ", "label": "Nothing"}])
 
 
+def test_v2_surface_definitions_without_text_are_dropped() -> None:
+    """Constructing the model directly with text-less definitions still omits the field."""
+    capabilities = V2AgentCapabilities.model_validate({
+        "surfaces": ["job.start", "case.step.detail"],
+        "surface_definitions": [
+            {"id": "job.start"},
+            {"id": "case.step.detail", "label": "  ", "description": ""},
+        ],
+    })
+    assert capabilities.surface_definitions == []
+    assert "surface_definitions" not in capabilities.model_dump(mode="json")
+
+
 def test_v2_awaiting_state_is_not_reopenable_by_default() -> None:
     awaiting = V2AwaitingState.model_validate({
         "reason": "Review campaign setup",
