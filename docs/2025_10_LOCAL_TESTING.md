@@ -2,7 +2,9 @@
 
 
 > **Created:** 2025-10-07
-> **Updated:** 2026-01-29
+> **Updated:** 2026-09-25
+
+> **Legacy / known gaps.** This is a Docker smoke test for `supervaizer deploy local`. Its API health check probes a removed route, host `SUPERVAIZE_API_KEY` is overridden by a test key, `--generate-rsa` writes a variable the server never reads, and the container cannot start a Studio-registered v2 controller (no `SUPERVAIZER_WORKSPACE_AUTH_*` passthrough). For local development use `supervaizer start --local` (see [2025_08_CLI.md](2025_08_CLI.md)).
 
 This document describes how to test Supervaizer deployments locally using Docker before deploying to cloud platforms.
 
@@ -18,24 +20,14 @@ The local testing functionality allows you to:
 
 ## Quick Start
 
-### 1. Basic Local Test
+### Basic Local Test
 
 ```bash
 # Test with default settings
-supervaizer deploy local
+supervaizer deploy local --name my-agent
 
-# Test with custom port and generated secrets
-supervaizer deploy local --port 8080 --generate-api-key --generate-rsa
-```
-
-### 2. Using the Test Script
-
-```bash
-# Make the script executable
-chmod +x test_local.py
-
-# Run the test script
-./test_local.py
+# Test with custom port and a generated API key
+supervaizer deploy local --name my-agent --port 8080 --generate-api-key
 ```
 
 ## Command Options

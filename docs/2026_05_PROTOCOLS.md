@@ -1,20 +1,16 @@
 # Protocol Support
 
 > **Created:** 2025-08-06
-> **Updated:** 2026-05-18
+> **Updated:** 2026-09-25
 
 SUPERVAIZER uses several protocol layers. They are related, but they do different jobs:
 
-| Layer              | Role in Supervaizer                                                                                           | Current status                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **A2A**            | Transport and discovery:                                                                                      | Implemented for discovery,                                                    |
-|                    | Agent Cards, controller URL, JSON-RPC method calls, and event streams.                                        | `supervaizer/action.invoke`, `supervaizer/surface.load`, and SSE observation. |
-| **A2UI**           | Surface payloads:                                                                                             | Implemented as the payload format                                             |
-|                    | declarative UI documents for Studio-rendered forms, dashboards, detail views, and mounted resource workflows. | returned by `supervaizer/surface.load`.                                       |
-| **AG-UI**          | Live agent-user runtime:                                                                                      | Not part of the MVP runtime;                                                  |
-|                    | bidirectional event flow for streaming messages, tool calls, state updates, and interactive agent sessions.   | v2 registration only carries optional `ag_ui_version` metadata.               |
-| **Supervaizer v2** | Application semantics:                                                                                        | Implemented as the Studio operation contract                                  |
-|                    | Jobs, Cases, Steps, Resources, Datasets, Surfaces, Actions, Artifacts, and sync/offline policy.               | layered on A2A and A2UI.                                                      |
+| Layer | Role in Supervaizer | Current status |
+| --- | --- | --- |
+| **A2A** | Transport and discovery: Agent Cards, controller URL, JSON-RPC method calls, and event streams. | Implemented for discovery, `supervaizer/action.invoke`, `supervaizer/surface.load`, and SSE observation. |
+| **A2UI** | Surface payloads: declarative UI documents for Studio-rendered forms, dashboards, detail views, and mounted resource workflows. | Implemented as the payload format returned by `supervaizer/surface.load`. |
+| **AG-UI** | Live agent-user runtime: bidirectional event flow for streaming messages, tool calls, state updates, and interactive agent sessions. | Not part of the MVP runtime; v2 registration only carries optional `ag_ui_version` metadata. |
+| **Supervaizer v2** | Application semantics: Jobs, Cases, Steps, Resources, Datasets, Surfaces, Actions, Artifacts, and sync/offline policy. | Implemented as the Studio operation contract layered on A2A and A2UI. |
 
 The detailed Supervaizer v2 model is documented in [2026_05_SUPERVAIZER_v2.md](2026_05_SUPERVAIZER_v2.md).
 
@@ -22,17 +18,13 @@ The detailed Supervaizer v2 model is documented in [2026_05_SUPERVAIZER_v2.md](2
 
 ### Overview
 
-SUPERVAIZER implements the [Agent-to-Agent (A2A) protocol](https://a2a-protocol.org/) for standardized agent discovery and interaction.
+SUPERVAIZER implements [A2A](https://a2a-protocol.org/)-style agent discovery and a JSON-RPC controller endpoint. The Agent Card is Supervaizer's own format (`schema_version: a2a_2023_v1`) and does not follow the upstream A2A AgentCard schema field for field.
 
 ### Implemented A2A Features
 
-- **Agent Discovery**: `/.well-known/agents.json` endpoint for listing all available agents
-  Note: the current version of the A2A protocol does not support yet multiple agents.
-- **Agent Cards**: Detailed agent information available at `/.well-known/agents/v{version}/{agent_slug}_agent.json`
-- **Health Monitoring**: Real-time system and agent health data at `/.well-known/health`
-- **Versioned Endpoints**: Support for agent versioning with backward compatibility
-- **OpenAPI Integration**: Direct links to OpenAPI specifications and documentation
-- **Version Information**: Comprehensive version tracking with changelog access
+- **Agent Discovery**: `/.well-known/agents.json` lists every agent served by the controller
+- **Agent Cards**: `/.well-known/agents/v{version}/{agent_slug}_agent.json`, plus the unversioned legacy route `/.well-known/agents/{agent_slug}_agent.json`
+- **Health Monitoring**: system and agent health at `/.well-known/health`
 - **JSON-RPC Controller Endpoint**: `POST /a2a` supports Supervaizer v2 methods including `supervaizer/action.invoke` and `supervaizer/surface.load`; requests require `X-API-Key` with write scope
 - **Server-Sent Events**: `GET /a2a/events` streams Supervaizer v2 action effects for observers that need a live feed; requests require `X-API-Key` with read scope
 
@@ -53,7 +45,9 @@ This extension does **not** replace the existing Studio server-registration trus
 
 Workspace and tenant slugs are not enough to authorize shared-agent access. A Supervaizer v2 controller should treat them as display and routing hints only.
 
-The planned shared-agent model uses a Studio-owned Workspace Agent Grant and a short-lived Studio-signed workspace authorization token. Studio sends the token with Studio-to-agent requests, and the Supervaizer SDK verifies it before dispatching handlers. This lets stateless agents safely serve multiple workspaces without storing grant state locally.
+The shared-agent model uses a Studio-owned Workspace Agent Grant and a short-lived Studio-signed workspace authorization token. Studio sends the token with Studio-to-agent requests, and the Supervaizer SDK verifies it before dispatching handlers. This lets stateless agents safely serve multiple workspaces without storing grant state locally.
+
+Studio sends the token in the `X-Supervaize-Workspace-Authorization: Bearer <token>` header. With `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED` unset, every non-bootstrap `/a2a` call fails with JSON-RPC error `-32030 workspace_authorization_not_configured`; this includes local mode.
 
 See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md).
 
@@ -68,11 +62,12 @@ Supervaizer v2 currently exposes two A2A JSON-RPC methods:
 
 Both methods are scoped by `agent_slug`. In multi-agent controllers, handlers must be registered for the correct agent slug.
 
-Workspace-scoped calls require a Studio-signed workspace authorization token.
-The only bootstrap exceptions are `workspace_binding.*` actions and the
-`workspace_binding.create` surface. These calls are used before a Workspace
-Agent Grant exists, so they require normal Studio-to-agent transport
-authentication but not a workspace authorization token.
+Every action and surface requires a Studio-signed workspace authorization token,
+except the bootstrap set: the `workspace_binding.options` and
+`workspace_binding.create` actions and the `workspace_binding.create` surface.
+These calls are used before a Workspace Agent Grant exists, so they require
+normal Studio-to-agent transport authentication but not a workspace
+authorization token.
 
 ### Transport Status
 
@@ -163,21 +158,16 @@ curl https://your-server/.well-known/agents.json
 curl https://your-server/.well-known/agents/v1.0.0/myagent_agent.json
 ```
 
-Full documentation of A2A endpoints can be found at [local A2A](http://127.0.0.1:8001/docs#/Protocol%20A2A)
+With a running controller, the A2A routes are listed under the `Protocol A2A` tag in the Swagger UI at `http://127.0.0.1:8000/docs`.
 
-### Future A2A Enhancements
+### Not Yet Implemented
 
-- **Webhooks**: Event subscription for real-time updates
-- **Rich Authentication**: OAuth2 and API key options with scope control
-- **Tool Streaming**: Support for streaming responses in long-running operations
-- **Extended Metadata**: Licensing, pricing, and usage limit information
-- **Localization**: Multi-language support for agent interfaces
-- **A2A Push Notifications**: push delivery for environments that need callback delivery instead of JSON-RPC polling/SSE observation
-- **AG-UI Runtime Integration**: optional bidirectional streaming UI runtime for live agent interactions; current v2 registrations only carry `ag_ui_version` metadata
+- **A2A push notifications**: callback delivery instead of JSON-RPC polling or SSE observation. Not advertised until implemented.
+- **AG-UI runtime**: optional bidirectional streaming runtime for live agent sessions. Registrations only carry `ag_ui_version` metadata.
 
 ## Enabling Protocol Support
 
-A2A endpoints are enabled by default. You can control protocol support when creating your server:
+A2A endpoints are enabled by default. `a2a_endpoints=False` is honoured only for a standalone server; when a `supervisor_account` is set or local mode is on, the server forces it back to `True`.
 
 ```python
 server = Server(
@@ -186,8 +176,4 @@ server = Server(
 )
 ```
 
-## Protocol Evolution
-
-The A2A protocol has evolved to incorporate features from multiple agent communication standards, including the former Agent Communication Protocol (ACP). This unified approach provides a comprehensive standard for agent interoperability across different systems and platforms.
-
-For the latest protocol specifications and updates, visit [a2a-protocol.org](https://a2a-protocol.org/).
+For the latest protocol specifications, see [a2a-protocol.org](https://a2a-protocol.org/), [a2ui.org](https://a2ui.org/), and [docs.ag-ui.com](https://docs.ag-ui.com/introduction).

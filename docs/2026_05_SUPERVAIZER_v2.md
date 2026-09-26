@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-05-22
+> **Updated:** 2026-09-25
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -106,17 +106,20 @@ This does not replace the existing Studio server registration process. Server id
 
 Workspace slugs and tenant slugs are not authorization primitives. They are display and routing hints only.
 
-When Studio operates an agent shared into another workspace, Studio must prove that the recipient workspace admin accepted the agent. The planned v2 model is a Studio-owned Workspace Agent Grant plus a short-lived Studio-signed workspace authorization token on each Studio-to-agent request.
+When Studio operates an agent shared into another workspace, Studio must prove that the recipient workspace admin accepted the agent. The v2 model is a Studio-owned Workspace Agent Grant plus a short-lived Studio-signed workspace authorization token on each Studio-to-agent request.
 
 Agents may be stateless. They do not need to persist grants locally. The agent verifies the token on every request and uses the verified grant context for resource access, dataset queries, `job.start`, `job.sync`, artifacts, and HITL actions.
 
 If an agent requires an agent-side record before accepting a workspace, it can
-declare `workspace_binding` in its v2 registration. Supervaizer treats
-`workspace_binding.*` actions and the `workspace_binding.create` surface as
-bootstrap capabilities: they still require Studio-to-agent transport
-authentication, but they run before a workspace authorization token exists. All
-other workspace-scoped actions and surfaces fail closed without a valid
-workspace authorization token.
+declare `workspace_binding` in its v2 registration. Exactly two action ids,
+`workspace_binding.options` and `workspace_binding.create`, plus the
+`workspace_binding.create` surface, are bootstrap capabilities: they still
+require Studio-to-agent transport authentication, but they run before a
+workspace authorization token exists. Custom ids configured in
+`workspace_binding.existing.action` or `create.action` are not exempt. Every
+other action and surface fails closed without a valid workspace authorization
+token, whatever `scope` it declares; the dispatcher does not consult
+`V2ActionDefinition.scope` for authorization.
 
 See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md) for the implementation plan.
 
@@ -186,8 +189,8 @@ A Step is an observable activity inside a Case.
 In the current SDK model:
 
 - `activity` is `operation` or `delegation`
-- `status` carries lifecycle state such as pending, active, awaiting, completed, failed, or cancelled
-- `awaiting` carries HITL state when Studio must collect operator input
+- `status` carries lifecycle state such as pending, active, awaiting, completed, failed, or cancelled (a free-form string; these values are the convention Studio renders)
+- `awaiting` carries HITL state when Studio must collect operator input: a required `reason`, the `surface` and `action` to use, `fields`, and `reopenable` (default `False`) declaring whether an answered step may be reopened and resubmitted
 - `outputs` carries produced artifacts
 
 HITL is therefore not a Step kind. It is represented by `status="awaiting"` plus an `awaiting` object with a surface, action, and fields.
@@ -237,8 +240,7 @@ Artifacts are agent-owned outputs. The protocol only defines the reference shape
 
 - `id`
 - `type`
-- `title`
-- optional external id and media type
+- optional `title`, external id, and media type
 
 Artifact types such as `transcript`, `synthesis`, `report`, `metric`, or `decision` belong to the agent registration. Studio can render known artifact types richly and fall back to generic previews for unknown types.
 
@@ -257,6 +259,7 @@ Examples:
 A resource declaration can include:
 
 - operations such as `list`, `get`, `create`, `update`, `delete`, `import`
+- `scope` (`workspace`, `mission`, or `job`) and `requires_context` (default `["workspace.id"]`)
 - display metadata for title, columns, and search fields
 - simple form fields
 - typed resource-backed option sources
@@ -273,14 +276,15 @@ This avoids repeating the v1 dynamic-choice callback model.
 
 Datasets are read-oriented tables or metric streams that Studio can query through typed actions.
 
-An auto-surfaced dataset declares:
+A dataset declares:
 
 - `id`
 - `label`
 - display columns
-- `auto_surface=True`
+- `scope` (`workspace`, `mission`, or `job`; default `workspace`)
+- `auto_surface=True` to get a Studio-generated `mission.agent.dataset.<id>` surface
 
-The SDK derives the action id `dataset.<id>.query`. Studio can render the result in generic tables and dashboards, including `mission.analytics` surfaces.
+The SDK derives a `dataset.<id>.query` action (`mutating=False`) for every dataset, auto-surfaced or not. Studio can render the result in generic tables and dashboards, including `mission.analytics` surfaces.
 
 ## Dashboards
 
@@ -379,12 +383,24 @@ Common action IDs:
 | `resource.<id>.<operation>` | Run a resource operation. |
 | `dataset.<id>.query` | Query an agent-owned dataset. |
 | `artifact.get` | Load artifact content by reference. |
+| `job.start.preview` | Preview a job setup plan before `job.start`; declared through `job_policy.setup`. |
+| `workspace_binding.options`, `workspace_binding.create` | Bootstrap actions that bind an agent-side record to a Studio workspace. |
+| `agent.refresh`, `agent.custom.<method>` | Agent-level methods declared through `V2AgentMethods`. |
 
-Action requests include `actor`, `workspace`, `mission_id`, `agent_slug`, `surface`, `action`, `input`, and optional correlation fields such as `job_id`, `case_id`, `step_id`, `draft_session_id`, and `idempotency_key`.
+Action requests include `request_id`, `actor`, `workspace`, `mission_id`, `agent_slug`, `surface`, `action`, `input`, and optional correlation fields such as `job_id`, `case_id`, `step_id`, `draft_session_id`, and `idempotency_key`. After verification the SDK injects `workspace_authorization` (a `V2VerifiedWorkspaceContext`) so handlers use verified claims rather than headers.
+
+### Action metadata
+
+Since 1.6.0, `capabilities.actions` serializes as a list of `V2ActionDefinition` objects, each with `id`, `mutating` (does invoking it change agent-side state?), and `scope` (`workspace`, `mission`, or `job`). Consumers authorize and group actions from this metadata instead of pattern-matching ids.
+
+- Bare strings are still accepted in `build_v2_agent_registration(actions=...)` and coerce to `mutating=True, scope="job"`, the fail-closed reading.
+- Derived actions inherit metadata from their definition: resource operations take `V2ResourceDefinition.scope` and stay `mutating=True` unless declared otherwise, dataset queries are `mutating=False`, `job_policy.setup.preview_action` is `mutating=False`, and workspace binding actions are `workspace`-scoped.
+- Precedence is explicit > derived > bare: an explicit `V2ActionDefinition` in `actions=` overrides derived metadata regardless of position, and the earliest mention fixes the order.
+- `job_policy.setup` (`V2JobSetupPolicy`) declares `preview_action`, `start_action`, and `submit_action` (defaults `job.start.preview`, `job.start`, `step.awaiting.submit`), the `action_scopes` they apply to (default empty), and an opaque `plan`. `V2ActionResult.setup_plan` carries the plan back to Studio.
 
 ### Context assignment semantics
 
-`context.assign` carries a `V2ContextAssignment` payload: the selected items (`ref`, `version`, `scope`, `title`), the `job_id`, an optional `mission_id`, and a Studio-stamped `assigned_at`. An empty `items` list is an explicit "no context" assignment, not an error.
+`context.assign` carries a `V2ContextAssignment` payload: the selected items (`ref`, `version`, `scope`, `title`), the `job_id`, an optional `mission_id`, and a Studio-stamped `assigned_at`. An empty `items` list is an explicit "no context" assignment, not an error. `mission_id` is required when any item is mission-scoped.
 
 The payload intentionally contains references, not content. On receipt the agent fetches each item once through `ContextClient.open()` and freezes the returned content as its own snapshot with provenance (`ref`, `version`, content `hash`, `synced_at`). `ContextClient.open()` returns the item's current `version`; the agent MUST compare it against the assigned `version` and fail the whole assignment with an explicit error when they differ — the item changed between selection and sync, and the operator should re-assign. Agents must not silently store content under a version it does not match, and must not re-read Studio context during job execution; a new `context.assign` is the only refresh path.
 
@@ -419,8 +435,8 @@ The v2 model intentionally replaces v1 field/dynamic-choice/job-poll behavior.
 | v1 concept | v2 replacement |
 | --- | --- |
 | `AgentMethodField` for Studio job start | A2UI `job.start` surface |
-| `dynamic_choices_callback` | typed resource option sources or typed actions |
-| `job_poll` | `job.sync` |
+| `dynamic_choices_callback` (removed in 1.0.0; passing it raises) | typed resource option sources or typed actions |
+| `job_poll` (removed; passing it raises) | `job.sync` |
 | controller-specific HITL payloads | `case.step.awaiting` surface plus `step.awaiting.submit` |
 | fixed Studio assumptions about agent outputs | agent-declared artifact types and `case.step.detail` surfaces |
 
@@ -439,71 +455,14 @@ New agents should model Studio integration through v2 from the start.
 - Return stable external ids in Job/Case/Step/Artifact snapshots.
 - Keep business validation inside agent actions, not inside Studio-specific code paths.
 
-## Implementation Status: Agent Interviewer Reference Agent
+## Design Rules
 
-As of 2026-05-22, Agent Interviewer is the reference implementation for the
-v2 operating model. The current implementation is not just discovery metadata;
-Studio can call the agent through A2A JSON-RPC, render A2UI surfaces, and sync
-job state back from the agent.
+These decisions are fixed for v2 and apply to every agent built on the SDK:
 
-Implemented across the local Runwaize repos:
-
-- Supervaizer SDK exposes the v2 registration builder, A2A Agent Card metadata,
-  JSON-RPC action dispatch, surface dispatch, resource/dataset/action contracts,
-  workspace authorization verification, and clear handler-blocking errors.
-- Studio ingests v2 registration data, renders generic resources, datasets,
-  surfaces, HITL forms, artifacts, job analytics, case lanes, and job-state
-  snapshots, and no longer relies on v1 dynamic job-start choices for v2 agents.
-- Agent Interviewer declares campaigns, contacts, prompts, scenarios,
-  campaign_contacts, campaign datasets, transcript/synthesis artifacts, setup /
-  work / deliverable lanes, job analytics, workspace binding actions, and
-  campaign-specific surfaces through the v2 contract.
-- Studio-to-agent calls for workspace-scoped actions use Workspace Agent Grants
-  and Studio-signed workspace authorization tokens. Raw tenant or workspace
-  slugs are not authority.
-- Campaign starts return a top-level `job_state` snapshot so Studio can
-  materialize setup cases immediately, then converge through `job.sync`.
-- Contact enrollment import is modeled as a generic `ResourceImport` surface.
-  Studio communicates and validates file structure; Agent Interviewer owns the
-  import format, tenant validation, persistence, and returned job state.
-- Agent Interviewer job analytics are Vega-Lite based and currently focus on
-  the campaign-scoped session-duration-over-time chart for Studio job detail.
-- Public interview configuration failures must be caught before live interview
-  startup. A missing or empty configured campaign prompt is a campaign
-  configuration error, not a network interruption.
-
-Deliberate decisions:
-
-- v2 does not preserve v1 dynamic-choice, job-poll, or legacy case-update
-  behavior unless explicitly required. For the current v2 workstream, enforce
-  v2 workspace operations whenever the Supervaize controller path is active.
-- No guessing and no implicit fallback: missing workspace authorization,
-  missing workspace binding, mismatched server/agent id, missing scopes, and
-  missing campaign prompt configuration must fail with explicit errors.
-- Studio owns generic rendering and acceptance records. Agents own business
-  vocabulary and must validate every business mutation.
-- `server.register.details.server_id` is the authoritative controller identity.
-  It should survive agent restarts through registration, not by manual user
-  configuration.
-- If `SUPERVAIZER_API_KEY` is set, Supervaizer uses it. If it is not set, the
-  agent developer may allow generation. Startup must verify Studio persisted
-  the effective key; mismatches fail startup instead of producing repeated
-  `/a2a` 401s later.
-
-Current gaps to consider next:
-
-- Make contract-change reacceptance smarter: already accepted grants should be
-  refreshable automatically when only non-expanding registration metadata
-  changes; expanded scopes or data access still require explicit acceptance.
-- Strengthen e2e coverage for the entire blue-sky flow: share agent, accept
-  workspace binding, create mission, create campaign job, import contacts, run
-  setup case, start interview, sync transcript/synthesis, render analytics, and
-  revoke access.
-- Add clearer Studio operator recovery for invalid campaign configuration,
-  missing workspace binding, missing signing key, wrong server id, and revoked
-  grants.
-- Complete production deployment hardening for split public/controller runtimes,
-  Cloud Run startup probes, Secret Manager requirements, and dashboarded
-  registration-handshake health.
-- Decide how Studio should present historical jobs when grants are revoked or
-  when an agent/server is replaced.
+- v2 does not preserve v1 dynamic-choice, job-poll, or legacy case-update behavior. When the Supervaize controller path is active, workspace operations go through v2.
+- No guessing and no implicit fallback: missing workspace authorization, missing workspace binding, mismatched server or agent id, and missing scopes fail with explicit errors that name the missing configuration.
+- Studio owns generic rendering and acceptance records. Agents own business vocabulary and validate every business mutation.
+- `server.register.details.server_id` is the controller identity Studio keys on. It comes from `SUPERVAIZER_SERVER_ID`, or a new UUID per process when unset, so set the variable in every deployed environment to keep grants stable across restarts and instances.
+- If `SUPERVAIZER_API_KEY` is unset, the SDK generates a key at startup and logs only its fingerprint. Startup verifies that Studio persisted the effective key, and a mismatch fails startup instead of producing repeated `/a2a` 401s later.
+- Agent-specific configuration errors are surfaced before work starts, as configuration errors rather than transport failures.
+- Action results may return a top-level `job_state` snapshot so Studio can materialize cases immediately, then converge through `job.sync`.

@@ -1,7 +1,7 @@
 # Supervaizer
 
 > **Created:** 2024-12-28
-> **Updated:** 2026-05-17
+> **Updated:** 2026-09-25
 
 Supervaizer is the Python controller SDK for exposing AI agents to Supervaize Studio through the Supervaizer v2 operation contract.
 
@@ -20,7 +20,8 @@ Supervaizer does not contain agent business logic. Agents declare their resource
 - [Supervaizer v2 concepts](docs/2026_05_SUPERVAIZER_v2.md)
 - [Protocols: A2A, A2UI, AG-UI, and Supervaizer v2](docs/2026_05_PROTOCOLS.md)
 - [CLI reference](docs/2025_08_CLI.md)
-- [REST and admin API reference](docs/2025_08_REST_API.md)
+- [API surfaces and authentication](docs/2025_08_REST_API.md)
+- [Admin interface and workbench](docs/2025_08_ADMIN_README.md)
 - [Hello World example repository](https://github.com/supervaize/supervaize_hello_world)
 - [Built-in local Hello World agent](src/supervaizer/examples/hello_world_agent.py)
 
@@ -35,7 +36,7 @@ pip install supervaizer
 For local development from this repository:
 
 ```bash
-uv sync
+just install-dev   # uv sync --extra dev
 ```
 
 ### 2. Run The Built-In V2 Hello World Agent
@@ -46,32 +47,34 @@ The fastest way to see the v2 controller is local mode:
 supervaizer start --local
 ```
 
-If your project does not define `supervaizer_control.py`, local mode starts the built-in Hello World agent. It exposes:
+Local mode runs the agents from your `supervaizer_control.py` plus the built-in Hello World agent (disable it with `SUPERVAIZER_DISABLE_HELLO_WORLD=true`); with no control file it starts Hello World alone. Hello World declares:
 
 - a v2 Agent Card
-- a `job.start` A2UI form surface
-- `job.start`, `job.sync`, and `step.awaiting.submit` actions
+- `job.start` and `case.step.awaiting` A2UI surfaces
+- `job.start`, `job.start.preview`, `job.sync`, and `step.awaiting.submit` actions
 - one generated resource action, `resource.hello_messages.list`
 - a minimal HITL review step when human review is enabled
 
+Local mode binds to `127.0.0.1`, skips Studio registration, and uses the API key `local-dev`. Invoking v2 actions over `/a2a` requires Studio workspace authorization, which local mode does not have, so `/a2a` calls answer `workspace_authorization_not_configured`; use the workbench at `/manage` to run jobs locally.
+
 Open these endpoints:
 
-| URL | Purpose |
-| --- | --- |
-| `http://127.0.0.1:8000/docs` | FastAPI Swagger docs |
-| `http://127.0.0.1:8000/.well-known/agents.json` | A2A discovery |
-| `http://127.0.0.1:8000/.well-known/health` | Controller health |
-| `http://127.0.0.1:8000/a2a` | A2A JSON-RPC controller endpoint |
-| `http://127.0.0.1:8000/a2a/events` | SSE stream for v2 effects |
-| `http://127.0.0.1:8000/admin` | Local admin interface |
+| URL | Purpose | Access |
+| --- | --- | --- |
+| `http://127.0.0.1:8000/docs` | FastAPI Swagger docs | public |
+| `http://127.0.0.1:8000/.well-known/agents.json` | A2A discovery | public |
+| `http://127.0.0.1:8000/.well-known/health` | Controller health | public |
+| `POST http://127.0.0.1:8000/a2a` | A2A JSON-RPC controller endpoint | `X-API-Key` (write scope) plus workspace token |
+| `GET http://127.0.0.1:8000/a2a/events` | SSE stream for v2 effects | `X-API-Key` (read scope) |
+| `http://127.0.0.1:8000/manage` | Admin interface and agent workbench | Tailscale IP, or loopback in local mode |
 
 ### 3. Inspect The Hello World Example
 
-Use the public example as the reference project layout:
+The built-in agent is the v2 reference implementation:
 
-- Repository: [supervaize/supervaize_hello_world](https://github.com/supervaize/supervaize_hello_world)
 - Local built-in implementation: [src/supervaizer/examples/hello_world_agent.py](src/supervaizer/examples/hello_world_agent.py)
 - Local server registration: [src/supervaizer/examples/local_server.py](src/supervaizer/examples/local_server.py)
+- Public repository: [supervaize/supervaize_hello_world](https://github.com/supervaize/supervaize_hello_world). It shows the standalone project layout but still uses the v1 `AgentMethodField` style; model new agents on the built-in v2 agent instead.
 
 Run the standalone example:
 
@@ -93,7 +96,10 @@ from typing import Any
 
 from supervaizer import (
     Agent,
+    AgentMethod,
+    AgentMethods,
     Server,
+    V2ActionDefinition,
     V2ResourceDefinition,
     build_v2_agent_registration,
 )
@@ -113,7 +119,11 @@ registration = build_v2_agent_registration(
     controller_url="/a2a",
     a2ui_catalog_version=A2UI_CATALOG_VERSION,
     surfaces=["job.start"],
-    actions=["job.start"],
+    # Bare ids default to mutating=True, scope="job"; declare read-only actions explicitly.
+    actions=[
+        "job.start",
+        V2ActionDefinition(id="resource.contacts.list", mutating=False, scope="workspace"),
+    ],
     case_lanes=[{"id": "work", "label": "Work", "default": True}],
     job_policy={"sync": {"action": "job.sync"}},
     resources=[
@@ -123,15 +133,25 @@ registration = build_v2_agent_registration(
             auto_surface=True,
             operations=["list"],
             scope="workspace",
-            requires_context=["workspace.slug"],
         )
     ],
+)
+
+# The v1 /api routes, still mounted in Studio and local mode, require a job_start method.
+# Studio operates v2 agents through the handlers below, not through this method.
+methods = AgentMethods(
+    job_start=AgentMethod(
+        name="start",
+        method="supervaizer_control.start_job",
+        params={"action": "start"},
+    ),
 )
 
 agent = Agent(
     name=AGENT_NAME,
     version=AGENT_VERSION,
     description="My Supervaizer v2 agent.",
+    methods=methods,
     supervaizer_v2_registration=registration,
 )
 
@@ -167,7 +187,7 @@ def load_job_start_surface(request: Any) -> dict[str, Any]:
 
 @server.v2_action("job.start", agent_slug=agent.slug)
 def start_job(request: Any) -> dict[str, Any]:
-    job_id = getattr(request, "job_id", None) or "local-job"
+    job_id = request.job_id or "local-job"
     return {
         "status": "ok",
         "effects": [
@@ -180,6 +200,7 @@ def start_job(request: Any) -> dict[str, Any]:
         "job_state": {
             "job": {
                 "id": job_id,
+                "mission_id": request.mission_id,
                 "agent_slug": agent.slug,
                 "status": "completed",
                 "source": {"type": "fresh_start"},
@@ -212,7 +233,7 @@ def sync_job(request: Any) -> dict[str, Any]:
         "effects": [
             {
                 "type": "job.synced",
-                "job_id": getattr(request, "job_id", None),
+                "job_id": request.job_id,
                 "status": "completed",
             }
         ],
@@ -244,14 +265,37 @@ python supervaizer_control.py
 
 ### 5. Connect To Studio
 
-For Studio-managed operation, configure the controller with your Studio credentials and public controller URL:
+Studio-managed operation needs a `supervisor_account` on the `Server`, the controller's own API key, and workspace authorization trust material. The scaffold template (`supervaizer scaffold`) reads these variables:
 
 ```bash
-export SUPERVAIZE_API_KEY=...
+export SUPERVAIZE_API_KEY=...            # agent -> Studio calls
 export SUPERVAIZE_WORKSPACE_ID=...
 export SUPERVAIZE_API_URL=https://app.supervaize.com
+export SUPERVAIZER_API_KEY=...           # Studio -> controller calls (X-API-Key); generated if unset
 export SUPERVAIZER_PUBLIC_URL=https://your-controller.example.com
+
+# Workspace authorization: required when A2A is enabled and the controller registers with Studio
+export SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true
+export SUPERVAIZER_WORKSPACE_AUTH_ISSUER=<Studio issuer URL>
+export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL=<Studio JWKS URL>   # or SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY=<PEM>
 ```
+
+In your own control file, build the account explicitly; `Server` does not read the `SUPERVAIZE_*` variables itself:
+
+```python
+import os
+
+from supervaizer import Account, Server
+
+account = Account(
+    workspace_id=os.environ["SUPERVAIZE_WORKSPACE_ID"],
+    api_key=os.environ["SUPERVAIZE_API_KEY"],
+    api_url=os.environ.get("SUPERVAIZE_API_URL", "https://app.supervaize.com"),
+)
+server = Server(agents=[agent], supervisor_account=account)
+```
+
+Without the three `SUPERVAIZER_WORKSPACE_AUTH_*` variables, a Studio-registered controller refuses to launch (`Studio-registered Supervaizer v2 A2A requires workspace authorization`). Local mode does not need them. See [docs/2026_05_WORKSPACE_AGENT_GRANTS.md](docs/2026_05_WORKSPACE_AGENT_GRANTS.md).
 
 Then start the controller:
 
@@ -294,17 +338,22 @@ Common surfaces:
 - `mission.analytics`
 - `mission.agent.overview`
 - `mission.agent.resource.<resource_id>`
-- `mission.agent.surface.<surface_id>`
+- `mission.agent.dataset.<dataset_id>`
 
 Actions are typed commands invoked through A2A JSON-RPC:
 
-- `job.start`
+- `job.start`, `job.start.preview`
 - `job.stop`
 - `job.sync`
 - `step.awaiting.submit`
+- `context.assign`
 - `resource.<id>.<operation>`
 - `dataset.<id>.query`
 - `artifact.get`
+- `agent.refresh`, `agent.custom.<method>`
+- `workspace_binding.options`, `workspace_binding.create`
+
+Each declared action carries `mutating` and `scope` metadata (`V2ActionDefinition`, since 1.6.0); a bare id string defaults to `mutating=True, scope="job"`.
 
 Dynamic UI behavior must be either A2UI local logic or typed action calls. Supervaizer v2 does not reintroduce callback-shaped dynamic field logic.
 
@@ -341,15 +390,17 @@ Install deployment extras:
 pip install "supervaizer[deploy]"
 ```
 
-Preview and deploy:
+Preview, smoke-test in Docker, and deploy:
 
 ```bash
-supervaizer deploy plan
-supervaizer deploy local --generate-api-key --generate-rsa
-supervaizer deploy up --platform cloud-run --region us-central1
+supervaizer deploy plan --platform cloud-run --name my-agent --project-id my-gcp-project
+supervaizer deploy local --name my-agent --generate-api-key
+supervaizer deploy up --platform cloud-run --name my-agent --project-id my-gcp-project --region us-central1
 ```
 
-Supported targets include Google Cloud Run, AWS App Runner, and DigitalOcean App Platform.
+Targets: Google Cloud Run, AWS App Runner, and DigitalOcean App Platform.
+
+> **Experimental:** `deploy up` builds the image locally but does not push it to a registry, and generated secrets are not injected under the variable names the server reads. Use `plan` and `local` today; finish cloud deployment with your provider's CLI.
 
 See:
 
@@ -358,33 +409,15 @@ See:
 
 ## Admin Interface
 
-The optional admin interface is available at `/admin` when `admin_interface=True`.
-
-```python
-from supervaizer import Agent, Server
-
-server = Server(
-    agents=[Agent(name="My Agent")],
-    api_key="local-dev",
-    admin_interface=True,
-)
-server.launch()
-```
+The admin interface and agent workbench are mounted at `/manage` (`admin_interface=True`, the default). Access is restricted to Tailscale addresses (`100.64.0.0/10`), plus loopback in local mode; no API key is used. See [docs/2025_08_ADMIN_README.md](docs/2025_08_ADMIN_README.md).
 
 ## Development
 
-Run tests:
+Run tests and checks:
 
 ```bash
-uv run pytest
-```
-
-Run focused checks:
-
-```bash
-uv run ruff check .
-uv run ruff format --check .
-git diff --check
+just test        # pytest, no coverage
+just precommit   # ruff check, ruff format, mypy, hooks
 ```
 
 ## Contributing

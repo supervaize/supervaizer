@@ -13,14 +13,22 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 - Add or update targeted tests for changed behavior.
 - Keep public payloads and generated docs compatible with Studio unless both repos are updated together.
 - Use GitButler (`but`) for branch, commit, and push operations when available.
+- Personas (`backend-developer`, `tech-lead`, ...) are defined in `../.agent/personas/`; name one when requesting work.
 
-## Usage
+## Documentation Map
 
-Reference specific personas when requesting work:
+| Need | Read |
+| --- | --- |
+| User-facing overview and quick start | `README.md` |
+| Supervaizer v2 contract (Jobs, Cases, Steps, Resources, Surfaces, Actions) | `docs/2026_05_SUPERVAIZER_v2.md` |
+| Protocol layering (A2A, A2UI, AG-UI) | `docs/2026_05_PROTOCOLS.md` |
+| Workspace authorization (grants, signed tokens) | `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` |
+| CLI, deployment, local Docker testing | `docs/2025_08_CLI.md`, `docs/rfc/2025_10_001-cloud-deployment-cli.md`, `docs/2025_10_LOCAL_TESTING.md` |
+| API surfaces and auth, admin UI, persistence, v1 parameter validation | `docs/2025_08_REST_API.md`, `docs/2025_08_ADMIN_README.md`, `docs/2025_08_PERSISTENCE.md`, `docs/2025_08_PARAMETER_VALIDATION.md` |
+| Generated model and OpenAPI reference (`just generate-docs`) | `docs/model_reference/`, `docs/api/openapi.json` |
+| Release history | `docs/CHANGELOG.md` |
 
-- "As a **backend-developer**, implement feature X"
-- "As a **frontend-developer**, implement feature Y"
-- "As a **tech-lead**, review my changes"
+Docs are prefixed `YYYY_MM_` with their creation month; `2025_*` files document v1-era subsystems that still exist, `2026_05_*` files define the v2 contract.
 
 ## Cross-Repo Compatibility (supervaizer <-> Studio)
 
@@ -34,15 +42,17 @@ Reference specific personas when requesting work:
 
 - When preparing a merge to `main` or a release, keep `docs/CHANGELOG.md` **Unreleased** accurate; on request, align listed dependency or tooling changes with the delta since the previous git tag (including `pyproject.toml`).
 - Prefer `docs/CHANGELOG.md` `Unreleased` entries grouped into `Added` / `Changed` / `Fixed` (instead of custom feature headings).
-- Dependabot PRs should target `develop`, not `main` (set `target-branch: "develop"` in `.github/dependabot.yml`).
+- Dependabot PRs target `develop`, not `main` (`target-branch` in `.github/dependabot.yml`); feature branches and PRs target `develop` too. `main` only receives release PRs from `just ship`.
 
 ## Learned Workspace Facts
 
-- `supervaizer start --reload` (or `SUPERVAIZER_RELOAD=true`) enables Uvicorn’s `reload` (file watching, dev-only; leave off in production).
+- `supervaizer start --reload` / `--debug` only set `SUPERVAIZER_RELOAD` / `SUPERVAIZER_DEBUG`; `Server` never reads them, and the CLI only overrides host, port, and public URL on the control script's `Server`. Uvicorn also rejects `reload=True` with an app object. Treat both flags as non-functional until fixed.
+- Local mode cannot invoke v2 actions or surfaces over `/a2a`: without `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true` the controller answers `-32030 workspace_authorization_not_configured`, and token checks need `agent.server_agent_id`, which only Studio registration sets.
+- `just install-hooks` sets `core.hooksPath=.githooks`, so the hooks that `pre-commit install` writes to `.git/hooks` never run; `just precommit` and CI are the real gates.
+- A Studio-registered controller with A2A enabled fails at launch unless `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true`, `SUPERVAIZER_WORKSPACE_AUTH_ISSUER`, and `SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY` or `_JWKS_URL` are set (`studio_handshake.validate_studio_a2a_workspace_authorization`). `--local` is exempt.
 - If agent data-resource routes are mounted twice (e.g. both inside `create_agents_routes` and again from `Server` startup), OpenAPI sees duplicate routes and `operationId` uniqueness tests fail.
 - Compliance for this repo expects explicit type annotations, including return types, on functions in new or modified Python files (including tests), for mypy-clean CI.
-- `ADMIN_ALLOWED_IPS` restricts `/admin` when set (comma-separated IPs/CIDR); unset or empty allows all client IPs.
-- In `9agents/agent_interviewer`, empty `MANAGE_ALLOWED_IPS` still requires `MANAGE_AUTH_TOKEN` when that env is set; supervaizer’s admin IP middleware has no equivalent token fallback when the allowlist is empty.
+- Route surfaces since 0.15.0: `/api/*` requires `X-API-Key`; `/a2a` needs write scope and `/a2a/events` read scope; `/manage/*` (admin UI + workbench) is gated by `require_tailscale` (client IP in `100.64.0.0/10`, or loopback when `SUPERVAIZER_LOCAL_MODE=true`) with no API key. `X-Forwarded-For` is honoured only when the peer is in `TRUSTED_PROXIES`. `ADMIN_ALLOWED_IPS` and `/admin` no longer exist.
 - CI (`python-package` workflow): the pre-commit job checks **Ruff** formatting (`ruff format --check`) and **YAML** in `.github/workflows` via `yamllint` (not Black).
 - In the matrix **build** job, `astral-sh/setup-uv` sets `cache-suffix: py-${{ matrix.python-version }}` so parallel Python versions do not race on the same GitHub Actions cache reservation.
 - `@singleton` (from `supervaizer.common`) replaces the decorated class name with a function at import time; modules that annotate with that class in unions (e.g. `StorageManager | None` in `storage.py`) need `from __future__ import annotations` or class-body evaluation raises `TypeError`.

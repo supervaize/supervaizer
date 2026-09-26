@@ -2,9 +2,9 @@
 
 
 > **Created:** 2026-04-27
-> **Updated:** 2026-04-27
+> **Updated:** 2026-09-25
 
-**Status:** Proposed
+**Status:** Implemented in 0.17.0 (`account_service.send_event` is async; `_sync` shims remain)
 **Date:** 2026-04-27
 **Affects:** `supervaizer` SDK (published PyPI package)
 
