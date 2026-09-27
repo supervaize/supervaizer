@@ -276,9 +276,11 @@ export SUPERVAIZER_PUBLIC_URL=https://your-controller.example.com
 
 # Workspace authorization: required when A2A is enabled and the controller registers with Studio
 export SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true
-export SUPERVAIZER_WORKSPACE_AUTH_ISSUER=<Studio issuer URL>
-export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL=<Studio JWKS URL>   # or SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY=<PEM>
+export SUPERVAIZER_WORKSPACE_AUTH_ISSUER=https://studio.supervaize.com
+export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL=https://app.supervaize.com/w/your-workspace-slug/api/v1/workspace-agent-grants/jwks/  # or SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY=<PEM>
 ```
+
+Copy the generated workspace authorization values from Studio's **Developer → Environment variables** section. The issuer must match Studio's token issuer. The JWKS URL is public and supplies the signing key; use the workspace slug shown in that generated URL. This verification config is separate from `SUPERVAIZE_API_KEY` and `SUPERVAIZER_API_KEY`.
 
 In your own control file, build the account explicitly; `Server` does not read the `SUPERVAIZE_*` variables itself:
 

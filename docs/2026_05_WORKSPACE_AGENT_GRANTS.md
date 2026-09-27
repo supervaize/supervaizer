@@ -95,6 +95,8 @@ The agent needs only stable trust material, configured through environment varia
 | `SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE` | Optional expected `aud` override |
 | `SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS` | Clock skew tolerance, default 30 |
 
+For production Studio, `SUPERVAIZER_WORKSPACE_AUTH_ISSUER` is `https://studio.supervaize.com`. The JWKS URL uses the Studio API origin and the workspace slug, for example `https://app.supervaize.com/w/your-workspace-slug/api/v1/workspace-agent-grants/jwks/`. In Studio, open **Developer → Environment variables** to copy the values generated for the workspace. These issuer and JWKS settings are public verification data, not API secrets. For another Studio deployment, use its generated values so the issuer matches the tokens it signs. If a custom deployment overrides the server-side `STUDIO_PUBLIC_ORIGIN`, set the Studio frontend build variable `VITE_STUDIO_PUBLIC_ORIGIN` to the same value.
+
 When A2A endpoints are enabled and the controller registers with Studio, `Server.launch()` refuses to start unless `REQUIRED=true`, `ISSUER`, and one key source are set. Local mode (`supervaizer start --local`) skips this check. The agent does not need to store grants locally.
 
 ## Token Shape
