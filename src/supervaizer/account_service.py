@@ -66,12 +66,45 @@ def _event_request(
 
 def _event_curl(url_event: str, headers: dict[str, str]) -> str:
     curl_headers = " ".join(
-        f'-H "{key}: {value[:3] + "..." if len(value) > 3 else "***"}"'
-        if key.casefold() == "x-api-key"
-        else f'-H "{key}: {value}"'
+        f'-H "{key}: {_redact_header_value(key, value)}"'
         for key, value in headers.items()
     )
     return f"curl -X 'POST' '{url_event}' {curl_headers}"
+
+
+def _is_sensitive_field(name: Any) -> bool:
+    normalized = "".join(
+        character for character in str(name).casefold() if character.isalnum()
+    )
+    return normalized in {
+        "apikey",
+        "xapikey",
+        "authorization",
+        "proxyauthorization",
+        "accesstoken",
+        "secret",
+    }
+
+
+def _redact_header_value(name: str, value: str) -> str:
+    if not _is_sensitive_field(name):
+        return value
+    if name.casefold() in {"authorization", "proxy-authorization"}:
+        scheme, separator, _ = value.partition(" ")
+        if separator:
+            return f"{scheme} ***"
+    return "***"
+
+
+def _redact_sensitive_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: "***" if _is_sensitive_field(key) else _redact_sensitive_value(nested)
+            for key, nested in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_redact_sensitive_value(item) for item in value]
+    return value
 
 
 def _event_success(event: "Event", response: httpx.Response) -> ApiSuccess:
@@ -90,6 +123,11 @@ def _handle_event_http_error(
 ) -> NoReturn:
     log.error("[Send event] HTTP Error occurred")
     log.warning(f"⚠️ Try to connect via curl:\n{curl_cmd}")
+    if (response := getattr(error, "response", None)) is not None:
+        request_id = response.headers.get("X-Request-ID", "unavailable")[:80]
+        log.error(
+            f"[Send event] Remote response status={response.status_code} request_id={request_id!r}"
+        )
 
     error_result = ApiError(
         message=f"Error sending event {event.type.name}",
@@ -97,7 +135,9 @@ def _handle_event_http_error(
         payload=event.payload,
         exception=error,
     )
-    log.error(f"[Send event] Error details: {error_result.dict}")
+    log.error(
+        f"[Send event] Error details: {_redact_sensitive_value(error_result.dict)}"
+    )
     log.error(error_result.log_message)
     raise error
 
