@@ -280,7 +280,7 @@ export SUPERVAIZER_WORKSPACE_AUTH_ISSUER=https://studio.supervaize.com
 export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL=https://app.supervaize.com/w/your-workspace-slug/api/v1/workspace-agent-grants/jwks/  # or SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY=<PEM>
 ```
 
-Copy the generated workspace authorization values from Studio's **Developer → Environment variables** section. The issuer must match Studio's token issuer. The JWKS URL is public and supplies the signing key; use the workspace slug shown in that generated URL. This verification config is separate from `SUPERVAIZE_API_KEY` and `SUPERVAIZER_API_KEY`.
+Copy the generated workspace values from Studio's **Developer → Environment variables** section. `SUPERVAIZE_WORKSPACE_ID` must be the workspace slug shown there; the API key's user must belong to that workspace and retain Developer access. A mismatch can make `SERVER_REGISTER` return HTTP 403. The issuer must match Studio's token issuer. The JWKS URL is public and supplies the signing key. Workspace authorization is separate from `SUPERVAIZE_API_KEY` and `SUPERVAIZER_API_KEY`.
 
 In your own control file, build the account explicitly; `Server` does not read the `SUPERVAIZE_*` variables itself:
 
