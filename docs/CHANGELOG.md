@@ -42,6 +42,10 @@ All notable changes to this project will be documented in this file.
 - Root-level `test_local.py` (it ran `python -m supervaizer`, which has no `__main__`; use `supervaizer deploy local`) and `test_dockerfile_generation.py` (license header only).
 - **No-op deploy flags** — `deploy up --yes`, `deploy up --no-rollback`, and `--verbose` on `deploy plan`, `up`, `down`, and `status` did nothing. They now fail as unknown options. `deploy down --yes` and `--verbose` on `deploy local` and `clean` remain.
 
+### Added
+
+- **Rule checkpoint gates** — V2 controllers can explicitly declare `before` and `after` rule-checkpoint support, including declared business-secret paths. `RuleCheckpointGate` and `Case.run_guarded_step()` request Studio authorization around a cooperative effect, persist the outcome for safe recovery, and receive approved pauses through the declared `rule.checkpoint.resume` action.
+
 ## [1.6.0] - 2026-08-30
 
 ### Added
