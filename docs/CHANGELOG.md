@@ -46,6 +46,10 @@ All notable changes to this project will be documented in this file.
 
 - **Rule checkpoint gates** — V2 controllers can explicitly declare `before` and `after` rule-checkpoint support, including declared business-secret paths. `RuleCheckpointGate` and `Case.run_guarded_step()` request Studio authorization around a cooperative effect, persist the outcome for safe recovery, and receive approved pauses through the declared `rule.checkpoint.resume` action.
 
+### Fixed
+
+- **Rule checkpoint recovery** — Early resume delivery wakes live waiters, resumed proposals retain step identity, and lost after responses retry only evaluation. Concurrent original execution and recovery cannot advance a step twice.
+
 ## [1.6.0] - 2026-08-30
 
 ### Added
