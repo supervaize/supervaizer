@@ -48,6 +48,10 @@ from supervaizer.common import (
 )
 from supervaizer.contracts import (
     API_VERSION,
+    RULE_CHECKPOINT_RESUME_ACTION,
+    V2ActionResult,
+    V2Effect,
+    RuleCheckpointResume,
     V2WorkspaceAuthorizationSettings,
 )
 from supervaizer.instructions import display_instructions
@@ -63,6 +67,7 @@ from supervaizer.routers import (
     create_public_router,
 )  # <-- ADDED
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
+from supervaizer.rule_controls import resume_rule_checkpoint
 from supervaizer.scheduled_steps import (
     _execute_scheduled_method as _execute_scheduled_method,
     _run_scheduled_step_loop,
@@ -142,6 +147,26 @@ def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
         return agent.execute_v2_action_method(action, request)
 
     return handler
+
+
+def _rule_checkpoint_resume_handler(request: Any) -> V2ActionResult:
+    decision = resume_rule_checkpoint(
+        RuleCheckpointResume.model_validate(
+            request.input | {"job_id": request.job_id, "case_id": request.case_id}
+        )
+    )
+    status = decision.status if decision is not None else "pending_delivery"
+    return V2ActionResult(
+        status="ok",
+        effects=[
+            V2Effect(
+                type="rule.checkpoint.resumed",
+                job_id=request.job_id,
+                status=status,
+                summary={"checkpoint_id": request.input.get("checkpoint_id")},
+            )
+        ],
+    )
 
 
 class ServerAbstract(SvBaseModel):
@@ -689,6 +714,13 @@ class Server(ServerAbstract):
                 self.register_v2_action(
                     action,
                     _agent_v2_method_handler(agent, action),
+                    agent_slug=agent.slug,
+                )
+            registration = agent.supervaizer_v2_registration
+            if registration is not None and registration.capabilities.rule_checkpoints:
+                self.register_v2_action(
+                    RULE_CHECKPOINT_RESUME_ACTION,
+                    _rule_checkpoint_resume_handler,
                     agent_slug=agent.slug,
                 )
 

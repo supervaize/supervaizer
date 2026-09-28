@@ -31,6 +31,7 @@ WORKSPACE_BINDING_CREATE_ACTION = "workspace_binding.create"
 WORKSPACE_BINDING_CREATE_SURFACE = "workspace_binding.create"
 AGENT_REFRESH_ACTION = "agent.refresh"
 AGENT_REFRESH_EFFECT = "agent.refreshed"
+RULE_CHECKPOINT_RESUME_ACTION = "rule.checkpoint.resume"
 AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
 _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 V2_DISPLAY_TEXT_MAX_LENGTH = 300
@@ -245,6 +246,9 @@ class JobStartRequest(ContractModel):
     job_context: dict[str, Any]
     job_fields: dict[str, Any] = Field(default_factory=dict)
     encrypted_agent_parameters: str | None = None
+    rule_snapshot: "RuleCheckpointSnapshot | None" = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class CaseUpdateEvent(ContractModel):
@@ -429,6 +433,9 @@ class V2AgentCapabilities(ContractModel):
     actions: list[V2ActionDefinition] = Field(default_factory=list)
     case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
+    rule_checkpoints: "V2RuleCheckpointCapability | None" = Field(
+        default=None, exclude_if=_is_none
+    )
 
     @field_validator("actions", mode="before")
     @classmethod
@@ -458,7 +465,90 @@ class V2AgentCapabilities(ContractModel):
         # A definition with no text says nothing, and keeping it would serialize a
         # non-empty `surface_definitions` for an agent that declares no display text.
         self.surface_definitions = with_text
+        if self.rule_checkpoints is not None and not any(
+            action.id == RULE_CHECKPOINT_RESUME_ACTION for action in self.actions
+        ):
+            self.actions.append(
+                V2ActionDefinition(
+                    id=RULE_CHECKPOINT_RESUME_ACTION,
+                    mutating=True,
+                    scope="job",
+                )
+            )
         return self
+
+
+class V2RuleCheckpointCapability(ContractModel):
+    """Opt-in support for Studio before/after rule checkpoints."""
+
+    version: Literal[1] = 1
+    phases: list[Literal["before", "after"]]
+    secret_refs: list[str] = Field(default_factory=list)
+
+    @field_validator("phases")
+    @classmethod
+    def validate_phases(
+        cls, value: list[Literal["before", "after"]]
+    ) -> list[Literal["before", "after"]]:
+        if not value:
+            raise ValueError("rule_checkpoints.phases must declare at least one phase")
+        if len(value) != len(set(value)):
+            raise ValueError("rule_checkpoints.phases must not contain duplicates")
+        return value
+
+    @field_validator("secret_refs")
+    @classmethod
+    def validate_secret_refs(cls, value: list[str]) -> list[str]:
+        allowed_prefixes = (
+            "job.fields.",
+            "case.metadata.",
+            "step.payload.",
+            "context.",
+        )
+        if len(value) != len(set(value)):
+            raise ValueError("rule_checkpoints.secret_refs must not contain duplicates")
+        if any(not reference.startswith(allowed_prefixes) for reference in value):
+            raise ValueError("rule_checkpoints.secret_refs contains an invalid path")
+        return value
+
+
+class RuleCheckpointSnapshot(ContractModel):
+    """Opaque frozen rule snapshot supplied by Studio for one governed job."""
+
+    hash: str
+    checkpoint_url: str
+    version: Literal[1]
+    checkpoint_token: str
+
+
+class RuleCheckpointRequest(ContractModel):
+    occurrence_id: str
+    phase: Literal["before", "after"]
+    snapshot_hash: str
+    job_id: str
+    case_id: str
+    step_id: str
+    context: dict[str, Any]
+    secret_refs: list[str] = Field(default_factory=list)
+
+
+class RuleCheckpointResponse(ContractModel):
+    checkpoint_id: str
+    status: Literal["allow", "pause", "stop"]
+    snapshot_hash: str
+    input_hash: str
+
+
+class RuleCheckpointResume(ContractModel):
+    checkpoint_id: str
+    job_id: str
+    case_id: str
+    occurrence_id: str
+    phase: Literal["before", "after"]
+    status: Literal["allow", "pause", "stop"]
+    snapshot_hash: str
+    input_hash: str
+    decision_id: str
 
 
 class V2AgentMethod(ContractModel):
@@ -747,6 +837,7 @@ def build_v2_agent_registration(
     agent_methods: V2AgentMethods | dict[str, Any] | None = None,
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
+    rule_checkpoints: V2RuleCheckpointCapability | dict[str, Any] | None = None,
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
     a2ui_version: str = SUPERVAIZER_V2_A2UI_VERSION,
     a2a_version: str = SUPERVAIZER_V2_A2A_VERSION,
@@ -809,6 +900,9 @@ def build_v2_agent_registration(
             actions=capability_actions,
             case_lanes=_contract_list(case_lanes, V2CaseLaneDefinition),
             artifact_types=_contract_list(artifact_types, V2ArtifactTypeDefinition),
+            rule_checkpoints=_contract_or_none(
+                rule_checkpoints, V2RuleCheckpointCapability
+            ),
         ),
         job_policy=job_policy_definition,
         resources=resource_definitions,
@@ -834,6 +928,15 @@ def _contract_or_default[ContractModelT: ContractModel](
 ) -> ContractModelT:
     if value is None:
         return model()
+    return value if isinstance(value, model) else model.model_validate(value)
+
+
+def _contract_or_none[ContractModelT: ContractModel](
+    value: ContractModelT | dict[str, Any] | None,
+    model: type[ContractModelT],
+) -> ContractModelT | None:
+    if value is None:
+        return None
     return value if isinstance(value, model) else model.model_validate(value)
 
 
