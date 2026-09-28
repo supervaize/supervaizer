@@ -148,7 +148,7 @@ async def perform_step(account, case, start_input):
     )
 ```
 
-`Case.run_guarded_step()` first reports the Case to Studio, then requests a `before` decision, performs the effect only after `allow`, requests an `after` decision, and advances only after that decision is also `allow`. A `pause` waits for the controller's `rule.checkpoint.resume` action; it does not poll. The helper records an effect as started before calling it, so a recovered process never silently replays an uncertain external effect. Use `recover_guarded_step()` only after the agent has independently established the prior effect's result.
+`Case.run_guarded_step()` first reports the Case to Studio, then requests a `before` decision, performs the effect only after `allow`, requests an `after` decision, and advances only after that decision is also `allow`. A `pause` waits for the controller's `rule.checkpoint.resume` action; it does not poll. A persisted `before` allow safely continues the effect after restart. The helper records an effect as started before calling it, so recovery never replays an uncertain external effect. When an after response was lost, use `recover_guarded_step()` with the original gate, result, and after-context callback. It verifies that callback produces the same context, retries only the original after checkpoint, then advances once on `allow`.
 
 `rule_snapshot` and its checkpoint token are opaque controller input. Do not construct, alter, log, or place either in agent business context. `secret_refs` declares paths whose values Studio must exclude from checkpoint context; declare every business secret path an agent author supplies. Platform credentials are excluded by the platform and must never be propagated as declared business secrets.
 

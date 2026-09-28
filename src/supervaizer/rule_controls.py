@@ -76,7 +76,9 @@ class RuleCheckpointGate:
         snapshot = (
             request.rule_snapshot
             if isinstance(request, JobStartRequest)
-            else RuleCheckpointSnapshot.model_validate(request.input.get("rule_snapshot"))
+            else RuleCheckpointSnapshot.model_validate(
+                request.input.get("rule_snapshot")
+            )
             if request.input.get("rule_snapshot") is not None
             else None
         )
@@ -201,6 +203,7 @@ def resume_rule_checkpoint(
         state["status"] = decision.status
         state["decision_id"] = decision.decision_id
         case._persist()
+        _DELIVERED_DECISIONS[decision.checkpoint_id] = decision
         return RuleCheckpointResponse.model_validate(decision.model_dump())
     raise ValueError("Rule checkpoint resume does not match persisted occurrence")
 
@@ -225,13 +228,26 @@ async def run_guarded_step(
     active_key = (case.id, occurrence_id)
     existing_before = states.get(before_key)
     context_hash = _checkpoint_input_hash(before_context)
+    before_allowed = False
     if existing_before is not None:
-        if existing_before.get("status") != "checking":
+        if existing_before.get("context_hash") != context_hash:
+            raise ValueError("Rule checkpoint retry context changed")
+        if existing_before.get("snapshot_hash") != gate.snapshot.hash:
+            raise ValueError("Rule checkpoint retry snapshot changed")
+        if existing_before.get("step_id") != step_id:
+            raise ValueError("Rule checkpoint retry step changed")
+        before_allowed = existing_before.get("status") == "allow"
+        if before_allowed and (
+            states.get(after_key, {}).get("effect_started")
+            or states.get(after_key, {}).get("effect_completed")
+        ):
             raise RuleCheckpointRecoveryRequired(
                 "Rule checkpoint occurrence is already claimed"
             )
-        if existing_before.get("context_hash") != context_hash:
-            raise ValueError("Rule checkpoint retry context changed")
+        if not before_allowed and existing_before.get("status") != "checking":
+            raise RuleCheckpointRecoveryRequired(
+                "Rule checkpoint occurrence is already claimed"
+            )
     if active_key in _ACTIVE_OCCURRENCES:
         raise RuleCheckpointRecoveryRequired("Rule checkpoint occurrence is active")
     after_state = states.get(after_key, {})
@@ -240,92 +256,143 @@ async def run_guarded_step(
             "Started rule-gated effect requires an explicit recovery handler"
         )
     _ACTIVE_OCCURRENCES.add(active_key)
-    states[before_key] = {
-        "occurrence_id": occurrence_id,
-        "phase": "before",
-        "snapshot_hash": gate.snapshot.hash,
-        "context_hash": context_hash,
-        "status": "checking",
-    }
-    case._persist()
-
     try:
-        before = await gate.checkpoint(
+        if not before_allowed:
+            states[before_key] = {
+                "occurrence_id": occurrence_id,
+                "phase": "before",
+                "snapshot_hash": gate.snapshot.hash,
+                "step_id": step_id,
+                "context_hash": context_hash,
+                "status": "checking",
+            }
+            case._persist()
+            before = await gate.checkpoint(
+                occurrence_id=occurrence_id,
+                phase="before",
+                job_id=case.job_id,
+                case_id=case.id,
+                step_id=step_id,
+                context=before_context,
+            )
+            states[before_key] = _checkpoint_state(before, occurrence_id, "before")
+            states[before_key]["step_id"] = step_id
+            states[before_key]["context_hash"] = context_hash
+            case._persist()
+            if before.status == "pause":
+                before = await gate.wait_for_resume(before, occurrence_id, "before")
+                states[before_key] = _checkpoint_state(before, occurrence_id, "before")
+                states[before_key]["step_id"] = step_id
+                states[before_key]["context_hash"] = context_hash
+                case._persist()
+            if before.status != "allow":
+                raise RuleCheckpointBlocked(before)
+        states[after_key] = {
+            "occurrence_id": occurrence_id,
+            "phase": "after",
+            "snapshot_hash": gate.snapshot.hash,
+            "step_id": step_id,
+            "effect_started": True,
+            "status": "pending",
+        }
+        case._persist()
+        result = await effect()
+        after_context_value = after_context(result)
+        states[after_key]["effect_completed"] = True
+        states[after_key]["context_hash"] = _checkpoint_input_hash(after_context_value)
+        case._persist()
+        after = await gate.checkpoint(
             occurrence_id=occurrence_id,
-            phase="before",
+            phase="after",
             job_id=case.job_id,
             case_id=case.id,
             step_id=step_id,
-            context=before_context,
+            context=after_context_value,
         )
-    except Exception:
-        _ACTIVE_OCCURRENCES.discard(active_key)
-        raise
-    states[before_key] = _checkpoint_state(before, occurrence_id, "before")
-    case._persist()
-    if before.status == "pause":
-        before = await gate.wait_for_resume(before, occurrence_id, "before")
-        states[before_key] = _checkpoint_state(before, occurrence_id, "before")
-        case._persist()
-    _ACTIVE_OCCURRENCES.discard(active_key)
-    if before.status != "allow":
-        raise RuleCheckpointBlocked(before)
-    states[after_key] = {
-        "occurrence_id": occurrence_id,
-        "phase": "after",
-        "snapshot_hash": gate.snapshot.hash,
-        "effect_started": True,
-        "status": "pending",
-    }
-    case._persist()
-    result = await effect()
-    states[after_key]["effect_completed"] = True
-    case._persist()
-    after = await gate.checkpoint(
-        occurrence_id=occurrence_id,
-        phase="after",
-        job_id=case.job_id,
-        case_id=case.id,
-        step_id=step_id,
-        context=after_context(result),
-    )
-    states[after_key] = _checkpoint_state(after, occurrence_id, "after", True)
-    case._persist()
-    if after.status == "pause":
-        after = await gate.wait_for_resume(after, occurrence_id, "after")
         states[after_key] = _checkpoint_state(after, occurrence_id, "after", True)
+        states[after_key]["step_id"] = step_id
+        states[after_key]["context_hash"] = _checkpoint_input_hash(after_context_value)
         case._persist()
-    if after.status != "allow":
-        raise RuleCheckpointBlocked(after)
-    if advance is not None:
-        states[after_key]["advancement_started"] = True
-        case._persist()
-        await advance(result)
-        states[after_key]["advancement_completed"] = True
-        case._persist()
-    return result
+        if after.status == "pause":
+            after = await gate.wait_for_resume(after, occurrence_id, "after")
+            states[after_key] = _checkpoint_state(after, occurrence_id, "after", True)
+            states[after_key]["step_id"] = step_id
+            states[after_key]["context_hash"] = _checkpoint_input_hash(
+                after_context_value
+            )
+            case._persist()
+        if after.status != "allow":
+            raise RuleCheckpointBlocked(after)
+        if advance is not None:
+            states[after_key]["advancement_started"] = True
+            case._persist()
+            await advance(result)
+            states[after_key]["advancement_completed"] = True
+            case._persist()
+        return result
+    finally:
+        _ACTIVE_OCCURRENCES.discard(active_key)
 
 
 async def recover_guarded_step(
     *,
+    gate: RuleCheckpointGate | None = None,
     case: "Case",
     occurrence_id: str,
     result: T,
+    after_context: Callable[[T], dict[str, Any]] | None = None,
     advance: Callable[[T], Awaitable[Any]] | None = None,
 ) -> T:
-    """Advance a manually recovered completed effect only after its after gate allows."""
+    """Retry a pending after gate, then advance a recovered completed effect once."""
     state = case.metadata.get("_rule_checkpoints", {}).get(f"{occurrence_id}:after", {})
-    if not state.get("effect_completed") or state.get("status") != "allow":
+    if not state.get("effect_completed"):
         raise RuleCheckpointRecoveryRequired("Rule checkpoint is not ready to recover")
+    active_key = (case.id, occurrence_id)
+    if active_key in _ACTIVE_OCCURRENCES:
+        raise RuleCheckpointRecoveryRequired("Rule checkpoint occurrence is active")
     if state.get("advancement_started") and not state.get("advancement_completed"):
         raise RuleCheckpointRecoveryRequired("Rule checkpoint advancement is ambiguous")
-    if advance is not None and not state.get("advancement_completed"):
-        state["advancement_started"] = True
-        case._persist()
-        await advance(result)
-        state["advancement_completed"] = True
-        case._persist()
-    return result
+    _ACTIVE_OCCURRENCES.add(active_key)
+    try:
+        if state.get("status") == "pending":
+            if gate is None or after_context is None:
+                raise RuleCheckpointRecoveryRequired(
+                    "Pending after checkpoint requires its gate and context"
+                )
+            if state.get("snapshot_hash") != gate.snapshot.hash:
+                raise ValueError("Rule checkpoint recovery snapshot changed")
+            context = after_context(result)
+            if state.get("context_hash") != _checkpoint_input_hash(context):
+                raise ValueError("Rule checkpoint recovery context changed")
+            after = await gate.checkpoint(
+                occurrence_id=occurrence_id,
+                phase="after",
+                job_id=case.job_id,
+                case_id=case.id,
+                step_id=state["step_id"],
+                context=context,
+            )
+            state.update(_checkpoint_state(after, occurrence_id, "after", True))
+            state["context_hash"] = _checkpoint_input_hash(context)
+            case._persist()
+            if after.status == "pause":
+                after = await gate.wait_for_resume(after, occurrence_id, "after")
+                state.update(_checkpoint_state(after, occurrence_id, "after", True))
+                state["context_hash"] = _checkpoint_input_hash(context)
+                case._persist()
+        if state.get("status") != "allow":
+            raise RuleCheckpointRecoveryRequired(
+                "Rule checkpoint is not ready to recover"
+            )
+        if advance is not None and not state.get("advancement_completed"):
+            state["advancement_started"] = True
+            case._persist()
+            await advance(result)
+            state["advancement_completed"] = True
+            case._persist()
+        return result
+    finally:
+        _ACTIVE_OCCURRENCES.discard(active_key)
 
 
 def _checkpoint_state(

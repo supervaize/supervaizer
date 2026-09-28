@@ -8,6 +8,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from supervaizer import Case
 from supervaizer.contracts import (
     JobStartRequest,
     RuleCheckpointResponse,
@@ -16,10 +17,13 @@ from supervaizer.contracts import (
     V2ActionRequest,
     V2AgentCapabilities,
 )
+from supervaizer.lifecycle import EntityStatus
 from supervaizer.rule_controls import (
     RuleCheckpointBlocked,
     RuleCheckpointGate,
     RuleCheckpointRecoveryRequired,
+    _checkpoint_input_hash,
+    recover_guarded_step,
     run_guarded_step,
     resume_rule_checkpoint,
 )
@@ -448,6 +452,71 @@ async def test_checkpoint_resume_retained_until_waiter_is_registered(
 
 
 @pytest.mark.asyncio
+async def test_persisted_resume_wakes_later_waiter(
+    account_fixture: Any, storage_manager: Any
+) -> None:
+    state = {
+        "checkpoint_id": "checkpoint-race",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    case = Case(
+        id="case-race",
+        job_id="job-1",
+        account=account_fixture,
+        name="Persisted rule case",
+        description="Resume checkpoint delivery",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={"_rule_checkpoints": {"occurrence-1:before": state}},
+    )
+    decision = RuleCheckpointResume(
+        checkpoint_id="checkpoint-race",
+        job_id="job-1",
+        case_id="case-race",
+        occurrence_id="occurrence-1",
+        phase="before",
+        status="allow",
+        snapshot_hash="snapshot-1",
+        input_hash="input-1",
+        decision_id="decision-1",
+    )
+
+    assert resume_rule_checkpoint(decision) is not None
+    assert state["status"] == "allow"
+    assert (
+        storage_manager.get_object_by_id("Case", case.id)["metadata"][
+            "_rule_checkpoints"
+        ]["occurrence-1:before"]["status"]
+        == "allow"
+    )
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+
+    resumed = await gate.wait_for_resume(
+        RuleCheckpointResponse(
+            checkpoint_id="checkpoint-race",
+            status="pause",
+            snapshot_hash="snapshot-1",
+            input_hash="input-1",
+        ),
+        "occurrence-1",
+        "before",
+    )
+
+    assert resumed.status == "allow"
+
+
+@pytest.mark.asyncio
 async def test_started_effect_is_never_replayed_after_failure(
     account_fixture: Any, mocker: MockerFixture
 ) -> None:
@@ -543,6 +612,369 @@ async def test_lost_after_response_never_replays_completed_effect(
             after_context=lambda _: {},
         )
     effect.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_recovery_retries_pending_after_without_replaying_effect(
+    account_fixture: Any, mocker: MockerFixture
+) -> None:
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    checkpoint = mocker.patch.object(
+        gate,
+        "checkpoint",
+        side_effect=[
+            RuleCheckpointResponse(
+                checkpoint_id="before-checkpoint",
+                status="allow",
+                snapshot_hash="snapshot-1",
+                input_hash="before-input",
+            ),
+            RuntimeError("transport lost"),
+            RuleCheckpointResponse(
+                checkpoint_id="after-checkpoint",
+                status="allow",
+                snapshot_hash="snapshot-1",
+                input_hash="after-input",
+            ),
+        ],
+    )
+    effect = mocker.AsyncMock(return_value="done")
+    advance = mocker.AsyncMock()
+    case = SimpleNamespace(
+        id="case-1",
+        job_id="job-1",
+        metadata={"_rule_checkpoint_case_registered": True},
+        _persist=lambda: None,
+    )
+
+    with pytest.raises(RuntimeError, match="transport lost"):
+        await run_guarded_step(
+            gate=gate,
+            case=case,
+            step_id="step-1",
+            occurrence_id="occurrence-1",
+            before_context={"proposed": True},
+            effect=effect,
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+    with pytest.raises(ValueError, match="context changed"):
+        await recover_guarded_step(
+            gate=gate,
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            after_context=lambda result: {"result": f"other-{result}"},
+            advance=advance,
+        )
+
+    assert (
+        await recover_guarded_step(
+            gate=gate,
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+        == "done"
+    )
+    effect.assert_awaited_once()
+    advance.assert_awaited_once_with("done")
+    assert checkpoint.await_count == 3
+    assert checkpoint.await_args.kwargs["occurrence_id"] == "occurrence-1"
+    assert checkpoint.await_args.kwargs["phase"] == "after"
+
+
+@pytest.mark.asyncio
+async def test_persisted_before_allow_continues_without_rechecking(
+    account_fixture: Any, mocker: MockerFixture, storage_manager: Any
+) -> None:
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    checkpoint = mocker.patch.object(
+        gate,
+        "checkpoint",
+        return_value=RuleCheckpointResponse(
+            checkpoint_id="after-checkpoint",
+            status="allow",
+            snapshot_hash="snapshot-1",
+            input_hash="after-input",
+        ),
+    )
+    effect = mocker.AsyncMock(return_value="done")
+    case = Case(
+        id="case-before-allow",
+        job_id="job-before-allow",
+        account=account_fixture,
+        name="Persisted before allow",
+        description="Restart continuation",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={
+            "_rule_checkpoint_case_registered": True,
+            "_rule_checkpoints": {
+                "occurrence-1:before": {
+                    "occurrence_id": "occurrence-1",
+                    "phase": "before",
+                    "snapshot_hash": "snapshot-1",
+                    "step_id": "step-1",
+                    "context_hash": _checkpoint_input_hash({"proposed": True}),
+                    "status": "allow",
+                }
+            },
+        },
+    )
+    persisted = storage_manager.get_object_by_id("Case", case.id)
+    assert persisted is not None
+    restarted_case = SimpleNamespace(
+        id=case.id,
+        job_id=case.job_id,
+        metadata=persisted["metadata"],
+        _persist=mocker.Mock(),
+    )
+    assert (
+        await run_guarded_step(
+            gate=gate,
+            case=restarted_case,
+            step_id="step-1",
+            occurrence_id="occurrence-1",
+            before_context={"proposed": True},
+            effect=effect,
+            after_context=lambda result: {"result": result},
+        )
+        == "done"
+    )
+    effect.assert_awaited_once()
+    assert checkpoint.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_persisted_before_allow_rejects_changed_step(
+    account_fixture: Any, mocker: MockerFixture
+) -> None:
+    checkpoint = mocker.AsyncMock()
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    mocker.patch.object(gate, "checkpoint", checkpoint)
+    effect = mocker.AsyncMock()
+    case = SimpleNamespace(
+        id="case-1",
+        job_id="job-1",
+        metadata={
+            "_rule_checkpoint_case_registered": True,
+            "_rule_checkpoints": {
+                "occurrence-1:before": {
+                    "occurrence_id": "occurrence-1",
+                    "phase": "before",
+                    "snapshot_hash": "snapshot-1",
+                    "step_id": "step-1",
+                    "context_hash": _checkpoint_input_hash({"proposed": True}),
+                    "status": "allow",
+                }
+            },
+        },
+        _persist=lambda: None,
+    )
+
+    with pytest.raises(ValueError, match="step changed"):
+        await run_guarded_step(
+            gate=gate,
+            case=case,
+            step_id="different-step",
+            occurrence_id="occurrence-1",
+            before_context={"proposed": True},
+            effect=effect,
+            after_context=lambda result: {"result": result},
+        )
+
+    effect.assert_not_awaited()
+    checkpoint.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_recovery_advances_only_once(
+    account_fixture: Any, mocker: MockerFixture
+) -> None:
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    mocker.patch.object(
+        gate,
+        "checkpoint",
+        return_value=RuleCheckpointResponse(
+            checkpoint_id="after-checkpoint",
+            status="allow",
+            snapshot_hash="snapshot-1",
+            input_hash="after-input",
+        ),
+    )
+    case = SimpleNamespace(
+        id="case-1",
+        job_id="job-1",
+        metadata={
+            "_rule_checkpoints": {
+                "occurrence-1:after": {
+                    "occurrence_id": "occurrence-1",
+                    "phase": "after",
+                    "snapshot_hash": "snapshot-1",
+                    "step_id": "step-1",
+                    "context_hash": _checkpoint_input_hash({"result": "done"}),
+                    "effect_started": True,
+                    "effect_completed": True,
+                    "status": "pending",
+                }
+            }
+        },
+        _persist=lambda: None,
+    )
+    started = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def advance(_: str) -> None:
+        nonlocal calls
+        calls += 1
+        started.set()
+        await release.wait()
+
+    recovery = asyncio.create_task(
+        recover_guarded_step(
+            gate=gate,
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+    )
+    await started.wait()
+    with pytest.raises(RuleCheckpointRecoveryRequired, match="active"):
+        await recover_guarded_step(
+            gate=gate,
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+    release.set()
+    assert await recovery == "done"
+    assert (
+        await recover_guarded_step(
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            advance=advance,
+        )
+        == "done"
+    )
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_recovery_cannot_advance_while_original_after_request_is_active(
+    account_fixture: Any, mocker: MockerFixture
+) -> None:
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    after_waiting = asyncio.Event()
+    release_after = asyncio.Event()
+    calls: list[str] = []
+
+    async def checkpoint(**kwargs: Any) -> RuleCheckpointResponse:
+        if kwargs["phase"] == "before":
+            return RuleCheckpointResponse(
+                checkpoint_id="before-checkpoint",
+                status="allow",
+                snapshot_hash="snapshot-1",
+                input_hash="before-input",
+            )
+        after_waiting.set()
+        await release_after.wait()
+        return RuleCheckpointResponse(
+            checkpoint_id="after-checkpoint",
+            status="allow",
+            snapshot_hash="snapshot-1",
+            input_hash="after-input",
+        )
+
+    mocker.patch.object(gate, "checkpoint", side_effect=checkpoint)
+    case = SimpleNamespace(
+        id="case-1",
+        job_id="job-1",
+        metadata={"_rule_checkpoint_case_registered": True},
+        _persist=lambda: None,
+    )
+
+    async def effect() -> str:
+        calls.append("effect")
+        return "done"
+
+    async def advance(_: str) -> None:
+        calls.append("advance")
+
+    original = asyncio.create_task(
+        run_guarded_step(
+            gate=gate,
+            case=case,
+            step_id="step-1",
+            occurrence_id="occurrence-1",
+            before_context={"proposed": True},
+            effect=effect,
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+    )
+    await after_waiting.wait()
+
+    with pytest.raises(RuleCheckpointRecoveryRequired, match="active"):
+        await recover_guarded_step(
+            gate=gate,
+            case=case,
+            occurrence_id="occurrence-1",
+            result="done",
+            after_context=lambda result: {"result": result},
+            advance=advance,
+        )
+
+    release_after.set()
+    assert await original == "done"
+    assert calls == ["effect", "advance"]
 
 
 @pytest.mark.asyncio
