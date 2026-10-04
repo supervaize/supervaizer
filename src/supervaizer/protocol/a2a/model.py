@@ -31,8 +31,8 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
     Returns:
         A dictionary representing the agent card in A2A format
     """
-    # Construct the agent URL
-    agent_url = f"{base_url}{agent.path}"
+    # Agent routes are mounted under the /api router's /supervaizer prefix.
+    agent_url = f"{base_url}/api/supervaizer{agent.path}"
 
     # Build API endpoints object with OpenAPI integration
     api_endpoints = [
@@ -99,18 +99,18 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
                 },
             })
 
-    # Build authentication object
     authentication = {
-        "type": "none",
-        "description": "Authentication is handled at the Supervaize server level",
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": (
+            "Required on /api/* and /a2a. /.well-known/* discovery is public."
+        ),
     }
 
-    # Version information
-    version_info = {
-        "current": agent.version,
-        "latest": agent.version,
-        "changelog_url": f"{base_url}/changelog/{agent.slug}",
-    }
+    version_info: dict[str, Any] = {"current": agent.version}
+    if agent.release_notes_url:
+        version_info["changelog_url"] = agent.release_notes_url
 
     # Create the main agent card
     agent_card = {
@@ -123,8 +123,7 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
         },
         "version": agent.version,
         "version_info": version_info,
-        "logo_url": f"{base_url}/static/agents/{agent.slug}_logo.png",
-        "human_url": f"{base_url}/agents/{agent.slug}",
+        "human_url": f"{agent_url}/{agent.instructions_path}",
         "contact_information": {"general": {"email": "support@supervaize.com"}},
         "api_endpoints": api_endpoints,
         "tools": tools,

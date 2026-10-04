@@ -24,7 +24,7 @@ Request:
 { "encrypted_agent_parameters": "<encrypted string>" }
 ```
 
-The decrypted payload must be an object `{ "PARAM_NAME": "value" }`. A JSON list is renamed to `param_0`, `param_1`, ... and fails as unknown parameters. Note that job start expects the same parameters as a list of `{ "name": ..., "value": ... }` objects, so the two endpoints currently disagree on the shape.
+The canonical decrypted payload is the list that Studio sends and job start (`POST .../jobs`) consumes: `[{ "name": "PARAM_NAME", "value": "..." }, ...]`. Extra keys on each item (`description`, `is_secret`, ...) are ignored. Send the same encrypted string to both endpoints. A required parameter with a `null` value counts as missing. The object form `{ "PARAM_NAME": "value" }` is still accepted here, but job start rejects it.
 
 Response:
 
@@ -43,7 +43,7 @@ Response:
 }
 ```
 
-Other outcomes: an agent without `parameters_setup` returns `valid: true` ("Agent has no parameter setup defined"); a decryption failure returns `valid: false`; a missing `encrypted_agent_parameters` validates an empty object.
+Other outcomes: an agent without `parameters_setup` returns `valid: true` ("Agent has no parameter setup defined"); a decryption failure returns `valid: false`; a list item without a string `name` and a `value`, or a payload that is neither a list nor an object, returns `valid: false`; a missing `encrypted_agent_parameters` validates an empty object.
 
 ### `validate-method-fields`
 

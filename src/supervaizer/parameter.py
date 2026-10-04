@@ -170,7 +170,7 @@ class ParametersSetup(SvBaseModel):
         Tested in tests/test_parameter.test_parameters_setup_update_values_from_server
         """
         for parameter in server_parameters_setup:
-            if parameter.get("name", None) in self.definitions.keys():
+            if parameter.get("name", None) in self.definitions:
                 def_parameter = self.definitions[parameter["name"]]
                 def_parameter.set_value(parameter["value"])
             else:
@@ -207,9 +207,9 @@ class ParametersSetup(SvBaseModel):
                 "invalid_parameters": {"parameters": error_msg},
             }
 
-        # First check for missing required parameters
+        # First check for missing required parameters; a None value counts as missing.
         for param_name, param_def in self.definitions.items():
-            if param_def.is_required and param_name not in parameters:
+            if param_def.is_required and parameters.get(param_name) is None:
                 error_msg = f"Required parameter '{param_name}' is missing"
                 errors.append(error_msg)
                 invalid_parameters[param_name] = error_msg
