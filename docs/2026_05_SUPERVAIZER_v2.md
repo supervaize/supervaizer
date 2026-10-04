@@ -283,7 +283,7 @@ V2SurfaceResult(
                 "label": "Approve review",
                 "type": "boolean",
                 "required": True,
-            }
+            },
         ],
     },
 )

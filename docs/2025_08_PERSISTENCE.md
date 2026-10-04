@@ -25,9 +25,9 @@ from supervaizer.storage import storage_manager
 
 storage_manager.save_object("Job", job.model_dump())
 storage_manager.get_objects("Job")
-storage_manager.get_object_by_id("Case", case_id)      # None when missing
+storage_manager.get_object_by_id("Case", case_id)  # None when missing
 storage_manager.get_cases_for_job(job_id)
-storage_manager.delete_object("Job", job_id)            # False when missing
+storage_manager.delete_object("Job", job_id)  # False when missing
 storage_manager.reset_storage()
 storage_manager.close()
 ```

@@ -104,6 +104,10 @@ include = ["src/", "README.md"]
 path = "src/supervaizer/__version__.py"
 
 
+[tool.ruff.lint]
+# Explicit rule set: Ruff 0.16 enlarged its defaults.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
 "tests/*" = ["N802", "N803", "N806"] # test function naming

@@ -46,8 +46,11 @@ This is a **minor breaking change** for callers that invoke SDK methods from syn
 
 **Before:**
 ```python
-_httpx_transport = httpx.HTTPTransport(retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2)))
+_httpx_transport = httpx.HTTPTransport(
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+)
 _httpx_client = httpx.Client(transport=_httpx_transport)
+
 
 def send_event(account, sender, event) -> ApiResult:
     ...
@@ -58,8 +61,11 @@ def send_event(account, sender, event) -> ApiResult:
 
 **After:**
 ```python
-_httpx_transport = httpx.AsyncHTTPTransport(retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2)))
+_httpx_transport = httpx.AsyncHTTPTransport(
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+)
 _httpx_client = httpx.AsyncClient(transport=_httpx_transport)
+
 
 async def send_event(account, sender, event) -> ApiResult:
     ...
@@ -75,16 +81,21 @@ async def send_event(account, sender, event) -> ApiResult:
 ```python
 async def send_update_case(self, case, update) -> ApiResult:
     from supervaizer.event import CaseUpdateEvent
+
     event = CaseUpdateEvent(case=case, update=update, account=self)
     return await account_service.send_event(update, event)
 
+
 async def send_start_case(self, case) -> ApiResult:
     from supervaizer.event import CaseStartEvent
+
     event = CaseStartEvent(case=case, account=self)
     return await account_service.send_event(case, event)
 
+
 async def send_register_agent(self, agent, polling) -> ApiResult:
     from supervaizer.event import AgentRegisterEvent
+
     event = AgentRegisterEvent(agent=agent, account=self, polling=polling)
     return await account_service.send_event(agent, event)
 ```
@@ -108,10 +119,12 @@ Callers that invoke SDK methods from synchronous code (CLI registration, telemet
 def send_event_sync(account, sender, event) -> ApiResult:
     """Sync entry point for environments without a running event loop (CLI, scripts)."""
     import asyncio
+
     try:
         asyncio.get_running_loop()
         # Already inside a loop — run in a thread to avoid deadlock
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(asyncio.run, send_event(account, sender, event)).result()
     except RuntimeError:
