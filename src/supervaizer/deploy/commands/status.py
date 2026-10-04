@@ -35,7 +35,6 @@ def deploy_status(
     env: str = "dev",
     region: str | None = None,
     project_id: str | None = None,
-    verbose: bool = False,
     source_dir: Path | None = None,
 ) -> None:
     """Show deployment status and health information."""

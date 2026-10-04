@@ -24,9 +24,13 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from supervaizer.common import log
-from supervaizer.deploy.docker import DockerManager, ensure_docker_running
+from supervaizer.deploy.docker import (
+    DockerManager,
+    ensure_docker_running,
+    get_container_env,
+)
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.drivers.base import DeploymentResult
+from supervaizer.deploy.drivers.base import SECRET_ENV_VARS, DeploymentResult
 from supervaizer.deploy.state import StateManager
 from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
 
@@ -43,10 +47,7 @@ def deploy_up(
     port: int = 8000,
     generate_api_key: bool = False,
     generate_rsa: bool = False,
-    yes: bool = False,
-    no_rollback: bool = False,
     timeout: int = 300,
-    verbose: bool = False,
     source_dir: Path | None = None,
 ) -> None:
     """Deploy or update the service."""
@@ -55,10 +56,17 @@ def deploy_up(
         console.print(f"[bold red]Error:[/] Unsupported platform: {platform}")
         console.print(f"Supported platforms: {', '.join(get_supported_platforms())}")
         return
+    if image and "/" in image:
+        console.print(
+            "[bold red]Error:[/] --image takes name[:tag]; "
+            "the platform registry is added automatically"
+        )
+        return
 
     # Set defaults
+    project_dir = source_dir or Path.cwd()
     if not name:
-        name = (source_dir or Path.cwd()).name
+        name = project_dir.name
     if not region:
         region = _get_default_region(platform)
 
@@ -79,7 +87,7 @@ def deploy_up(
             return
 
         # Create deployment directory
-        deployment_dir = create_deployment_directory(source_dir or Path.cwd())
+        deployment_dir = create_deployment_directory(project_dir)
         state_manager = StateManager(deployment_dir)
 
         # Create driver
@@ -97,8 +105,9 @@ def deploy_up(
         if not image:
             image = _generate_image_tag(name, env)
 
-        # Generate secrets
-        secrets_dict = _generate_secrets(name, env, generate_api_key, generate_rsa)
+        env_vars, secrets_dict = build_service_env(
+            env, port, _generate_secrets(generate_api_key, generate_rsa)
+        )
 
         # Build and push Docker image
         with Progress(
@@ -109,41 +118,18 @@ def deploy_up(
             task = progress.add_task("Building Docker image...", total=None)
 
             docker_manager = DockerManager()
-
-            # Generate Docker files
             dockerfile_path = deployment_dir / "Dockerfile"
-            dockerignore_path = deployment_dir / ".dockerignore"
-            compose_path = deployment_dir / "docker-compose.yml"
-
             docker_manager.generate_dockerfile(
                 output_path=dockerfile_path,
                 app_port=port,
             )
-            docker_manager.generate_dockerignore(dockerignore_path)
-            docker_manager.generate_docker_compose(
-                compose_path,
-                port=port,
-                service_name=name,
-                environment=env,
-                api_key=secrets_dict.get("api_key", "test-api-key"),
-                rsa_key=secrets_dict.get("rsa_private_key", "test-rsa-key"),
-            )
+            docker_manager.generate_dockerignore(deployment_dir / ".dockerignore")
+            docker_manager.build_image(image, project_dir, dockerfile_path)
 
-            # Build image
-            progress.update(task, description="Building Docker image...")
-
-            # Get build arguments for environment variables
-            from supervaizer.deploy.docker import get_docker_build_args
-
-            build_args = get_docker_build_args(port)
-
-            docker_manager.build_image(
-                image, source_dir or Path.cwd(), dockerfile_path, build_args=build_args
-            )
-
-            # Push image (this would be platform-specific)
             progress.update(task, description="Pushing Docker image...")
-            # Note: Actual push would depend on the platform's registry
+            remote_image = driver.prepare_registry(image)
+            docker_manager.tag_image(image, remote_image)
+            docker_manager.push_image(remote_image, auth_config=driver.registry_auth())
 
         # Deploy service
         with Progress(
@@ -156,9 +142,9 @@ def deploy_up(
             result = driver.deploy_service(
                 service_name=name,
                 environment=env,
-                image_tag=image,
+                image_tag=remote_image,
                 port=port,
-                env_vars=_get_default_env_vars(env),
+                env_vars=env_vars,
                 secrets=secrets_dict,
                 timeout=timeout,
             )
@@ -171,7 +157,7 @@ def deploy_up(
                 environment=env,
                 region=region,
                 project_id=project_id,
-                image_tag=image,
+                image_tag=remote_image,
                 image_digest=result.image_digest,
                 service_url=result.service_url,
                 revision=result.revision,
@@ -186,14 +172,23 @@ def deploy_up(
             _display_deployment_result(result)
         else:
             console.print(f"[bold red]Deployment failed:[/] {result.error_message}")
-            if not no_rollback:
-                console.print(
-                    "[yellow]Consider using --no-rollback to keep failed revision[/yellow]"
-                )
 
     except Exception as e:
         log.error(f"Deployment failed: {e}")
         console.print(f"[bold red]Deployment failed:[/] {e}")
+
+
+def build_service_env(
+    environment: str, port: int, secrets: dict[str, str]
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Split the container environment into plain variables and platform secrets."""
+    env_vars = get_container_env(environment, port)
+    # Drivers set SUPERVAIZER_PUBLIC_URL from the deployed service URL.
+    env_vars.pop("SUPERVAIZER_PUBLIC_URL", None)
+    host_secrets = {
+        name: env_vars.pop(name) for name in SECRET_ENV_VARS if name in env_vars
+    }
+    return env_vars, {**secrets, **host_secrets}
 
 
 def _get_default_region(platform: str) -> str:
@@ -212,20 +207,13 @@ def _generate_image_tag(service_name: str, environment: str) -> str:
     return f"{service_name}-{environment}:{git_sha}"
 
 
-def _generate_secrets(
-    service_name: str, environment: str, generate_api_key: bool, generate_rsa: bool
-) -> dict[str, str]:
-    """Generate secrets for deployment."""
+def _generate_secrets(generate_api_key: bool, generate_rsa: bool) -> dict[str, str]:
+    """Generate controller secrets under the variable names the server reads."""
     secrets_dict = {}
-
     if generate_api_key:
-        api_key = _generate_api_key()
-        secrets_dict[f"{service_name}-{environment}-api-key"] = api_key
-
+        secrets_dict["SUPERVAIZER_API_KEY"] = _generate_api_key()
     if generate_rsa:
-        rsa_key = _generate_rsa_key()
-        secrets_dict[f"{service_name}-{environment}-rsa-key"] = rsa_key
-
+        secrets_dict["SUPERVAIZER_PRIVATE_KEY"] = _generate_rsa_key()
     return secrets_dict
 
 
@@ -252,16 +240,6 @@ def _generate_rsa_key() -> str:
     )
 
     return pem.decode("utf-8")
-
-
-def _get_default_env_vars(environment: str) -> dict[str, str]:
-    """Get default environment variables."""
-    return {
-        "SUPERVAIZER_ENVIRONMENT": environment,
-        "SUPERVAIZER_HOST": "0.0.0.0",
-        "SUPERVAIZER_PORT": "8000",
-        "SV_LOG_LEVEL": "INFO",
-    }
 
 
 def _display_deployment_result(result: DeploymentResult) -> None:

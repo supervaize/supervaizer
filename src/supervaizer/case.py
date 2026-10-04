@@ -13,17 +13,22 @@
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import shortuuid
 from pydantic import ConfigDict, Field
 
 from supervaizer.common import ApiResult, SvBaseModel, log, singleton
 from supervaizer.lifecycle import EntityEvents, EntityStatus
+from supervaizer.rule_controls import RuleCheckpointGate, run_guarded_step
 from supervaizer.storage import PersistentEntityLifecycle, StorageManager
 
 if TYPE_CHECKING:
     from supervaizer.account import Account
+
+
+T = TypeVar("T")
 
 
 class CaseNodeUpdate(SvBaseModel):
@@ -299,6 +304,42 @@ class Case(CaseAbstractModel):
         self.updates.append(updateCaseNode)
         self._persist()
 
+    async def run_guarded_step(
+        self,
+        *,
+        gate: RuleCheckpointGate,
+        step_id: str,
+        occurrence_id: str,
+        before_context: dict[str, Any],
+        effect: Callable[[], Awaitable[T]],
+        after_context: Callable[[T], dict[str, Any]],
+        advance: Callable[[T], Awaitable[Any]] | None = None,
+    ) -> T:
+        """Explicitly gate an effect and its subsequent case advancement."""
+        await self.sync_rule_checkpoint_case()
+        return await run_guarded_step(
+            gate=gate,
+            case=self,
+            step_id=step_id,
+            occurrence_id=occurrence_id,
+            before_context=before_context,
+            effect=effect,
+            after_context=after_context,
+            advance=advance,
+        )
+
+    async def sync_rule_checkpoint_case(self) -> None:
+        """Ensure Studio has the case row required by a rule checkpoint."""
+        if self.metadata.get("_rule_checkpoint_case_registered"):
+            return
+        result = await self.account.send_start_case(self)
+        if result is None:
+            raise RuntimeError(
+                "Studio did not confirm rule checkpoint case registration"
+            )
+        self.metadata["_rule_checkpoint_case_registered"] = True
+        self._persist()
+
     def update_sync(self, updateCaseNode: CaseNodeUpdate, **kwargs: Any) -> None:
         self._prepare_update(updateCaseNode)
         self.account.send_update_case_sync(self, updateCaseNode)
@@ -384,6 +425,11 @@ class Case(CaseAbstractModel):
         case_result: dict[str, Any],
         final_cost: float | None = None,
     ) -> CaseNodeUpdate:
+        if any(
+            state.get("status") != "allow"
+            for state in self.metadata.get("_rule_checkpoints", {}).values()
+        ):
+            raise RuntimeError("Cannot close a case before rule checkpoints allow it")
         if final_cost:
             self.total_cost = final_cost
         else:

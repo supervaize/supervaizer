@@ -11,7 +11,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
-import hmac
 import os
 import secrets
 import time
@@ -23,10 +22,9 @@ from urllib.parse import urlunparse
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from fastapi import FastAPI, HTTPException, Request, Security, status
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
-from fastapi.security import APIKeyHeader
 from starlette.datastructures import MutableHeaders
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
@@ -50,6 +48,10 @@ from supervaizer.common import (
 )
 from supervaizer.contracts import (
     API_VERSION,
+    RULE_CHECKPOINT_RESUME_ACTION,
+    V2ActionResult,
+    V2Effect,
+    RuleCheckpointResume,
     V2WorkspaceAuthorizationSettings,
 )
 from supervaizer.instructions import display_instructions
@@ -65,6 +67,7 @@ from supervaizer.routers import (
     create_public_router,
 )  # <-- ADDED
 from supervaizer.routes import get_server  # <-- MODIFIED: removed per-router imports
+from supervaizer.rule_controls import resume_rule_checkpoint
 from supervaizer.scheduled_steps import (
     _execute_scheduled_method as _execute_scheduled_method,
     _run_scheduled_step_loop,
@@ -91,6 +94,7 @@ from supervaizer.studio_handshake import (
     validate_studio_a2a_workspace_authorization,
 )
 from supervaizer.workspace_authorization import (
+    local_mode_workspace_authorization_bypassed,
     validate_workspace_authorization_settings,
 )
 
@@ -143,6 +147,31 @@ def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
         return agent.execute_v2_action_method(action, request)
 
     return handler
+
+
+def _rule_checkpoint_resume_handler(request: Any) -> V2ActionResult:
+    decision = resume_rule_checkpoint(
+        RuleCheckpointResume.model_validate(
+            request.input
+            | {
+                "job_id": request.job_id,
+                "case_id": request.case_id,
+                "agent_slug": request.agent_slug,
+            }
+        )
+    )
+    status = decision.status if decision is not None else "pending_delivery"
+    return V2ActionResult(
+        status="ok",
+        effects=[
+            V2Effect(
+                type="rule.checkpoint.resumed",
+                job_id=request.job_id,
+                status=status,
+                summary={"checkpoint_id": request.input.get("checkpoint_id")},
+            )
+        ],
+    )
 
 
 class ServerAbstract(SvBaseModel):
@@ -210,9 +239,6 @@ class ServerAbstract(SvBaseModel):
     api_key: str | None = Field(
         default=None,
         description="Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated",
-    )
-    api_key_header: APIKeyHeader | None = Field(
-        default=None, description="API key header for authentication"
     )
     workspace_authorization: V2WorkspaceAuthorizationSettings = Field(
         default_factory=V2WorkspaceAuthorizationSettings,
@@ -459,10 +485,6 @@ class Server(ServerAbstract):
                 content={"detail": exc.errors(), "body": exc.body},
             )
 
-        # Create API key header security
-        API_KEY_NAME = "X-API-Key"
-        api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
-
         super().__init__(
             scheme=scheme,
             host=host,
@@ -479,7 +501,6 @@ class Server(ServerAbstract):
             public_key=public_key,
             public_url=public_url,
             api_key=api_key,
-            api_key_header=api_key_header,
             workspace_authorization=workspace_authorization_settings,
             **kwargs,
         )
@@ -495,6 +516,12 @@ class Server(ServerAbstract):
             )
 
         log.info(f"[Server launch] Server ID: {self.server_id}")
+        if local_mode_workspace_authorization_bypassed(self):
+            log.warning(
+                "[Server launch] Local mode: workspace authorization is BYPASSED "
+                "for /a2a actions and surfaces. Handlers get an unverified "
+                "'local-mode' workspace context. Do not expose this server."
+            )
 
         # Store server instance on app state before building routers
         self.app.state.server = self  # <-- MOVED earlier (was after route mount)
@@ -561,38 +588,6 @@ class Server(ServerAbstract):
 
         if not self.public_url:
             self.public_url = f"{self.scheme}://{self.host}:{self.port}"
-
-    async def verify_api_key(
-        self, api_key: str = Security(APIKeyHeader(name="X-API-Key"))
-    ) -> bool:
-        """Verify that the API key is valid.
-
-        Args:
-            api_key: The API key from the request header
-
-        Returns:
-            True if the API key is valid
-
-        Raises:
-            HTTPException: If the API key is invalid or not provided when required
-        """
-        if self.api_key is None:
-            # API key authentication is disabled
-            return True
-
-        # Constant-time comparison to avoid a timing side channel on the key.
-        # Compare bytes so non-ASCII keys fail closed instead of raising
-        # TypeError (hmac.compare_digest rejects non-ASCII str inputs).
-        if not hmac.compare_digest(
-            (api_key or "").encode("utf-8"), self.api_key.encode("utf-8")
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid API key",
-                headers={"WWW-Authenticate": "APIKey"},
-            )
-
-        return True
 
     @property
     def url(self) -> str:
@@ -724,6 +719,13 @@ class Server(ServerAbstract):
                 self.register_v2_action(
                     action,
                     _agent_v2_method_handler(agent, action),
+                    agent_slug=agent.slug,
+                )
+            registration = agent.supervaizer_v2_registration
+            if registration is not None and registration.capabilities.rule_checkpoints:
+                self.register_v2_action(
+                    RULE_CHECKPOINT_RESUME_ACTION,
+                    _rule_checkpoint_resume_handler,
                     agent_slug=agent.slug,
                 )
 

@@ -35,7 +35,6 @@ def deploy_down(
     region: str | None = None,
     project_id: str | None = None,
     yes: bool = False,
-    verbose: bool = False,
     source_dir: Path | None = None,
 ) -> None:
     """Destroy the service and cleanup resources."""

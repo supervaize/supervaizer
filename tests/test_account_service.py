@@ -12,7 +12,7 @@
 
 
 import pytest
-from httpx import ConnectError, HTTPStatusError
+from httpx import ConnectError, Headers, HTTPStatusError
 from pytest_mock import MockerFixture
 
 from supervaizer import Account, ApiSuccess, account_service
@@ -22,6 +22,17 @@ from supervaizer.event import Event
 from supervaizer.server import Server
 
 from . import AUTH_ERROR_RESPONSE, WAKEUP_EVENT_RESPONSE
+
+
+@pytest.mark.parametrize(
+    "field_name", ["token", "refresh_token", "id_token", "custom-auth-token"]
+)
+def test_redact_generic_and_qualified_token_fields(field_name: str) -> None:
+    payload = {"job": {"metadata": {field_name: "credential", "state": "done"}}}
+
+    assert account_service._redact_sensitive_value(payload) == {
+        "job": {"metadata": {field_name: "***", "state": "done"}}
+    }
 
 
 @pytest.mark.asyncio
@@ -70,6 +81,7 @@ async def test_send_event_auth_error(
     mock_response = mocker.Mock()
     mock_response.status_code = 403
     mock_response.text = str(AUTH_ERROR_RESPONSE)
+    mock_response.headers = Headers({"X-Request-ID": "req-123"})
 
     error = HTTPStatusError(
         "403 Client Error: Forbidden for url",
@@ -79,10 +91,14 @@ async def test_send_event_auth_error(
     mock_response.raise_for_status.side_effect = error
     mock_post.return_value = mock_response
 
+    mock_log = mocker.patch("supervaizer.account_service.log")
     with pytest.raises(HTTPStatusError, match="403 Client Error: Forbidden for url"):
         await send_event(
             account=account_fixture, sender=server_fixture, event=event_fixture
         )
+
+    errors = [str(call.args[0]) for call in mock_log.error.call_args_list]
+    assert any("status=403 request_id='req-123'" in msg for msg in errors)
 
 
 @pytest.mark.asyncio
@@ -138,6 +154,7 @@ def test_send_event_sync_auth_error(
     mock_response = mocker.Mock()
     mock_response.status_code = 403
     mock_response.text = str(AUTH_ERROR_RESPONSE)
+    mock_response.headers = Headers({"X-Request-ID": "req-123"})
 
     error = HTTPStatusError(
         "403 Client Error: Forbidden for url",
@@ -147,10 +164,14 @@ def test_send_event_sync_auth_error(
     mock_response.raise_for_status.side_effect = error
     mock_post.return_value = mock_response
 
+    mock_log = mocker.patch("supervaizer.account_service.log")
     with pytest.raises(HTTPStatusError, match="403 Client Error: Forbidden for url"):
         send_event_sync(
             account=account_fixture, sender=server_fixture, event=event_fixture
         )
+
+    errors = [str(call.args[0]) for call in mock_log.error.call_args_list]
+    assert any("status=403 request_id='req-123'" in msg for msg in errors)
 
 
 def test_send_event_sync_url_error(

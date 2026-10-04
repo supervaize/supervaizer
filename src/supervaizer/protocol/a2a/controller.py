@@ -21,6 +21,8 @@ from supervaizer.contracts import (
     V2ActionResult,
     V2SurfaceRequest,
     V2SurfaceResult,
+    V2VerifiedWorkspaceContext,
+    V2WorkspaceContext,
     WORKSPACE_BINDING_CREATE_ACTION,
     WORKSPACE_BINDING_CREATE_SURFACE,
     WORKSPACE_BINDING_OPTIONS_ACTION,
@@ -28,6 +30,8 @@ from supervaizer.contracts import (
 from supervaizer.protocol.a2a.events import A2A_EFFECT_EVENT, publish_v2_event
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationError,
+    build_local_mode_workspace_context,
+    local_mode_workspace_authorization_bypassed,
     verify_workspace_authorization_for_request_async,
 )
 
@@ -166,8 +170,8 @@ async def _dispatch_action(
     verified_workspace = None
     if _action_requires_workspace_authorization(action_request.action):
         try:
-            verified_workspace = await verify_workspace_authorization_for_request_async(
-                server=server,
+            verified_workspace = await _authorize_workspace(
+                server,
                 token=workspace_authorization_token,
                 required_scopes=[
                     SUPERVAIZER_ACTION_INVOKE_METHOD,
@@ -175,7 +179,6 @@ async def _dispatch_action(
                 ],
                 request_workspace=action_request.workspace,
                 agent_slug=action_request.agent_slug,
-                require_configured=True,
             )
         except WorkspaceAuthorizationError as exc:
             return _json_rpc_error(
@@ -264,8 +267,8 @@ async def _dispatch_surface(
     verified_workspace = None
     if _surface_requires_workspace_authorization(surface_request.surface):
         try:
-            verified_workspace = await verify_workspace_authorization_for_request_async(
-                server=server,
+            verified_workspace = await _authorize_workspace(
+                server,
                 token=workspace_authorization_token,
                 required_scopes=[
                     SUPERVAIZER_SURFACE_LOAD_METHOD,
@@ -273,7 +276,6 @@ async def _dispatch_surface(
                 ],
                 request_workspace=surface_request.workspace,
                 agent_slug=surface_request.agent_slug,
-                require_configured=True,
             )
         except WorkspaceAuthorizationError as exc:
             return _json_rpc_error(
@@ -322,6 +324,33 @@ async def _dispatch_surface(
         )
 
     return JsonRpcResponse(id=request.id, result=result.model_dump(mode="json"))
+
+
+async def _authorize_workspace(
+    server: "Server",
+    *,
+    token: str | None,
+    required_scopes: list[str],
+    request_workspace: V2WorkspaceContext,
+    agent_slug: str,
+) -> V2VerifiedWorkspaceContext | None:
+    # Local mode replaces only the "not configured" failure; any configured
+    # verifier or Studio account keeps the fail-closed token check.
+    if local_mode_workspace_authorization_bypassed(server):
+        return build_local_mode_workspace_context(
+            server=server,
+            required_scopes=required_scopes,
+            request_workspace=request_workspace,
+            agent_slug=agent_slug,
+        )
+    return await verify_workspace_authorization_for_request_async(
+        server=server,
+        token=token,
+        required_scopes=required_scopes,
+        request_workspace=request_workspace,
+        agent_slug=agent_slug,
+        require_configured=True,
+    )
 
 
 def _validate_action_request(params: dict[str, Any]) -> V2ActionRequest:

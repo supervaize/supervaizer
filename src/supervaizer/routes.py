@@ -461,6 +461,11 @@ def create_agents_routes(server: "Server") -> APIRouter:
 
 def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     """Create agent-specific routes."""
+    if not agent.methods and agent.supervaizer_v2_registration is None:
+        raise ValueError(
+            f"Agent {agent.name} has no methods defined and no "
+            "supervaizer_v2_registration"
+        )
     # tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
     tags: list[str | Enum] = ["Supervision"]
     router = APIRouter(
@@ -574,7 +579,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
-        agent_parameters: dict[str, Any] = {}
+        agent_parameters: Any = {}
         if encrypted_agent_parameters:
             # Basic debug trace
             log.info(
@@ -593,26 +598,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     json.loads(agent_parameters_str) if agent_parameters_str else {}
                 )
 
-                # Debug: Log the parsed data type and structure
-                log.info(f"🔍 Parsed agent_parameters type: {type(agent_parameters)}")
-                if isinstance(agent_parameters, list):
-                    log.info(
-                        f"🔍 Converting list to dict with {len(agent_parameters)} items"
-                    )
-                    # Convert list to dict if needed (common when frontend sends array)
-                    agent_parameters = {
-                        f"param_{i}": param for i, param in enumerate(agent_parameters)
-                    }
-                elif isinstance(agent_parameters, dict):
-                    log.info(
-                        f"🔍 Agent parameters keys: {list(agent_parameters.keys())}"
-                    )
-                else:
-                    log.warning(
-                        f"🔍 Unexpected type: {type(agent_parameters)}, converting to empty dict"
-                    )
-                    agent_parameters = {}
-
             except Exception as e:
                 log.error(f"❌ Decryption failed: {type(e).__name__}: {e!s}")
                 result = {
@@ -626,6 +611,31 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 # Do not log the result payload: it can echo parameter data.
                 log.info(f"📤 Agent {agent.name}: Decryption failed")
                 return result
+
+        # Canonical shape: the list of {"name": ..., "value": ...} objects that
+        # Studio sends and job start consumes. The {NAME: value} dict form stays
+        # accepted for existing callers. Any other type fails in validate_parameters.
+        if isinstance(agent_parameters, list):
+            if not all(
+                isinstance(param, dict)
+                and isinstance(param.get("name"), str)
+                and "value" in param
+                for param in agent_parameters
+            ):
+                error_msg = (
+                    "Each agent parameter must be an object with a string "
+                    "'name' and a 'value'"
+                )
+                log.info(f"📤 Agent {agent.name}: Malformed agent parameter list")
+                return {
+                    "valid": False,
+                    "message": "Agent parameter validation failed",
+                    "errors": [error_msg],
+                    "invalid_parameters": {"encrypted_agent_parameters": error_msg},
+                }
+            agent_parameters = {
+                param["name"]: param["value"] for param in agent_parameters
+            }
 
         # Log the incoming request details.
         # Never log decrypted parameter values (secrets); log only presence/count.
@@ -735,8 +745,39 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
+    @router.post(
+        "/parameters",
+        summary=f"Server updates agent: {agent.name}",
+        description="Server updates agent onboarding status and/or encrypted parameters",
+        response_model=AgentResponse,
+        responses={
+            http_status.HTTP_200_OK: {"model": AgentResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
+    )
+    @handle_route_errors()
+    async def server_update_agent(
+        onboarding_status: str | None = Body(None),
+        parameters_encrypted: str | None = Body(None),
+        agent: Agent = Depends(get_agent),
+    ) -> AgentResponse:
+        log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
+
+        if onboarding_status is not None:
+            agent.server_agent_onboarding_status = onboarding_status
+        if parameters_encrypted is not None:
+            agent.update_parameters_from_server(server, parameters_encrypted)
+        # import importlib
+
+        # importlib.reload(Agent)
+        return AgentResponse(**agent.registration_info)
+
+    # v2-only agent: Studio runs jobs through /a2a, so skip the v1 job routes.
     if not agent.methods:
-        raise ValueError(f"Agent {agent.name} has no methods defined")
+        return router
 
     agent_job_model_name = f"{agent.slug}_Start_Job_Model"
     # Create the dynamic model with the custom name for FastAPI documentation
@@ -930,36 +971,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 detail=f"Agent {agent.name} did not return a job status",
             )
         return result
-
-    @router.post(
-        "/parameters",
-        summary=f"Server updates agent: {agent.name}",
-        description="Server updates agent onboarding status and/or encrypted parameters",
-        response_model=AgentResponse,
-        responses={
-            http_status.HTTP_200_OK: {"model": AgentResponse},
-            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-        },
-        dependencies=[
-            Depends(require_scope("write"))
-        ],  # <-- MODIFIED: scope-enforced write
-    )
-    @handle_route_errors()
-    async def server_update_agent(
-        onboarding_status: str | None = Body(None),
-        parameters_encrypted: str | None = Body(None),
-        agent: Agent = Depends(get_agent),
-    ) -> AgentResponse:
-        log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
-
-        if onboarding_status is not None:
-            agent.server_agent_onboarding_status = onboarding_status
-        if parameters_encrypted is not None:
-            agent.update_parameters_from_server(server, parameters_encrypted)
-        # import importlib
-
-        # importlib.reload(Agent)
-        return AgentResponse(**agent.registration_info)
 
     return router
 

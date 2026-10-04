@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 1.5.0
+**Version:** 1.6.0
 
 ### `account.Account`
 
@@ -408,7 +408,6 @@ public_url: full url (including scheme and port) to use for outbound connections
 | `public_key` | `RSAPublicKey` | **required** | RSA public key for secret parameters encryption - Used in agent-to-server communication - Not needed by user |
 | `public_url` | `str` | `None` | Public including scheme and port to use for inbound connections |
 | `api_key` | `str` | `None` | Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated |
-| `api_key_header` | `APIKeyHeader` | `None` | API key header for authentication |
 | `workspace_authorization` | `V2WorkspaceAuthorizationSettings` | — | Optional Studio-signed workspace authorization verifier settings |
 
 #### Examples
@@ -443,4 +442,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-08-29 19:33:55*
+*Uploaded on 2026-09-25 06:09:35*

@@ -31,8 +31,10 @@ WORKSPACE_BINDING_CREATE_ACTION = "workspace_binding.create"
 WORKSPACE_BINDING_CREATE_SURFACE = "workspace_binding.create"
 AGENT_REFRESH_ACTION = "agent.refresh"
 AGENT_REFRESH_EFFECT = "agent.refreshed"
+RULE_CHECKPOINT_RESUME_ACTION = "rule.checkpoint.resume"
 AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
 _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+V2_DISPLAY_TEXT_MAX_LENGTH = 300
 
 
 class ContractModel(BaseModel):
@@ -244,6 +246,9 @@ class JobStartRequest(ContractModel):
     job_context: dict[str, Any]
     job_fields: dict[str, Any] = Field(default_factory=dict)
     encrypted_agent_parameters: str | None = None
+    rule_snapshot: "RuleCheckpointSnapshot | None" = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class CaseUpdateEvent(ContractModel):
@@ -308,6 +313,31 @@ class V2ArtifactTypeDefinition(ContractModel):
     renderer_surface: str | None = None
 
 
+def _is_none(value: Any) -> bool:
+    return value is None
+
+
+def _is_empty(value: Any) -> bool:
+    return not value
+
+
+def _strip_display_text(value: Any) -> Any:
+    """Trim agent-declared display text; blank text declares nothing."""
+    if isinstance(value, str):
+        return value.strip() or None
+    return value
+
+
+_LABEL_FIELD_HELP = (
+    "Short caption a consumer may show instead of one derived from the id. "
+    "Plain text; display only, never an authorization input."
+)
+_DESCRIPTION_FIELD_HELP = (
+    "One or two plain-language sentences a consumer may show as help text, "
+    "such as a tooltip. Plain text; display only, never an authorization input."
+)
+
+
 class V2ActionDefinition(ContractModel):
     """Declared metadata for one invokable agent action.
 
@@ -329,6 +359,18 @@ class V2ActionDefinition(ContractModel):
         default="job",
         description="Context the action operates within.",
     )
+    label: str | None = Field(
+        default=None,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        exclude_if=_is_none,
+        description=_LABEL_FIELD_HELP,
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        exclude_if=_is_none,
+        description=_DESCRIPTION_FIELD_HELP,
+    )
 
     @field_validator("id")
     @classmethod
@@ -337,12 +379,63 @@ class V2ActionDefinition(ContractModel):
             raise ValueError("action definitions must have a non-empty id")
         return value
 
+    @field_validator("label", "description", mode="before")
+    @classmethod
+    def strip_display_text(cls, value: Any) -> Any:
+        return _strip_display_text(value)
+
+
+class V2SurfaceDefinition(ContractModel):
+    """Display text for one declared surface.
+
+    `capabilities.surfaces` stays a list of ids, so consumers keep matching
+    surfaces by string; a definition only adds human-readable text for one of
+    those ids.
+    """
+
+    id: str = Field(description="Surface id, as listed in `capabilities.surfaces`.")
+    label: str | None = Field(
+        default=None,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        exclude_if=_is_none,
+        description=_LABEL_FIELD_HELP,
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        exclude_if=_is_none,
+        description=_DESCRIPTION_FIELD_HELP,
+    )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_is_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("surface definitions must have a non-empty id")
+        return value
+
+    @field_validator("label", "description", mode="before")
+    @classmethod
+    def strip_display_text(cls, value: Any) -> Any:
+        return _strip_display_text(value)
+
 
 class V2AgentCapabilities(ContractModel):
     surfaces: list[str] = Field(default_factory=list)
+    surface_definitions: list[V2SurfaceDefinition] = Field(
+        default_factory=list,
+        exclude_if=_is_empty,
+        description=(
+            "Display text for declared surfaces, at most one per id. "
+            "Omitted from the serialized registration when empty."
+        ),
+    )
     actions: list[V2ActionDefinition] = Field(default_factory=list)
     case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
+    rule_checkpoints: "V2RuleCheckpointCapability | None" = Field(
+        default=None, exclude_if=_is_none
+    )
 
     @field_validator("actions", mode="before")
     @classmethod
@@ -351,6 +444,114 @@ class V2AgentCapabilities(ContractModel):
         if not isinstance(value, list):
             return value
         return [{"id": item} if isinstance(item, str) else item for item in value]
+
+    @model_validator(mode="after")
+    def validate_surface_definitions(self) -> V2AgentCapabilities:
+        declared = set(self.surfaces)
+        described: set[str] = set()
+        with_text: list[V2SurfaceDefinition] = []
+        for definition in self.surface_definitions:
+            if definition.id not in declared:
+                raise ValueError(
+                    f"surface_definitions describes undeclared surface {definition.id!r}"
+                )
+            if definition.id in described:
+                raise ValueError(
+                    f"surface_definitions describes surface {definition.id!r} twice"
+                )
+            described.add(definition.id)
+            if definition.label is not None or definition.description is not None:
+                with_text.append(definition)
+        # A definition with no text says nothing, and keeping it would serialize a
+        # non-empty `surface_definitions` for an agent that declares no display text.
+        self.surface_definitions = with_text
+        if self.rule_checkpoints is not None and not any(
+            action.id == RULE_CHECKPOINT_RESUME_ACTION for action in self.actions
+        ):
+            self.actions.append(
+                V2ActionDefinition(
+                    id=RULE_CHECKPOINT_RESUME_ACTION,
+                    mutating=True,
+                    scope="job",
+                )
+            )
+        return self
+
+
+class V2RuleCheckpointCapability(ContractModel):
+    """Opt-in support for Studio before/after rule checkpoints."""
+
+    version: Literal[1] = 1
+    phases: list[Literal["before", "after"]]
+    secret_refs: list[str] = Field(default_factory=list)
+
+    @field_validator("phases")
+    @classmethod
+    def validate_phases(
+        cls, value: list[Literal["before", "after"]]
+    ) -> list[Literal["before", "after"]]:
+        if not value:
+            raise ValueError("rule_checkpoints.phases must declare at least one phase")
+        if len(value) != len(set(value)):
+            raise ValueError("rule_checkpoints.phases must not contain duplicates")
+        return value
+
+    @field_validator("secret_refs")
+    @classmethod
+    def validate_secret_refs(cls, value: list[str]) -> list[str]:
+        allowed_prefixes = (
+            "job.fields.",
+            "case.metadata.",
+            "step.payload.",
+            "context.",
+        )
+        if len(value) != len(set(value)):
+            raise ValueError("rule_checkpoints.secret_refs must not contain duplicates")
+        if any(not reference.startswith(allowed_prefixes) for reference in value):
+            raise ValueError("rule_checkpoints.secret_refs contains an invalid path")
+        return value
+
+
+class RuleCheckpointSnapshot(ContractModel):
+    """Opaque frozen rule snapshot supplied by Studio for one governed job."""
+
+    hash: str
+    checkpoint_url: str
+    version: Literal[1]
+    checkpoint_token: str
+
+
+class RuleCheckpointRequest(ContractModel):
+    occurrence_id: str
+    phase: Literal["before", "after"]
+    snapshot_hash: str
+    job_id: str
+    case_id: str
+    step_id: str
+    context: dict[str, Any]
+    secret_refs: list[str] = Field(default_factory=list)
+
+
+class RuleCheckpointResponse(ContractModel):
+    checkpoint_id: str
+    status: Literal["allow", "pause", "stop"]
+    snapshot_hash: str
+    input_hash: str
+
+
+class RuleCheckpointResume(ContractModel):
+    checkpoint_id: str
+    job_id: str
+    case_id: str
+    # Set by the controller from the A2A request, like job_id and case_id.
+    agent_slug: str
+    occurrence_id: str
+    phase: Literal["before", "after"]
+    # A resume settles a paused checkpoint, so "pause" is not a decision.
+    status: Literal["allow", "stop"]
+    snapshot_hash: str
+    input_hash: str
+    decision_id: str
 
 
 class V2AgentMethod(ContractModel):
@@ -624,13 +825,13 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
 
 def build_v2_agent_registration(
     *,
-    agent_id: str,
     agent_slug: str,
     display_name: str,
-    agent_card_url: str,
-    controller_url: str,
     a2ui_catalog_version: str,
-    surfaces: Iterable[str] = (),
+    agent_id: str | None = None,
+    agent_card_url: str | None = None,
+    controller_url: str = "/a2a",
+    surfaces: Iterable[str | V2SurfaceDefinition | dict[str, Any]] = (),
     actions: Iterable[str | V2ActionDefinition | dict[str, Any]] = (),
     resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
     datasets: Iterable[V2DatasetDefinition | dict[str, Any]] = (),
@@ -639,6 +840,7 @@ def build_v2_agent_registration(
     agent_methods: V2AgentMethods | dict[str, Any] | None = None,
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
+    rule_checkpoints: V2RuleCheckpointCapability | dict[str, Any] | None = None,
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
     a2ui_version: str = SUPERVAIZER_V2_A2UI_VERSION,
     a2a_version: str = SUPERVAIZER_V2_A2A_VERSION,
@@ -646,16 +848,28 @@ def build_v2_agent_registration(
     a2a_transport: V2A2ATransport | dict[str, Any] | None = None,
     a2a_external_interop: V2A2AExternalInterop | dict[str, Any] | None = None,
 ) -> SupervaizerV2AgentRegistrationContract:
-    """Build and validate a Supervaizer v2 registration from SDK primitives."""
+    """Build and validate a Supervaizer v2 registration from SDK primitives.
+
+    ``agent_slug`` must equal ``Agent.slug``. ``agent_id`` defaults to the slug,
+    ``controller_url`` to the ``/a2a`` route every controller serves, and
+    ``agent_card_url`` to the unversioned Agent Card route for the slug.
+    """
+    if agent_id is None:
+        agent_id = agent_slug
+    if agent_card_url is None:
+        # ponytail: unversioned card route, the builder does not know the agent
+        # version; pass agent_card_url to advertise the versioned route.
+        agent_card_url = f"/.well-known/agents/{agent_slug}_agent.json"
     resource_definitions = _contract_list(resources, V2ResourceDefinition)
     dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)
     workspace_binding_definition = _workspace_binding(workspace_binding)
     agent_method_definitions = _agent_methods(agent_methods)
     job_policy_definition = _job_policy(job_policy)
+    declared_surface_ids, surface_definitions = _split_surface_declarations(surfaces)
 
     capability_surfaces = _unique_strings([
-        *surfaces,
+        *declared_surface_ids,
         *_auto_resource_surface_ids(resource_definitions),
         *_auto_dataset_surface_ids(dataset_definitions),
         *_dashboard_surface_ids(dashboard_definitions),
@@ -696,9 +910,13 @@ def build_v2_agent_registration(
         ),
         capabilities=V2AgentCapabilities(
             surfaces=capability_surfaces,
+            surface_definitions=surface_definitions,
             actions=capability_actions,
             case_lanes=_contract_list(case_lanes, V2CaseLaneDefinition),
             artifact_types=_contract_list(artifact_types, V2ArtifactTypeDefinition),
+            rule_checkpoints=_contract_or_none(
+                rule_checkpoints, V2RuleCheckpointCapability
+            ),
         ),
         job_policy=job_policy_definition,
         resources=resource_definitions,
@@ -724,6 +942,15 @@ def _contract_or_default[ContractModelT: ContractModel](
 ) -> ContractModelT:
     if value is None:
         return model()
+    return value if isinstance(value, model) else model.model_validate(value)
+
+
+def _contract_or_none[ContractModelT: ContractModel](
+    value: ContractModelT | dict[str, Any] | None,
+    model: type[ContractModelT],
+) -> ContractModelT | None:
+    if value is None:
+        return None
     return value if isinstance(value, model) else model.model_validate(value)
 
 
@@ -760,6 +987,33 @@ def _unique_strings(values: Iterable[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def _split_surface_declarations(
+    declared: Iterable[str | V2SurfaceDefinition | dict[str, Any]],
+) -> tuple[list[str], list[V2SurfaceDefinition]]:
+    """Split declared surfaces into ids and the definitions that carry display text.
+
+    A bare id string declares no text and passes through unchanged, so a
+    string-only declaration serializes exactly as before. The first definition
+    with text for an id wins.
+    """
+    ids: list[str] = []
+    definitions: dict[str, V2SurfaceDefinition] = {}
+    for entry in declared:
+        if isinstance(entry, str):
+            ids.append(entry)
+            continue
+        definition = (
+            entry
+            if isinstance(entry, V2SurfaceDefinition)
+            else V2SurfaceDefinition.model_validate(entry)
+        )
+        ids.append(definition.id)
+        has_text = definition.label is not None or definition.description is not None
+        if has_text:
+            definitions.setdefault(definition.id, definition)
+    return ids, list(definitions.values())
 
 
 def _auto_resource_surface_ids(resources: Iterable[V2ResourceDefinition]) -> list[str]:

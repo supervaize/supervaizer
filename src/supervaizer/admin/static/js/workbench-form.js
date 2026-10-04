@@ -12,17 +12,13 @@ class WorkbenchForm {
         this.basePath = `/manage/agents/${config.agentSlug}/workbench`;
         this.activeJobId = null;
 
-        // Optional callback overrides for param/field collection and API key
-        this._getApiKey = config.getApiKey || (() => sessionStorage.getItem('admin_api_key') || '');
+        // Optional callback overrides for param/field collection.
+        // No API key: every call targets /manage, which Tailscale gates.
         this._getParams = config.getParams || null;
         this._getFields = config.getFields || null;
         if (config.onJobStarted) this.onJobStarted = config.onJobStarted;
         if (config.onError) this.onError = config.onError;
         this._ws = null;
-    }
-
-    getApiKey() {
-        return this._getApiKey();
     }
 
     collectParameters() {
@@ -89,10 +85,7 @@ class WorkbenchForm {
         try {
             const response = await fetch(this.startUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.getApiKey(),
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ parameters, fields }),
             });
             let result;
@@ -127,7 +120,7 @@ class WorkbenchForm {
         try {
             const response = await fetch(
                 `${this.basePath}/jobs/${this.activeJobId}/steps/${caseId}/${stepIndex}/execute`,
-                { method: 'POST', headers: { 'X-API-Key': this.getApiKey() } },
+                { method: 'POST' },
             );
             const result = await response.json();
             if (!response.ok) {
@@ -146,7 +139,7 @@ class WorkbenchForm {
         try {
             const response = await fetch(
                 `${this.basePath}/jobs/${this.activeJobId}/steps/${caseId}/${stepIndex}/cancel`,
-                { method: 'POST', headers: { 'X-API-Key': this.getApiKey() } },
+                { method: 'POST' },
             );
             if (!response.ok) {
                 this.onError('Cancel failed');
@@ -166,7 +159,6 @@ class WorkbenchForm {
         try {
             const response = await fetch(`${this.basePath}/jobs/${targetJobId}/stop`, {
                 method: 'POST',
-                headers: { 'X-API-Key': this.getApiKey() },
             });
             const result = await response.json();
             if (!response.ok) {
@@ -184,9 +176,7 @@ class WorkbenchForm {
         if (!this.activeJobId) return;
 
         try {
-            const response = await fetch(`${this.basePath}/jobs/${this.activeJobId}/status`, {
-                headers: { 'X-API-Key': this.getApiKey() },
-            });
+            const response = await fetch(`${this.basePath}/jobs/${this.activeJobId}/status`);
             return await response.json();
         } catch (e) {
             this.onError(`Network error: ${e.message}`);
@@ -215,10 +205,7 @@ class WorkbenchForm {
                 `${this.basePath}/jobs/${this.activeJobId}/cases/${caseId}/answer`,
                 {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': this.getApiKey(),
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ answer: answerPayload }),
                 },
             );
@@ -302,10 +289,8 @@ class WorkbenchForm {
         // Don't overwrite while user interacts with HITL (unless forced)
         if (!force && this._hasActiveHitl()) return;
         const url = `${this.basePath}/jobs/${this.activeJobId}`;
-        const apiKey = this.getApiKey();
-        const headers = apiKey ? { 'X-API-Key': apiKey } : {};
         const self = this;
-        fetch(url, { headers })
+        fetch(url)
             .then(r => r.text())
             .then(html => {
                 container.innerHTML = html;

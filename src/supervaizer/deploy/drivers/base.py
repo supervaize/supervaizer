@@ -23,6 +23,20 @@ from typing import Any
 
 from pydantic import BaseModel
 
+# Container variables stored in the platform secret manager, mapped to the
+# secret-name suffix. Suffixes stay stable so `deploy down` finds old secrets.
+SECRET_ENV_VARS = {
+    "SUPERVAIZER_API_KEY": "api-key",
+    "SUPERVAIZER_PRIVATE_KEY": "rsa-key",
+    "SUPERVAIZE_API_KEY": "studio-api-key",
+}
+
+
+def split_image_tag(image_tag: str) -> tuple[str, str]:
+    """Split a local `name[:tag]` image reference into repository and tag."""
+    repository, _, tag = image_tag.partition(":")
+    return repository, tag or "latest"
+
 
 class ActionType(str, Enum):
     """Type of deployment action."""
@@ -182,9 +196,24 @@ class BaseDriver(ABC):
     def check_prerequisites(self) -> list[str]:
         """Check prerequisites and return list of missing requirements."""
 
+    def prepare_registry(self, image_tag: str) -> str:
+        """Ensure the registry repository exists and return the remote image reference."""
+        # Not abstract, so drivers written before this method still instantiate.
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement prepare_registry() for `deploy up`"
+        )
+
+    def registry_auth(self) -> dict[str, str] | None:
+        """Return Docker push credentials; None uses the local Docker credential store."""
+        return None
+
     def get_service_key(self, service_name: str, environment: str) -> str:
         """Generate a unique key for the service."""
         return f"{service_name}-{environment}"
+
+    def get_secret_name(self, service_key: str, env_var: str) -> str:
+        """Name of the platform secret that holds a container variable."""
+        return f"{service_key}-{SECRET_ENV_VARS[env_var]}"
 
     def validate_configuration(self, **kwargs: Any) -> list[str]:
         """Validate driver configuration and return list of errors."""
