@@ -574,7 +574,7 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
 
-        agent_parameters: dict[str, Any] = {}
+        agent_parameters: Any = {}
         if encrypted_agent_parameters:
             # Basic debug trace
             log.info(
@@ -593,26 +593,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     json.loads(agent_parameters_str) if agent_parameters_str else {}
                 )
 
-                # Debug: Log the parsed data type and structure
-                log.info(f"🔍 Parsed agent_parameters type: {type(agent_parameters)}")
-                if isinstance(agent_parameters, list):
-                    log.info(
-                        f"🔍 Converting list to dict with {len(agent_parameters)} items"
-                    )
-                    # Convert list to dict if needed (common when frontend sends array)
-                    agent_parameters = {
-                        f"param_{i}": param for i, param in enumerate(agent_parameters)
-                    }
-                elif isinstance(agent_parameters, dict):
-                    log.info(
-                        f"🔍 Agent parameters keys: {list(agent_parameters.keys())}"
-                    )
-                else:
-                    log.warning(
-                        f"🔍 Unexpected type: {type(agent_parameters)}, converting to empty dict"
-                    )
-                    agent_parameters = {}
-
             except Exception as e:
                 log.error(f"❌ Decryption failed: {type(e).__name__}: {e!s}")
                 result = {
@@ -626,6 +606,31 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 # Do not log the result payload: it can echo parameter data.
                 log.info(f"📤 Agent {agent.name}: Decryption failed")
                 return result
+
+        # Canonical shape: the list of {"name": ..., "value": ...} objects that
+        # Studio sends and job start consumes. The {NAME: value} dict form stays
+        # accepted for existing callers. Any other type fails in validate_parameters.
+        if isinstance(agent_parameters, list):
+            if not all(
+                isinstance(param, dict)
+                and isinstance(param.get("name"), str)
+                and "value" in param
+                for param in agent_parameters
+            ):
+                error_msg = (
+                    "Each agent parameter must be an object with a string "
+                    "'name' and a 'value'"
+                )
+                log.info(f"📤 Agent {agent.name}: Malformed agent parameter list")
+                return {
+                    "valid": False,
+                    "message": "Agent parameter validation failed",
+                    "errors": [error_msg],
+                    "invalid_parameters": {"encrypted_agent_parameters": error_msg},
+                }
+            agent_parameters = {
+                param["name"]: param["value"] for param in agent_parameters
+            }
 
         # Log the incoming request details.
         # Never log decrypted parameter values (secrets); log only presence/count.
