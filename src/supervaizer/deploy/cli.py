@@ -64,7 +64,11 @@ project_id_option = typer.Option(
 verbose_option = typer.Option(False, "--verbose", "-v", help="Show detailed output")
 
 # Additional parameters for specific commands
-image_option = typer.Option(None, "--image", help="Container image (registry/repo:tag)")
+image_option = typer.Option(
+    None,
+    "--image",
+    help="Image name[:tag], pushed to the platform registry (default: {name}-{env}:{git-sha})",
+)
 port_option = typer.Option(8000, "--port", help="Application port")
 generate_api_key_option = typer.Option(
     False, "--generate-api-key", help="Generate secure API key"
@@ -72,8 +76,7 @@ generate_api_key_option = typer.Option(
 generate_rsa_option = typer.Option(
     False, "--generate-rsa", help="Generate RSA private key"
 )
-yes_option = typer.Option(False, "--yes", "-y", help="Non-interactive mode")
-no_rollback_option = typer.Option(False, "--no-rollback", help="Keep failed revision")
+yes_option = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt")
 timeout_option = typer.Option(300, "--timeout", help="Deployment timeout in seconds")
 docker_files_only_option = typer.Option(
     False, "--docker-files-only", help="Only generate Docker files without running them"
@@ -171,7 +174,6 @@ def plan(
     env: str = env_option,
     region: str = region_option,
     project_id: str = project_id_option,
-    verbose: bool = verbose_option,
 ) -> None:
     """Plan deployment changes without applying them."""
     # Check if deploy extras are installed (e.g., docker, cloud SDKs)
@@ -183,7 +185,7 @@ def plan(
         raise typer.Exit(1)
     _check_platform_required(platform, "plan")
     source_dir = _check_pyproject_toml()
-    plan_deployment(platform, name, env, region, project_id, verbose, source_dir)
+    plan_deployment(platform, name, env, region, project_id, source_dir)
 
 
 @deploy_app.command(no_args_is_help=True)
@@ -197,12 +199,9 @@ def up(
     port: int = port_option,
     generate_api_key: bool = generate_api_key_option,
     generate_rsa: bool = generate_rsa_option,
-    yes: bool = yes_option,
-    no_rollback: bool = no_rollback_option,
     timeout: int = timeout_option,
-    verbose: bool = verbose_option,
 ) -> None:
-    """Deploy or update the service."""
+    """Build, push, and deploy the service."""
     _check_platform_required(platform, "up")
     source_dir = _check_pyproject_toml()
     deploy_up(
@@ -215,10 +214,7 @@ def up(
         port,
         generate_api_key,
         generate_rsa,
-        yes,
-        no_rollback,
         timeout,
-        verbose,
         source_dir,
     )
 
@@ -231,12 +227,11 @@ def down(
     region: str = region_option,
     project_id: str = project_id_option,
     yes: bool = yes_option,
-    verbose: bool = verbose_option,
 ) -> None:
     """Destroy the service and cleanup resources."""
     _check_platform_required(platform, "down")
     source_dir = _check_pyproject_toml()
-    deploy_down(platform, name, env, region, project_id, yes, verbose, source_dir)
+    deploy_down(platform, name, env, region, project_id, yes, source_dir)
 
 
 @deploy_app.command(no_args_is_help=True)
@@ -246,12 +241,11 @@ def status(
     env: str = env_option,
     region: str = region_option,
     project_id: str = project_id_option,
-    verbose: bool = verbose_option,
 ) -> None:
     """Show deployment status and health information."""
     _check_platform_required(platform, "status")
     source_dir = _check_pyproject_toml()
-    deploy_status(platform, name, env, region, project_id, verbose, source_dir)
+    deploy_status(platform, name, env, region, project_id, source_dir)
 
 
 @deploy_app.command()

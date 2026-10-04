@@ -22,6 +22,7 @@ from rich.console import Console
 from rich.table import Table
 
 from supervaizer.common import log
+from supervaizer.deploy.commands.up import build_service_env
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 from supervaizer.deploy.drivers.base import DeploymentPlan
 from supervaizer.deploy.utils import get_git_sha
@@ -35,7 +36,6 @@ def plan_deployment(
     env: str = "dev",
     region: str | None = None,
     project_id: str | None = None,
-    verbose: bool = False,
     source_dir: Path | None = None,
 ) -> None:
     """Plan deployment changes without applying them."""
@@ -74,13 +74,21 @@ def plan_deployment(
         image_tag = _generate_image_tag(name, env)
 
         # Create deployment plan
+        env_vars, secrets = build_service_env(
+            env,
+            8000,
+            {
+                "SUPERVAIZER_API_KEY": "placeholder",
+                "SUPERVAIZER_PRIVATE_KEY": "placeholder",
+            },
+        )
         plan = driver.plan_deployment(
             service_name=name,
             environment=env,
             image_tag=image_tag,
             port=8000,
-            env_vars=_get_default_env_vars(env),
-            secrets=_get_default_secrets(name, env),
+            env_vars=env_vars,
+            secrets=secrets,
         )
 
         # Display plan
@@ -105,24 +113,6 @@ def _generate_image_tag(service_name: str, environment: str) -> str:
     """Generate image tag for deployment."""
     git_sha = get_git_sha()
     return f"{service_name}-{environment}:{git_sha}"
-
-
-def _get_default_env_vars(environment: str) -> dict[str, str]:
-    """Get default environment variables."""
-    return {
-        "SUPERVAIZER_ENVIRONMENT": environment,
-        "SUPERVAIZER_HOST": "0.0.0.0",
-        "SUPERVAIZER_PORT": "8000",
-        "SV_LOG_LEVEL": "INFO",
-    }
-
-
-def _get_default_secrets(service_name: str, environment: str) -> dict[str, str]:
-    """Get default secrets for deployment."""
-    return {
-        f"{service_name}-{environment}-api-key": "placeholder-api-key",
-        f"{service_name}-{environment}-rsa-key": "placeholder-rsa-key",
-    }
 
 
 def _display_plan(plan: DeploymentPlan) -> None:

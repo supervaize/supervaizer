@@ -30,6 +30,8 @@ from supervaizer.deploy.drivers.base import (
     DeploymentResult,
     ResourceAction,
     ResourceType,
+    SECRET_ENV_VARS,
+    split_image_tag,
 )
 
 console = Console()
@@ -146,7 +148,8 @@ class CloudRunDriver(BaseDriver):
 
         # Check secrets
         if secrets:
-            for secret_name, secret_value in secrets.items():
+            for env_var in secrets:
+                secret_name = self.get_secret_name(full_service_name, env_var)
                 secret_path = f"projects/{self.project_id}/secrets/{secret_name}"
                 try:
                     self.secret_client.get_secret(name=secret_path)
@@ -202,7 +205,7 @@ class CloudRunDriver(BaseDriver):
         try:
             # Create/update secrets first
             if secrets:
-                self._create_or_update_secrets(secrets)
+                self._create_or_update_secrets(full_service_name, secrets)
 
             # Create/update service
             service = self._create_or_update_service(
@@ -395,9 +398,12 @@ class CloudRunDriver(BaseDriver):
 
         return errors
 
-    def _create_or_update_secrets(self, secrets: dict[str, str]) -> None:
+    def _create_or_update_secrets(
+        self, service_key: str, secrets: dict[str, str]
+    ) -> None:
         """Create or update secrets in Secret Manager."""
-        for secret_name, secret_value in secrets.items():
+        for env_var, secret_value in secrets.items():
+            secret_name = self.get_secret_name(service_key, env_var)
             secret_path = f"projects/{self.project_id}/secrets/{secret_name}"
 
             try:
@@ -405,7 +411,6 @@ class CloudRunDriver(BaseDriver):
                 self.secret_client.get_secret(name=secret_path)
 
                 # Update existing secret
-                parent = f"projects/{self.project_id}"
                 self.secret_client.add_secret_version(
                     request={
                         "parent": secret_path,
@@ -452,9 +457,10 @@ class CloudRunDriver(BaseDriver):
 
         # Build secret references
         secret_refs = []
-        for secret_name in secrets:
+        for env_var in secrets:
+            secret_name = self.get_secret_name(service_name, env_var)
             secret_refs.append({
-                "name": secret_name,
+                "name": env_var,
                 "value_source": {
                     "secret_key_ref": {
                         "secret": f"projects/{self.project_id}/secrets/{secret_name}",
@@ -465,6 +471,7 @@ class CloudRunDriver(BaseDriver):
 
         # Service configuration
         service_config = {
+            "name": service_path,
             "template": {
                 "containers": [
                     {
@@ -486,22 +493,42 @@ class CloudRunDriver(BaseDriver):
             ],
         }
 
-        try:
-            # Try to update existing service
-            service = self.run_client.update_service(
-                request={"service": service_config, "name": service_path}
-            )
-            log.info(f"Updated Cloud Run service: {service_name}")
-            return service
+        # allow_missing creates the service on first deploy.
+        operation = self.run_client.update_service(
+            request={"service": service_config, "allow_missing": True}
+        )
+        service = operation.result()
+        log.info(f"Deployed Cloud Run service: {service_name}")
+        return service
 
-        except NotFound:
-            # Create new service
-            service_config["name"] = service_path
-            service = self.run_client.create_service(
-                request={"parent": self.service_parent, "service": service_config}
+    def prepare_registry(self, image_tag: str) -> str:
+        """Ensure an Artifact Registry repository exists and return the image path."""
+        repository, tag = split_image_tag(image_tag)
+        try:
+            self.registry_client.get_repository(
+                name=f"{self.registry_location}/repositories/{repository}"
             )
-            log.info(f"Created Cloud Run service: {service_name}")
-            return service
+        except NotFound:
+            self.registry_client.create_repository(
+                parent=self.registry_location,
+                repository_id=repository,
+                repository=artifactregistry_v1.Repository(
+                    format_=artifactregistry_v1.Repository.Format.DOCKER
+                ),
+            ).result()
+            log.info(f"Created Artifact Registry repository {repository}")
+        host = f"{self.region}-docker.pkg.dev"
+        return f"{host}/{self.project_id}/{repository}/{repository}:{tag}"
+
+    def registry_auth(self) -> dict[str, str]:
+        """Short-lived Artifact Registry credentials for the active gcloud account."""
+        result = subprocess.run(
+            ["gcloud", "auth", "print-access-token"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return {"username": "oauth2accesstoken", "password": result.stdout.strip()}
 
     def _wait_for_service_ready(self, service_path: str, timeout: int) -> str | None:
         """Wait for service to be ready and return URL."""
@@ -539,9 +566,7 @@ class CloudRunDriver(BaseDriver):
 
             # Update service
             service.template.containers[0].env = env_vars
-            self.run_client.update_service(
-                request={"service": service, "name": service_path}
-            )
+            self.run_client.update_service(request={"service": service}).result()
 
             log.info(f"Set SUPERVAIZER_PUBLIC_URL to {public_url}")
 
@@ -550,14 +575,8 @@ class CloudRunDriver(BaseDriver):
 
     def _delete_secrets(self, service_name: str) -> None:
         """Delete secrets associated with the service."""
-        # This is a simplified implementation
-        # In practice, you might want to be more selective about which secrets to delete
-        common_secrets = [
-            f"{service_name}-api-key",
-            f"{service_name}-rsa-key",
-        ]
-
-        for secret_name in common_secrets:
+        for env_var in SECRET_ENV_VARS:
+            secret_name = self.get_secret_name(service_name, env_var)
             secret_path = f"projects/{self.project_id}/secrets/{secret_name}"
             try:
                 self.secret_client.delete_secret(name=secret_path)

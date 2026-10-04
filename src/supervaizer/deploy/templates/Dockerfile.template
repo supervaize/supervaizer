@@ -24,8 +24,9 @@ RUN chmod +x /entrypoint.sh
 COPY . .
 
 # COPY .deployment/debug_env.py ./debug_env.py
-# Set environment variables
-{{ENV_VARS}}
+# Configuration and credentials are passed as container environment variables
+# at runtime, never baked into the image (deploy up pushes it to a registry).
+ENV SUPERVAIZER_PORT={{APP_PORT}}
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash supervaizer && \
