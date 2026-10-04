@@ -543,6 +543,8 @@ class RuleCheckpointResume(ContractModel):
     checkpoint_id: str
     job_id: str
     case_id: str
+    # Set by the controller from the A2A request, like job_id and case_id.
+    agent_slug: str
     occurrence_id: str
     phase: Literal["before", "after"]
     # A resume settles a paused checkpoint, so "pause" is not a decision.

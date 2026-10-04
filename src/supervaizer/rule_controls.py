@@ -67,9 +67,12 @@ class RuleCheckpointGate:
         account: "Account",
         snapshot: RuleCheckpointSnapshot,
         secret_refs: tuple[str, ...] = (),
+        *,
+        agent_slug: str,
     ) -> None:
         self.account = account
         self.snapshot = snapshot
+        self.agent_slug = agent_slug
         self.secret_refs = list(secret_refs)
         self._waiters: dict[str, asyncio.Future[RuleCheckpointResponse]] = {}
         self._pending_identities: dict[str, tuple[str, str, str, str, str]] = {}
@@ -81,20 +84,28 @@ class RuleCheckpointGate:
         request: JobStartRequest | V2ActionRequest,
         *,
         secret_refs: tuple[str, ...] = (),
+        agent_slug: str | None = None,
     ) -> "RuleCheckpointGate":
-        """Require the frozen snapshot before running a governed job."""
-        snapshot = (
-            request.rule_snapshot
-            if isinstance(request, JobStartRequest)
-            else RuleCheckpointSnapshot.model_validate(
-                request.input.get("rule_snapshot")
+        """Require the frozen snapshot before running a governed job.
+
+        A v1 ``JobStartRequest`` names no agent, so pass ``agent_slug``; a
+        ``V2ActionRequest`` carries its own.
+        """
+        if isinstance(request, JobStartRequest):
+            snapshot = request.rule_snapshot
+        else:
+            raw_snapshot = request.input.get("rule_snapshot")
+            snapshot = (
+                RuleCheckpointSnapshot.model_validate(raw_snapshot)
+                if raw_snapshot is not None
+                else None
             )
-            if request.input.get("rule_snapshot") is not None
-            else None
-        )
+            agent_slug = request.agent_slug
         if snapshot is None:
             raise ValueError("Governed job requires rule_snapshot")
-        return cls(account, snapshot, secret_refs)
+        if not agent_slug:
+            raise ValueError("Governed job requires agent_slug")
+        return cls(account, snapshot, secret_refs, agent_slug=agent_slug)
 
     async def checkpoint(
         self,
@@ -171,6 +182,8 @@ class RuleCheckpointGate:
         """Resolve a pending in-process checkpoint from a controller push handler."""
         if decision.snapshot_hash != self.snapshot.hash:
             raise ValueError("Rule checkpoint resume snapshot_hash does not match")
+        if decision.agent_slug != self.agent_slug:
+            raise ValueError("Rule checkpoint resume is for another agent")
         waiter = self._waiters.get(decision.checkpoint_id)
         if waiter is None:
             raise RuleCheckpointRecoveryRequired(
@@ -185,9 +198,17 @@ class RuleCheckpointGate:
         ) != self._pending_identities[decision.checkpoint_id]:
             raise ValueError("Rule checkpoint resume does not match pending occurrence")
         response = RuleCheckpointResponse.model_validate(decision.model_dump())
-        if not waiter.done():
-            waiter.set_result(response)
+        # A sync v1 job method runs its own event loop in a worker thread, so
+        # settle the waiter on its loop, not on the handler's.
+        waiter.get_loop().call_soon_threadsafe(_settle, waiter, response)
         return response
+
+
+def _settle(
+    waiter: asyncio.Future[RuleCheckpointResponse], response: RuleCheckpointResponse
+) -> None:
+    if not waiter.done():
+        waiter.set_result(response)
 
 
 def resume_rule_checkpoint(
@@ -206,6 +227,8 @@ def resume_rule_checkpoint(
     if case is None:
         _retain_decision(decision)
         return None
+    if case.metadata.get("_rule_checkpoint_agent_slug") != decision.agent_slug:
+        raise ValueError("Rule checkpoint resume is for another agent")
     for state in case.metadata.get("_rule_checkpoints", {}).values():
         if "checkpoint_id" not in state and (
             state.get("occurrence_id"),
@@ -242,6 +265,14 @@ def _retain_decision(decision: RuleCheckpointResume) -> None:
     _DELIVERED_DECISIONS[decision.checkpoint_id] = decision
     if len(_DELIVERED_DECISIONS) > _DELIVERED_DECISIONS_LIMIT:
         del _DELIVERED_DECISIONS[next(iter(_DELIVERED_DECISIONS))]
+    # A waiter in another thread can register, and find the cache empty, after
+    # the caller looked for its gate. Hand the decision over; pop picks one side.
+    gate = _PENDING_GATES.get(decision.checkpoint_id)
+    if (
+        gate is not None
+        and _DELIVERED_DECISIONS.pop(decision.checkpoint_id, None) is not None
+    ):
+        gate.resume(decision)
 
 
 async def run_guarded_step(
@@ -258,6 +289,9 @@ async def run_guarded_step(
     """Run an effect only after `before`, then advance only after `after` allows."""
     if not case.metadata.get("_rule_checkpoint_case_registered"):
         raise ValueError("Rule checkpoint case must be registered before a gate")
+    owner = case.metadata.setdefault("_rule_checkpoint_agent_slug", gate.agent_slug)
+    if owner != gate.agent_slug:
+        raise ValueError("Rule checkpoint case belongs to another agent")
     states = case.metadata.setdefault("_rule_checkpoints", {})
     before_key = f"{occurrence_id}:before"
     after_key = f"{occurrence_id}:after"

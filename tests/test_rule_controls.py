@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -92,6 +94,7 @@ def test_gate_from_job_start_keeps_declared_secret_refs(account_fixture: Any) ->
         account_fixture,
         request,
         secret_refs=("case.metadata.customer_secret",),
+        agent_slug="agent-1",
     )
 
     assert gate.secret_refs == ["case.metadata.customer_secret"]
@@ -146,6 +149,7 @@ async def test_guarded_step_prevents_effect_before_allow(
             checkpoint_token="token",
         ),
         secret_refs=("case.metadata.customer_secret",),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
@@ -191,6 +195,7 @@ async def test_guarded_step_prevents_advancement_after_stop(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
@@ -226,6 +231,7 @@ async def test_checkpoint_rejects_snapshot_mismatch(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuntimeError, match="snapshot_hash"):
@@ -262,6 +268,7 @@ async def test_checkpoint_failure_does_not_run_effect(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
@@ -303,6 +310,7 @@ async def test_before_checkpoint_failure_retries_same_context_without_effect(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
@@ -340,6 +348,7 @@ async def test_checkpoint_resume_resolves_matching_pending_decision(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     response = RuleCheckpointResponse(
         checkpoint_id="checkpoint-1",
@@ -365,6 +374,7 @@ async def test_checkpoint_resume_resolves_matching_pending_decision(
             snapshot_hash="snapshot-1",
             input_hash="input-1",
             decision_id="decision-1",
+            agent_slug="agent-1",
         )
     )
 
@@ -387,6 +397,7 @@ async def test_checkpoint_credentials_go_only_to_configured_studio(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     await gate.checkpoint(
@@ -415,6 +426,7 @@ async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     waiting = asyncio.create_task(
         gate.wait_for_resume(
@@ -435,6 +447,7 @@ async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
         "checkpoint_id": "checkpoint-pause",
         "job_id": "job-1",
         "case_id": "case-1",
+        "agent_slug": "agent-1",
         "occurrence_id": "occurrence-1",
         "phase": "before",
         "snapshot_hash": "snapshot-1",
@@ -461,6 +474,7 @@ def _resume(checkpoint_id: str, case_id: str = "case-1") -> RuleCheckpointResume
         snapshot_hash="snapshot-1",
         input_hash="input-1",
         decision_id="decision-1",
+        agent_slug="agent-1",
     )
 
 
@@ -482,6 +496,7 @@ def _gate(account: Any) -> RuleCheckpointGate:
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
 
@@ -548,7 +563,10 @@ async def test_resume_before_checkpoint_response_reaches_later_waiter(
         name="In-flight rule case",
         description="Resume before checkpoint response",
         status=EntityStatus.IN_PROGRESS,
-        metadata={"_rule_checkpoints": {"occurrence-1:before": checking}},
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"occurrence-1:before": checking},
+        },
     )
 
     assert (
@@ -564,6 +582,146 @@ async def test_resume_before_checkpoint_response_reaches_later_waiter(
     )
 
     assert resumed.status == "allow"
+
+
+def test_v1_gate_requires_agent_slug(account_fixture: Any) -> None:
+    request = JobStartRequest(
+        job_context={},
+        rule_snapshot=RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="requires agent_slug"):
+        RuleCheckpointGate.from_job_start(account_fixture, request)
+
+
+@pytest.mark.asyncio
+async def test_resume_from_another_agent_does_not_release_gate(
+    account_fixture: Any,
+) -> None:
+    waiting = asyncio.create_task(
+        _gate(account_fixture).wait_for_resume(
+            _paused("checkpoint-agent"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-1",
+        )
+    )
+    await asyncio.sleep(0)
+
+    def resume_as(agent_slug: str) -> Any:
+        return _rule_checkpoint_resume_handler(
+            V2ActionRequest(
+                request_id="request-1",
+                actor={"user_id": "studio"},
+                workspace={"id": "workspace-1"},
+                mission_id="mission-1",
+                agent_slug=agent_slug,
+                surface="mission.agent",
+                action="rule.checkpoint.resume",
+                job_id="job-1",
+                case_id="case-1",
+                input=_resume("checkpoint-agent").model_dump(
+                    exclude={"job_id", "case_id", "agent_slug"}
+                ),
+            )
+        )
+
+    with pytest.raises(ValueError, match="another agent"):
+        resume_as("agent-other")
+    assert not waiting.done()
+
+    resume_as("agent-1")
+    assert (await waiting).status == "allow"
+
+
+def test_persisted_resume_from_another_agent_is_rejected(
+    account_fixture: Any, storage_manager: Any
+) -> None:
+    state = {
+        "checkpoint_id": "checkpoint-owned",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    Case(
+        id="case-owned",
+        job_id="job-1",
+        account=account_fixture,
+        name="Owned rule case",
+        description="Reject another agent's resume",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"occurrence-1:before": state},
+        },
+    )
+    decision = _resume("checkpoint-owned", "case-owned").model_copy(
+        update={"agent_slug": "agent-other"}
+    )
+
+    with pytest.raises(ValueError, match="another agent"):
+        resume_rule_checkpoint(decision)
+    assert state["status"] == "pause"
+
+
+def test_resume_wakes_a_waiter_on_another_threads_loop(account_fixture: Any) -> None:
+    gate = _gate(account_fixture)
+    result: dict[str, str] = {}
+
+    def sync_job_method() -> None:
+        # A sync v1 job method runs in a worker thread with its own loop.
+        async def wait() -> None:
+            resumed = await gate.wait_for_resume(
+                _paused("checkpoint-thread"),
+                "occurrence-1",
+                "before",
+                job_id="job-1",
+                case_id="case-1",
+            )
+            result["status"] = resumed.status
+
+        asyncio.run(wait())
+
+    worker = threading.Thread(target=sync_job_method, daemon=True)
+    worker.start()
+    for _ in range(100):
+        if "checkpoint-thread" in gate._waiters:
+            break
+        time.sleep(0.01)
+
+    resume_rule_checkpoint(_resume("checkpoint-thread"))
+    worker.join(timeout=2)
+
+    assert result == {"status": "allow"}
+
+
+@pytest.mark.asyncio
+async def test_decision_retained_after_waiter_registered_still_wakes_it(
+    account_fixture: Any,
+) -> None:
+    waiting = asyncio.create_task(
+        _gate(account_fixture).wait_for_resume(
+            _paused("checkpoint-handoff"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-1",
+        )
+    )
+    await asyncio.sleep(0)
+
+    # The handler looked for the gate before the waiter registered it.
+    _retain_decision(_resume("checkpoint-handoff"))
+
+    assert (await asyncio.wait_for(waiting, 1)).status == "allow"
 
 
 def test_retained_decisions_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -587,6 +745,7 @@ async def test_a2a_resume_handler_delivers_studio_payload(account_fixture: Any) 
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     waiting = asyncio.create_task(
         gate.wait_for_resume(
@@ -642,6 +801,7 @@ async def test_checkpoint_resume_retained_until_waiter_is_registered(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     decision = RuleCheckpointResume(
         checkpoint_id="checkpoint-race",
@@ -653,6 +813,7 @@ async def test_checkpoint_resume_retained_until_waiter_is_registered(
         snapshot_hash="snapshot-1",
         input_hash="input-1",
         decision_id="decision-1",
+        agent_slug="agent-1",
     )
     assert resume_rule_checkpoint(decision) is None
 
@@ -690,7 +851,10 @@ async def test_persisted_resume_wakes_later_waiter(
         name="Persisted rule case",
         description="Resume checkpoint delivery",
         status=EntityStatus.IN_PROGRESS,
-        metadata={"_rule_checkpoints": {"occurrence-1:before": state}},
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"occurrence-1:before": state},
+        },
     )
     decision = RuleCheckpointResume(
         checkpoint_id="checkpoint-race",
@@ -702,6 +866,7 @@ async def test_persisted_resume_wakes_later_waiter(
         snapshot_hash="snapshot-1",
         input_hash="input-1",
         decision_id="decision-1",
+        agent_slug="agent-1",
     )
 
     assert resume_rule_checkpoint(decision) is not None
@@ -720,6 +885,7 @@ async def test_persisted_resume_wakes_later_waiter(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     resumed = await gate.wait_for_resume(
@@ -761,6 +927,7 @@ async def test_started_effect_is_never_replayed_after_failure(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuntimeError, match="effect failed"):
@@ -811,6 +978,7 @@ async def test_lost_after_response_never_replays_completed_effect(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
@@ -848,6 +1016,7 @@ async def test_recovery_retries_pending_after_without_replaying_effect(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     checkpoint = mocker.patch.object(
         gate,
@@ -928,6 +1097,7 @@ async def test_persisted_before_allow_continues_without_rechecking(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     checkpoint = mocker.patch.object(
         gate,
@@ -998,6 +1168,7 @@ async def test_persisted_before_allow_rejects_changed_step(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     mocker.patch.object(gate, "checkpoint", checkpoint)
     effect = mocker.AsyncMock()
@@ -1047,6 +1218,7 @@ async def test_concurrent_recovery_advances_only_once(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     mocker.patch.object(
         gate,
@@ -1133,6 +1305,7 @@ async def test_recovery_cannot_advance_while_original_after_request_is_active(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     after_waiting = asyncio.Event()
     release_after = asyncio.Event()
@@ -1222,6 +1395,7 @@ async def test_duplicate_completed_occurrence_never_replays_effect(
             version=1,
             checkpoint_token="token",
         ),
+        agent_slug="agent-1",
     )
     await run_guarded_step(
         gate=gate,

@@ -152,7 +152,12 @@ def _agent_v2_method_handler(agent: Agent, action: str) -> ActionHandler:
 def _rule_checkpoint_resume_handler(request: Any) -> V2ActionResult:
     decision = resume_rule_checkpoint(
         RuleCheckpointResume.model_validate(
-            request.input | {"job_id": request.job_id, "case_id": request.case_id}
+            request.input
+            | {
+                "job_id": request.job_id,
+                "case_id": request.case_id,
+                "agent_slug": request.agent_slug,
+            }
         )
     )
     status = decision.status if decision is not None else "pending_delivery"
