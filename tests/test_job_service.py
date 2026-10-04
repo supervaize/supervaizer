@@ -418,6 +418,33 @@ async def test_service_job_custom_with_parameters(
 
 
 @pytest.mark.asyncio
+async def test_service_job_custom_rejects_bad_parameter_shape(
+    server_fixture: "Server",
+    agent_fixture: "Agent",
+    context_fixture: "JobContext",
+    mocker: MockerFixture,
+) -> None:
+    """A payload that is not a list of dicts fails before the task is queued."""
+    background_tasks = mocker.MagicMock()
+    mocker.patch(
+        "supervaizer.job_service.decrypt_value", return_value='{"API_KEY": "x"}'
+    )
+
+    with pytest.raises(ValueError, match="list of dictionaries"):
+        await service_job_custom(
+            method_name="custom_method",
+            server=server_fixture,
+            background_tasks=background_tasks,
+            agent=agent_fixture,
+            sv_context=context_fixture,
+            job_fields={},
+            encrypted_agent_parameters="encrypted_string",
+        )
+
+    background_tasks.add_task.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_service_job_custom_no_job_id(
     server_fixture: "Server",
     agent_fixture: "Agent",

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
-from supervaizer.job import Job, Jobs
+from supervaizer.job import Job, Jobs, normalize_agent_parameters
 from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
@@ -135,7 +135,8 @@ async def service_job_custom(
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-        agent_parameters = (
+        # Reject a bad shape now (400), not later in the background method.
+        agent_parameters = normalize_agent_parameters(
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
         log.debug("[Decrypted parameters] : parameters decrypted")

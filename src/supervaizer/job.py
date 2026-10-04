@@ -244,6 +244,31 @@ class JobResponse(SvBaseModel):
         }
 
 
+def normalize_agent_parameters(agent_parameters: Any) -> list[dict[str, Any]] | None:
+    """Return decrypted agent parameters as a list of dicts.
+
+    Raises ValueError for any other shape, so job start and custom calls
+    reject the same payloads before any agent method runs.
+    """
+    if agent_parameters is None:
+        return None
+    # Unwrap nested list: [[{...}, {...}]] -> [{...}, {...}]
+    if (
+        isinstance(agent_parameters, list)
+        and agent_parameters
+        and isinstance(agent_parameters[0], list)
+    ):
+        agent_parameters = agent_parameters[0]
+    if not isinstance(agent_parameters, list) or not all(
+        isinstance(p, dict) for p in agent_parameters
+    ):
+        raise ValueError(
+            "agent_parameters must be a list of dictionaries, "
+            f"got: {type(agent_parameters).__name__}"
+        )
+    return agent_parameters
+
+
 class AbstractJob(SvBaseModel):
     supervaizer_VERSION: ClassVar[str] = VERSION
     id: str
@@ -387,18 +412,7 @@ class Job(AbstractJob):
         # Use provided name or fallback to mission name from context
         job_name = name or job_context.mission_name
 
-        # Ensure agent_parameters is a list of dicts, not nested incorrectly
-        if agent_parameters is not None:
-            # If it's a list but the first element is also a list, unwrap it
-            if isinstance(agent_parameters, list) and len(agent_parameters) > 0:
-                if isinstance(agent_parameters[0], list):
-                    # Unwrap nested list: [[{...}, {...}]] -> [{...}, {...}]
-                    agent_parameters = agent_parameters[0]
-            # Ensure all elements are dicts
-            if not all(isinstance(p, dict) for p in agent_parameters):
-                raise ValueError(
-                    f"agent_parameters must be a list of dictionaries, got: {type(agent_parameters)}"
-                )
+        agent_parameters = normalize_agent_parameters(agent_parameters)
 
         job = cls(
             id=job_id,
