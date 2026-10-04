@@ -47,7 +47,9 @@ Workspace and tenant slugs are not enough to authorize shared-agent access. A Su
 
 The shared-agent model uses a Studio-owned Workspace Agent Grant and a short-lived Studio-signed workspace authorization token. Studio sends the token with Studio-to-agent requests, and the Supervaizer SDK verifies it before dispatching handlers. This lets stateless agents safely serve multiple workspaces without storing grant state locally.
 
-Studio sends the token in the `X-Supervaize-Workspace-Authorization: Bearer <token>` header. With `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED` unset, every non-bootstrap `/a2a` call fails with JSON-RPC error `-32030 workspace_authorization_not_configured`; this includes local mode.
+Studio sends the token in the `X-Supervaize-Workspace-Authorization: Bearer <token>` header. With `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED` unset, every non-bootstrap `/a2a` call fails with JSON-RPC error `-32030 workspace_authorization_not_configured`.
+
+Local mode is the only exception. When `SUPERVAIZER_LOCAL_MODE=true`, the server has no `supervisor_account`, and no verifier is configured, `/a2a` dispatches without a token. Handlers get an unverified `V2VerifiedWorkspaceContext` with `grant_id="local-mode"` (`LOCAL_MODE_WORKSPACE_GRANT_ID`), the request's workspace, the controller agent `id`, and exactly the scopes the call needs. The server logs a warning at startup. If a Studio account is attached or a verifier is configured, the normal fail-closed check applies, local mode or not. Agent data-resource routes do not take this bypass.
 
 See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md).
 
@@ -62,8 +64,8 @@ Supervaizer v2 currently exposes two A2A JSON-RPC methods:
 
 Both methods are scoped by `agent_slug`. In multi-agent controllers, handlers must be registered for the correct agent slug.
 
-Every action and surface requires a Studio-signed workspace authorization token,
-except the bootstrap set: the `workspace_binding.options` and
+Outside the local-mode exception above, every action and surface requires a
+Studio-signed workspace authorization token, except the bootstrap set: the `workspace_binding.options` and
 `workspace_binding.create` actions and the `workspace_binding.create` surface.
 These calls are used before a Workspace Agent Grant exists, so they require
 normal Studio-to-agent transport authentication but not a workspace

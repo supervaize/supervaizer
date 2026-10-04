@@ -55,7 +55,19 @@ Local mode runs the agents from your `supervaizer_control.py` plus the built-in 
 - one generated resource action, `resource.hello_messages.list`
 - a minimal HITL review step when human review is enabled
 
-Local mode binds to `127.0.0.1`, skips Studio registration, and uses the API key `local-dev`. Invoking v2 actions over `/a2a` requires Studio workspace authorization, which local mode does not have, so `/a2a` calls answer `workspace_authorization_not_configured`; use the workbench at `/manage` to run jobs locally.
+Local mode binds to `127.0.0.1`, skips Studio registration, and uses the API key `local-dev`. It also bypasses Studio workspace authorization for `/a2a` actions and surfaces, so `X-API-Key` alone is enough:
+
+```bash
+curl -s http://127.0.0.1:8000/a2a \
+  -H "X-API-Key: local-dev" -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "supervaizer/action.invoke",
+       "params": {"request_id": "r1", "actor": {"user_id": "me"},
+                  "workspace": {"id": "local"}, "mission_id": "m1",
+                  "agent_slug": "hello-world-ai-agent", "surface": "job.start",
+                  "action": "job.start", "input": {"count": 1}, "job_id": "job-1"}}'
+```
+
+Handlers receive an unverified `workspace_authorization` whose `grant_id` is `local-mode`, and the server logs a startup warning. The bypass applies only while no `SUPERVAIZER_WORKSPACE_AUTH_*` verifier is configured and the server has no Studio account; otherwise every call needs a real Studio token. Never expose a local-mode port: anyone who reaches it can run your agents with the well-known key.
 
 Open these endpoints:
 
@@ -64,7 +76,7 @@ Open these endpoints:
 | `http://127.0.0.1:8000/docs` | FastAPI Swagger docs | public |
 | `http://127.0.0.1:8000/.well-known/agents.json` | A2A discovery | public |
 | `http://127.0.0.1:8000/.well-known/health` | Controller health | public |
-| `POST http://127.0.0.1:8000/a2a` | A2A JSON-RPC controller endpoint | `X-API-Key` (write scope) plus workspace token |
+| `POST http://127.0.0.1:8000/a2a` | A2A JSON-RPC controller endpoint | `X-API-Key` (write scope); workspace token outside local mode |
 | `GET http://127.0.0.1:8000/a2a/events` | SSE stream for v2 effects | `X-API-Key` (read scope) |
 | `http://127.0.0.1:8000/manage` | Admin interface and agent workbench | Tailscale IP, or loopback in local mode |
 
