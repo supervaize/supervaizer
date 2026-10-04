@@ -115,14 +115,22 @@ def local_mode_workspace_authorization_bypassed(server: Any) -> bool:
 
     All three conditions are required: ``SUPERVAIZER_LOCAL_MODE=true``, no
     Studio ``supervisor_account``, and no workspace authorization settings.
-    Configured settings are always enforced, and a Studio account always takes
-    the production path. Evaluated per request, like the loopback check in
-    ``access.tailscale``.
+    Any trust setting counts as configured even when ``enabled`` is false, so a
+    forgotten ``SUPERVAIZER_WORKSPACE_AUTH_REQUIRED`` fails closed instead of
+    bypassing. A Studio account always takes the production path. Evaluated
+    per request, like the loopback check in ``access.tailscale``.
     """
+    settings = get_workspace_authorization_settings(server)
+    configured = settings.enabled or any((
+        settings.issuer,
+        settings.audience,
+        settings.public_key_pem,
+        settings.jwks_url,
+    ))
     return (
         is_local_mode()
         and getattr(server, "supervisor_account", None) is None
-        and not workspace_authorization_enabled(server)
+        and not configured
     )
 
 

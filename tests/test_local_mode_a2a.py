@@ -187,6 +187,25 @@ def test_local_mode_with_supervisor_account_is_still_enforced(
     _assert_auth_error(payload, "workspace_authorization_not_configured")
 
 
+@pytest.mark.parametrize(
+    "setting", ["issuer", "audience", "public_key_pem", "jwks_url"]
+)
+def test_local_mode_with_partial_auth_settings_fails_closed(
+    local_server: Server, setting: str
+) -> None:
+    # Trust material without SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true must not
+    # silently fall back to the local-mode bypass.
+    local_server.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=False, **{setting: "configured"}
+    )
+    slug = local_server.agents[0].slug
+
+    payload = _rpc(
+        local_server, SUPERVAIZER_SURFACE_LOAD_METHOD, slug, surface="job.start"
+    )
+    _assert_auth_error(payload, "workspace_authorization_not_configured")
+
+
 def test_local_mode_with_configured_auth_still_requires_token(
     local_server: Server,
 ) -> None:

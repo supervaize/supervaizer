@@ -49,7 +49,7 @@ The shared-agent model uses a Studio-owned Workspace Agent Grant and a short-liv
 
 Studio sends the token in the `X-Supervaize-Workspace-Authorization: Bearer <token>` header. With `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED` unset, every non-bootstrap `/a2a` call fails with JSON-RPC error `-32030 workspace_authorization_not_configured`.
 
-Local mode is the only exception. When `SUPERVAIZER_LOCAL_MODE=true`, the server has no `supervisor_account`, and no verifier is configured, `/a2a` dispatches without a token. Handlers get an unverified `V2VerifiedWorkspaceContext` with `grant_id="local-mode"` (`LOCAL_MODE_WORKSPACE_GRANT_ID`), the request's workspace, the controller agent `id`, and exactly the scopes the call needs. The server logs a warning at startup. If a Studio account is attached or a verifier is configured, the normal fail-closed check applies, local mode or not. Agent data-resource routes do not take this bypass.
+Local mode is the only exception. When `SUPERVAIZER_LOCAL_MODE=true`, the server has no `supervisor_account`, and no workspace authorization setting is present (`enabled`, `issuer`, `audience`, `public_key_pem`, or `jwks_url`), `/a2a` dispatches without a token. Handlers get an unverified `V2VerifiedWorkspaceContext` with `grant_id="local-mode"` (`LOCAL_MODE_WORKSPACE_GRANT_ID`), the request's workspace, the controller agent `id`, and exactly the scopes the call needs. The server logs a warning at startup. If a Studio account is attached or any of those settings is present, even without `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true`, the normal fail-closed check applies, local mode or not. Agent data-resource routes do not take this bypass.
 
 See [2026_05_WORKSPACE_AGENT_GRANTS.md](2026_05_WORKSPACE_AGENT_GRANTS.md).
 

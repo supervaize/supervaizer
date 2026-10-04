@@ -67,7 +67,7 @@ curl -s http://127.0.0.1:8000/a2a \
                   "action": "job.start", "input": {"count": 1}, "job_id": "job-1"}}'
 ```
 
-Handlers receive an unverified `workspace_authorization` whose `grant_id` is `local-mode`, and the server logs a startup warning. The bypass applies only while no `SUPERVAIZER_WORKSPACE_AUTH_*` verifier is configured and the server has no Studio account; otherwise every call needs a real Studio token. Never expose a local-mode port: anyone who reaches it can run your agents with the well-known key.
+Handlers receive an unverified `workspace_authorization` whose `grant_id` is `local-mode`, and the server logs a startup warning. The bypass applies only while the server has no Studio account and none of `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED`, `_ISSUER`, `_AUDIENCE`, `_PUBLIC_KEY`, or `_JWKS_URL` is set. Otherwise every call needs a real Studio token, and a partial setup answers `workspace_authorization_not_configured`. Never expose a local-mode port: anyone who reaches it can run your agents with the well-known key.
 
 Open these endpoints:
 
