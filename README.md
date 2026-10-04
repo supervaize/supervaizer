@@ -1,7 +1,7 @@
 # Supervaizer
 
 > **Created:** 2024-12-28
-> **Updated:** 2026-09-25
+> **Updated:** 2026-10-05
 
 Supervaizer is the Python controller SDK for exposing AI agents to Supervaize Studio through the Supervaizer v2 operation contract.
 
@@ -101,7 +101,7 @@ supervaizer start
 
 ### 4. Add A V2 Controller To Your Agent
 
-Create `supervaizer_control.py` in your agent project.
+Run `supervaizer scaffold` to create `supervaizer_control.py`, or write the file yourself. It is a complete v2 agent: one registration, one surface, and one action. The scaffolded file also builds a Studio `Account` from the environment; local mode ignores it.
 
 ```python
 from typing import Any
@@ -109,75 +109,36 @@ from typing import Any
 from supervaizer import (
     Agent,
     Server,
-    V2ActionDefinition,
-    V2ResourceDefinition,
+    V2ActionRequest,
+    V2SurfaceRequest,
     build_v2_agent_registration,
 )
 
-
-AGENT_NAME = "My Agent"
-AGENT_SLUG = "my-agent"
-AGENT_VERSION = "0.1.0"
-A2UI_CATALOG_VERSION = "my-agent-ui.1"
-
-
-registration = build_v2_agent_registration(
-    agent_id=AGENT_SLUG,
-    agent_slug=AGENT_SLUG,
-    display_name=AGENT_NAME,
-    agent_card_url=f"/.well-known/agents/v{AGENT_VERSION}/{AGENT_SLUG}_agent.json",
-    controller_url="/a2a",
-    a2ui_catalog_version=A2UI_CATALOG_VERSION,
-    surfaces=["job.start"],
-    # Bare ids default to mutating=True, scope="job"; declare read-only actions explicitly.
-    actions=[
-        "job.start",
-        V2ActionDefinition(id="resource.contacts.list", mutating=False, scope="workspace"),
-    ],
-    case_lanes=[{"id": "work", "label": "Work", "default": True}],
-    job_policy={"sync": {"action": "job.sync"}},
-    resources=[
-        V2ResourceDefinition(
-            id="contacts",
-            label="Contacts",
-            auto_surface=True,
-            operations=["list"],
-            scope="workspace",
-        )
-    ],
-)
-
 agent = Agent(
-    name=AGENT_NAME,
-    version=AGENT_VERSION,
+    name="My Agent",
+    version="0.1.0",
     description="My Supervaizer v2 agent.",
-    supervaizer_v2_registration=registration,
+    supervaizer_v2_registration=build_v2_agent_registration(
+        agent_slug="my-agent",  # must equal Agent.slug, the slugified name
+        display_name="My Agent",
+        a2ui_catalog_version="my-agent-ui.1",  # bump when your surfaces change
+        surfaces=["job.start"],
+        actions=["job.start"],
+    ),
 )
 
-server = Server(
-    agents=[agent],
-    a2a_endpoints=True,
-    admin_interface=True,
-)
+server = Server(agents=[agent])
 
 
 @server.v2_surface("job.start", agent_slug=agent.slug)
-def load_job_start_surface(request: Any) -> dict[str, Any]:
+def job_start_form(request: V2SurfaceRequest) -> dict[str, Any]:
     return {
-        "surface": "job.start",
-        "a2ui_version": registration.versions.a2ui_version,
-        "a2ui_catalog_version": A2UI_CATALOG_VERSION,
+        "surface": request.surface,
         "document": {
             "type": "Form",
-            "id": "my-agent.job.start",
             "title": "Start job",
             "fields": [
-                {
-                    "id": "goal",
-                    "label": "Goal",
-                    "type": "string",
-                    "required": True,
-                }
+                {"id": "goal", "label": "Goal", "type": "string", "required": True}
             ],
             "submit": {"action": "job.start", "label": "Start"},
         },
@@ -185,82 +146,70 @@ def load_job_start_surface(request: Any) -> dict[str, Any]:
 
 
 @server.v2_action("job.start", agent_slug=agent.slug)
-def start_job(request: Any) -> dict[str, Any]:
+def start_job(request: V2ActionRequest) -> dict[str, Any]:
     job_id = request.job_id or "local-job"
     return {
         "status": "ok",
-        "effects": [
-            {
-                "type": "job.started",
-                "job_id": job_id,
-                "status": "completed",
-            }
-        ],
+        "effects": [{"type": "job.started", "job_id": job_id, "status": "completed"}],
         "job_state": {
             "job": {
                 "id": job_id,
                 "mission_id": request.mission_id,
-                "agent_slug": agent.slug,
+                "agent_slug": request.agent_slug,
                 "status": "completed",
                 "source": {"type": "fresh_start"},
             },
             "cases": [
                 {
                     "id": "case-1",
-                    "lane": "work",
-                    "title": "First case",
+                    "title": request.input["goal"],
                     "status": "completed",
                     "steps": [
-                        {
-                            "id": "step-1",
-                            "activity": "operation",
-                            "status": "completed",
-                            "title": "Run operation",
-                            "outputs": [],
-                        }
+                        {"id": "step-1", "activity": "operation", "status": "completed"}
                     ],
                 }
             ],
         },
     }
-
-
-@server.v2_action("job.sync", agent_slug=agent.slug)
-def sync_job(request: Any) -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "effects": [
-            {
-                "type": "job.synced",
-                "job_id": request.job_id,
-                "status": "completed",
-            }
-        ],
-    }
-
-
-@server.v2_action("resource.contacts.list", agent_slug=agent.slug)
-def list_contacts(request: Any) -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "effects": [
-            {
-                "type": "resource.listed",
-                "resource": "contacts",
-                "items": [],
-            }
-        ],
-    }
-
-
-server.launch()
 ```
 
-Run it:
+Start it in local mode. The CLI loads `supervaizer_control.py`, finds the `Server`, and launches it:
 
 ```bash
-python supervaizer_control.py
+supervaizer start --local
 ```
+
+Load the surface:
+
+```bash
+curl -s http://127.0.0.1:8000/a2a \
+  -H "X-API-Key: local-dev" -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "supervaizer/surface.load",
+       "params": {"request_id": "r1", "actor": {"user_id": "me"},
+                  "workspace": {"id": "local"}, "mission_id": "m1",
+                  "agent_slug": "my-agent", "surface": "job.start"}}'
+```
+
+| Part | Role |
+| --- | --- |
+| `build_v2_agent_registration` | Declares the `surfaces` Studio can show and the `actions` Studio can call. |
+| `@server.v2_surface` | Returns the A2UI document for one declared surface. |
+| `@server.v2_action` | Runs one declared action. Returns `effects` and an optional `job_state` snapshot. |
+
+Rules that prevent the usual first errors:
+
+- `agent_slug` in the registration must equal `Agent.slug` (the slugified `name`). A mismatch fails at `Agent` creation.
+- Register one handler for each declared action and each surface you serve. A missing action handler answers JSON-RPC error `-32010`; a missing surface handler answers `-32011`.
+- Pass `agent_slug` to each handler decorator. Local mode adds the built-in Hello World agent, so the server holds two agents and cannot infer the slug.
+- A bare action id defaults to `mutating=True, scope="job"`. Declare a read-only action with `V2ActionDefinition(id=..., mutating=False, scope=...)`.
+
+Add these when you need them:
+
+- Status convergence: declare `job_policy={"sync": {"action": "job.sync"}}` and register a `job.sync` handler.
+- Human review: return a step with `status="awaiting"` and an `awaiting` object. Declare the `case.step.awaiting` surface and the `step.awaiting.submit` action.
+- Business objects: declare `resources=[...]`. The SDK derives the `resource.<id>.<operation>` actions; you register their handlers.
+
+The built-in [Hello World agent](src/supervaizer/examples/hello_world_agent.py) shows all three. [Supervaizer v2 concepts](docs/2026_05_SUPERVAIZER_v2.md) holds the full model.
 
 ### 5. Connect To Studio
 
@@ -308,68 +257,19 @@ Studio registration remains the trust bootstrap. It owns server identity, public
 
 ## V2 Concepts
 
-### Jobs, Cases, And Steps
-
-Studio starts and tracks Jobs. Agents return convergent state through action effects and optional `job_state` snapshots.
-
-A `job_state` contains:
-
-- one Job record
-- Cases grouped by `lane`; default lane is `work`
-- Steps with `activity`, `status`, optional `awaiting`, and `outputs`
-- Artifact references for agent-owned deliverables
-
-Failure is a status, not a step kind. Agent-specific deliverables are artifacts, not universal protocol enum values.
-
-### Resources And Datasets
-
-Resources are agent-owned business objects that Studio can render generically when `auto_surface=True`.
-
-Datasets are agent-owned queryable data products for dashboards and analytics. Dashboard widgets can point at datasets, typed actions, or inline data and may use Vega-Lite chart specs.
-
-### Surfaces And Actions
-
-Surfaces are named UI entry points. A surface handler returns an A2UI document.
-
-Common surfaces:
-
-- `job.start`
-- `case.step.awaiting`
-- `case.step.detail`
-- `mission.analytics`
-- `mission.agent.overview`
-- `mission.agent.resource.<resource_id>`
-- `mission.agent.dataset.<dataset_id>`
-
-Actions are typed commands invoked through A2A JSON-RPC:
-
-- `job.start`, `job.start.preview`
-- `job.stop`
-- `job.sync`
-- `step.awaiting.submit`
-- `context.assign`
-- `resource.<id>.<operation>`
-- `dataset.<id>.query`
-- `artifact.get`
-- `agent.refresh`, `agent.custom.<method>`
-- `workspace_binding.options`, `workspace_binding.create`
-
-Each declared action carries `mutating` and `scope` metadata (`V2ActionDefinition`, since 1.6.0); a bare id string defaults to `mutating=True, scope="job"`.
-
-Dynamic UI behavior must be either A2UI local logic or typed action calls. Supervaizer v2 does not reintroduce callback-shaped dynamic field logic.
-
-## Protocols
-
-Supervaizer v2 uses each protocol for a specific job:
-
-| Layer | Role |
+| Concept | Meaning |
 | --- | --- |
-| A2A | Discovery, Agent Cards, JSON-RPC controller calls, and SSE event observation |
-| A2UI | Declarative Studio-rendered documents for forms, tables, dashboards, detail views, and custom workflows |
-| AG-UI | Future optional runtime for live bidirectional agent-user sessions |
-| Supervaizer v2 | Application semantics: Jobs, Cases, Steps, Resources, Datasets, Surfaces, Actions, Artifacts, and sync/offline policy |
+| Job | Committed work that Studio tracks for an agent. |
+| Case | A unit of work inside a Job, grouped by `lane` (default `work`). |
+| Step | An observable activity inside a Case: `activity`, `status`, optional `awaiting`, and `outputs`. |
+| Surface | A named UI entry point. Its handler returns an A2UI document. |
+| Action | A typed command invoked through A2A JSON-RPC. Its handler returns `effects` and an optional `job_state`. |
+| Resource, Dataset | Agent-owned business objects and queryable data that Studio renders generically. |
+| Artifact | An agent-owned output, referenced from Step `outputs`. |
 
-Read [docs/2026_05_PROTOCOLS.md](docs/2026_05_PROTOCOLS.md) for the protocol split and links to upstream A2A, A2UI, AG-UI, and Vega-Lite references.
+Failure is a status, not a step kind. Human review is `status="awaiting"` plus an `awaiting` object. Dynamic UI behavior is A2UI local logic or a typed action call, never a callback.
+
+The full model, the standard surface and action ids, and the protocol split are in [docs/2026_05_SUPERVAIZER_v2.md](docs/2026_05_SUPERVAIZER_v2.md) and [docs/2026_05_PROTOCOLS.md](docs/2026_05_PROTOCOLS.md).
 
 ## CLI
 
