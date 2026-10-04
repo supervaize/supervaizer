@@ -37,7 +37,6 @@ The whole `/manage` router (HTTP and WebSocket) is gated by `require_tailscale`.
 | `/manage/server` | Server identity, registration state, public URL |
 | `/manage/agents` | Registered agents and their methods |
 | `/manage/agents/{slug}/workbench` | Workbench: start a job, follow cases and steps, answer HITL prompts, execute, cancel, or schedule steps, live console over WebSocket |
-| `/manage/job-start-test` | Manual job-start form for testing |
 | `/manage/console` | Live log console fed by `/manage/log-stream` (server-sent events) |
 
 Job and case lists auto-refresh every 30 seconds. Jobs are created through the workbench or the API, not from the job list.

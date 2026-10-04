@@ -374,7 +374,7 @@
 </div>{# end workbenchPage #}
 
 {# ── Workbench JS ────────────────────────────────────────────────── #}
-<script src="/manage/static/js/workbench-form.js?v=14"></script>
+<script src="/manage/static/js/workbench-form.js?v=15"></script>
 <script>
     function applyConsoleFilter() {
         var container = document.getElementById('console-log-container');
@@ -422,7 +422,6 @@
                         monitorContainerId: 'monitor-container',
                         monitorUrl: '/manage/agents/{{ agent_slug }}/workbench/jobs/',
                         errorsContainerId: 'workbench-errors',
-                        getApiKey: () => sessionStorage.getItem('admin_api_key') || document.body.dataset.adminKey || '{{ api_key }}',
                     });
                     // Initial load of console and job history
                     window.workbenchForm._refreshConsole();
