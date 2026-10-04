@@ -64,7 +64,7 @@ storage_manager.close()
 
 ## Security Notes
 
-- Decrypted `agent_parameters` are never written to `entities.json`: `Job.to_dict` excludes them, so a job reloaded from storage has none. A custom-method call sets them again from its own `encrypted_agent_parameters`.
+- Decrypted `agent_parameters` are never written to `entities.json`: `Job.to_dict` excludes them, so a job reloaded from storage has none. A custom-method call passes its own decrypted `encrypted_agent_parameters` to that run only.
 - Job records saved before this change can still hold `agent_parameters` in cleartext, because `upsert` merges into the stored record and does not remove the key. Remove `agent_parameters` from those `Job` records after you upgrade.
 - The RSA private key and server id are never written to disk. Set `SUPERVAIZER_PRIVATE_KEY` and `SUPERVAIZER_SERVER_ID` to keep them stable across restarts.
 

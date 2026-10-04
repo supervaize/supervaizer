@@ -313,6 +313,7 @@ async def test_service_job_custom_new_job(
         context_fixture,
         server_fixture,
         method_name,
+        agent_parameters=None,
     )
 
     assert result == mock_job
@@ -360,6 +361,7 @@ async def test_service_job_custom_existing_job(
         context_fixture,
         server_fixture,
         method_name,
+        agent_parameters=None,
     )
 
 
@@ -409,8 +411,8 @@ async def test_service_job_custom_with_parameters(
     )
 
     assert result == mock_job
-    # Never persisted, so the custom run gets them from this request only.
-    assert mock_job.agent_parameters == [
+    # Passed per call, never written to the shared job.
+    assert background_tasks.add_task.call_args.kwargs["agent_parameters"] == [
         {"name": "custom_key", "value": "custom_value"}
     ]
 

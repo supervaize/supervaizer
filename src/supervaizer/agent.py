@@ -1057,6 +1057,7 @@ class Agent(AgentAbstract):
         context: JobContext,
         server: "Server",
         method_name: str = "job_start",
+        agent_parameters: list[dict[str, Any]] | None = None,
     ) -> Job:
         """Execute the agent's start method in the background
 
@@ -1064,6 +1065,8 @@ class Agent(AgentAbstract):
             job (Job): The job instance to execute
             job_fields (dict): The job-specific parameters
             context (SupervaizeContextModel): The context of the job
+            agent_parameters (list | None): Decrypted parameters for this call
+                only; None uses job.agent_parameters
         Returns:
             Job: The updated job instance
         """
@@ -1095,7 +1098,11 @@ class Agent(AgentAbstract):
             method_params
             | {"fields": job_fields}
             | {"context": context}
-            | {"agent_parameters": job.agent_parameters}
+            | {
+                "agent_parameters": job.agent_parameters
+                if agent_parameters is None
+                else agent_parameters
+            }
         )
         # agent_parameters holds decrypted secrets: never log it.
         log.debug(

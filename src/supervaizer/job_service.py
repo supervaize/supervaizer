@@ -155,9 +155,6 @@ async def service_job_custom(
         name=sv_context.mission_name,
         status=EntityStatus.STOPPED,
     )  # TODO clean the name
-    # Parameters are never persisted, so a job reloaded from storage has none.
-    if agent_parameters is not None:
-        job.agent_parameters = agent_parameters
     # Start the background execution
     background_tasks.add_task(
         agent.job_start,
@@ -166,5 +163,8 @@ async def service_job_custom(
         sv_context,
         server,
         method_name,
+        # Per call, not on the shared job: concurrent custom calls on one job
+        # must not see each other's parameters.
+        agent_parameters=agent_parameters,
     )
     return job
