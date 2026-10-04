@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 from __future__ import annotations
 
 import asyncio
@@ -6,6 +12,7 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from supervaizer import Case
@@ -358,6 +365,83 @@ async def test_checkpoint_resume_resolves_matching_pending_decision(
         )
     )
 
+    assert (await waiting).status == "allow"
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_credentials_go_only_to_configured_studio(
+    account_fixture: Any, mocker: MockerFixture
+) -> None:
+    post = mocker.patch(
+        "supervaizer.rule_controls._httpx_client.post",
+        new=mocker.AsyncMock(return_value=_response("allow")),
+    )
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://attacker.example/collect",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+
+    await gate.checkpoint(
+        occurrence_id="occurrence-1",
+        phase="before",
+        job_id="job-1",
+        case_id="case-1",
+        step_id="step-1",
+        context={},
+    )
+
+    assert post.await_args.args[0] == (
+        f"{account_fixture.api_url}/api/v1/rule-checkpoints/"
+    )
+
+
+@pytest.mark.asyncio
+async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
+    account_fixture: Any,
+) -> None:
+    gate = RuleCheckpointGate(
+        account_fixture,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+    waiting = asyncio.create_task(
+        gate.wait_for_resume(
+            RuleCheckpointResponse(
+                checkpoint_id="checkpoint-pause",
+                status="pause",
+                snapshot_hash="snapshot-1",
+                input_hash="input-1",
+            ),
+            "occurrence-1",
+            "before",
+        )
+    )
+    await asyncio.sleep(0)
+    decision = {
+        "checkpoint_id": "checkpoint-pause",
+        "job_id": "job-1",
+        "case_id": "case-1",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "decision_id": "decision-1",
+    }
+
+    with pytest.raises(ValidationError):
+        RuleCheckpointResume.model_validate(decision | {"status": "pause"})
+    assert not waiting.done()
+
+    gate.resume(RuleCheckpointResume.model_validate(decision | {"status": "allow"}))
     assert (await waiting).status == "allow"
 
 

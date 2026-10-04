@@ -1,3 +1,9 @@
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
 """Explicit SDK helpers for Studio rule checkpoint gates.
 
 Agents must put cooperative effects inside ``run_guarded_step`` and declare
@@ -107,8 +113,10 @@ class RuleCheckpointGate:
             secret_refs=self.secret_refs,
         )
         try:
+            # The snapshot arrives in request input, so its checkpoint_url is not
+            # trusted with controller credentials: post only to the configured Studio.
             response = await _httpx_client.post(
-                self.snapshot.checkpoint_url,
+                f"{self.account.api_url}/api/v1/rule-checkpoints/",
                 headers=self.account.api_headers
                 | {"X-Rule-Checkpoint-Token": self.snapshot.checkpoint_token},
                 json=request.model_dump(mode="json"),

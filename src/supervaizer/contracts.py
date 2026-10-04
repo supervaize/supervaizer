@@ -545,7 +545,8 @@ class RuleCheckpointResume(ContractModel):
     case_id: str
     occurrence_id: str
     phase: Literal["before", "after"]
-    status: Literal["allow", "pause", "stop"]
+    # A resume settles a paused checkpoint, so "pause" is not a decision.
+    status: Literal["allow", "stop"]
     snapshot_hash: str
     input_hash: str
     decision_id: str

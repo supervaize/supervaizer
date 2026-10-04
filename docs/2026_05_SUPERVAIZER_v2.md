@@ -126,7 +126,7 @@ registration = build_v2_agent_registration(
 
 async def perform_step(account, case, start_input):
     # `start_input` is the full V2ActionRequest received by the controller.
-    # Studio supplies the opaque, signed rule_snapshot when this job is governed.
+    # Studio supplies the opaque rule_snapshot when this job is governed.
     job_start = V2ActionRequest.model_validate(start_input)
     gate = RuleCheckpointGate.from_job_start(
         account,
@@ -150,7 +150,7 @@ async def perform_step(account, case, start_input):
 
 `Case.run_guarded_step()` first reports the Case to Studio, then requests a `before` decision, performs the effect only after `allow`, requests an `after` decision, and advances only after that decision is also `allow`. A `pause` waits for the controller's `rule.checkpoint.resume` action; it does not poll. A persisted `before` allow safely continues the effect after restart. The helper records an effect as started before calling it, so recovery never replays an uncertain external effect. When an after response was lost, use `recover_guarded_step()` with the original gate, result, and after-context callback. It verifies that callback produces the same context, retries only the original after checkpoint, then advances once on `allow`.
 
-`rule_snapshot` and its checkpoint token are opaque controller input. Do not construct, alter, log, or place either in agent business context. `secret_refs` declares paths whose values Studio must exclude from checkpoint context; declare every business secret path an agent author supplies. Platform credentials are excluded by the platform and must never be propagated as declared business secrets.
+`rule_snapshot` and its checkpoint token are opaque controller input. Do not construct, alter, log, or place either in agent business context. The gate posts checkpoints only to `{account.api_url}/api/v1/rule-checkpoints/`; it ignores the snapshot's `checkpoint_url`, so a forged snapshot cannot send controller credentials to another host. A `rule.checkpoint.resume` decision is `allow` or `stop`; the controller rejects `pause`, and the checkpoint keeps waiting. `secret_refs` declares paths whose values Studio must exclude from checkpoint context; declare every business secret path an agent author supplies. Platform credentials are excluded by the platform and must never be propagated as declared business secrets.
 
 ## Workspace Authorization
 
