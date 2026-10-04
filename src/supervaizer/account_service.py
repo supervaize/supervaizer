@@ -65,7 +65,12 @@ def _event_request(
 
 
 def _event_curl(url_event: str, headers: dict[str, str]) -> str:
-    curl_headers = " ".join([f'-H "{key}: {value}"' for key, value in headers.items()])
+    curl_headers = " ".join(
+        f'-H "{key}: {value[:3] + "..." if len(value) > 3 else "***"}"'
+        if key.casefold() == "x-api-key"
+        else f'-H "{key}: {value}"'
+        for key, value in headers.items()
+    )
     return f"curl -X 'POST' '{url_event}' {curl_headers}"
 
 

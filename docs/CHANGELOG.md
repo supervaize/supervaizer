@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Masked API keys in diagnostic curl logs** — Error logs now show only a short API-key prefix instead of the full credential.
+
 ### Changed
 
 - **Documentation audit** — README, AGENTS.md, CONTRIBUTING.md, SECURITY.md, and `docs/` verified against the 1.6.0 code. Fixed: admin UI path and access model (`/manage`, Tailscale-gated, `ADMIN_ALLOWED_IPS` removed), the README v2 sample (`mission_id`, explicit `V2ActionDefinition`), Studio connection (`Account` wiring and the `SUPERVAIZER_WORKSPACE_AUTH_*` launch requirement), CLI reference (actual `deploy` options, non-functional `--reload`/`--debug`), persistence (the singleton ignores `db_path`; no `CachingMiddleware`), workspace authorization (`WorkspaceAuthorizationClaims`, exact bootstrap ids, env vars), CONTRIBUTING (mypy path, 88 columns, gitmoji commits, PRs target `develop`), and SECURITY (supported versions, actual branch rulesets). `docs/2025_08_ADMIN_README.md` and `docs/2025_08_REST_API.md` rewritten; `docs/2025_10_LOCAL_TESTING.md` marked legacy; RFC statuses updated; `GEMINI.md` and `.cursorrules` now point to `AGENTS.md`.
