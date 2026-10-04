@@ -993,7 +993,11 @@ class Agent(AgentAbstract):
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
-        log.debug(f"[Agent method] {method.__name__} with params {params}")
+        # agent_parameters holds decrypted secrets: never log it.
+        log.debug(
+            f"[Agent method] {method.__name__} with params "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
+        )
         result = method(**params)
         if not isinstance(result, JobResponse):
             raise TypeError(
@@ -1093,8 +1097,10 @@ class Agent(AgentAbstract):
             | {"context": context}
             | {"agent_parameters": job.agent_parameters}
         )
+        # agent_parameters holds decrypted secrets: never log it.
         log.debug(
-            f"[Agent job_start] action_method : {action_method} - params : {params}"
+            f"[Agent job_start] action_method : {action_method} - params : "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
         )
         try:
             if action.is_async:

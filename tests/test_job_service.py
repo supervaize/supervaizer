@@ -390,7 +390,7 @@ async def test_service_job_custom_with_parameters(
     # Mock decrypt_value
     mock_decrypt_value = mocker.patch(
         "supervaizer.job_service.decrypt_value",
-        return_value='{"custom_key": "custom_value"}',
+        return_value='[{"name": "custom_key", "value": "custom_value"}]',
     )
 
     result = await service_job_custom(
@@ -409,6 +409,10 @@ async def test_service_job_custom_with_parameters(
     )
 
     assert result == mock_job
+    # Never persisted, so the custom run gets them from this request only.
+    assert mock_job.agent_parameters == [
+        {"name": "custom_key", "value": "custom_value"}
+    ]
 
 
 @pytest.mark.asyncio

@@ -257,7 +257,11 @@ class AbstractJob(SvBaseModel):
     responses: list["JobResponse"] = []
     finished_at: datetime | None = None
     created_at: datetime | None = None
-    agent_parameters: list[dict[str, Any]] | None = None
+    # Decrypted values, secrets included: only for the agent method at run time.
+    # exclude keeps them out of to_dict (storage, /manage) and HTTP responses.
+    agent_parameters: list[dict[str, Any]] | None = Field(
+        default=None, exclude=True, repr=False
+    )
     case_ids: list[str] = []  # Foreign key relationship to cases
     metadata: dict[str, Any] = Field(
         default_factory=dict,

@@ -129,13 +129,13 @@ async def service_job_custom(
     log.info(
         f"[service_job_custom] /custom/{method_name} [custom job] {agent.name} with params {job_fields}"
     )
-    _agent_parameters: dict[str, Any] | None = None
+    agent_parameters: list[dict[str, Any]] | None = None
     # If agent has parameters_setup defined, validate parameters
     if agent.parameters_setup and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-        _agent_parameters = (
+        agent_parameters = (
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
         log.debug("[Decrypted parameters] : parameters decrypted")
@@ -155,6 +155,9 @@ async def service_job_custom(
         name=sv_context.mission_name,
         status=EntityStatus.STOPPED,
     )  # TODO clean the name
+    # Parameters are never persisted, so a job reloaded from storage has none.
+    if agent_parameters is not None:
+        job.agent_parameters = agent_parameters
     # Start the background execution
     background_tasks.add_task(
         agent.job_start,
