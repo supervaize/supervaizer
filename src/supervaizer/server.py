@@ -11,7 +11,6 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
-import hmac
 import os
 import secrets
 import time
@@ -23,10 +22,9 @@ from urllib.parse import urlunparse
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from fastapi import FastAPI, HTTPException, Request, Security, status
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
-from fastapi.security import APIKeyHeader
 from starlette.datastructures import MutableHeaders
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
@@ -210,9 +208,6 @@ class ServerAbstract(SvBaseModel):
     api_key: str | None = Field(
         default=None,
         description="Force the API key to access the supervaizer endpoints - if not provided, a random key will be generated",
-    )
-    api_key_header: APIKeyHeader | None = Field(
-        default=None, description="API key header for authentication"
     )
     workspace_authorization: V2WorkspaceAuthorizationSettings = Field(
         default_factory=V2WorkspaceAuthorizationSettings,
@@ -459,10 +454,6 @@ class Server(ServerAbstract):
                 content={"detail": exc.errors(), "body": exc.body},
             )
 
-        # Create API key header security
-        API_KEY_NAME = "X-API-Key"
-        api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
-
         super().__init__(
             scheme=scheme,
             host=host,
@@ -479,7 +470,6 @@ class Server(ServerAbstract):
             public_key=public_key,
             public_url=public_url,
             api_key=api_key,
-            api_key_header=api_key_header,
             workspace_authorization=workspace_authorization_settings,
             **kwargs,
         )
@@ -561,38 +551,6 @@ class Server(ServerAbstract):
 
         if not self.public_url:
             self.public_url = f"{self.scheme}://{self.host}:{self.port}"
-
-    async def verify_api_key(
-        self, api_key: str = Security(APIKeyHeader(name="X-API-Key"))
-    ) -> bool:
-        """Verify that the API key is valid.
-
-        Args:
-            api_key: The API key from the request header
-
-        Returns:
-            True if the API key is valid
-
-        Raises:
-            HTTPException: If the API key is invalid or not provided when required
-        """
-        if self.api_key is None:
-            # API key authentication is disabled
-            return True
-
-        # Constant-time comparison to avoid a timing side channel on the key.
-        # Compare bytes so non-ASCII keys fail closed instead of raising
-        # TypeError (hmac.compare_digest rejects non-ASCII str inputs).
-        if not hmac.compare_digest(
-            (api_key or "").encode("utf-8"), self.api_key.encode("utf-8")
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid API key",
-                headers={"WWW-Authenticate": "APIKey"},
-            )
-
-        return True
 
     @property
     def url(self) -> str:
