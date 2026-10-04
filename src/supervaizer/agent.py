@@ -906,6 +906,7 @@ class Agent(AgentAbstract):
         Example of agent_registration data is available in mock_api_responses.py
 
         Server is used to decrypt parameters if needed
+        Returns None without a Studio account; raises if the Studio lookup fails.
         Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
         if server.supervisor_account:
@@ -923,8 +924,15 @@ class Agent(AgentAbstract):
         else:
             return None
         if not isinstance(from_server, ApiSuccess):
-            log.error(f"[Agent update_agent_from_server] Failed : {from_server}")
-            return None
+            # Stop the launch: continuing would run with unrefreshed status and
+            # parameters, and hide Studio errors such as an agent id mismatch.
+            response = getattr(from_server.exception, "response", None)
+            status = response.status_code if response is not None else "no response"
+            raise RuntimeError(
+                f"Agent update from Studio failed for slug={self.slug} "
+                f"server_agent_id={self.server_agent_id}: GET {from_server.url} "
+                f"returned {status} ({from_server.exception})"
+            )
 
         agent_from_server = _agent_detail_from_server_response(from_server.detail)
         server_agent_id = _agent_id_from_server_detail(agent_from_server)
