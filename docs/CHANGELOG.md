@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - **`/manage` pages no longer expose the API key** — Every admin page put the write-scope `SUPERVAIZER_API_KEY` in a `data-admin-key` attribute on `<body>`, and the workbench page also inlined it in its script. Anyone who could open `/manage` could read the key and call the write-scope `/api/*` routes with it. Since 0.15.0, `require_tailscale` gates `/manage` and its endpoints need no key, so the templates and `workbench-form.js` no longer receive or send it. The `/manage/job-start-test` page and `job-start-form.js` are removed: the page never loaded the script, and the script targeted an agent path that does not exist.
 - **Valid empty registration parameter setup** — Agents without parameter definitions now send an empty list instead of `null`.
 - **Safer HTTP error diagnostics** — Diagnostic curl output masks authorization and API-key headers, serialized event details redact API keys and token fields, and HTTP errors log the remote status and request ID.
+- **`just dev` starts the controller** — The recipe ran `uvicorn controller:app --reload`, but there is no `controller` module. `just dev` is now an alias of `just local` (`uv run supervaizer start --local`).
+- **Correct refresh hint** — When `supervaize_instructions.html` already exists, the CLI now points to `supervaizer scaffold refresh-instructions` instead of the nonexistent `supervaizer refresh-instructions`.
 
 ### Changed
 
@@ -19,6 +21,8 @@ All notable changes to this project will be documented in this file.
 ### Removed
 
 - `docs/2025_04_API_REFERENCE.md` (v1 examples that no longer run), `docs/2025_08_PROTOCOLS.md` (subset of `2026_05_PROTOCOLS.md`), `docs/superpowers/` plans (shipped or removed features), and the CHANGELOG `TODO` block. `docs/2025_08_PARAMETER_VALIDATION_IMPLEMENTATION.md` trimmed to `docs/2025_08_PARAMETER_VALIDATION.md`.
+- **`supervaizer start --debug` and `--reload`** — With a control script, both options only set `SUPERVAIZER_DEBUG` / `SUPERVAIZER_RELOAD`, which `Server` never reads. Only the no-script `--local` fallback used them: `--debug` turned on FastAPI debug mode, and `--reload` crashed in uvicorn (`You must pass the application as an import string`). Behavior change: either option now fails with a usage error (exit code 2), and the CLI and `examples/local_server.py` no longer read the two variables. For debug mode, set `debug=True` on the `Server` in a control script. Restart after code changes.
+- Root-level `test_local.py` (it ran `python -m supervaizer`, which has no `__main__`; use `supervaizer deploy local`) and `test_dockerfile_generation.py` (license header only).
 
 ## [1.6.0] - 2026-08-30
 

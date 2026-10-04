@@ -105,6 +105,38 @@ class TestCLIStart:
             assert "built-in Hello World agent" in result.stdout
             mock_launch.assert_called_once()
 
+    @pytest.mark.parametrize("flag", ["--reload", "--debug"])
+    def test_start_rejects_removed_flags(self, runner: CliRunner, flag: str) -> None:
+        """--reload and --debug were removed; only the no-script --local fallback used them."""
+        result = runner.invoke(app, ["start", flag])
+
+        assert result.exit_code == 2
+        assert "No such option" in result.output
+
+
+class TestCLIScaffoldInstructions:
+    """Tests for the scaffold instructions subcommand."""
+
+    def test_existing_file_hint_names_scaffold_subcommand(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """The overwrite hint names the real `scaffold refresh-instructions` command."""
+        instructions = tmp_path / "supervaize_instructions.html"
+        instructions.write_text("<p>custom</p>")
+
+        result = runner.invoke(
+            app,
+            [
+                "scaffold",
+                "instructions",
+                "--control-file",
+                str(tmp_path / "supervaizer_control.py"),
+            ],
+        )
+
+        assert "supervaizer scaffold refresh-instructions" in result.stdout
+        assert instructions.read_text() == "<p>custom</p>"
+
 
 class TestCLIInstall:
     """Tests for the scaffold command."""

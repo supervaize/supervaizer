@@ -96,13 +96,12 @@ install-hooks:
     @git config core.hooksPath .githooks
     # Git hooks installed
 
-# API documentation @http://127.0.0.1:8000/redoc
-dev:
-    uvicorn controller:app --reload
-
 # Local test mode: no Studio credentials, built-in Hello World agent (for agent workbench)
 local:
     uv run supervaizer start --local
+
+# Kept for the RUNWAIZE root guide, which lists `just dev` for this repo
+alias dev := local
 
 # Create git tag for current version - Automated done in post-commit hook
 tag-version:

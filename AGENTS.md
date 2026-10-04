@@ -46,7 +46,7 @@ Docs are prefixed `YYYY_MM_` with their creation month; `2025_*` files document 
 
 ## Learned Workspace Facts
 
-- `supervaizer start --reload` / `--debug` only set `SUPERVAIZER_RELOAD` / `SUPERVAIZER_DEBUG`; `Server` never reads them, and the CLI only overrides host, port, and public URL on the control script's `Server`. Uvicorn also rejects `reload=True` with an app object. Treat both flags as non-functional until fixed.
+- `supervaizer start` has no `--reload` / `--debug` (removed: with a control script they only set env vars that `Server` never read; only the no-script `--local` fallback used them), and the CLI only overrides host, port, and public URL on the control script's `Server`. `Server(reload=True).launch()` still fails because `uvicorn.run` gets an app object, not an import string; `tools/start_server_with_reload.py` shows the import-string pattern.
 - Local mode cannot invoke v2 actions or surfaces over `/a2a`: without `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true` the controller answers `-32030 workspace_authorization_not_configured`, and token checks need `agent.server_agent_id`, which only Studio registration sets.
 - `just install-hooks` sets `core.hooksPath=.githooks`, so the hooks that `pre-commit install` writes to `.git/hooks` never run; `just precommit` and CI are the real gates.
 - A Studio-registered controller with A2A enabled fails at launch unless `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true`, `SUPERVAIZER_WORKSPACE_AUTH_ISSUER`, and `SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY` or `_JWKS_URL` are set (`studio_handshake.validate_studio_a2a_workspace_authorization`). `--local` is exempt.

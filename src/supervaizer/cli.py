@@ -124,14 +124,6 @@ def start(
         os.environ.get("SUPERVAIZER_LOG_LEVEL", "INFO"),
         help="Log level (DEBUG, INFO, WARNING, ERROR)",
     ),
-    debug: bool = typer.Option(
-        (os.environ.get("SUPERVAIZER_DEBUG") or "False").lower() == "true",
-        help="Enable debug mode",
-    ),
-    reload: bool = typer.Option(
-        (os.environ.get("SUPERVAIZER_RELOAD") or "False").lower() == "true",
-        help="Enable auto-reload",
-    ),
     environment: str = typer.Option(
         os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"), help="Environment name"
     ),
@@ -163,8 +155,6 @@ def start(
     os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
     os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
     os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
-    os.environ["SUPERVAIZER_DEBUG"] = str(debug)
-    os.environ["SUPERVAIZER_RELOAD"] = str(reload)
     if user_provided_public_url:
         assert public_url is not None
         os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
@@ -251,8 +241,6 @@ def start(
             host=host,
             port=port,
             public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
-            debug=debug,
-            reload=reload,
             environment=environment,
             api_key=None,
         )
@@ -331,7 +319,7 @@ def _create_instructions_file(
                 f"[bold yellow]Warning:[/] {instructions_path} already exists"
             )
             console.print(
-                "Use [bold]--force[/] to overwrite it, or run [bold]supervaizer refresh-instructions[/]"
+                "Use [bold]--force[/] to overwrite it, or run [bold]supervaizer scaffold refresh-instructions[/]"
             )
         return instructions_path
 
