@@ -16,7 +16,6 @@ Local Testing Command
 This module provides local testing functionality using Docker Compose.
 """
 
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -28,7 +27,13 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from supervaizer.deploy.docker import DockerManager
+from supervaizer.deploy.docker import (
+    PASSTHROUGH_ENV_VARS,
+    DockerManager,
+    get_container_env,
+)
+
+COMPOSE = ["docker", "compose", "-f", ".deployment/docker-compose.yml"]
 
 console = Console()
 
@@ -87,11 +92,9 @@ def local_docker(
         )
         docker_manager.generate_dockerignore()
         docker_manager.generate_docker_compose(
+            env_vars={**get_container_env(env, port), **secrets},
             port=port,
             service_name=service_name,
-            environment=env,
-            api_key=secrets.get("api_key", "test-api-key"),
-            rsa_key=secrets.get("rsa_private_key", "test-rsa-key"),
         )
         console.print("[green]✓[/] Deployment files generated")
 
@@ -103,19 +106,17 @@ def local_docker(
             console.print("  • .deployment/.dockerignore")
             console.print("  • .deployment/docker-compose.yml")
             console.print("\n[bold]To start the services:[/]")
-            console.print("[dim]docker-compose -f .deployment/docker-compose.yml up[/]")
+            console.print("[dim]docker compose -f .deployment/docker-compose.yml up[/]")
             console.print("\n[bold]To debug environment variables:[/]")
             console.print(
-                f"[dim]docker-compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
+                f"[dim]docker compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
             )
             console.print(
-                "\n[bold]Note:[/] Environment variables are automatically included from your host environment."
+                "\n[bold]Note:[/] docker-compose.yml holds the values of these host "
+                "variables at generation time. Re-run after changing them:"
             )
-            console.print("Make sure to set the following variables if needed:")
-            console.print("  • SUPERVAIZE_API_KEY")
-            console.print("  • SUPERVAIZE_WORKSPACE_ID")
-            console.print("  • SUPERVAIZE_API_URL")
-            console.print("  • SUPERVAIZER_PUBLIC_URL")
+            for var_name in PASSTHROUGH_ENV_VARS:
+                console.print(f"  • {var_name}")
             return
 
         # Step 4: Build Docker image
@@ -123,22 +124,12 @@ def local_docker(
         image_tag = f"{service_name}:local-test"
         # Create a new DockerManager instance that requires Docker for building
         build_docker_manager = DockerManager(require_docker=True)
-
-        # Get build arguments for environment variables
-        from supervaizer.deploy.docker import get_docker_build_args
-
-        build_args = get_docker_build_args(port)
-
-        build_docker_manager.build_image(
-            image_tag, verbose=verbose, build_args=build_args
-        )
+        build_docker_manager.build_image(image_tag, verbose=verbose)
         console.print(f"[green]✓[/] Image built: {image_tag}")
 
         # Step 5: Start services with Docker Compose
         console.print("\n[bold]Step 5:[/] Starting services...")
-        _start_docker_compose(
-            service_name=service_name, port=port, secrets=secrets, verbose=verbose
-        )
+        _start_docker_compose(verbose=verbose)
         console.print("[green]✓[/] Services started")
 
         # Step 6: Wait for service to be ready
@@ -153,7 +144,7 @@ def local_docker(
 
         # Step 7: Run health checks
         console.print("\n[bold]Step 7:[/] Running health checks...")
-        health_results = _run_health_checks(service_url, secrets.get("api_key"))
+        health_results = _run_health_checks(service_url)
         _display_health_results(health_results)
 
         # Step 8: Display service information
@@ -172,10 +163,10 @@ def local_docker(
     finally:
         # Always show cleanup instructions
         console.print("\n[bold]To stop the test services:[/]")
-        console.print("[dim]docker-compose -f .deployment/docker-compose.yml down[/]")
+        console.print("[dim]docker compose -f .deployment/docker-compose.yml down[/]")
         console.print("\n[bold]To debug environment variables:[/]")
         console.print(
-            f"[dim]docker-compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
+            f"[dim]docker compose -f .deployment/docker-compose.yml run --rm {service_name} python debug_env.py[/]"
         )
         console.print("\n[bold]To clean up all deployment files:[/]")
         console.print("[dim]supervaizer deploy clean[/]")
@@ -193,16 +184,16 @@ def _check_docker_available() -> bool:
 
 
 def _generate_test_secrets(generate_api_key: bool, generate_rsa: bool) -> dict:
-    """Generate test secrets for local testing."""
+    """Generate test secrets, keyed by the variable names the server reads."""
     secrets = {}
 
     if generate_api_key:
         # Generate a test API key
         import secrets as secrets_module
 
-        secrets["api_key"] = secrets_module.token_urlsafe(32)
+        secrets["SUPERVAIZER_API_KEY"] = secrets_module.token_urlsafe(32)
     else:
-        secrets["api_key"] = "test-api-key-local"
+        secrets["SUPERVAIZER_API_KEY"] = "test-api-key-local"
 
     if generate_rsa:
         # Generate a test RSA key
@@ -219,48 +210,22 @@ def _generate_test_secrets(generate_api_key: bool, generate_rsa: bool) -> dict:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         )
-        secrets["rsa_private_key"] = private_pem.decode()
-    else:
-        secrets["rsa_private_key"] = "test-rsa-key-local"
+        secrets["SUPERVAIZER_PRIVATE_KEY"] = private_pem.decode()
 
     return secrets
 
 
-def _start_docker_compose(
-    service_name: str, port: int, secrets: dict, verbose: bool = False
-) -> None:
-    """Start services using Docker Compose."""
-    compose_file = Path(".deployment/docker-compose.yml")
-
-    if not compose_file.exists():
+def _start_docker_compose(verbose: bool = False) -> None:
+    """Start services using Docker Compose. Values come from the compose file."""
+    if not Path(".deployment/docker-compose.yml").exists():
         raise RuntimeError("Docker Compose file not found")
 
-    # Set environment variables for Docker Compose
-    env = os.environ.copy()
-    env.update({
-        "SERVICE_NAME": service_name,
-        "SERVICE_PORT": str(port),
-        "SUPERVAIZER_API_KEY": secrets["api_key"],
-        "SV_RSA_PRIVATE_KEY": secrets["rsa_private_key"],
-        "SUPERVAIZER_ENVIRONMENT": "dev",
-        "SUPERVAIZER_HOST": "0.0.0.0",
-        "SUPERVAIZER_PORT": str(port),
-        "SV_LOG_LEVEL": "INFO",
-    })
-
-    cmd = ["docker-compose", "-f", str(compose_file), "up", "-d"]
-
+    result = subprocess.run([*COMPOSE, "up", "-d"], capture_output=True, text=True)
     if verbose:
-        # When verbose, capture output to display it
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        # Display the captured output
         if result.stdout:
             console.print(result.stdout)
         if result.stderr:
             console.print(f"[yellow]Stderr:[/] {result.stderr}")
-    else:
-        # When not verbose, capture output silently
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
 
     if result.returncode != 0:
         error_msg = result.stderr if result.stderr else "Unknown error"
@@ -291,7 +256,7 @@ def _wait_for_service(url: str, timeout: int) -> bool:
     return False
 
 
-def _run_health_checks(url: str, api_key: str | None) -> dict[str, Any]:
+def _run_health_checks(url: str) -> dict[str, Any]:
     """Run comprehensive health checks."""
     results: dict[str, Any] = {}
 
@@ -309,23 +274,6 @@ def _run_health_checks(url: str, api_key: str | None) -> dict[str, Any]:
             "success": False,
             "error": str(e),
         }
-
-    # API health check (if API key available)
-    if api_key:
-        try:
-            headers = {"X-API-Key": api_key}
-            response = httpx.get(f"{url}/agents/health", headers=headers, timeout=10)
-            results["api_health_endpoint"] = {
-                "status": response.status_code,
-                "success": response.status_code == 200,
-                "response_time": response.elapsed.total_seconds(),
-            }
-        except Exception as e:
-            results["api_health_endpoint"] = {
-                "status": None,
-                "success": False,
-                "error": str(e),
-            }
 
     # API documentation check
     try:
@@ -380,12 +328,8 @@ def _display_service_info(
     info_table.add_row("Service Name", service_name)
     info_table.add_row("URL", url)
     info_table.add_row("Port", str(port))
-    info_table.add_row(
-        "API Key",
-        secrets["api_key"][:8] + "..."
-        if len(secrets["api_key"]) > 8
-        else secrets["api_key"],
-    )
+    api_key = secrets["SUPERVAIZER_API_KEY"]
+    info_table.add_row("API Key", api_key[:8] + "..." if len(api_key) > 8 else api_key)
     info_table.add_row("Environment", "dev")
 
     console.print(info_table)
@@ -395,16 +339,8 @@ def _show_service_logs(service_name: str) -> None:
     """Show service logs for debugging."""
     console.print("\n[bold]Service Logs:[/]")
     try:
-        # Try docker-compose logs first
         result = subprocess.run(
-            [
-                "docker-compose",
-                "-f",
-                ".deployment/docker-compose.yml",
-                "logs",
-                "--tail=100",
-                service_name,
-            ],
+            [*COMPOSE, "logs", "--tail=100", service_name],
             capture_output=True,
             text=True,
         )
@@ -434,15 +370,7 @@ def _show_service_logs(service_name: str) -> None:
         # Also try to get container status
         console.print("\n[bold]Container Status:[/]")
         status_result = subprocess.run(
-            [
-                "docker-compose",
-                "-f",
-                ".deployment/docker-compose.yml",
-                "ps",
-                "-a",
-            ],
-            capture_output=True,
-            text=True,
+            [*COMPOSE, "ps", "-a"], capture_output=True, text=True
         )
         if status_result.stdout:
             console.print(status_result.stdout)
@@ -454,11 +382,7 @@ def _cleanup_test_resources(service_name: str) -> None:
     """Clean up test resources."""
     console.print("\n[bold]Cleaning up test resources...[/]")
     try:
-        subprocess.run(
-            ["docker-compose", "-f", ".deployment/docker-compose.yml", "down"],
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run([*COMPOSE, "down"], capture_output=True, text=True)
         console.print("[green]✓[/] Test resources cleaned up")
     except Exception as e:
         console.print(f"[yellow]Warning:[/] Failed to cleanup resources: {e}")

@@ -131,14 +131,6 @@ class EntityFilter(BaseModel):
     skip: int = 0
 
 
-def _get_admin_api_key(request: Request) -> str | None:
-    """API key for admin: live server's key (e.g. local-dev) or env."""
-    live = getattr(request.app.state, "server", None)
-    if live is not None and getattr(live, "api_key", None):
-        return live.api_key
-    return os.getenv("SUPERVAIZER_API_KEY")
-
-
 def _is_local_mode(request: Request) -> bool:
     """True when server has no Studio registration (supervisor_account is None)."""
     live = getattr(request.app.state, "server", None)
@@ -277,7 +269,6 @@ def create_admin_routes() -> APIRouter:
                     "system_status": "Online",
                     "db_name": "TinyDB",
                     "data_storage_path": str(storage.db_path.absolute()),
-                    "api_key": _get_admin_api_key(request),
                     "local_mode": _is_local_mode(request),
                     "server_id": os.getenv("SUPERVAIZER_SERVER_ID"),
                 },
@@ -295,7 +286,6 @@ def create_admin_routes() -> APIRouter:
             {
                 "request": request,
                 "api_version": API_VERSION,
-                "api_key": _get_admin_api_key(request),
                 "local_mode": _is_local_mode(request),
             },
         )
@@ -309,7 +299,6 @@ def create_admin_routes() -> APIRouter:
             {
                 "request": request,
                 "api_version": API_VERSION,
-                "api_key": _get_admin_api_key(request),
                 "local_mode": _is_local_mode(request),
             },
         )
@@ -330,7 +319,6 @@ def create_admin_routes() -> APIRouter:
                     "api_version": VERSION,
                     "server_status": server_status,
                     "server_config": server_config,
-                    "api_key": _get_admin_api_key(request),
                     "local_mode": _is_local_mode(request),
                 },
             )
@@ -355,7 +343,6 @@ def create_admin_routes() -> APIRouter:
                     "request": request,
                     "api_version": VERSION,
                     "agents": server_info.agents,
-                    "api_key": _get_admin_api_key(request),
                     "local_mode": _is_local_mode(request),
                 },
             )
@@ -364,20 +351,6 @@ def create_admin_routes() -> APIRouter:
             raise HTTPException(
                 status_code=503, detail="Server information unavailable"
             ) from e
-
-    @router.get("/job-start-test", response_class=HTMLResponse)
-    async def admin_job_start_test_page(request: Request) -> Response:
-        """Job start form test page."""
-        return templates.TemplateResponse(
-            request,
-            "job_start_test.html",
-            {
-                "request": request,
-                "api_version": API_VERSION,
-                "api_key": _get_admin_api_key(request),
-                "local_mode": _is_local_mode(request),
-            },
-        )
 
     @router.get("/static/{file_path:path}")
     async def serve_static(file_path: str) -> Response:
@@ -548,7 +521,6 @@ def create_admin_routes() -> APIRouter:
                 {
                     "request": request,
                     "agents": filtered_agents,
-                    "api_key": _get_admin_api_key(request),
                 },
             )
 

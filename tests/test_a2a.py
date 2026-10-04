@@ -123,7 +123,6 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert "version" in card
     assert card["version"] == agent_fixture.version
     assert "version_info" in card
-    assert "logo_url" in card
     assert "human_url" in card
     assert "contact_information" in card
     assert "api_endpoints" in card
@@ -134,7 +133,12 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
     assert isinstance(card["api_endpoints"], list)
     assert len(card["api_endpoints"]) > 0
     assert card["api_endpoints"][0]["type"] == "json"
-    assert card["api_endpoints"][0]["url"] == f"{base_url}{agent_fixture.path}"
+    assert (
+        card["api_endpoints"][0]["url"]
+        == f"{base_url}/api/supervaizer{agent_fixture.path}"
+    )
+    assert card["authentication"]["type"] == "apiKey"
+    assert card["authentication"]["name"] == "X-API-Key"
 
     # Test OpenAPI integration
     assert "openapi_url" in card["api_endpoints"][0]
@@ -165,11 +169,41 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
         for name in agent_fixture.methods.custom.keys():
             assert name in tool_names
 
-    # Test versioning information
-    assert "version_info" in card
-    assert "current" in card["version_info"]
-    assert "latest" in card["version_info"]
-    assert "changelog_url" in card["version_info"]
+    # No release notes declared: the card claims no changelog.
+    assert card["version_info"] == {"current": agent_fixture.version}
+
+
+def test_agent_card_changelog_url_uses_release_notes_url(agent_fixture: Agent) -> None:
+    agent_fixture.release_notes_url = "https://example.com/releases/1.0.0"
+    card = create_agent_card(agent_fixture, "http://test.example.com")
+    assert card["version_info"]["changelog_url"] == agent_fixture.release_notes_url
+
+
+def test_agent_card_urls_resolve_to_routes(server_fixture: Server) -> None:
+    """Every URL the card advertises on this controller is a mounted route."""
+    base_url = "http://test.example.com"
+    card = create_agent_card(server_fixture.agents[0], base_url)
+    endpoint = card["api_endpoints"][0]
+    requests = [
+        ("GET", card["human_url"]),
+        ("GET", endpoint["url"]),
+        ("GET", endpoint["openapi_url"]),
+        ("GET", endpoint["docs_url"]),
+        *(
+            (example["request"]["method"], example["request"]["url"])
+            for example in endpoint["examples"]
+        ),
+    ]
+    client = TestClient(server_fixture.app)
+    for method, url in requests:
+        response = client.request(
+            method,
+            url.removeprefix(base_url),
+            headers={"X-API-Key": "test-api-key"},
+        )
+        # POST examples carry no body, so validation (422) proves the route exists.
+        expected = {200} if method == "GET" else {422}
+        assert response.status_code in expected, f"{method} {url}"
 
 
 def test_create_agent_card_includes_supervaizer_v2_extension() -> None:
@@ -2035,7 +2069,6 @@ def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
             "description",
             "developer",
             "version",
-            "logo_url",
             "human_url",
             "contact_information",
             "api_endpoints",
@@ -2050,7 +2083,6 @@ def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
                 "properties": {"name": {"type": "string"}},
             },
             "version": {"type": "string"},
-            "logo_url": {"type": "string"},
             "human_url": {"type": "string"},
             "contact_information": {"type": "object"},
             "api_endpoints": {

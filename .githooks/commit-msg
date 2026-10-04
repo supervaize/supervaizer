@@ -1,0 +1,5 @@
+#!/bin/sh
+# Installed by `just install-hooks`, which points core.hooksPath at this directory.
+
+# Run the commit-msg stage of .pre-commit-config.yaml: add the gitmoji, then check the format.
+exec uv run python -m pre_commit run --hook-stage commit-msg --commit-msg-filename "$1"

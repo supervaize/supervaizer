@@ -888,7 +888,7 @@ class Agent(AgentAbstract):
             "methods": self.methods.registration_info if self.methods else {},
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
-            else None,
+            else [],
             "server_agent_id": f"{self.server_agent_id}",
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
@@ -906,6 +906,7 @@ class Agent(AgentAbstract):
         Example of agent_registration data is available in mock_api_responses.py
 
         Server is used to decrypt parameters if needed
+        Returns None without a Studio account; raises if the Studio lookup fails.
         Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
         if server.supervisor_account:
@@ -923,8 +924,15 @@ class Agent(AgentAbstract):
         else:
             return None
         if not isinstance(from_server, ApiSuccess):
-            log.error(f"[Agent update_agent_from_server] Failed : {from_server}")
-            return None
+            # Stop the launch: continuing would run with unrefreshed status and
+            # parameters, and hide Studio errors such as an agent id mismatch.
+            response = getattr(from_server.exception, "response", None)
+            status = response.status_code if response is not None else "no response"
+            raise RuntimeError(
+                f"Agent update from Studio failed for slug={self.slug} "
+                f"server_agent_id={self.server_agent_id}: GET {from_server.url} "
+                f"returned {status} ({from_server.exception})"
+            )
 
         agent_from_server = _agent_detail_from_server_response(from_server.detail)
         server_agent_id = _agent_id_from_server_detail(agent_from_server)
@@ -993,7 +1001,11 @@ class Agent(AgentAbstract):
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
-        log.debug(f"[Agent method] {method.__name__} with params {params}")
+        # agent_parameters holds decrypted secrets: never log it.
+        log.debug(
+            f"[Agent method] {method.__name__} with params "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
+        )
         result = method(**params)
         if not isinstance(result, JobResponse):
             raise TypeError(
@@ -1053,6 +1065,7 @@ class Agent(AgentAbstract):
         context: JobContext,
         server: "Server",
         method_name: str = "job_start",
+        agent_parameters: list[dict[str, Any]] | None = None,
     ) -> Job:
         """Execute the agent's start method in the background
 
@@ -1060,6 +1073,8 @@ class Agent(AgentAbstract):
             job (Job): The job instance to execute
             job_fields (dict): The job-specific parameters
             context (SupervaizeContextModel): The context of the job
+            agent_parameters (list | None): Decrypted parameters for this call
+                only; None uses job.agent_parameters
         Returns:
             Job: The updated job instance
         """
@@ -1091,10 +1106,16 @@ class Agent(AgentAbstract):
             method_params
             | {"fields": job_fields}
             | {"context": context}
-            | {"agent_parameters": job.agent_parameters}
+            | {
+                "agent_parameters": job.agent_parameters
+                if agent_parameters is None
+                else agent_parameters
+            }
         )
+        # agent_parameters holds decrypted secrets: never log it.
         log.debug(
-            f"[Agent job_start] action_method : {action_method} - params : {params}"
+            f"[Agent job_start] action_method : {action_method} - params : "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
         )
         try:
             if action.is_async:
@@ -1205,3 +1226,9 @@ class AgentResponse(BaseModel):
     server_agent_id: str | None = None
     server_agent_status: str | None = None
     server_agent_onboarding_status: str | None = None
+
+    @field_validator("methods", mode="before")
+    @classmethod
+    def empty_methods_mean_none(cls, value: Any) -> Any:
+        """registration_info sends {} for a v2-only agent (no v1 methods)."""
+        return None if value == {} else value

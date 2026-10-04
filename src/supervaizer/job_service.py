@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from supervaizer.common import decrypt_value, log
 from supervaizer.event import JobFinishedEvent
-from supervaizer.job import Job, Jobs
+from supervaizer.job import Job, Jobs, normalize_agent_parameters
 from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
@@ -129,13 +129,14 @@ async def service_job_custom(
     log.info(
         f"[service_job_custom] /custom/{method_name} [custom job] {agent.name} with params {job_fields}"
     )
-    _agent_parameters: dict[str, Any] | None = None
+    agent_parameters: list[dict[str, Any]] | None = None
     # If agent has parameters_setup defined, validate parameters
     if agent.parameters_setup and encrypted_agent_parameters:
         agent_parameters_str = decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
-        _agent_parameters = (
+        # Reject a bad shape now (400), not later in the background method.
+        agent_parameters = normalize_agent_parameters(
             json.loads(agent_parameters_str) if agent_parameters_str else None
         )
         log.debug("[Decrypted parameters] : parameters decrypted")
@@ -163,5 +164,8 @@ async def service_job_custom(
         sv_context,
         server,
         method_name,
+        # Per call, not on the shared job: concurrent custom calls on one job
+        # must not see each other's parameters.
+        agent_parameters=agent_parameters,
     )
     return job

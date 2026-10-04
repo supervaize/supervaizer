@@ -108,6 +108,15 @@ class TestWorkbenchPageRendering:
         assert response.status_code == 200
         assert "Workbench" in response.text
 
+    def test_workbench_page_does_not_expose_api_key(
+        self, test_client_with_agent: tuple[TestClient, str]
+    ) -> None:
+        """The workbench calls /manage routes only, so the page must not carry the key."""
+        client, agent_slug = test_client_with_agent
+        response = client.get(f"/manage/agents/{agent_slug}/workbench")
+        assert response.status_code == 200
+        assert "test-api-key" not in response.text  # key set by the fixture
+
     def test_workbench_page_404_for_unknown_agent(self, test_client_with_agent):
         """Workbench page should 404 for unknown agent slug."""
         client, _ = test_client_with_agent

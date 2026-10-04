@@ -4,192 +4,40 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
-# This is an example file.
-# It must be copied / renamed to supervaizer_control.py
-# and edited to configure your agent(s)
+# Supervaizer v2 controller template.
+# `supervaizer scaffold` copies this file to supervaizer_control.py.
+# Try it without Studio:  supervaizer start --local
+# Then edit the agent, the surface, and the action below.
 
 import os
-
-import shortuuid
-from rich.console import Console
+from typing import Any
 
 from supervaizer import (
+    Account,
     Agent,
-    AgentMethod,
-    AgentMethodField,
-    AgentMethods,
-    Parameter,
-    ParametersSetup,
     Server,
-)
-from supervaizer.account import Account
-
-# Create a console with default style set to yellow
-console = Console(style="yellow")
-
-# Public url of your hosted agent  (including port if needed)
-# Use loca.lt or ngrok to get a public url during development.
-# This can be setup from environment variables.
-# SUPERVAIZER_HOST and SUPERVAIZER_PORT
-DEV_PUBLIC_URL = "https://myagent-dev.loca.lt"
-# Public url of your hosted agent
-PROD_PUBLIC_URL = "https://myagent.cloud-hosting.net:8001"
-
-
-# Define the parameters and secrets expected by the agent
-agent_parameters: ParametersSetup | None = ParametersSetup.from_list([
-    Parameter(
-        name="OPEN_API_KEY",
-        description="OpenAPI Key",
-        is_environment=True,
-        is_secret=True,
-    ),
-    Parameter(
-        name="SERPER_API",
-        description="Server API key updated",
-        is_environment=True,
-        is_secret=True,
-    ),
-    Parameter(
-        name="COMPETITOR_SUMMARY_URL",
-        description="Competitor Summary URL",
-        is_environment=True,
-        is_secret=False,
-    ),
-])
-
-# Define the method used to start a job
-job_start_method: AgentMethod = AgentMethod(
-    name="start",  # This is required
-    method="example_agent.example_synchronous_job_start",  # Path to the main function in dotted notation.
-    is_async=False,  # Only use sync methods for the moment
-    params={"action": "start"},  # If default parameters must be passed to the function.
-    fields=[
-        AgentMethodField(
-            name="Company to research",
-            type=str,
-            field_type="CharField",
-            description="Company to research",
-            default="Google",
-            required=True,
-        ),
-        AgentMethodField(
-            name="Max number of results",
-            type=int,
-            field_type="IntegerField",
-            required=True,
-        ),
-        AgentMethodField(
-            name="Subscribe to updates",
-            type=bool,
-            field_type="BooleanField",
-            required=False,
-        ),
-        AgentMethodField(
-            name="Type of research",
-            type=str,
-            field_type="ChoiceField",
-            choices=[("A", "Advanced"), ("R", "Restricted")],
-            widget="RadioSelect",
-            required=True,
-        ),
-        AgentMethodField(
-            name="List of projects",
-            type=str,
-            field_type="ChoiceField",
-            choices=[("P1", "Project 1"), ("P2", "Project 2"), ("P3", "Project 3")],
-            required=True,
-        ),
-        AgentMethodField(
-            name="Details of research",
-            type=str,
-            field_type="CharField",
-            widget="Textarea",
-            required=False,
-        ),
-        AgentMethodField(
-            name="List of countries",
-            type=list[str],
-            field_type="MultipleChoiceField",
-            choices=[
-                ("PA", "Panama"),
-                ("PG", "Papua New Guinea"),
-                ("PY", "Paraguay"),
-                ("PE", "Peru"),
-                ("PH", "Philippines"),
-                ("PN", "Pitcairn"),
-                ("PL", "Poland"),
-            ],
-            required=True,
-        ),
-        AgentMethodField(
-            name="languages",
-            type=list[str],
-            field_type="MultipleChoiceField",
-            choices=[("en", "English"), ("fr", "French"), ("es", "Spanish")],
-            required=False,
-        ),
-    ],
-    description="Start the collection of new competitor summary",
+    V2ActionRequest,
+    V2SurfaceRequest,
+    build_v2_agent_registration,
 )
 
-job_stop_method: AgentMethod = AgentMethod(
-    name="stop",
-    method="control.stop",
-    params={"action": "stop"},
-    description="Stop the agent",
-)
-job_status_method: AgentMethod = AgentMethod(
-    name="status",
-    method="hello.mystatus",
-    params={"status": "statusvalue"},
-    description="Get the status of the agent",
-)
-custom_method: AgentMethod = AgentMethod(
-    name="custom",
-    method="control.custom",
-    params={"action": "custom"},
-    description="Custom method",
-)
+AGENT_NAME = "My Agent"
 
-custom_method2: AgentMethod = AgentMethod(
-    name="custom2",
-    method="control.custom2",
-    params={"action": "custom2"},
-    description="Custom method",
-)
-
-
-agent_name = "competitor_summary"
-
-# Define the Agent
+# The registration declares what Studio can show (surfaces) and call (actions).
 agent: Agent = Agent(
-    name=agent_name,
-    id=shortuuid.uuid(f"{agent_name}"),
-    author="John Doe",  # Author of the agent
-    developer="Developer",  # Developer of the controller integration
-    maintainer="Ive Maintained",  # Maintainer of the integration
-    editor="DevAiExperts",  # Editor (usually a company)
-    version="1.3",  # Version string
-    description="This is a test agent",
-    tags=["testtag", "testtag2"],
-    methods=AgentMethods(
-        job_start=job_start_method,
-        job_stop=job_stop_method,
-        job_status=job_status_method,
-        chat=None,
-        custom={"custom1": custom_method, "custom2": custom_method2},
+    name=AGENT_NAME,
+    version="0.1.0",
+    description="Describe what your agent does.",
+    supervaizer_v2_registration=build_v2_agent_registration(
+        agent_slug="my-agent",  # must equal Agent.slug, the slugified name
+        display_name=AGENT_NAME,
+        a2ui_catalog_version="my-agent-ui.1",  # bump when your surfaces change
+        surfaces=["job.start"],
+        actions=["job.start"],
     ),
-    parameters_setup=agent_parameters,
-    instructions_path="supervaize_instructions.html",  # Path where instructions page is served
 )
 
+# Studio account, read from the environment. Local mode ignores it.
 # For export purposes, use dummy values if environment variables are not set
 account: Account = Account(
     workspace_id=os.getenv("SUPERVAIZE_WORKSPACE_ID") or "dummy_workspace_id",
@@ -197,12 +45,52 @@ account: Account = Account(
     api_url=os.getenv("SUPERVAIZE_API_URL") or "https://app.supervaize.com",
 )
 
-# Define the supervaizer server capabilities
-sv_server: Server = Server(
-    agents=[agent],
-    a2a_endpoints=True,  # Enable A2A endpoints
-    supervisor_account=account,  # Account of the supervisor from Supervaize
-)
+sv_server: Server = Server(agents=[agent], supervisor_account=account)
+
+
+# A surface handler returns the A2UI document Studio renders.
+@sv_server.v2_surface("job.start", agent_slug=agent.slug)
+def job_start_form(request: V2SurfaceRequest) -> dict[str, Any]:
+    return {
+        "surface": request.surface,
+        "document": {
+            "type": "Form",
+            "title": "Start job",
+            "fields": [
+                {"id": "goal", "label": "Goal", "type": "string", "required": True}
+            ],
+            "submit": {"action": "job.start", "label": "Start"},
+        },
+    }
+
+
+# An action handler runs your agent and returns effects plus the job state.
+@sv_server.v2_action("job.start", agent_slug=agent.slug)
+def start_job(request: V2ActionRequest) -> dict[str, Any]:
+    job_id = request.job_id or "local-job"
+    return {
+        "status": "ok",
+        "effects": [{"type": "job.started", "job_id": job_id, "status": "completed"}],
+        "job_state": {
+            "job": {
+                "id": job_id,
+                "mission_id": request.mission_id,
+                "agent_slug": request.agent_slug,
+                "status": "completed",
+                "source": {"type": "fresh_start"},
+            },
+            "cases": [
+                {
+                    "id": "case-1",
+                    "title": request.input["goal"],
+                    "status": "completed",
+                    "steps": [
+                        {"id": "step-1", "activity": "operation", "status": "completed"}
+                    ],
+                }
+            ],
+        },
+    }
 
 
 if __name__ == "__main__":

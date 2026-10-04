@@ -59,7 +59,7 @@ build:
     hatch build
 
 # Toggle PEP 440 .dev0 on canonical version (syncs src/supervaizer/__version__.py + pyproject [tool.bumpversion]).
-# Does not edit CHANGELOG or historical docs. After `on`, avoid `just tag_version` until `off` (tags should be release-only).
+# Does not edit CHANGELOG or historical docs. `just tag-version` does not tag a .dev version (tags are release-only).
 # Usage: just version-dev on | just version-dev off
 version-dev cmd:
     uv run python tools/dev_version.py {{cmd}}
@@ -86,27 +86,31 @@ push_tags:
     git push origin --tags
     @echo "Tags pushed to remote"
 
-# Install Git hooks
+# Install Git hooks: point git at the tracked hooks in .githooks
 install-hooks:
-    # First unset any existing hooksPath
-    @git config --unset-all core.hooksPath || true
-    # Install pre-commit hooks
-    @uv run python -m pre_commit install
-    # Set up our custom hooks
-    @git config core.hooksPath .githooks
-    # Git hooks installed
-
-# API documentation @http://127.0.0.1:8000/redoc
-dev:
-    uvicorn controller:app --reload
+    git config core.hooksPath .githooks
 
 # Local test mode: no Studio credentials, built-in Hello World agent (for agent workbench)
 local:
     uv run supervaizer start --local
 
-# Create git tag for current version - Automated done in post-commit hook
+# Kept for the RUNWAIZE root guide, which lists `just dev` for this repo
+alias dev := local
+
+# Create git tag vX.Y.Z for the current version (also run by the post-commit hook) - skips .dev versions and existing tags
 tag-version:
-    bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && TAG=\"v\${VERSION}\" && if git rev-parse -q --verify \"refs/tags/\${TAG}\" >/dev/null; then echo \"Tag \${TAG} already exists - skipping\"; else git tag -a \"\${TAG}\" -m \"Version \${VERSION}\" && echo \"Created tag \${TAG}\"; fi"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION=$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'"' -f2)
+    TAG="v${VERSION}"
+    if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "${VERSION} is not a release version (X.Y.Z) - no tag"
+    elif git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+        echo "Tag ${TAG} already exists - skipping"
+    else
+        git tag -a "${TAG}" -m "Version ${VERSION}"
+        echo "Created tag ${TAG}"
+    fi
 
 # Generate RSA private key (PEM) for SUPERVAIZER_PRIVATE_KEY (e.g. Vercel env)
 generate-private-key:
@@ -174,7 +178,8 @@ ship part="minor":
     RELEASE_TITLE="[${BUMP_TOKEN}] chore: merge develop to main"
     git fetch origin main develop
     git switch -c "$RELEASE_BRANCH" origin/main
-    git merge origin/develop --no-ff -m "$RELEASE_TITLE"
+    # The bump token is not a gitmoji message, so skip the commit-msg hook.
+    git merge origin/develop --no-ff --no-verify -m "$RELEASE_TITLE"
     git push -u origin "$RELEASE_BRANCH"
     if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       gh pr create \

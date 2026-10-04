@@ -16,6 +16,7 @@ Docker Operations
 This module handles Docker-related operations for deployment.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -27,57 +28,36 @@ console = Console()
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
-# List of environment variables to include in Dockerfile
-DOCKER_ENV_VARS = [
+# Host variables forwarded to the container at runtime. They are never baked
+# into the image: `deploy up` pushes the image to a registry, and this list
+# includes the Studio API key.
+PASSTHROUGH_ENV_VARS = [
     "SUPERVAIZE_API_KEY",
     "SUPERVAIZE_WORKSPACE_ID",
     "SUPERVAIZE_API_URL",
-    "SUPERVAIZER_PORT",
     "SUPERVAIZER_PUBLIC_URL",
+    "SUPERVAIZER_SERVER_ID",
+    "SUPERVAIZER_WORKSPACE_AUTH_REQUIRED",
+    "SUPERVAIZER_WORKSPACE_AUTH_ISSUER",
+    "SUPERVAIZER_WORKSPACE_AUTH_AUDIENCE",
+    "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY",
+    "SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL",
+    "SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS",
 ]
 
 
-def get_docker_env_vars(port: int = 8000) -> dict[str, str]:
-    """Get environment variables for Docker deployment.
-
-    Args:
-        port: The application port to use for SUPERVAIZER_PORT
-
-    Returns:
-        Dictionary mapping environment variable names to their values
-    """
-    env_vars = {}
-
-    for var_name in DOCKER_ENV_VARS:
-        if var_name == "SUPERVAIZER_PORT":
-            env_vars[var_name] = str(port)
-        else:
-            env_vars[var_name] = os.getenv(var_name, "")
-
+def get_container_env(environment: str, port: int) -> dict[str, str]:
+    """Runtime environment for the controller container."""
+    env_vars = {
+        "SUPERVAIZER_ENVIRONMENT": environment,
+        "SUPERVAIZER_HOST": "0.0.0.0",
+        "SUPERVAIZER_PORT": str(port),
+        "SUPERVAIZER_LOG_LEVEL": os.getenv("SUPERVAIZER_LOG_LEVEL") or "INFO",
+    }
+    env_vars.update({
+        name: value for name in PASSTHROUGH_ENV_VARS if (value := os.getenv(name))
+    })
     return env_vars
-
-
-def get_docker_build_args(port: int = 8000) -> dict[str, str]:
-    """Get build arguments for Docker deployment.
-
-    Args:
-        port: The application port to use for SUPERVAIZER_PORT
-
-    Returns:
-        Dictionary mapping build argument names to their values
-    """
-    build_args = {}
-
-    for var_name in DOCKER_ENV_VARS:
-        if var_name == "SUPERVAIZER_PORT":
-            build_args[var_name] = str(port)
-        else:
-            # Only include build args for variables that are set
-            value = os.getenv(var_name)
-            if value:
-                build_args[var_name] = value
-
-    return build_args
 
 
 class DockerManager:
@@ -129,17 +109,6 @@ class DockerManager:
             "{{CONTROLLER_FILE}}", controller_file
         )
 
-        # Replace environment variables placeholder
-        env_vars = get_docker_env_vars(app_port)
-        env_lines = []
-        for var_name in env_vars.keys():
-            env_lines.append(f"ARG {var_name}")
-            env_lines.append(f"ENV {var_name}=${{{var_name}}}")
-        env_vars_section = "\n".join(env_lines)
-        dockerfile_content = dockerfile_content.replace(
-            "{{ENV_VARS}}", env_vars_section
-        )
-
         output_path.write_text(dockerfile_content)
         log.info(f"Generated Dockerfile at {output_path}")
 
@@ -176,12 +145,10 @@ class DockerManager:
 
     def generate_docker_compose(
         self,
+        env_vars: dict[str, str],
         output_path: Path | None = None,
         port: int = 8000,
         service_name: str = "supervaizer-dev",
-        environment: str = "dev",
-        api_key: str = "test-api-key",
-        rsa_key: str = "test-rsa-key",
     ) -> None:
         """Generate a docker-compose.yml for local testing."""
         if output_path is None:
@@ -194,31 +161,18 @@ class DockerManager:
         template_path = TEMPLATE_DIR / "docker-compose.yml.template"
         compose_content = template_path.read_text()
 
-        # Get environment variables for build args
-        env_vars = get_docker_env_vars(port)
-
-        # Replace template placeholders with actual values
+        # JSON strings are valid YAML scalars, so multi-line PEM values survive.
+        # `$$` stops Compose from interpolating `$` inside values.
+        env_lines = "\n".join(
+            f"      - {json.dumps(f'{key}={value}'.replace('$', '$$'))}"
+            for key, value in env_vars.items()
+        )
         compose_content = compose_content.replace("{{PORT}}", str(port))
         compose_content = compose_content.replace("{{SERVICE_NAME}}", service_name)
-        compose_content = compose_content.replace("{{ENVIRONMENT}}", environment)
-        compose_content = compose_content.replace("{{API_KEY}}", api_key)
-        compose_content = compose_content.replace("{{RSA_KEY}}", rsa_key)
-        compose_content = compose_content.replace(
-            "{{ env.SV_LOG_LEVEL | default('INFO') }}", "INFO"
-        )
-
-        # Replace environment variable placeholders for build args
-        compose_content = compose_content.replace(
-            "{{WORKSPACE_ID}}", env_vars.get("SUPERVAIZE_WORKSPACE_ID", "")
-        )
-        compose_content = compose_content.replace(
-            "{{API_URL}}", env_vars.get("SUPERVAIZE_API_URL", "")
-        )
-        compose_content = compose_content.replace(
-            "{{PUBLIC_URL}}", env_vars.get("SUPERVAIZER_PUBLIC_URL", "")
-        )
+        compose_content = compose_content.replace("{{ENV_VARS}}", env_lines)
 
         output_path.write_text(compose_content)
+        output_path.chmod(0o600)  # holds credentials
         log.info(f"Generated docker-compose.yml at {output_path}")
 
     def build_image(
@@ -323,7 +277,7 @@ class DockerManager:
             log.error(f"Failed to tag image: {e}")
             raise RuntimeError(f"Failed to tag image: {e}") from e
 
-    def push_image(self, tag: str) -> None:
+    def push_image(self, tag: str, auth_config: dict[str, str] | None = None) -> None:
         """Push Docker image to registry."""
         from docker.errors import DockerException
 
@@ -334,7 +288,9 @@ class DockerManager:
 
         try:
             log.info(f"Pushing image: {tag}")
-            push_logs = self.client.images.push(tag, stream=True, decode=True)
+            push_logs = self.client.images.push(
+                tag, stream=True, decode=True, auth_config=auth_config
+            )
 
             for log_line in push_logs:
                 if "error" in log_line:

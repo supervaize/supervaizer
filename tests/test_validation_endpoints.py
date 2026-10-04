@@ -10,13 +10,17 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import Header
 from fastapi.testclient import TestClient
 
 from supervaizer.agent import Agent, AgentMethod, AgentMethodField, AgentMethods
+from supervaizer.common import encrypt_value
+from supervaizer.job import JobContext, Jobs
 from supervaizer.parameter import Parameter, ParametersSetup
 from supervaizer.routes import create_agent_route
 from supervaizer.server import Server
@@ -206,6 +210,106 @@ class TestValidateAgentParameters:
         assert data["valid"] is False
         assert "Decryption failed" in data["message"]
         assert "encrypted_agent_parameters" in data["invalid_parameters"]
+
+    @patch.object(Agent, "job_start")
+    def test_studio_parameter_list_validates_and_starts_job(
+        self,
+        _mock_job_start: MagicMock,
+        mock_server: MagicMock,
+        test_client: TestClient,
+        test_agent: Agent,
+        context_fixture: JobContext,
+    ) -> None:
+        """The encrypted list Studio sends passes validation and starts a job."""
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        mock_server.private_key = private_key
+        # Same shape as Studio's AgentParameterSetup.to_dict_short, extra keys included.
+        studio_parameters = [
+            {
+                "name": "API_KEY",
+                "value": "new_key",
+                "description": None,
+                "is_environment": False,
+                "is_secret": True,
+                "is_required": True,
+            },
+            {
+                "name": "TIMEOUT",
+                "value": "60",
+                "description": None,
+                "is_environment": False,
+                "is_secret": False,
+                "is_required": True,
+            },
+        ]
+        encrypted = encrypt_value(
+            json.dumps(studio_parameters), private_key.public_key()
+        )
+        headers = {"X-API-Key": "test-api-key"}
+
+        validation = test_client.post(
+            "/test-agent/agents/test-agent/validate-agent-parameters",
+            json={"encrypted_agent_parameters": encrypted},
+            headers=headers,
+        )
+        assert validation.status_code == 200
+        assert validation.json()["valid"] is True, validation.json()
+
+        start = test_client.post(
+            "/test-agent/agents/test-agent/jobs",
+            json={
+                "job_context": context_fixture.model_dump(mode="json"),
+                "job_fields": {"company_name": "Acme", "max_results": 5},
+                "encrypted_agent_parameters": encrypted,
+            },
+            headers=headers,
+        )
+        assert start.status_code == 202, start.text
+        job = Jobs().get_job(context_fixture.job_id)
+        assert job is not None
+        assert job.agent_parameters == studio_parameters
+
+        assert test_agent.parameters_setup is not None
+        test_agent.parameters_setup.update_values_from_server(studio_parameters)
+        assert test_agent.parameters_setup.value("TIMEOUT") == "60"
+
+    @patch("supervaizer.common.decrypt_value")
+    def test_validate_agent_parameters_null_required_value(
+        self, mock_decrypt: MagicMock, test_client: TestClient
+    ) -> None:
+        """A required parameter with a null value counts as missing."""
+        mock_decrypt.return_value = (
+            '[{"name": "API_KEY", "value": null}, {"name": "TIMEOUT", "value": "60"}]'
+        )
+
+        response = test_client.post(
+            "/test-agent/agents/test-agent/validate-agent-parameters",
+            json={"encrypted_agent_parameters": "encrypted_string"},
+            headers={"X-API-Key": "test-api-key"},
+        )
+
+        data = response.json()
+        assert data["valid"] is False
+        assert data["invalid_parameters"] == {
+            "API_KEY": "Required parameter 'API_KEY' is missing"
+        }
+
+    @patch("supervaizer.common.decrypt_value")
+    def test_validate_agent_parameters_malformed_list(
+        self, mock_decrypt: MagicMock, test_client: TestClient
+    ) -> None:
+        """A list item without a name or value fails with a clear error."""
+        mock_decrypt.return_value = '[{"name": "API_KEY"}, "TIMEOUT"]'
+
+        response = test_client.post(
+            "/test-agent/agents/test-agent/validate-agent-parameters",
+            json={"encrypted_agent_parameters": "encrypted_string"},
+            headers={"X-API-Key": "test-api-key"},
+        )
+
+        data = response.json()
+        assert data["valid"] is False
+        assert "must be an object with a string 'name'" in data["errors"][0]
 
 
 class TestValidateMethodFields:

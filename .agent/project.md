@@ -9,7 +9,7 @@ This repo is public and packaged for external users, so API compatibility, typed
 ## Data Sensitivity Notes
 
 - Do not log or commit API keys, server secrets, workspace tokens, or customer data.
-- Preserve admin access controls such as `ADMIN_ALLOWED_IPS`.
+- Preserve admin access controls: the Tailscale gate on `/manage` (`require_tailscale`, `TRUSTED_PROXIES`) and API-key scopes on `/api` and `/a2a`.
 - Keep generated docs and examples free of real credentials.
 
 ## Allowed / Forbidden Actions

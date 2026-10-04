@@ -76,8 +76,7 @@ class TestLocalTesting:
 
         secrets = _generate_test_secrets(generate_api_key=True, generate_rsa=False)
 
-        assert secrets["api_key"] == "test-api-key-123"
-        assert secrets["rsa_private_key"] == "test-rsa-key-local"
+        assert secrets == {"SUPERVAIZER_API_KEY": "test-api-key-123"}
 
     def test_generate_test_secrets_with_rsa(self, mocker: MockerFixture):
         """Test secret generation with RSA key."""
@@ -91,15 +90,14 @@ class TestLocalTesting:
 
         secrets = _generate_test_secrets(generate_api_key=False, generate_rsa=True)
 
-        assert secrets["api_key"] == "test-api-key-local"
-        assert secrets["rsa_private_key"] == "test-rsa-key"
+        assert secrets["SUPERVAIZER_API_KEY"] == "test-api-key-local"
+        assert secrets["SUPERVAIZER_PRIVATE_KEY"] == "test-rsa-key"
 
     def test_generate_test_secrets_default(self):
         """Test default secret generation."""
         secrets = _generate_test_secrets(generate_api_key=False, generate_rsa=False)
 
-        assert secrets["api_key"] == "test-api-key-local"
-        assert secrets["rsa_private_key"] == "test-rsa-key-local"
+        assert secrets == {"SUPERVAIZER_API_KEY": "test-api-key-local"}
 
     def test_start_docker_compose_success(self, mocker: MockerFixture):
         """Test successful Docker Compose start."""
@@ -109,13 +107,13 @@ class TestLocalTesting:
         mock_run = mocker.patch("subprocess.run")
         mock_run.return_value.returncode = 0
 
-        secrets = {"api_key": "test-key", "rsa_private_key": "test-rsa"}
-        _start_docker_compose("test-service", 8000, secrets, False)
+        _start_docker_compose()
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args
         assert call_args[0][0] == [
-            "docker-compose",
+            "docker",
+            "compose",
             "-f",
             ".deployment/docker-compose.yml",
             "up",
@@ -131,20 +129,16 @@ class TestLocalTesting:
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = "Docker Compose error"
 
-        secrets = {"api_key": "test-key", "rsa_private_key": "test-rsa"}
-
         with pytest.raises(RuntimeError, match="Failed to start Docker Compose"):
-            _start_docker_compose("test-service", 8000, secrets, False)
+            _start_docker_compose()
 
     def test_start_docker_compose_missing_file(self, mocker: MockerFixture):
         """Test Docker Compose start with missing file."""
         mock_path = mocker.patch("pathlib.Path.exists")
         mock_path.return_value = False
 
-        secrets = {"api_key": "test-key", "rsa_private_key": "test-rsa"}
-
         with pytest.raises(RuntimeError, match="Docker Compose file not found"):
-            _start_docker_compose("test-service", 8000, secrets, False)
+            _start_docker_compose()
 
     def test_wait_for_service_success(self, mocker: MockerFixture):
         """Test successful service wait."""
@@ -182,35 +176,9 @@ class TestLocalTesting:
         # Mock the httpx.get calls - first call for health, second for docs
         mock_httpx.side_effect = [health_response, docs_response]
 
-        results = _run_health_checks("http://localhost:8000", None)  # No API key
+        results = _run_health_checks("http://localhost:8000")
 
         assert results["health_endpoint"]["success"] is True
-        assert results["api_docs"]["success"] is True
-        # Should not have api_health_endpoint when no API key provided
-        assert "api_health_endpoint" not in results
-
-    def test_run_health_checks_with_api_key(self, mocker: MockerFixture):
-        """Test health checks with API key."""
-        mock_httpx = mocker.patch("supervaizer.deploy.commands.local.httpx.get")
-
-        # Mock all responses
-        health_response = mocker.Mock()
-        health_response.status_code = 200
-        health_response.elapsed.total_seconds.return_value = 0.1
-
-        api_response = mocker.Mock()
-        api_response.status_code = 200
-        api_response.elapsed.total_seconds.return_value = 0.2
-
-        docs_response = mocker.Mock()
-        docs_response.status_code = 200
-
-        mock_httpx.side_effect = [health_response, api_response, docs_response]
-
-        results = _run_health_checks("http://localhost:8000", "test-api-key")
-
-        assert results["health_endpoint"]["success"] is True
-        assert results["api_health_endpoint"]["success"] is True
         assert results["api_docs"]["success"] is True
 
     def test_display_health_results(self, mocker: MockerFixture):
@@ -231,7 +199,7 @@ class TestLocalTesting:
         """Test service info display."""
         mock_console = mocker.patch("supervaizer.deploy.commands.local.console")
 
-        secrets = {"api_key": "test-api-key-123456789"}
+        secrets = {"SUPERVAIZER_API_KEY": "test-api-key-123456789"}
         _display_service_info("test-service", "http://localhost:8000", 8000, secrets)
 
         # Verify console.print was called (table creation)
@@ -246,12 +214,13 @@ class TestLocalTesting:
         _show_service_logs("test-service")
 
         # The function calls subprocess.run multiple times (logs, docker logs, ps)
-        # Check that at least the first call (docker-compose logs) was made
+        # Check that at least the first call (docker compose logs) was made
         assert mock_run.call_count >= 1
-        # Verify the first call is for docker-compose logs
+        # Verify the first call is for docker compose logs
         first_call = mock_run.call_args_list[0]
         assert first_call[0][0] == [
-            "docker-compose",
+            "docker",
+            "compose",
             "-f",
             ".deployment/docker-compose.yml",
             "logs",
@@ -267,7 +236,7 @@ class TestLocalTesting:
         _cleanup_test_resources("test-service")
 
         mock_run.assert_called_once_with(
-            ["docker-compose", "-f", ".deployment/docker-compose.yml", "down"],
+            ["docker", "compose", "-f", ".deployment/docker-compose.yml", "down"],
             capture_output=True,
             text=True,
         )
@@ -312,10 +281,7 @@ class TestLocalTesting:
         mock_check_docker.return_value = True
         mock_docker_instance = mocker.Mock()
         mock_docker_manager.return_value = mock_docker_instance
-        mock_generate_secrets.return_value = {
-            "api_key": "test-key",
-            "rsa_private_key": "test-rsa",
-        }
+        mock_generate_secrets.return_value = {"SUPERVAIZER_API_KEY": "test-key"}
         mock_wait_service.return_value = True
         mock_run_health.return_value = {"health_endpoint": {"success": True}}
 
@@ -340,13 +306,10 @@ class TestLocalTesting:
             app_port=8000,
         )
         mock_docker_instance.generate_dockerignore.assert_called_once()
-        mock_docker_instance.generate_docker_compose.assert_called_once_with(
-            port=8000,
-            service_name="test-service-dev",
-            environment="dev",
-            api_key="test-key",
-            rsa_key="test-rsa",
-        )
+        compose_kwargs = mock_docker_instance.generate_docker_compose.call_args.kwargs
+        assert compose_kwargs["port"] == 8000
+        assert compose_kwargs["service_name"] == "test-service-dev"
+        assert compose_kwargs["env_vars"]["SUPERVAIZER_API_KEY"] == "test-key"
         mock_docker_instance.build_image.assert_called_once()
         mock_generate_secrets.assert_called_once_with(True, False)
         mock_wait_service.assert_called_once()
@@ -401,10 +364,7 @@ class TestLocalTesting:
         mock_check_docker.return_value = True
         mock_docker_instance = mocker.Mock()
         mock_docker_manager.return_value = mock_docker_instance
-        mock_generate_secrets.return_value = {
-            "api_key": "test-key",
-            "rsa_private_key": "test-rsa",
-        }
+        mock_generate_secrets.return_value = {"SUPERVAIZER_API_KEY": "test-key"}
         mock_wait_service.return_value = False
 
         with pytest.raises(RuntimeError, match="Service startup timeout"):
@@ -442,10 +402,7 @@ class TestLocalTesting:
         mock_check_docker.return_value = True
         mock_docker_instance = mocker.Mock()
         mock_docker_manager.return_value = mock_docker_instance
-        mock_generate_secrets.return_value = {
-            "api_key": "test-key",
-            "rsa_private_key": "test-rsa",
-        }
+        mock_generate_secrets.return_value = {"SUPERVAIZER_API_KEY": "test-key"}
 
         # Run test with docker_files_only=True
         local_docker(
@@ -468,13 +425,10 @@ class TestLocalTesting:
             app_port=8000,
         )
         mock_docker_instance.generate_dockerignore.assert_called_once()
-        mock_docker_instance.generate_docker_compose.assert_called_once_with(
-            port=8000,
-            service_name="test-service-dev",
-            environment="dev",
-            api_key="test-key",
-            rsa_key="test-rsa",
-        )
+        compose_kwargs = mock_docker_instance.generate_docker_compose.call_args.kwargs
+        assert compose_kwargs["port"] == 8000
+        assert compose_kwargs["service_name"] == "test-service-dev"
+        assert compose_kwargs["env_vars"]["SUPERVAIZER_API_KEY"] == "test-key"
         mock_generate_secrets.assert_called_once_with(True, False)
 
         # Verify that build_image and other runtime operations are NOT called

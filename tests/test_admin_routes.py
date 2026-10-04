@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console_token, validate_console_token, verify_admin_access
@@ -79,6 +79,28 @@ class TestAdminUtilityFunctions:
 
     # <-- REMOVED: test_generate_console_token, test_validate_console_token_*
     # (console token system removed; Tailscale is the gate)
+
+
+def test_manage_dashboard_does_not_expose_api_key(
+    monkeypatch: pytest.MonkeyPatch, mocker: "MockerFixture"
+) -> None:
+    """/manage is gated by Tailscale, not the API key, so it must never render it."""
+    canary = "leakcanary7f3a9"
+    monkeypatch.setenv("SUPERVAIZER_API_KEY", canary)
+    mock_storage = Mock()
+    mock_storage.get_objects.side_effect = lambda obj_type: []
+    mock_storage._db.tables.return_value = []
+    mock_storage.db_path.absolute.return_value = "/tmp/test.db"
+    mocker.patch("supervaizer.admin.routes.StorageManager", return_value=mock_storage)
+    app = FastAPI()
+    app.state.server = Mock(api_key=canary, supervisor_account=None)
+    app.include_router(create_admin_routes(), prefix="/manage")
+
+    response = TestClient(app).get("/manage/")
+
+    assert response.status_code == 200
+    assert canary not in response.text
+    assert "data-admin-key" not in response.text
 
 
 class TestAdminModels:
