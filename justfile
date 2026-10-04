@@ -59,7 +59,7 @@ build:
     hatch build
 
 # Toggle PEP 440 .dev0 on canonical version (syncs src/supervaizer/__version__.py + pyproject [tool.bumpversion]).
-# Does not edit CHANGELOG or historical docs. After `on`, avoid `just tag_version` until `off` (tags should be release-only).
+# Does not edit CHANGELOG or historical docs. `just tag-version` does not tag a .dev version (tags are release-only).
 # Usage: just version-dev on | just version-dev off
 version-dev cmd:
     uv run python tools/dev_version.py {{cmd}}
@@ -97,9 +97,20 @@ local:
 # Kept for the RUNWAIZE root guide, which lists `just dev` for this repo
 alias dev := local
 
-# Create git tag for current version - Automated done in post-commit hook
+# Create git tag vX.Y.Z for the current version (also run by the post-commit hook) - skips .dev versions and existing tags
 tag-version:
-    bash -c "VERSION=\$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'\"' -f2) && TAG=\"v\${VERSION}\" && if git rev-parse -q --verify \"refs/tags/\${TAG}\" >/dev/null; then echo \"Tag \${TAG} already exists - skipping\"; else git tag -a \"\${TAG}\" -m \"Version \${VERSION}\" && echo \"Created tag \${TAG}\"; fi"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION=$(grep '^VERSION = ' src/supervaizer/__version__.py | cut -d'"' -f2)
+    TAG="v${VERSION}"
+    if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "${VERSION} is not a release version (X.Y.Z) - no tag"
+    elif git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+        echo "Tag ${TAG} already exists - skipping"
+    else
+        git tag -a "${TAG}" -m "Version ${VERSION}"
+        echo "Created tag ${TAG}"
+    fi
 
 # Generate RSA private key (PEM) for SUPERVAIZER_PRIVATE_KEY (e.g. Vercel env)
 generate-private-key:
