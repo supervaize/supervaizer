@@ -24,6 +24,7 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from supervaizer.cli import app
+from supervaizer.server import Server
 
 
 @pytest.fixture(autouse=True)
@@ -104,6 +105,57 @@ class TestCLIStart:
             assert "local test mode" in result.stdout
             assert "built-in Hello World agent" in result.stdout
             mock_launch.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("flag", "debug"), [("--debug", True), ("--reload", False)]
+    )
+    def test_start_accepts_deprecated_flags(
+        self,
+        runner: CliRunner,
+        monkeypatch: pytest.MonkeyPatch,
+        flag: str,
+        debug: bool,
+    ) -> None:
+        """--debug and --reload still run, with a deprecation warning."""
+        monkeypatch.setenv("SUPERVAIZER_DEBUG", "false")
+        monkeypatch.setenv("SUPERVAIZER_RELOAD", "false")
+        with (
+            patch.object(Server, "launch", autospec=True) as mock_launch,
+            patch("supervaizer.cli.os.path.exists", return_value=False),
+        ):
+            result = runner.invoke(app, ["start", "--local", flag])
+
+        assert result.exit_code == 0
+        assert f"{flag} is deprecated" in result.stdout
+        server = mock_launch.call_args.args[0]
+        assert server.debug is debug
+        # Uvicorn rejects reload=True with an app object, so the fallback ignores it.
+        assert server.reload is False
+        assert os.environ[f"SUPERVAIZER_{flag[2:].upper()}"] == "True"
+
+
+class TestCLIScaffoldInstructions:
+    """Tests for the scaffold instructions subcommand."""
+
+    def test_existing_file_hint_names_scaffold_subcommand(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """The overwrite hint names the real `scaffold refresh-instructions` command."""
+        instructions = tmp_path / "supervaize_instructions.html"
+        instructions.write_text("<p>custom</p>")
+
+        result = runner.invoke(
+            app,
+            [
+                "scaffold",
+                "instructions",
+                "--control-file",
+                str(tmp_path / "supervaizer_control.py"),
+            ],
+        )
+
+        assert "supervaizer scaffold refresh-instructions" in result.stdout
+        assert instructions.read_text() == "<p>custom</p>"
 
 
 class TestCLIInstall:

@@ -16,6 +16,7 @@ DigitalOcean App Platform Driver
 This module implements deployment to DigitalOcean App Platform.
 """
 
+import base64
 import json
 import subprocess
 import time
@@ -31,9 +32,12 @@ from supervaizer.deploy.drivers.base import (
     DeploymentResult,
     ResourceAction,
     ResourceType,
+    split_image_tag,
 )
 
 console = Console()
+
+DOCR_HOST = "registry.digitalocean.com"
 
 
 class DOAppPlatformDriver(BaseDriver):
@@ -95,15 +99,9 @@ class DOAppPlatformDriver(BaseDriver):
                 )
             )
 
-        # Check registry
-        registry_name = f"{service_name}-{environment}"
+        # Check the account container registry (one per DigitalOcean account)
         try:
-            result = subprocess.run(
-                ["doctl", "registry", "get", registry_name, "--format", "json"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            registry_name = self._get_registry_name()
             actions.append(
                 ResourceAction(
                     resource_type=ResourceType.REGISTRY,
@@ -112,13 +110,13 @@ class DOAppPlatformDriver(BaseDriver):
                     description="Container registry exists",
                 )
             )
-        except subprocess.CalledProcessError:
+        except RuntimeError as e:
             actions.append(
                 ResourceAction(
                     resource_type=ResourceType.REGISTRY,
                     action_type=ActionType.CREATE,
-                    resource_name=registry_name,
-                    description=f"Create container registry {registry_name}",
+                    resource_name="container-registry",
+                    description=str(e),
                 )
             )
 
@@ -153,14 +151,9 @@ class DOAppPlatformDriver(BaseDriver):
         full_service_name = self.get_service_key(service_name, environment)
 
         try:
-            # Ensure registry exists
-            registry_name = f"{service_name}-{environment}"
-            self._ensure_registry(registry_name)
-
-            # Create/update app spec
+            # image_tag is the DOCR reference returned by prepare_registry
             app_spec_path = self._create_app_spec(
                 full_service_name,
-                registry_name,
                 image_tag,
                 port,
                 env_vars or {},
@@ -214,18 +207,8 @@ class DOAppPlatformDriver(BaseDriver):
             subprocess.run(
                 ["doctl", "apps", "delete", full_service_name, "--force"], check=True
             )
+            # The container registry is shared by the whole account: keep it.
             log.info(f"Deleted App Platform app: {full_service_name}")
-
-            # Delete registry
-            registry_name = f"{service_name}-{environment}"
-            try:
-                subprocess.run(
-                    ["doctl", "registry", "delete", registry_name, "--force"],
-                    check=True,
-                )
-                log.info(f"Deleted container registry: {registry_name}")
-            except subprocess.CalledProcessError:
-                log.warning(f"Failed to delete registry {registry_name}")
 
             return DeploymentResult(
                 success=True,
@@ -316,60 +299,74 @@ class DOAppPlatformDriver(BaseDriver):
 
         return errors
 
-    def _ensure_registry(self, registry_name: str) -> None:
-        """Ensure container registry exists."""
+    def _get_registry_name(self) -> str:
+        """Name of the account container registry."""
         try:
-            subprocess.run(
-                ["doctl", "registry", "get", registry_name],
+            result = subprocess.run(
+                ["doctl", "registry", "get", "--format", "Name", "--no-header"],
                 capture_output=True,
+                text=True,
                 check=True,
             )
-            log.info(f"Container registry {registry_name} exists")
-        except subprocess.CalledProcessError:
-            # Create registry
-            subprocess.run(
-                ["doctl", "registry", "create", registry_name, "--region", self.region],
-                check=True,
-            )
-            log.info(f"Created container registry: {registry_name}")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                "No DigitalOcean container registry found. "
+                "Create one with `doctl registry create <name>`."
+            ) from e
+        return result.stdout.strip()
+
+    def prepare_registry(self, image_tag: str) -> str:
+        """Return the image reference in the account container registry."""
+        return f"{DOCR_HOST}/{self._get_registry_name()}/{image_tag}"
+
+    def registry_auth(self) -> dict[str, str]:
+        """Short-lived push credentials for the account container registry."""
+        result = subprocess.run(
+            [
+                "doctl",
+                "registry",
+                "docker-config",
+                "--read-write",
+                "--expiry-seconds",
+                "3600",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        auth = json.loads(result.stdout)["auths"][DOCR_HOST]["auth"]
+        username, _, password = base64.b64decode(auth).decode().partition(":")
+        return {"username": username, "password": password}
 
     def _create_app_spec(
         self,
         app_name: str,
-        registry_name: str,
         image_tag: str,
         port: int,
         env_vars: dict[str, str],
         secrets: dict[str, str],
     ) -> Path:
         """Create App Platform specification file."""
-        # Build environment variables
-        env_vars_list = []
-        for key, value in env_vars.items():
-            env_vars_list.append({"key": key, "value": value})
+        envs = [{"key": key, "value": value} for key, value in env_vars.items()]
+        # App Platform encrypts SECRET values on first apply.
+        envs += [
+            {"key": key, "value": value, "scope": "RUN_TIME", "type": "SECRET"}
+            for key, value in secrets.items()
+        ]
 
-        # Build secret references
-        secret_refs = []
-        for secret_name in secrets:
-            secret_refs.append({
-                "key": secret_name,
-                "scope": "RUN_TIME",
-                "type": "SECRET",
-            })
+        # image_tag is registry.digitalocean.com/<registry>/<repository>:<tag>
+        repository, tag = split_image_tag(image_tag.split("/", 2)[2])
 
-        # App spec
         app_spec = {
             "name": app_name,
             "services": [
                 {
                     "name": "web",
-                    "source_dir": "/",
-                    "github": {
-                        "repo": "supervaizer",
-                        "branch": "main",
-                        "deploy_on_push": False,
+                    "image": {
+                        "registry_type": "DOCR",
+                        "repository": repository,
+                        "tag": tag,
                     },
-                    "dockerfile_path": "Dockerfile",
                     "http_port": port,
                     "instance_count": 1,
                     "instance_size_slug": "basic-xxs",
@@ -382,7 +379,7 @@ class DOAppPlatformDriver(BaseDriver):
                         "success_threshold": 1,
                         "failure_threshold": 3,
                     },
-                    "envs": env_vars_list + secret_refs,
+                    "envs": envs,
                 }
             ],
             "region": self.region,
@@ -402,6 +399,7 @@ class DOAppPlatformDriver(BaseDriver):
 
         with open(spec_path, "w") as f:
             yaml.dump(app_spec, f, default_flow_style=False)
+        spec_path.chmod(0o600)  # holds secret values
 
         log.info(f"Created app spec at {spec_path}")
         return spec_path

@@ -41,7 +41,7 @@ uv run mypy src/supervaizer tests   # include tests
 2. Make your changes and add or update targeted tests.
 3. Run `just test` and `just precommit`.
 4. Update documentation (`docs/CHANGELOG.md` **Unreleased** section, and `just generate-docs` if public models changed).
-5. Commit with a signed-off Conventional Commit message: `git commit -s -m "✨ feat: add amazing feature"`. The pre-commit hooks enforce the [gitmoji conventional](https://github.com/ljnsn/cz-conventional-gitmoji) format.
+5. Commit with a signed-off Conventional Commit message: `git commit -s -m "✨ feat: add amazing feature"`. The `commit-msg` hook enforces the [gitmoji conventional](https://github.com/ljnsn/cz-conventional-gitmoji) format and adds the gitmoji when it is missing.
 6. Push and open a Pull Request against `develop`. `main` only receives release PRs.
 
 ## Code Style
@@ -50,6 +50,8 @@ uv run mypy src/supervaizer tests   # include tests
 - Mypy for type checking. New or modified functions, including tests, need explicit type annotations and return types.
 - Module-level imports by default; document any unavoidable local import.
 - Supervaizer is a published SDK: keep public payloads backward compatible unless the change is explicitly breaking and coordinated with Studio.
+
+After `just install-hooks`, each `git commit` runs the `.pre-commit-config.yaml` checks (Ruff, mypy, license header) on the staged files, and the `commit-msg` hook checks the message. GitButler's `but commit` does not run Git hooks.
 
 Run `just precommit` before pushing; CI enforces the same checks on every pull request.
 

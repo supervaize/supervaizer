@@ -16,6 +16,7 @@ AWS App Runner Driver
 This module implements deployment to AWS App Runner.
 """
 
+import base64
 import subprocess
 import time
 from typing import TYPE_CHECKING, Any
@@ -30,6 +31,8 @@ from supervaizer.deploy.drivers.base import (
     DeploymentResult,
     ResourceAction,
     ResourceType,
+    SECRET_ENV_VARS,
+    split_image_tag,
 )
 
 console = Console()
@@ -161,7 +164,8 @@ class AWSAppRunnerDriver(BaseDriver):
 
         # Check secrets
         if secrets:
-            for secret_name, secret_value in secrets.items():
+            for env_var in secrets:
+                secret_name = self.get_secret_name(full_service_name, env_var)
                 try:
                     self.secrets_client.describe_secret(SecretId=secret_name)
                     actions.append(
@@ -216,22 +220,17 @@ class AWSAppRunnerDriver(BaseDriver):
         full_service_name = self.get_service_key(service_name, environment)
 
         try:
-            # Ensure ECR repository exists
-            repo_name = f"{service_name}-{environment}"
-            self._ensure_ecr_repository(repo_name)
+            secret_arns = self._create_or_update_secrets(
+                full_service_name, secrets or {}
+            )
 
-            # Create/update secrets
-            if secrets:
-                self._create_or_update_secrets(secrets)
-
-            # Create/update service
+            # image_tag is the ECR reference returned by prepare_registry
             service_arn = self._create_or_update_service(
                 full_service_name,
-                repo_name,
                 image_tag,
                 port,
                 env_vars or {},
-                secrets or {},
+                secret_arns,
             )
 
             # Wait for service to be ready
@@ -417,35 +416,37 @@ class AWSAppRunnerDriver(BaseDriver):
             else:
                 raise
 
-    def _create_or_update_secrets(self, secrets: dict[str, str]) -> None:
-        """Create or update secrets in Secrets Manager."""
-        for secret_name, secret_value in secrets.items():
+    def _create_or_update_secrets(
+        self, service_key: str, secrets: dict[str, str]
+    ) -> dict[str, str]:
+        """Create or update secrets and return their ARNs by variable name."""
+        arns = {}
+        for env_var, secret_value in secrets.items():
+            secret_name = self.get_secret_name(service_key, env_var)
             try:
-                # Try to update existing secret
-                self.secrets_client.update_secret(
+                response = self.secrets_client.update_secret(
                     SecretId=secret_name, SecretString=secret_value
                 )
                 log.info(f"Updated secret {secret_name}")
             except ClientError as e:
-                if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                    # Create new secret
-                    self.secrets_client.create_secret(
-                        Name=secret_name,
-                        SecretString=secret_value,
-                        Description="Secret for Supervaizer deployment",
-                    )
-                    log.info(f"Created secret {secret_name}")
-                else:
+                if e.response["Error"]["Code"] != "ResourceNotFoundException":
                     raise
+                response = self.secrets_client.create_secret(
+                    Name=secret_name,
+                    SecretString=secret_value,
+                    Description="Secret for Supervaizer deployment",
+                )
+                log.info(f"Created secret {secret_name}")
+            arns[env_var] = response["ARN"]
+        return arns
 
     def _create_or_update_service(
         self,
         service_name: str,
-        repo_name: str,
         image_tag: str,
         port: int,
         env_vars: dict[str, str],
-        secrets: dict[str, str],
+        secret_arns: dict[str, str],
     ) -> str:
         """Create or update App Runner service."""
         account_id = self._get_account_id()
@@ -453,28 +454,16 @@ class AWSAppRunnerDriver(BaseDriver):
             f"arn:aws:apprunner:{self.region}:{account_id}:service/{service_name}"
         )
 
-        # Build environment variables
-        env_vars_list = []
-        for key, value in env_vars.items():
-            env_vars_list.append({"Name": key, "Value": value})
-
-        # Build secret references
-        secret_refs = []
-        for secret_name in secrets:
-            secret_refs.append({
-                "Name": secret_name,
-                "ValueFrom": f"arn:aws:secretsmanager:{self.region}:{account_id}:secret:{secret_name}",
-            })
-
         # Service configuration
         service_config = {
             "ServiceName": service_name,
             "SourceConfiguration": {
                 "ImageRepository": {
-                    "ImageIdentifier": f"{account_id}.dkr.ecr.{self.region}.amazonaws.com/{repo_name}:{image_tag}",
+                    "ImageIdentifier": image_tag,
                     "ImageConfiguration": {
                         "Port": str(port),
-                        "RuntimeEnvironmentVariables": env_vars_list + secret_refs,
+                        "RuntimeEnvironmentVariables": env_vars,
+                        "RuntimeEnvironmentSecrets": secret_arns,
                     },
                     "ImageRepositoryType": "ECR",
                 },
@@ -514,6 +503,20 @@ class AWSAppRunnerDriver(BaseDriver):
             else:
                 raise
 
+    def prepare_registry(self, image_tag: str) -> str:
+        """Ensure the ECR repository exists and return the image reference."""
+        repository, tag = split_image_tag(image_tag)
+        self._ensure_ecr_repository(repository)
+        host = f"{self._get_account_id()}.dkr.ecr.{self.region}.amazonaws.com"
+        return f"{host}/{repository}:{tag}"
+
+    def registry_auth(self) -> dict[str, str]:
+        """Short-lived ECR push credentials."""
+        response = self.ecr_client.get_authorization_token()
+        token = response["authorizationData"][0]["authorizationToken"]
+        username, _, password = base64.b64decode(token).decode().partition(":")
+        return {"username": username, "password": password}
+
     def _wait_for_service_ready(self, service_arn: str, timeout: int) -> str | None:
         """Wait for service to be ready and return URL."""
         start_time = time.time()
@@ -551,23 +554,12 @@ class AWSAppRunnerDriver(BaseDriver):
             response = self.apprunner_client.describe_service(ServiceArn=service_arn)
             service = response["Service"]
 
-            # Update environment variables
-            current_env_vars = service["SourceConfiguration"]["ImageRepository"][
-                "ImageConfiguration"
-            ].get("RuntimeEnvironmentVariables", [])
-
-            # Remove existing SUPERVAIZER_PUBLIC_URL
-            env_vars = [
-                env
-                for env in current_env_vars
-                if env["Name"] != "SUPERVAIZER_PUBLIC_URL"
-            ]
-
-            # Add the public URL
-            env_vars.append({
-                "Name": "SUPERVAIZER_PUBLIC_URL",
-                "Value": public_url,
-            })
+            env_vars = {
+                **service["SourceConfiguration"]["ImageRepository"][
+                    "ImageConfiguration"
+                ].get("RuntimeEnvironmentVariables", {}),
+                "SUPERVAIZER_PUBLIC_URL": public_url,
+            }
 
             # Update service
             self.apprunner_client.update_service(
@@ -593,12 +585,8 @@ class AWSAppRunnerDriver(BaseDriver):
 
     def _delete_secrets(self, service_name: str) -> None:
         """Delete secrets associated with the service."""
-        common_secrets = [
-            f"{service_name}-api-key",
-            f"{service_name}-rsa-key",
-        ]
-
-        for secret_name in common_secrets:
+        for env_var in SECRET_ENV_VARS:
+            secret_name = self.get_secret_name(service_name, env_var)
             try:
                 self.secrets_client.delete_secret(
                     SecretId=secret_name, ForceDeleteWithoutRecovery=True

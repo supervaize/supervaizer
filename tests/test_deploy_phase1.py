@@ -124,17 +124,19 @@ class TestDockerManager:
 
             mocker.patch("docker.DockerClient")
             manager = DockerManager()
-            manager.generate_docker_compose(output_path)
+            manager.generate_docker_compose(
+                {"SUPERVAIZER_ENVIRONMENT": "dev", "SUPERVAIZER_API_KEY": "k"},
+                output_path,
+            )
 
             assert output_path.exists()
             content = output_path.read_text()
             assert "ports:" in content
-            assert "8000:8000" in content
+            assert "127.0.0.1:8000:8000" in content
             # Verify template placeholders are replaced with actual values
             assert "supervaizer-dev:" in content  # service name
-            assert "SUPERVAIZER_ENVIRONMENT=dev" in content  # environment
-            assert "SUPERVAIZER_API_KEY=test-api-key" in content  # api key
-            assert "SV_RSA_PRIVATE_KEY=test-rsa-key" in content  # rsa key
+            assert '"SUPERVAIZER_ENVIRONMENT=dev"' in content  # environment
+            assert '"SUPERVAIZER_API_KEY=k"' in content  # api key
             # Verify no template placeholders remain
             assert "{{" not in content
             assert "}}" not in content
@@ -535,7 +537,6 @@ class TestDeployCommands:
             env="dev",
             region="us-central1",
             project_id="test-project",
-            verbose=True,
         )
 
         # Verify console output
@@ -550,6 +551,10 @@ class TestDeployCommands:
 
         # Mock console.print to capture output
         mocker.patch("supervaizer.deploy.commands.up.console.print")
+        # Stop before touching the local Docker daemon or cloud credentials.
+        mocker.patch(
+            "supervaizer.deploy.commands.up.ensure_docker_running", return_value=False
+        )
 
         up.deploy_up(
             platform="aws-app-runner",
@@ -557,23 +562,28 @@ class TestDeployCommands:
             env="staging",
             region="us-east-1",
             project_id="test-account",
-            image="test-registry/test:latest",
+            image="test:latest",
             port=8080,
             generate_api_key=True,
             generate_rsa=True,
-            yes=True,
-            no_rollback=False,
             timeout=600,
-            verbose=True,
         )
 
         # The test is primarily to ensure the command can be called without error.
         # The logic is tested in the command-specific tests.
         assert True
 
-    def test_deploy_down_command(self, mocker: MockerFixture) -> None:
+    def test_deploy_down_command(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Test deploy down command."""
         from supervaizer.deploy.commands.down import StateManager, deploy_down
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".deployment").mkdir()
 
         # Mock the driver factory to return a mock driver
         mock_driver = mocker.Mock()
@@ -638,6 +648,8 @@ class TestDeployCommands:
 
         # Mock console.print to capture output
         mocker.patch.object(up.console, "print")
+        # Stop before touching the local Docker daemon or cloud credentials.
+        mocker.patch.object(up, "ensure_docker_running", return_value=False)
 
         deploy_up(platform="aws-app-runner")
 

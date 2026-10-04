@@ -34,8 +34,10 @@ def debug_environment_variables() -> None:
         "SUPERVAIZER_ENVIRONMENT",
         "SUPERVAIZER_HOST",
         "SUPERVAIZER_API_KEY",
-        "SV_RSA_PRIVATE_KEY",
-        "SV_LOG_LEVEL",
+        "SUPERVAIZER_PRIVATE_KEY",
+        "SUPERVAIZER_LOG_LEVEL",
+        "SUPERVAIZER_WORKSPACE_AUTH_REQUIRED",
+        "SUPERVAIZER_WORKSPACE_AUTH_ISSUER",
     ]
 
     print("=== Supervaize Environment Variables ===")
