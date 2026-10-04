@@ -339,6 +339,35 @@ def test_v2_resource_field_options_source_is_typed() -> None:
     assert field.options_source.label_field == "email"
 
 
+def test_build_v2_agent_registration_defaults_identity_and_urls() -> None:
+    registration = build_v2_agent_registration(
+        agent_slug="hello-world",
+        display_name="Hello World",
+        a2ui_catalog_version="hello-ui.1",
+    )
+
+    assert registration.agent.id == "hello-world"
+    assert registration.a2a.controller_url == "/a2a"
+    assert (
+        registration.a2a.agent_card_url == "/.well-known/agents/hello-world_agent.json"
+    )
+
+    explicit = build_v2_agent_registration(
+        agent_id="agent-123",
+        agent_slug="hello-world",
+        display_name="Hello World",
+        agent_card_url="/.well-known/agents/v1/hello-world_agent.json",
+        controller_url="/custom",
+        a2ui_catalog_version="hello-ui.1",
+    )
+
+    assert explicit.agent.id == "agent-123"
+    assert explicit.a2a.controller_url == "/custom"
+    assert (
+        explicit.a2a.agent_card_url == "/.well-known/agents/v1/hello-world_agent.json"
+    )
+
+
 def test_build_v2_agent_registration_derives_capabilities() -> None:
     registration = build_v2_agent_registration(
         agent_id="hello",

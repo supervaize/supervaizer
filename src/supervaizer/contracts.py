@@ -825,12 +825,12 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
 
 def build_v2_agent_registration(
     *,
-    agent_id: str,
     agent_slug: str,
     display_name: str,
-    agent_card_url: str,
-    controller_url: str,
     a2ui_catalog_version: str,
+    agent_id: str | None = None,
+    agent_card_url: str | None = None,
+    controller_url: str = "/a2a",
     surfaces: Iterable[str | V2SurfaceDefinition | dict[str, Any]] = (),
     actions: Iterable[str | V2ActionDefinition | dict[str, Any]] = (),
     resources: Iterable[V2ResourceDefinition | dict[str, Any]] = (),
@@ -848,7 +848,18 @@ def build_v2_agent_registration(
     a2a_transport: V2A2ATransport | dict[str, Any] | None = None,
     a2a_external_interop: V2A2AExternalInterop | dict[str, Any] | None = None,
 ) -> SupervaizerV2AgentRegistrationContract:
-    """Build and validate a Supervaizer v2 registration from SDK primitives."""
+    """Build and validate a Supervaizer v2 registration from SDK primitives.
+
+    ``agent_slug`` must equal ``Agent.slug``. ``agent_id`` defaults to the slug,
+    ``controller_url`` to the ``/a2a`` route every controller serves, and
+    ``agent_card_url`` to the unversioned Agent Card route for the slug.
+    """
+    if agent_id is None:
+        agent_id = agent_slug
+    if agent_card_url is None:
+        # ponytail: unversioned card route, the builder does not know the agent
+        # version; pass agent_card_url to advertise the versioned route.
+        agent_card_url = f"/.well-known/agents/{agent_slug}_agent.json"
     resource_definitions = _contract_list(resources, V2ResourceDefinition)
     dataset_definitions = _contract_list(datasets, V2DatasetDefinition)
     dashboard_definitions = _contract_list(dashboards, V2DashboardDefinition)

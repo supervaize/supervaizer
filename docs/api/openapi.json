@@ -663,16 +663,16 @@
         }
       }
     },
-    "/api/supervaizer/agents/competitor-summary/": {
+    "/api/supervaizer/agents/my-agent/": {
       "get": {
         "tags": [
           "Supervision",
           "Supervision",
           "Supervision"
         ],
-        "summary": "Get information about the agent competitor_summary",
+        "summary": "Get information about the agent My Agent",
         "description": "Detailed information about the agent, returned as a JSON object with Agent class fields",
-        "operationId": "agent_info_api_supervaizer_agents_competitor_summary__get",
+        "operationId": "agent_info_api_supervaizer_agents_my_agent__get",
         "parameters": [
           {
             "name": "X-API-Key",
@@ -715,16 +715,16 @@
         }
       }
     },
-    "/api/supervaizer/agents/competitor-summary/supervaize_instructions.html": {
+    "/api/supervaizer/agents/my-agent/supervaize_instructions.html": {
       "get": {
         "tags": [
           "Supervision",
           "Supervision",
           "Supervision"
         ],
-        "summary": "Get supervaize instructions page for agent competitor_summary",
+        "summary": "Get supervaize instructions page for agent My Agent",
         "description": "HTML page displaying agent registration information and instructions",
-        "operationId": "supervaize_instructions_api_supervaizer_agents_competitor_summary_supervaize_instructions_html_get",
+        "operationId": "supervaize_instructions_api_supervaizer_agents_my_agent_supervaize_instructions_html_get",
         "parameters": [
           {
             "name": "X-API-Key",
@@ -767,15 +767,15 @@
         }
       }
     },
-    "/api/supervaizer/agents/competitor-summary/validate-agent-parameters": {
+    "/api/supervaizer/agents/my-agent/validate-agent-parameters": {
       "post": {
         "tags": [
           "Supervision",
           "Supervision"
         ],
-        "summary": "Validate agent parameters for agent: competitor_summary",
+        "summary": "Validate agent parameters for agent: My Agent",
         "description": "Validate agent configuration parameters (secrets, API keys, etc.) before starting a job",
-        "operationId": "validate_agent_parameters_api_supervaizer_agents_competitor_summary_validate_agent_parameters_post",
+        "operationId": "validate_agent_parameters_api_supervaizer_agents_my_agent_validate_agent_parameters_post",
         "parameters": [
           {
             "name": "X-API-Key",
@@ -812,7 +812,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 200 Validate Agent Parameters Api Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                  "title": "Response 200 Validate Agent Parameters Api Supervaizer Agents My Agent Validate Agent Parameters Post"
                 }
               }
             }
@@ -823,7 +823,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 400 Validate Agent Parameters Api Supervaizer Agents Competitor Summary Validate Agent Parameters Post"
+                  "title": "Response 400 Validate Agent Parameters Api Supervaizer Agents My Agent Validate Agent Parameters Post"
                 }
               }
             },
@@ -852,15 +852,15 @@
         }
       }
     },
-    "/api/supervaizer/agents/competitor-summary/validate-method-fields": {
+    "/api/supervaizer/agents/my-agent/validate-method-fields": {
       "post": {
         "tags": [
           "Supervision",
           "Supervision"
         ],
-        "summary": "Validate method fields for agent: competitor_summary",
+        "summary": "Validate method fields for agent: My Agent",
         "description": "Validate job input fields against the method's field definitions before starting a job",
-        "operationId": "validate_method_fields_api_supervaizer_agents_competitor_summary_validate_method_fields_post",
+        "operationId": "validate_method_fields_api_supervaizer_agents_my_agent_validate_method_fields_post",
         "parameters": [
           {
             "name": "X-API-Key",
@@ -897,7 +897,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 200 Validate Method Fields Api Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                  "title": "Response 200 Validate Method Fields Api Supervaizer Agents My Agent Validate Method Fields Post"
                 }
               }
             }
@@ -908,7 +908,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 400 Validate Method Fields Api Supervaizer Agents Competitor Summary Validate Method Fields Post"
+                  "title": "Response 400 Validate Method Fields Api Supervaizer Agents My Agent Validate Method Fields Post"
                 }
               }
             },
@@ -937,460 +937,15 @@
         }
       }
     },
-    "/api/supervaizer/agents/competitor-summary/jobs": {
+    "/api/supervaizer/agents/my-agent/parameters": {
       "post": {
         "tags": [
           "Supervision",
           "Supervision"
         ],
-        "summary": "Start a job with agent: competitor_summary",
-        "description": "Start the collection of new competitor summary",
-        "operationId": "start_job_api_supervaizer_agents_competitor_summary_jobs_post",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "Body Params"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Job"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response 400 Start Job Api Supervaizer Agents Competitor Summary Jobs Post"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Get all jobs for agent: competitor_summary",
-        "description": "Get all jobs for this agent with pagination and optional status filtering",
-        "operationId": "get_agent_jobs_api_supervaizer_agents_competitor_summary_jobs_get",
-        "parameters": [
-          {
-            "name": "skip",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of jobs to skip",
-              "default": 0,
-              "title": "Skip"
-            },
-            "description": "Number of jobs to skip"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 1000,
-              "minimum": 1,
-              "description": "Number of jobs to return",
-              "default": 100,
-              "title": "Limit"
-            },
-            "description": "Number of jobs to return"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/EntityStatus"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter jobs by status",
-              "title": "Status"
-            },
-            "description": "Filter jobs by status"
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/JobResponse"
-                  },
-                  "title": "Response 200 Get Agent Jobs Api Supervaizer Agents Competitor Summary Jobs Get"
-                }
-              }
-            }
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/jobs/{job_id}": {
-      "get": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Get job status for agent: competitor_summary",
-        "description": "Get the status and details of a specific job",
-        "operationId": "get_job_status_api_supervaizer_agents_competitor_summary_jobs__job_id__get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Job"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/stop": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Stop the agent: competitor_summary",
-        "description": "Stop the agent",
-        "operationId": "stop_agent_api_supervaizer_agents_competitor_summary_stop_post",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true,
-                "title": "Params"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AgentResponse"
-                }
-              }
-            },
-            "description": "Accepted"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/status": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Get the status of the agent: competitor_summary",
-        "description": "Get the status of the agent",
-        "operationId": "status_agent_api_supervaizer_agents_competitor_summary_status_post",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AgentMethodParams"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/parameters": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Server updates agent: competitor_summary",
+        "summary": "Server updates agent: My Agent",
         "description": "Server updates agent onboarding status and/or encrypted parameters",
-        "operationId": "server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post",
+        "operationId": "server_update_agent_api_supervaizer_agents_my_agent_parameters_post",
         "parameters": [
           {
             "name": "X-API-Key",
@@ -1413,7 +968,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post"
+                "$ref": "#/components/schemas/Body_server_update_agent_api_supervaizer_agents_my_agent_parameters_post"
               }
             }
           }
@@ -1438,192 +993,6 @@
               }
             },
             "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/custom/custom1": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Trigger custom method 'custom1' for agent: competitor_summary",
-        "description": "Custom method",
-        "operationId": "competitor_summary_custom_custom1_api_supervaizer_agents_competitor_summary_custom_custom1_post",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "Body Params"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            },
-            "description": "Accepted"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response 400 Competitor Summary Custom Custom1 Api Supervaizer Agents Competitor Summary Custom Custom1 Post"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method Not Allowed"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/supervaizer/agents/competitor-summary/custom/custom2": {
-      "post": {
-        "tags": [
-          "Supervision",
-          "Supervision"
-        ],
-        "summary": "Trigger custom method 'custom2' for agent: competitor_summary",
-        "description": "Custom method",
-        "operationId": "competitor_summary_custom_custom2_api_supervaizer_agents_competitor_summary_custom_custom2_post",
-        "parameters": [
-          {
-            "name": "X-API-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "title": "Body Params"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            },
-            "description": "Accepted"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response 400 Competitor Summary Custom Custom2 Api Supervaizer Agents Competitor Summary Custom Custom2 Post"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method Not Allowed"
           },
           "422": {
             "description": "Validation Error",
@@ -1709,15 +1078,15 @@
         }
       }
     },
-    "/.well-known/agents/v1.3/competitor-summary_agent.json": {
+    "/.well-known/agents/v0.1.0/my-agent_agent.json": {
       "get": {
         "tags": [
           "Public",
           "Protocol A2A"
         ],
-        "summary": "A2A Agent Card for competitor_summary (v1)",
-        "description": "Returns agent card for competitor_summary according to A2A protocol specification",
-        "operationId": "get_agent_card__well_known_agents_v1_3_competitor_summary_agent_json_get",
+        "summary": "A2A Agent Card for My Agent (v1)",
+        "description": "Returns agent card for My Agent according to A2A protocol specification",
+        "operationId": "get_agent_card__well_known_agents_v0_1_0_my_agent_agent_json_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1726,7 +1095,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Get Agent Card  Well Known Agents V1 3 Competitor Summary Agent Json Get"
+                  "title": "Response Get Agent Card  Well Known Agents V0 1 0 My Agent Agent Json Get"
                 }
               }
             }
@@ -1734,15 +1103,15 @@
         }
       }
     },
-    "/.well-known/agents/competitor-summary_agent.json": {
+    "/.well-known/agents/my-agent_agent.json": {
       "get": {
         "tags": [
           "Public",
           "Protocol A2A"
         ],
-        "summary": "A2A Agent Card for competitor_summary (Legacy)",
-        "description": "Legacy endpoint for competitor_summary agent card",
-        "operationId": "get_agent_card_legacy__well_known_agents_competitor_summary_agent_json_get",
+        "summary": "A2A Agent Card for My Agent (Legacy)",
+        "description": "Legacy endpoint for My Agent agent card",
+        "operationId": "get_agent_card_legacy__well_known_agents_my_agent_agent_json_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1751,7 +1120,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Get Agent Card Legacy  Well Known Agents Competitor Summary Agent Json Get"
+                  "title": "Response Get Agent Card Legacy  Well Known Agents My Agent Agent Json Get"
                 }
               }
             }
@@ -3770,19 +3139,6 @@
           }
         ]
       },
-      "AgentMethodParams": {
-        "properties": {
-          "params": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Params",
-            "description": "A simple key-value dictionary of parameters what will be passed to the AgentMethod.method as kwargs"
-          }
-        },
-        "type": "object",
-        "title": "AgentMethodParams",
-        "description": "Method parameters for agent operations."
-      },
       "AgentMethods": {
         "properties": {
           "job_start": {
@@ -4010,7 +3366,7 @@
         "title": "AgentResponse",
         "description": "Response model for agent endpoints - values provided by Agent.registration_info"
       },
-      "Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post": {
+      "Body_server_update_agent_api_supervaizer_agents_my_agent_parameters_post": {
         "properties": {
           "onboarding_status": {
             "anyOf": [
@@ -4036,7 +3392,7 @@
           }
         },
         "type": "object",
-        "title": "Body_server_update_agent_api_supervaizer_agents_competitor_summary_parameters_post"
+        "title": "Body_server_update_agent_api_supervaizer_agents_my_agent_parameters_post"
       },
       "CaseNode": {
         "properties": {
@@ -4165,7 +3521,7 @@
             "type": "string",
             "format": "date-time",
             "title": "Timestamp",
-            "default": "2026-09-25T06:09:35.944579"
+            "default": "2026-10-05T00:49:54.808582"
           },
           "status_code": {
             "type": "integer",
@@ -4221,225 +3577,6 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
-      },
-      "Job": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "agent_name": {
-            "type": "string",
-            "title": "Agent Name"
-          },
-          "status": {
-            "$ref": "#/components/schemas/EntityStatus"
-          },
-          "job_context": {
-            "$ref": "#/components/schemas/JobContext"
-          },
-          "payload": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Payload"
-          },
-          "result": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Result"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "responses": {
-            "items": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "array",
-            "title": "Responses",
-            "default": []
-          },
-          "finished_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finished At"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          },
-          "case_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Case Ids",
-            "default": []
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Metadata",
-            "description": "Agent-provided domain metadata (e.g. source object context)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "agent_name",
-          "status",
-          "job_context"
-        ],
-        "title": "Job",
-        "description": "Jobs are typically created by the platform and are not created by the agent.\n\nArgs:\n    id (str): Unique identifier for the job - provided by the platform\n    agent_name (str): Name (slug) of the agent running the job\n    status (EntityStatus): Current status of the job\n    job_context (JobContext): Context information for the job\n    payload (Any, optional): Job payload data. Defaults to None\n    result (Any, optional): Job result data. Defaults to None\n    error (str, optional): Error message if job failed. Defaults to None\n    responses (list[JobResponse], optional): List of job responses. Defaults to empty list\n    finished_at (datetime, optional): When job completed. Defaults to None\n    created_at (datetime, optional): When job was created. Defaults to None"
-      },
-      "JobContext": {
-        "properties": {
-          "workspace_id": {
-            "type": "string",
-            "title": "Workspace Id"
-          },
-          "job_id": {
-            "type": "string",
-            "title": "Job Id"
-          },
-          "started_by": {
-            "type": "string",
-            "title": "Started By"
-          },
-          "started_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Started At"
-          },
-          "mission_id": {
-            "type": "string",
-            "title": "Mission Id"
-          },
-          "mission_name": {
-            "type": "string",
-            "title": "Mission Name"
-          },
-          "mission_context": {
-            "title": "Mission Context"
-          },
-          "job_instructions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JobInstructions"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "workspace_id",
-          "job_id",
-          "started_by",
-          "started_at",
-          "mission_id",
-          "mission_name"
-        ],
-        "title": "JobContext"
-      },
-      "JobInstructions": {
-        "properties": {
-          "max_cases": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Cases"
-          },
-          "max_duration": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Duration"
-          },
-          "max_cost": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Cost"
-          },
-          "stop_on_warning": {
-            "type": "boolean",
-            "title": "Stop On Warning",
-            "default": false
-          },
-          "stop_on_error": {
-            "type": "boolean",
-            "title": "Stop On Error",
-            "default": true
-          },
-          "job_start_time": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Job Start Time"
-          }
-        },
-        "type": "object",
-        "title": "JobInstructions"
       },
       "JobResponse": {
         "properties": {

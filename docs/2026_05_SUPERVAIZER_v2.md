@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-09-25
+> **Updated:** 2026-10-05
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -52,11 +52,8 @@ from supervaizer.contracts import (
 )
 
 registration = build_v2_agent_registration(
-    agent_id="research-agent",
     agent_slug="research-agent",
     display_name="Research Agent",
-    agent_card_url="/.well-known/agents/v1.0.0/research-agent_agent.json",
-    controller_url="/a2a",
     a2ui_catalog_version="research-agent.2026-05-16",
     surfaces=[
         "job.start",
@@ -97,6 +94,10 @@ agent = Agent(
     # but new v2 agents should model Studio operation through v2.
 )
 ```
+
+Only three arguments are required. `agent_slug` must equal `Agent.slug` (the slugified `name`); a mismatch fails at `Agent` creation. `display_name` is the name Studio shows. `a2ui_catalog_version` is your own version for your surface documents.
+
+The other identity arguments have defaults: `agent_id` is the slug, `controller_url` is `/a2a`, and `agent_card_url` is the unversioned card route `/.well-known/agents/<slug>_agent.json`. `a2ui_version` and `a2a_version` default to the versions this SDK release pins. Pass any of them only to override.
 
 The v2 registration is exposed in the A2A Agent Card under `supervaizer.v2`.
 
@@ -208,6 +209,10 @@ def start_job(request: V2ActionRequest) -> V2ActionResult:
 ```
 
 Surface handlers return A2UI documents. Action handlers perform business logic and return typed effects, optionally with a full `job_state` snapshot for sync convergence.
+
+A handler can return the typed model or a plain dict; the SDK validates both. A surface result needs `surface` and `document`; `a2ui_version` and `a2ui_catalog_version` are optional. An action result needs `status` (`ok` or `error`).
+
+`agent_slug` on the decorator is optional only when the server holds one agent. Local mode adds the built-in Hello World agent, so pass `agent_slug` if you use `supervaizer start --local`.
 
 ## Core Model
 
@@ -527,7 +532,7 @@ New agents should model Studio integration through v2 from the start.
 ## Minimal Checklist For A v2 Agent
 
 - Declare `supervaizer_v2_registration`.
-- Pin `a2ui_version`, `a2a_version`, and `a2ui_catalog_version`.
+- Set `a2ui_catalog_version`. `a2ui_version` and `a2a_version` default to the SDK-pinned versions.
 - Declare at least one surface, usually `job.start`.
 - Register `job.start`.
 - Register `job.sync` if Studio needs status convergence or catch-up.
