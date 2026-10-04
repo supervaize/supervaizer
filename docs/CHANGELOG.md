@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Local mode can invoke v2 actions and surfaces** — With `SUPERVAIZER_LOCAL_MODE=true`, no `supervisor_account`, and no `SUPERVAIZER_WORKSPACE_AUTH_*` verifier, `POST /a2a` `supervaizer/action.invoke` and `supervaizer/surface.load` no longer answer `-32030 workspace_authorization_not_configured`. Handlers get an unverified workspace context with `grant_id="local-mode"` (`LOCAL_MODE_WORKSPACE_GRANT_ID`) and only the scopes the call needs, and startup logs a bypass warning. A configured verifier or an attached Studio account keeps the fail-closed token check, and data-resource routes never bypass.
+
 ### Fixed
 
 - **`/manage` pages no longer expose the API key** — Every admin page put the write-scope `SUPERVAIZER_API_KEY` in a `data-admin-key` attribute on `<body>`, and the workbench page also inlined it in its script. Anyone who could open `/manage` could read the key and call the write-scope `/api/*` routes with it. Since 0.15.0, `require_tailscale` gates `/manage` and its endpoints need no key, so the templates and `workbench-form.js` no longer receive or send it. The `/manage/job-start-test` page and `job-start-form.js` are removed: the page never loaded the script, and the script targeted an agent path that does not exist.

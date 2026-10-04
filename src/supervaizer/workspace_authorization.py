@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 import httpx
 from pydantic import Field, ValidationError, field_validator
 
+from supervaizer.common import is_local_mode
 from supervaizer.contracts import (
     ContractModel,
     V2VerifiedWorkspaceContext,
@@ -34,6 +35,7 @@ from supervaizer.contracts import (
 WORKSPACE_AUTHORIZATION_HEADER = "X-Supervaize-Workspace-Authorization"
 WORKSPACE_AUTHORIZATION_ALGORITHM = "EdDSA"
 JWKS_KEY_CACHE_MAX_SIZE = 16
+LOCAL_MODE_WORKSPACE_GRANT_ID = "local-mode"
 
 WorkspaceAuthorizationPublicKey: TypeAlias = ed25519.Ed25519PublicKey
 _JwksKeyCacheKey: TypeAlias = tuple[str, str]
@@ -106,6 +108,55 @@ def validate_workspace_authorization_settings(
             "Workspace authorization is enabled but no public_key_pem or jwks_url "
             "is configured"
         )
+
+
+def local_mode_workspace_authorization_bypassed(server: Any) -> bool:
+    """True when A2A dispatch skips workspace tokens for local testing.
+
+    All three conditions are required: ``SUPERVAIZER_LOCAL_MODE=true``, no
+    Studio ``supervisor_account``, and no workspace authorization settings.
+    Any trust setting counts as configured even when ``enabled`` is false, so a
+    forgotten ``SUPERVAIZER_WORKSPACE_AUTH_REQUIRED`` fails closed instead of
+    bypassing. A Studio account always takes the production path. Evaluated
+    per request, like the loopback check in ``access.tailscale``.
+    """
+    settings = get_workspace_authorization_settings(server)
+    configured = settings.enabled or any((
+        settings.issuer,
+        settings.audience,
+        settings.public_key_pem,
+        settings.jwks_url,
+    ))
+    return (
+        is_local_mode()
+        and getattr(server, "supervisor_account", None) is None
+        and not configured
+    )
+
+
+def build_local_mode_workspace_context(
+    *,
+    server: Any,
+    required_scopes: Iterable[str],
+    request_workspace: V2WorkspaceContext,
+    agent_slug: str,
+) -> V2VerifiedWorkspaceContext:
+    """Return an unverified workspace context labelled with the local-mode grant.
+
+    Nothing here comes from Studio: the workspace is whatever the caller sent,
+    and the scopes are exactly the ones this request needs. Handlers can detect
+    it with ``grant_id == LOCAL_MODE_WORKSPACE_GRANT_ID``.
+    """
+    agent = _get_agent_by_slug(server, agent_slug)
+    return V2VerifiedWorkspaceContext(
+        grant_id=LOCAL_MODE_WORKSPACE_GRANT_ID,
+        workspace_id=request_workspace.id,
+        workspace_slug=request_workspace.slug,
+        agent_id=str(agent.id),
+        agent_slug=agent_slug,
+        server_id=str(server.server_id),
+        scopes=list(required_scopes),
+    )
 
 
 def extract_workspace_authorization_token(headers: Mapping[str, str]) -> str | None:

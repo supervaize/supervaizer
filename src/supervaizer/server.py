@@ -89,6 +89,7 @@ from supervaizer.studio_handshake import (
     validate_studio_a2a_workspace_authorization,
 )
 from supervaizer.workspace_authorization import (
+    local_mode_workspace_authorization_bypassed,
     validate_workspace_authorization_settings,
 )
 
@@ -485,6 +486,12 @@ class Server(ServerAbstract):
             )
 
         log.info(f"[Server launch] Server ID: {self.server_id}")
+        if local_mode_workspace_authorization_bypassed(self):
+            log.warning(
+                "[Server launch] Local mode: workspace authorization is BYPASSED "
+                "for /a2a actions and surfaces. Handlers get an unverified "
+                "'local-mode' workspace context. Do not expose this server."
+            )
 
         # Store server instance on app state before building routers
         self.app.state.server = self  # <-- MOVED earlier (was after route mount)
