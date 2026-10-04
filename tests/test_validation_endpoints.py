@@ -274,6 +274,27 @@ class TestValidateAgentParameters:
         assert test_agent.parameters_setup.value("TIMEOUT") == "60"
 
     @patch("supervaizer.common.decrypt_value")
+    def test_validate_agent_parameters_null_required_value(
+        self, mock_decrypt: MagicMock, test_client: TestClient
+    ) -> None:
+        """A required parameter with a null value counts as missing."""
+        mock_decrypt.return_value = (
+            '[{"name": "API_KEY", "value": null}, {"name": "TIMEOUT", "value": "60"}]'
+        )
+
+        response = test_client.post(
+            "/test-agent/agents/test-agent/validate-agent-parameters",
+            json={"encrypted_agent_parameters": "encrypted_string"},
+            headers={"X-API-Key": "test-api-key"},
+        )
+
+        data = response.json()
+        assert data["valid"] is False
+        assert data["invalid_parameters"] == {
+            "API_KEY": "Required parameter 'API_KEY' is missing"
+        }
+
+    @patch("supervaizer.common.decrypt_value")
     def test_validate_agent_parameters_malformed_list(
         self, mock_decrypt: MagicMock, test_client: TestClient
     ) -> None:

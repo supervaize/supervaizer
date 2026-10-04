@@ -24,7 +24,7 @@ Request:
 { "encrypted_agent_parameters": "<encrypted string>" }
 ```
 
-The canonical decrypted payload is the list that Studio sends and job start (`POST .../jobs`) consumes: `[{ "name": "PARAM_NAME", "value": "..." }, ...]`. Extra keys on each item (`description`, `is_secret`, ...) are ignored. Send the same encrypted string to both endpoints. The object form `{ "PARAM_NAME": "value" }` is still accepted here, but job start rejects it.
+The canonical decrypted payload is the list that Studio sends and job start (`POST .../jobs`) consumes: `[{ "name": "PARAM_NAME", "value": "..." }, ...]`. Extra keys on each item (`description`, `is_secret`, ...) are ignored. Send the same encrypted string to both endpoints. A required parameter with a `null` value counts as missing. The object form `{ "PARAM_NAME": "value" }` is still accepted here, but job start rejects it.
 
 Response:
 
