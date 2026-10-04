@@ -1205,3 +1205,9 @@ class AgentResponse(BaseModel):
     server_agent_id: str | None = None
     server_agent_status: str | None = None
     server_agent_onboarding_status: str | None = None
+
+    @field_validator("methods", mode="before")
+    @classmethod
+    def empty_methods_mean_none(cls, value: Any) -> Any:
+        """registration_info sends {} for a v2-only agent (no v1 methods)."""
+        return None if value == {} else value

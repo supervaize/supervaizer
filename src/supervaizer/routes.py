@@ -461,6 +461,11 @@ def create_agents_routes(server: "Server") -> APIRouter:
 
 def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
     """Create agent-specific routes."""
+    if not agent.methods and agent.supervaizer_v2_registration is None:
+        raise ValueError(
+            f"Agent {agent.name} has no methods defined and no "
+            "supervaizer_v2_registration"
+        )
     # tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
     tags: list[str | Enum] = ["Supervision"]
     router = APIRouter(
@@ -740,8 +745,39 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
+    @router.post(
+        "/parameters",
+        summary=f"Server updates agent: {agent.name}",
+        description="Server updates agent onboarding status and/or encrypted parameters",
+        response_model=AgentResponse,
+        responses={
+            http_status.HTTP_200_OK: {"model": AgentResponse},
+            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+        },
+        dependencies=[
+            Depends(require_scope("write"))
+        ],  # <-- MODIFIED: scope-enforced write
+    )
+    @handle_route_errors()
+    async def server_update_agent(
+        onboarding_status: str | None = Body(None),
+        parameters_encrypted: str | None = Body(None),
+        agent: Agent = Depends(get_agent),
+    ) -> AgentResponse:
+        log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
+
+        if onboarding_status is not None:
+            agent.server_agent_onboarding_status = onboarding_status
+        if parameters_encrypted is not None:
+            agent.update_parameters_from_server(server, parameters_encrypted)
+        # import importlib
+
+        # importlib.reload(Agent)
+        return AgentResponse(**agent.registration_info)
+
+    # v2-only agent: Studio runs jobs through /a2a, so skip the v1 job routes.
     if not agent.methods:
-        raise ValueError(f"Agent {agent.name} has no methods defined")
+        return router
 
     agent_job_model_name = f"{agent.slug}_Start_Job_Model"
     # Create the dynamic model with the custom name for FastAPI documentation
@@ -935,36 +971,6 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                 detail=f"Agent {agent.name} did not return a job status",
             )
         return result
-
-    @router.post(
-        "/parameters",
-        summary=f"Server updates agent: {agent.name}",
-        description="Server updates agent onboarding status and/or encrypted parameters",
-        response_model=AgentResponse,
-        responses={
-            http_status.HTTP_200_OK: {"model": AgentResponse},
-            http_status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-        },
-        dependencies=[
-            Depends(require_scope("write"))
-        ],  # <-- MODIFIED: scope-enforced write
-    )
-    @handle_route_errors()
-    async def server_update_agent(
-        onboarding_status: str | None = Body(None),
-        parameters_encrypted: str | None = Body(None),
-        agent: Agent = Depends(get_agent),
-    ) -> AgentResponse:
-        log.info(f"📥 POST /server_update [Server updates agent] {agent.name}")
-
-        if onboarding_status is not None:
-            agent.server_agent_onboarding_status = onboarding_status
-        if parameters_encrypted is not None:
-            agent.update_parameters_from_server(server, parameters_encrypted)
-        # import importlib
-
-        # importlib.reload(Agent)
-        return AgentResponse(**agent.registration_info)
 
     return router
 
