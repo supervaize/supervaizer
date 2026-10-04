@@ -49,40 +49,49 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
                     "description": "Retrieve information about the agent",
                     "request": {"method": "GET", "url": agent_url},
                 },
-                {
-                    "name": "Start a job",
-                    "description": "Start a new job with this agent",
-                    "request": {"method": "POST", "url": f"{agent_url}/jobs"},
-                },
+                # v2-only agents have no v1 /jobs route.
+                *(
+                    [
+                        {
+                            "name": "Start a job",
+                            "description": "Start a new job with this agent",
+                            "request": {"method": "POST", "url": f"{agent_url}/jobs"},
+                        }
+                    ]
+                    if agent.methods
+                    else []
+                ),
             ],
         }
     ]
 
     # Build the tools object based on agent methods
-    tools = []
+    tools: list[dict[str, Any]] = []
 
-    # Add basic job tools
-    tools.append({
-        "name": "job_start",
-        "description": (agent.methods.job_start.description if agent.methods else None)
-        or f"Start a job with {agent.name}",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "job_fields": {"type": "object"},
-                "job_context": {"type": "object"},
+    # Add basic job tools. v2-only agents have no v1 job routes; the
+    # "supervaizer" v2 block of the card lists their actions instead.
+    if agent.methods:
+        tools.append({
+            "name": "job_start",
+            "description": agent.methods.job_start.description
+            or f"Start a job with {agent.name}",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "job_fields": {"type": "object"},
+                    "job_context": {"type": "object"},
+                },
             },
-        },
-    })
+        })
 
-    tools.append({
-        "name": "job_status",
-        "description": "Check the status of a job",
-        "input_schema": {
-            "type": "object",
-            "properties": {"job_id": {"type": "string"}},
-        },
-    })
+        tools.append({
+            "name": "job_status",
+            "description": "Check the status of a job",
+            "input_schema": {
+                "type": "object",
+                "properties": {"job_id": {"type": "string"}},
+            },
+        })
 
     # Add custom tools if available
     if agent.methods and agent.methods.custom:

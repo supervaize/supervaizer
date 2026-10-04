@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from supervaizer import Account, Agent, Server, build_v2_agent_registration
 from supervaizer.contracts import AgentRegistrationContract
+from supervaizer.protocol.a2a import create_agent_card
 
 AGENT_NAME = "V2 Only Agent"
 AGENT_SLUG = "v2-only-agent"
@@ -79,6 +80,15 @@ def test_v2_only_agent_registration_sends_empty_methods() -> None:
     assert info["methods"] == {}
     assert contract.methods == {}
     assert info["supervaizer_v2"]["agent"]["slug"] == AGENT_SLUG
+
+
+def test_v2_only_agent_card_advertises_no_v1_job_routes() -> None:
+    card = create_agent_card(_v2_only_agent(), "https://agent.example.com")
+
+    assert card["tools"] == []
+    examples = card["api_endpoints"][0]["examples"]
+    assert [example["name"] for example in examples] == ["Get agent info"]
+    assert card["supervaizer"]["v2"]["agent"]["slug"] == AGENT_SLUG
 
 
 def test_agent_without_methods_or_v2_registration_raises(
