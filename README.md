@@ -96,8 +96,6 @@ from typing import Any
 
 from supervaizer import (
     Agent,
-    AgentMethod,
-    AgentMethods,
     Server,
     V2ActionDefinition,
     V2ResourceDefinition,
@@ -137,21 +135,10 @@ registration = build_v2_agent_registration(
     ],
 )
 
-# The v1 /api routes, still mounted in Studio and local mode, require a job_start method.
-# Studio operates v2 agents through the handlers below, not through this method.
-methods = AgentMethods(
-    job_start=AgentMethod(
-        name="start",
-        method="supervaizer_control.start_job",
-        params={"action": "start"},
-    ),
-)
-
 agent = Agent(
     name=AGENT_NAME,
     version=AGENT_VERSION,
     description="My Supervaizer v2 agent.",
-    methods=methods,
     supervaizer_v2_registration=registration,
 )
 
