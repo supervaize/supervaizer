@@ -196,9 +196,12 @@ class BaseDriver(ABC):
     def check_prerequisites(self) -> list[str]:
         """Check prerequisites and return list of missing requirements."""
 
-    @abstractmethod
     def prepare_registry(self, image_tag: str) -> str:
         """Ensure the registry repository exists and return the remote image reference."""
+        # Not abstract, so drivers written before this method still instantiate.
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement prepare_registry() for `deploy up`"
+        )
 
     def registry_auth(self) -> dict[str, str] | None:
         """Return Docker push credentials; None uses the local Docker credential store."""

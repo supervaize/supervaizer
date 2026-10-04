@@ -18,6 +18,7 @@ from pytest_mock import MockerFixture
 
 from supervaizer.deploy.drivers import cloud_run
 from supervaizer.deploy.drivers.aws_app_runner import AWSAppRunnerDriver, ClientError
+from supervaizer.deploy.drivers.base import BaseDriver
 from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
 from supervaizer.deploy.drivers.do_app_platform import DOAppPlatformDriver
 
@@ -278,3 +279,17 @@ class TestDOAppPlatform:
 
         commands = [c.args[0][:3] for c in run.call_args_list]
         assert ["doctl", "registry", "delete"] not in commands
+
+
+class TestBaseDriverCompatibility:
+    def test_driver_without_prepare_registry_still_instantiates(self) -> None:
+        """Drivers written before prepare_registry existed must still load."""
+
+        class LegacyDriver(BaseDriver):
+            plan_deployment = deploy_service = destroy_service = Mock()
+            get_service_status = verify_health = check_prerequisites = Mock()
+
+        driver = LegacyDriver("region")
+
+        with pytest.raises(NotImplementedError, match="LegacyDriver"):
+            driver.prepare_registry("my-agent-dev:abc")

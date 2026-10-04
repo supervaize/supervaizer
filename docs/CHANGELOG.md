@@ -24,12 +24,15 @@ All notable changes to this project will be documented in this file.
 - **Deploy credentials stay out of the image** — The generated Dockerfile no longer bakes `SUPERVAIZE_API_KEY` and the other host variables in as `ARG`/`ENV`; `up` passes them at runtime and stores `SUPERVAIZE_API_KEY` in the platform secret manager. `docker-compose.yml` and the DigitalOcean app spec are written with mode `600`, and `deploy local` publishes its port on `127.0.0.1` only.
 - **`deploy up --image` takes `name[:tag]`** — `up` adds the platform registry and rejects a value that contains `/`.
 - **DigitalOcean uses the account container registry** — `up` no longer creates a `{name}-{env}` registry and `down` no longer deletes it; DigitalOcean allows one registry per account.
-- **Deployment drivers declare their registry** — `BaseDriver` gains the abstract `prepare_registry()` and an overridable `registry_auth()`. A third-party driver subclass must implement `prepare_registry()`.
+- **Deployment drivers declare their registry** — `BaseDriver` gains `prepare_registry()` and an overridable `registry_auth()`. `prepare_registry()` is not abstract, so existing third-party driver subclasses still instantiate; `deploy up` raises `NotImplementedError` for a driver that does not implement it.
+
+### Deprecated
+
+- **`supervaizer start --debug` and `--reload`** — Both options still run but are hidden from `--help` and print a deprecation warning. `--debug` still sets `SUPERVAIZER_DEBUG` and turns on FastAPI debug mode in the no-script `--local` fallback; `Server` itself never reads the variable. `--reload` still sets `SUPERVAIZER_RELOAD`, but the fallback no longer passes it to uvicorn, where it crashed (`You must pass the application as an import string`). For debug mode, set `debug=True` on the `Server` in a control script. Restart after code changes.
 
 ### Removed
 
 - `docs/2025_04_API_REFERENCE.md` (v1 examples that no longer run), `docs/2025_08_PROTOCOLS.md` (subset of `2026_05_PROTOCOLS.md`), `docs/superpowers/` plans (shipped or removed features), and the CHANGELOG `TODO` block. `docs/2025_08_PARAMETER_VALIDATION_IMPLEMENTATION.md` trimmed to `docs/2025_08_PARAMETER_VALIDATION.md`.
-- **`supervaizer start --debug` and `--reload`** — With a control script, both options only set `SUPERVAIZER_DEBUG` / `SUPERVAIZER_RELOAD`, which `Server` never reads. Only the no-script `--local` fallback used them: `--debug` turned on FastAPI debug mode, and `--reload` crashed in uvicorn (`You must pass the application as an import string`). Behavior change: either option now fails with a usage error (exit code 2), and the CLI and `examples/local_server.py` no longer read the two variables. For debug mode, set `debug=True` on the `Server` in a control script. Restart after code changes.
 - Root-level `test_local.py` (it ran `python -m supervaizer`, which has no `__main__`; use `supervaizer deploy local`) and `test_dockerfile_generation.py` (license header only).
 - **No-op deploy flags** — `deploy up --yes`, `deploy up --no-rollback`, and `--verbose` on `deploy plan`, `up`, `down`, and `status` did nothing. They now fail as unknown options. `deploy down --yes` and `--verbose` on `deploy local` and `clean` remain.
 

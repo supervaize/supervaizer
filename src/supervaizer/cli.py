@@ -124,6 +124,16 @@ def start(
         os.environ.get("SUPERVAIZER_LOG_LEVEL", "INFO"),
         help="Log level (DEBUG, INFO, WARNING, ERROR)",
     ),
+    # Deprecated: kept so existing commands still run. Set debug=True on the
+    # Server in the control script instead.
+    debug: bool = typer.Option(
+        (os.environ.get("SUPERVAIZER_DEBUG") or "False").lower() == "true",
+        hidden=True,
+    ),
+    reload: bool = typer.Option(
+        (os.environ.get("SUPERVAIZER_RELOAD") or "False").lower() == "true",
+        hidden=True,
+    ),
     environment: str = typer.Option(
         os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"), help="Environment name"
     ),
@@ -155,6 +165,18 @@ def start(
     os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
     os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
     os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
+    os.environ["SUPERVAIZER_DEBUG"] = str(debug)
+    os.environ["SUPERVAIZER_RELOAD"] = str(reload)
+    if debug:
+        console.print(
+            "[bold yellow]Warning:[/] --debug is deprecated and will be removed. "
+            "Set debug=True on the Server in your control script."
+        )
+    if reload:
+        console.print(
+            "[bold yellow]Warning:[/] --reload is deprecated and will be removed. "
+            "The Server does not support auto-reload."
+        )
     if user_provided_public_url:
         assert public_url is not None
         os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
@@ -241,6 +263,7 @@ def start(
             host=host,
             port=port,
             public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
+            debug=debug,
             environment=environment,
             api_key=None,
         )

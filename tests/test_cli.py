@@ -24,6 +24,7 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from supervaizer.cli import app
+from supervaizer.server import Server
 
 
 @pytest.fixture(autouse=True)
@@ -105,13 +106,32 @@ class TestCLIStart:
             assert "built-in Hello World agent" in result.stdout
             mock_launch.assert_called_once()
 
-    @pytest.mark.parametrize("flag", ["--reload", "--debug"])
-    def test_start_rejects_removed_flags(self, runner: CliRunner, flag: str) -> None:
-        """--reload and --debug were removed; only the no-script --local fallback used them."""
-        result = runner.invoke(app, ["start", flag])
+    @pytest.mark.parametrize(
+        ("flag", "debug"), [("--debug", True), ("--reload", False)]
+    )
+    def test_start_accepts_deprecated_flags(
+        self,
+        runner: CliRunner,
+        monkeypatch: pytest.MonkeyPatch,
+        flag: str,
+        debug: bool,
+    ) -> None:
+        """--debug and --reload still run, with a deprecation warning."""
+        monkeypatch.setenv("SUPERVAIZER_DEBUG", "false")
+        monkeypatch.setenv("SUPERVAIZER_RELOAD", "false")
+        with (
+            patch.object(Server, "launch", autospec=True) as mock_launch,
+            patch("supervaizer.cli.os.path.exists", return_value=False),
+        ):
+            result = runner.invoke(app, ["start", "--local", flag])
 
-        assert result.exit_code == 2
-        assert "No such option" in result.output
+        assert result.exit_code == 0
+        assert f"{flag} is deprecated" in result.stdout
+        server = mock_launch.call_args.args[0]
+        assert server.debug is debug
+        # Uvicorn rejects reload=True with an app object, so the fallback ignores it.
+        assert server.reload is False
+        assert os.environ[f"SUPERVAIZER_{flag[2:].upper()}"] == "True"
 
 
 class TestCLIScaffoldInstructions:
