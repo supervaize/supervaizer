@@ -58,14 +58,6 @@ def workbench_log_listener(timestamp: str, level: str, message: str) -> None:
         _workbench_log_version += 1
 
 
-def _get_workbench_api_key(request: Request) -> str:
-    """API key for workbench requests (live server or env)."""
-    live = getattr(request.app.state, "server", None)
-    if live is not None and getattr(live, "api_key", None):
-        return live.api_key
-    return os.getenv("SUPERVAIZER_API_KEY") or ""
-
-
 def _is_workbench_local_mode(request: Request) -> bool:
     """True when server has no Studio registration."""
     live = getattr(request.app.state, "server", None)
@@ -213,7 +205,6 @@ def create_workbench_routes() -> APIRouter:
                 "job_fields": job_fields,
                 "active_job": active_job,
                 "api_version": API_VERSION,
-                "api_key": _get_workbench_api_key(request),
                 "local_mode": _is_workbench_local_mode(request),
                 "has_human_answer": agent.methods
                 and getattr(agent.methods, "human_answer", None) is not None,

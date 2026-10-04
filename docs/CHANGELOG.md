@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`/manage` pages no longer expose the API key** — Every admin page put the write-scope `SUPERVAIZER_API_KEY` in a `data-admin-key` attribute on `<body>`, and the workbench page also inlined it in its script. Anyone who could open `/manage` could read the key and call the write-scope `/api/*` routes with it. Since 0.15.0, `require_tailscale` gates `/manage` and its endpoints need no key, so the templates and `workbench-form.js` no longer receive or send it. The `/manage/job-start-test` page and `job-start-form.js` are removed: the page never loaded the script, and the script targeted an agent path that does not exist.
 - **Valid empty registration parameter setup** — Agents without parameter definitions now send an empty list instead of `null`.
 - **Safer HTTP error diagnostics** — Diagnostic curl output masks authorization and API-key headers, serialized event details redact API keys and token fields, and HTTP errors log the remote status and request ID.
 

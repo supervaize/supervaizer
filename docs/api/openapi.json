@@ -1983,28 +1983,6 @@
         }
       }
     },
-    "/manage/job-start-test": {
-      "get": {
-        "tags": [
-          "admin"
-        ],
-        "summary": "Admin Job Start Test Page",
-        "description": "Job start form test page.",
-        "operationId": "admin_job_start_test_page_manage_job_start_test_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/manage/static/{file_path}": {
       "get": {
         "tags": [
