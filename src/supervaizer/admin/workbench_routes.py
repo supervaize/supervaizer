@@ -219,6 +219,12 @@ def create_workbench_routes() -> APIRouter:
     async def workbench_start_job(request: Request, slug: str) -> Response:
         """Start a job from the workbench — no Studio communication."""
         agent = get_agent_by_slug(request, slug)
+        # Check before any side effect: a rejected start must not leave a Job.
+        if not agent.methods:
+            raise HTTPException(
+                status_code=400,
+                detail="Agent has no methods defined: the workbench runs v1 jobs only",
+            )
 
         body = await request.json()
         parameters = body.get("parameters", {})
@@ -279,9 +285,6 @@ def create_workbench_routes() -> APIRouter:
         )
 
         # Execute job_start directly, bypassing agent.job_start() which sends Studio events
-        if not agent.methods:
-            raise HTTPException(status_code=400, detail="Agent has no methods defined")
-
         action_method = agent.methods.job_start.method
         method_params = agent.methods.job_start.params or {}
         params = method_params | {

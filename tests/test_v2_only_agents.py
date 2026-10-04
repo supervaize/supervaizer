@@ -6,11 +6,16 @@
 
 """Agents that declare only a v2 registration run with the /api router mounted."""
 
+from unittest.mock import Mock, patch
+
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from supervaizer import Account, Agent, Server, build_v2_agent_registration
+from supervaizer.admin.routes import create_admin_routes
 from supervaizer.contracts import AgentRegistrationContract
+from supervaizer.job import Jobs
 from supervaizer.protocol.a2a import create_agent_card
 
 AGENT_NAME = "V2 Only Agent"
@@ -53,6 +58,35 @@ def test_v2_only_agent_starts_in_local_mode(monkeypatch: pytest.MonkeyPatch) -> 
     server = Server(agents=[_v2_only_agent()], api_key="test-key")
 
     _assert_v1_job_routes_skipped(server)
+
+
+def test_v2_only_agent_routes_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "true")
+    monkeypatch.setenv("SUPERVAIZER_DISABLE_HELLO_WORLD", "true")
+    server = Server(agents=[_v2_only_agent()], api_key="test-key")
+    client = TestClient(server.app)
+    headers = {"X-API-Key": "test-key"}
+
+    listed = client.get("/api/supervaizer/agents", headers=headers)
+    info = client.get(f"{AGENT_API_PATH}/", headers=headers)
+    updated = client.post(f"{AGENT_API_PATH}/parameters", headers=headers, json={})
+
+    assert [r.status_code for r in (listed, info, updated)] == [200, 200, 200]
+    assert info.json()["methods"] is None
+
+
+def test_workbench_start_rejects_v2_only_agent_without_creating_a_job() -> None:
+    app = FastAPI()
+    app.state.server = Mock(agents=[_v2_only_agent()], supervisor_account=None)
+    with patch("supervaizer.admin.routes.StorageManager"):
+        app.include_router(create_admin_routes(), prefix="/manage")
+
+    response = TestClient(app).post(
+        f"/manage/agents/{AGENT_SLUG}/workbench/start", json={}
+    )
+
+    assert response.status_code == 400
+    assert Jobs().get_agent_jobs(AGENT_NAME) == {}
 
 
 def test_v2_only_agent_starts_with_supervisor_account(
