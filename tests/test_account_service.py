@@ -24,6 +24,17 @@ from supervaizer.server import Server
 from . import AUTH_ERROR_RESPONSE, WAKEUP_EVENT_RESPONSE
 
 
+@pytest.mark.parametrize(
+    "field_name", ["token", "refresh_token", "id_token", "custom-auth-token"]
+)
+def test_redact_generic_and_qualified_token_fields(field_name: str) -> None:
+    payload = {"job": {"metadata": {field_name: "credential", "state": "done"}}}
+
+    assert account_service._redact_sensitive_value(payload) == {
+        "job": {"metadata": {field_name: "***", "state": "done"}}
+    }
+
+
 @pytest.mark.asyncio
 async def test_send_event_success(
     account_fixture: Account,

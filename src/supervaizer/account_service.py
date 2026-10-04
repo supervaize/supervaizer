@@ -76,12 +76,11 @@ def _is_sensitive_field(name: Any) -> bool:
     normalized = "".join(
         character for character in str(name).casefold() if character.isalnum()
     )
-    return normalized in {
+    return "token" in normalized or normalized in {
         "apikey",
         "xapikey",
         "authorization",
         "proxyauthorization",
-        "accesstoken",
         "secret",
     }
 
