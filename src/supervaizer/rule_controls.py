@@ -207,6 +207,14 @@ def resume_rule_checkpoint(
         _retain_decision(decision)
         return None
     for state in case.metadata.get("_rule_checkpoints", {}).values():
+        if "checkpoint_id" not in state and (
+            state.get("occurrence_id"),
+            state.get("phase"),
+            state.get("snapshot_hash"),
+        ) == (decision.occurrence_id, decision.phase, decision.snapshot_hash):
+            # The checkpoint request has not returned yet; its waiter takes this.
+            _retain_decision(decision)
+            return None
         if (
             state.get("checkpoint_id"),
             state.get("occurrence_id"),

@@ -529,6 +529,43 @@ async def test_mismatched_early_decision_is_discarded(account_fixture: Any) -> N
     assert (await waiting).status == "allow"
 
 
+@pytest.mark.asyncio
+async def test_resume_before_checkpoint_response_reaches_later_waiter(
+    account_fixture: Any, storage_manager: Any
+) -> None:
+    # run_guarded_step persists this state before it posts the checkpoint.
+    checking = {
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "step_id": "step-1",
+        "status": "checking",
+    }
+    Case(
+        id="case-in-flight",
+        job_id="job-1",
+        account=account_fixture,
+        name="In-flight rule case",
+        description="Resume before checkpoint response",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={"_rule_checkpoints": {"occurrence-1:before": checking}},
+    )
+
+    assert (
+        resume_rule_checkpoint(_resume("checkpoint-in-flight", "case-in-flight"))
+        is None
+    )
+    resumed = await _gate(account_fixture).wait_for_resume(
+        _paused("checkpoint-in-flight"),
+        "occurrence-1",
+        "before",
+        job_id="job-1",
+        case_id="case-in-flight",
+    )
+
+    assert resumed.status == "allow"
+
+
 def test_retained_decisions_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     retained: dict[str, RuleCheckpointResume] = {}
     monkeypatch.setattr("supervaizer.rule_controls._DELIVERED_DECISIONS", retained)
