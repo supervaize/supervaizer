@@ -30,6 +30,7 @@ from supervaizer.rule_controls import (
     RuleCheckpointGate,
     RuleCheckpointRecoveryRequired,
     _checkpoint_input_hash,
+    _retain_decision,
     recover_guarded_step,
     run_guarded_step,
     resume_rule_checkpoint,
@@ -347,7 +348,9 @@ async def test_checkpoint_resume_resolves_matching_pending_decision(
         input_hash="input-1",
     )
     waiting = asyncio.create_task(
-        gate.wait_for_resume(response, "occurrence-1", "before")
+        gate.wait_for_resume(
+            response, "occurrence-1", "before", job_id="job-1", case_id="case-1"
+        )
     )
     await asyncio.sleep(0)
 
@@ -423,6 +426,8 @@ async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
             ),
             "occurrence-1",
             "before",
+            job_id="job-1",
+            case_id="case-1",
         )
     )
     await asyncio.sleep(0)
@@ -443,6 +448,96 @@ async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
 
     gate.resume(RuleCheckpointResume.model_validate(decision | {"status": "allow"}))
     assert (await waiting).status == "allow"
+
+
+def _resume(checkpoint_id: str, case_id: str = "case-1") -> RuleCheckpointResume:
+    return RuleCheckpointResume(
+        checkpoint_id=checkpoint_id,
+        job_id="job-1",
+        case_id=case_id,
+        occurrence_id="occurrence-1",
+        phase="before",
+        status="allow",
+        snapshot_hash="snapshot-1",
+        input_hash="input-1",
+        decision_id="decision-1",
+    )
+
+
+def _paused(checkpoint_id: str) -> RuleCheckpointResponse:
+    return RuleCheckpointResponse(
+        checkpoint_id=checkpoint_id,
+        status="pause",
+        snapshot_hash="snapshot-1",
+        input_hash="input-1",
+    )
+
+
+def _gate(account: Any) -> RuleCheckpointGate:
+    return RuleCheckpointGate(
+        account,
+        RuleCheckpointSnapshot(
+            hash="snapshot-1",
+            checkpoint_url="https://studio.example/api/v1/rule-checkpoints/",
+            version=1,
+            checkpoint_token="token",
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_live_resume_for_another_case_does_not_release_gate(
+    account_fixture: Any,
+) -> None:
+    gate = _gate(account_fixture)
+    waiting = asyncio.create_task(
+        gate.wait_for_resume(
+            _paused("checkpoint-bound"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-1",
+        )
+    )
+    await asyncio.sleep(0)
+
+    with pytest.raises(ValueError, match="does not match pending occurrence"):
+        resume_rule_checkpoint(_resume("checkpoint-bound", case_id="case-other"))
+    assert not waiting.done()
+
+    resume_rule_checkpoint(_resume("checkpoint-bound"))
+    assert (await waiting).status == "allow"
+
+
+@pytest.mark.asyncio
+async def test_mismatched_early_decision_is_discarded(account_fixture: Any) -> None:
+    assert resume_rule_checkpoint(_resume("checkpoint-early", "case-other")) is None
+    gate = _gate(account_fixture)
+    waiting = asyncio.create_task(
+        gate.wait_for_resume(
+            _paused("checkpoint-early"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-1",
+        )
+    )
+    await asyncio.sleep(0)
+    assert not waiting.done()
+
+    resume_rule_checkpoint(_resume("checkpoint-early"))
+    assert (await waiting).status == "allow"
+
+
+def test_retained_decisions_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    retained: dict[str, RuleCheckpointResume] = {}
+    monkeypatch.setattr("supervaizer.rule_controls._DELIVERED_DECISIONS", retained)
+    monkeypatch.setattr("supervaizer.rule_controls._DELIVERED_DECISIONS_LIMIT", 2)
+
+    for checkpoint_id in ("checkpoint-a", "checkpoint-b", "checkpoint-c"):
+        _retain_decision(_resume(checkpoint_id))
+
+    assert list(retained) == ["checkpoint-b", "checkpoint-c"]
 
 
 @pytest.mark.asyncio
@@ -466,6 +561,8 @@ async def test_a2a_resume_handler_delivers_studio_payload(account_fixture: Any) 
             ),
             "occurrence-1",
             "before",
+            job_id="job-1",
+            case_id="case-1",
         )
     )
     await asyncio.sleep(0)
@@ -531,6 +628,8 @@ async def test_checkpoint_resume_retained_until_waiter_is_registered(
         ),
         "occurrence-1",
         "before",
+        job_id="job-1",
+        case_id="case-1",
     )
     assert resumed.status == "allow"
 
@@ -595,6 +694,8 @@ async def test_persisted_resume_wakes_later_waiter(
         ),
         "occurrence-1",
         "before",
+        job_id="job-1",
+        case_id="case-race",
     )
 
     assert resumed.status == "allow"

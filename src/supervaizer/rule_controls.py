@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import asyncio
+import contextlib
 import hashlib
 import httpx
 import json
@@ -38,6 +39,9 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 _PENDING_GATES: dict[str, "RuleCheckpointGate"] = {}
 _DELIVERED_DECISIONS: dict[str, RuleCheckpointResume] = {}
+# Early decisions wait milliseconds for their waiter, so past this many newer
+# deliveries an entry is abandoned. Switch to a TTL if a controller needs more.
+_DELIVERED_DECISIONS_LIMIT = 1024
 _ACTIVE_OCCURRENCES: set[tuple[str, str]] = set()
 
 
@@ -68,7 +72,7 @@ class RuleCheckpointGate:
         self.snapshot = snapshot
         self.secret_refs = list(secret_refs)
         self._waiters: dict[str, asyncio.Future[RuleCheckpointResponse]] = {}
-        self._pending_identities: dict[str, tuple[str, str, str]] = {}
+        self._pending_identities: dict[str, tuple[str, str, str, str, str]] = {}
 
     @classmethod
     def from_job_start(
@@ -134,6 +138,9 @@ class RuleCheckpointGate:
         response: RuleCheckpointResponse,
         occurrence_id: str,
         phase: Literal["before", "after"],
+        *,
+        job_id: str,
+        case_id: str,
     ) -> RuleCheckpointResponse:
         """Wait for a controller-pushed, validated decision without polling."""
         waiter = self._waiters.get(response.checkpoint_id)
@@ -141,6 +148,8 @@ class RuleCheckpointGate:
             waiter = asyncio.get_running_loop().create_future()
             self._waiters[response.checkpoint_id] = waiter
             self._pending_identities[response.checkpoint_id] = (
+                job_id,
+                case_id,
                 occurrence_id,
                 phase,
                 response.input_hash,
@@ -148,7 +157,9 @@ class RuleCheckpointGate:
             _PENDING_GATES[response.checkpoint_id] = self
             delivered = _DELIVERED_DECISIONS.pop(response.checkpoint_id, None)
             if delivered is not None:
-                self.resume(delivered)
+                # A mismatched early decision is discarded; keep waiting for a valid one.
+                with contextlib.suppress(ValueError):
+                    self.resume(delivered)
         try:
             return await waiter
         finally:
@@ -166,6 +177,8 @@ class RuleCheckpointGate:
                 f"Rule checkpoint {decision.checkpoint_id!r} has no in-process waiter"
             )
         if (
+            decision.job_id,
+            decision.case_id,
             decision.occurrence_id,
             decision.phase,
             decision.input_hash,
@@ -191,7 +204,7 @@ def resume_rule_checkpoint(
 
     case = Cases().get_case(decision.case_id, decision.job_id)
     if case is None:
-        _DELIVERED_DECISIONS[decision.checkpoint_id] = decision
+        _retain_decision(decision)
         return None
     for state in case.metadata.get("_rule_checkpoints", {}).values():
         if (
@@ -211,9 +224,16 @@ def resume_rule_checkpoint(
         state["status"] = decision.status
         state["decision_id"] = decision.decision_id
         case._persist()
-        _DELIVERED_DECISIONS[decision.checkpoint_id] = decision
+        _retain_decision(decision)
         return RuleCheckpointResponse.model_validate(decision.model_dump())
     raise ValueError("Rule checkpoint resume does not match persisted occurrence")
+
+
+def _retain_decision(decision: RuleCheckpointResume) -> None:
+    """Keep a decision for a waiter that registers later, evicting the oldest."""
+    _DELIVERED_DECISIONS[decision.checkpoint_id] = decision
+    if len(_DELIVERED_DECISIONS) > _DELIVERED_DECISIONS_LIMIT:
+        del _DELIVERED_DECISIONS[next(iter(_DELIVERED_DECISIONS))]
 
 
 async def run_guarded_step(
@@ -288,7 +308,9 @@ async def run_guarded_step(
             states[before_key]["context_hash"] = context_hash
             case._persist()
             if before.status == "pause":
-                before = await gate.wait_for_resume(before, occurrence_id, "before")
+                before = await gate.wait_for_resume(
+                    before, occurrence_id, "before", job_id=case.job_id, case_id=case.id
+                )
                 states[before_key] = _checkpoint_state(before, occurrence_id, "before")
                 states[before_key]["step_id"] = step_id
                 states[before_key]["context_hash"] = context_hash
@@ -322,7 +344,9 @@ async def run_guarded_step(
         states[after_key]["context_hash"] = _checkpoint_input_hash(after_context_value)
         case._persist()
         if after.status == "pause":
-            after = await gate.wait_for_resume(after, occurrence_id, "after")
+            after = await gate.wait_for_resume(
+                after, occurrence_id, "after", job_id=case.job_id, case_id=case.id
+            )
             states[after_key] = _checkpoint_state(after, occurrence_id, "after", True)
             states[after_key]["step_id"] = step_id
             states[after_key]["context_hash"] = _checkpoint_input_hash(
@@ -384,7 +408,9 @@ async def recover_guarded_step(
             state["context_hash"] = _checkpoint_input_hash(context)
             case._persist()
             if after.status == "pause":
-                after = await gate.wait_for_resume(after, occurrence_id, "after")
+                after = await gate.wait_for_resume(
+                    after, occurrence_id, "after", job_id=case.job_id, case_id=case.id
+                )
                 state.update(_checkpoint_state(after, occurrence_id, "after", True))
                 state["context_hash"] = _checkpoint_input_hash(context)
                 case._persist()
