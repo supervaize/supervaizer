@@ -191,6 +191,7 @@ if __name__ == "__main__":
         host=os.environ.get("SUPERVAIZER_HOST") or "0.0.0.0",
         port=int(os.environ.get("SUPERVAIZER_PORT") or "8000"),
         public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
+        debug=os.environ.get("SUPERVAIZER_DEBUG", "False").lower() == "true",
         environment=os.environ.get("SUPERVAIZER_ENVIRONMENT", "dev"),
         # Pass None so Server.__init__ local-mode logic defaults to "local-dev"
         api_key=None,
