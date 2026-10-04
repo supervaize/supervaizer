@@ -2,9 +2,9 @@
 
 
 > **Created:** 2025-10-07
-> **Updated:** 2026-09-25
+> **Updated:** 2026-10-04
 
-> **Legacy / known gaps.** This is a Docker smoke test for `supervaizer deploy local`. Its API health check probes a removed route, host `SUPERVAIZE_API_KEY` is overridden by a test key, `--generate-rsa` writes a variable the server never reads, and the container cannot start a Studio-registered v2 controller (no `SUPERVAIZER_WORKSPACE_AUTH_*` passthrough). For local development use `supervaizer start --local` (see [2025_08_CLI.md](2025_08_CLI.md)).
+> `supervaizer deploy local` runs the image that `deploy up` ships, with the same container environment. For day-to-day development use `supervaizer start --local` (see [2025_08_CLI.md](2025_08_CLI.md)). Requires Docker Compose v2 (`docker compose`).
 
 This document describes how to test Supervaizer deployments locally using Docker before deploying to cloud platforms.
 
@@ -36,21 +36,22 @@ The `supervaizer deploy local` command supports the following options:
 
 | Option               | Description                       | Default                |
 | -------------------- | --------------------------------- | ---------------------- |
-| `--name`             | Service name                      | Current directory name |
+| `--name`             | Service name                      | prompted               |
 | `--env`              | Environment (dev/staging/prod)    | dev                    |
 | `--port`             | Local port to expose              | 8000                   |
 | `--generate-api-key` | Generate secure API key           | false                  |
 | `--generate-rsa`     | Generate RSA private key          | false                  |
 | `--timeout`          | Service startup timeout (seconds) | 300                    |
 | `--verbose`          | Show detailed output              | false                  |
+| `--docker-files-only` | Generate the files, do not run them | false                |
+| `--controller-file`  | Controller file name              | supervaizer_control.py |
 
 ## What It Does
 
 ### 1. Pre-flight Checks
 
 - ✅ Verifies Docker is running
-- ✅ Checks Docker Compose availability
-- ✅ Validates project structure
+- ✅ Validates project structure (`pyproject.toml`)
 
 ### 2. File Generation
 
@@ -60,20 +61,18 @@ The `supervaizer deploy local` command supports the following options:
 
 ### 3. Secret Management
 
-- ✅ Generates test API keys (if requested)
-- ✅ Creates RSA keys (if requested)
-- ✅ Sets up environment variables
+- ✅ `SUPERVAIZER_API_KEY`: generated with `--generate-api-key`, else `test-api-key-local`
+- ✅ `SUPERVAIZER_PRIVATE_KEY`: generated with `--generate-rsa`, else the server generates one at startup
 
 ### 4. Environment Variables
 
-The local testing automatically includes environment variables from your host environment:
+The generated `docker-compose.yml` sets the container environment at runtime. Nothing goes into build arguments or image layers.
 
-- **SUPERVAIZE_API_KEY**: Your Supervaize API key
-- **SUPERVAIZE_WORKSPACE_ID**: Your workspace identifier
-- **SUPERVAIZE_API_URL**: Supervaize API endpoint URL
-- **SUPERVAIZER_PUBLIC_URL**: Public URL for your service
+- `SUPERVAIZER_ENVIRONMENT`, `SUPERVAIZER_HOST=0.0.0.0`, `SUPERVAIZER_PORT` (from `--port`), `SUPERVAIZER_LOG_LEVEL` (host value, else `INFO`)
+- The controller secrets from step 3
+- Host values, when set, of `SUPERVAIZE_API_KEY`, `SUPERVAIZE_WORKSPACE_ID`, `SUPERVAIZE_API_URL`, `SUPERVAIZER_PUBLIC_URL`, `SUPERVAIZER_SERVER_ID`, and every `SUPERVAIZER_WORKSPACE_AUTH_*` variable. A Studio-registered v2 controller needs the workspace authorization variables to start.
 
-These variables are securely passed as build arguments to the Docker image and are not stored in the image layers.
+The values are copied when the file is generated: re-run the command after you change them. The file holds credentials, so it is written with mode `600`, and the port is published on `127.0.0.1` only.
 
 ### 5. Docker Operations
 
@@ -84,7 +83,6 @@ These variables are securely passed as build arguments to the Docker image and a
 ### 6. Health Validation
 
 - ✅ Tests `/.well-known/health` endpoint
-- ✅ Validates API health endpoint (with API key)
 - ✅ Checks API documentation availability
 - ✅ Measures response times
 
@@ -140,7 +138,6 @@ Step 7: Running health checks...
 │ Endpoint            │ Status │ Response Time │ Details │
 ├─────────────────────┼────────┼───────────────┼─────────┤
 │ Health Endpoint     │ 200    │ 0.123s        │ ✓ OK    │
-│ Api Health Endpoint │ 200    │ 0.156s        │ ✓ OK    │
 │ Api Docs            │ 200    │ 0.089s        │ ✓ OK    │
 └─────────────────────┴────────┴───────────────┴─────────┘
 
@@ -162,10 +159,10 @@ API Documentation: http://localhost:8000/docs
 ReDoc: http://localhost:8000/redoc
 
 To stop the test services:
-docker-compose -f .deployment/docker-compose.yml down
+docker compose -f .deployment/docker-compose.yml down
 
 To debug environment variables:
-docker-compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
+docker compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
 
 To clean up all deployment files:
 supervaizer deploy clean
@@ -186,7 +183,7 @@ supervaizer deploy clean
 1. **Debug environment variables**:
 
    ```bash
-   docker-compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
+   docker compose -f .deployment/docker-compose.yml run --rm <service-name> python debug_env.py
    ```
 
 2. **Set required environment variables**:
@@ -201,7 +198,7 @@ supervaizer deploy clean
 3. **Regenerate deployment files**:
 
    ```bash
-   supervaizer deploy local --docker-files-only
+   supervaizer deploy local --name my-agent --docker-files-only
    ```
 
 4. **Check generated docker-compose.yml**:
@@ -247,7 +244,7 @@ supervaizer deploy local --port 8080
 
 1. Check service logs:
    ```bash
-   docker-compose -f .deployment/docker-compose.yml logs
+   docker compose -f .deployment/docker-compose.yml logs
    ```
 2. Increase timeout:
    ```bash
@@ -281,7 +278,7 @@ This will show:
 ### Stop Services
 
 ```bash
-docker-compose -f .deployment/docker-compose.yml down
+docker compose -f .deployment/docker-compose.yml down
 ```
 
 ### Remove Images
@@ -293,7 +290,7 @@ docker rmi my-agent-dev:local-test
 ### Clean Everything
 
 ```bash
-docker-compose -f .deployment/docker-compose.yml down --volumes --rmi all
+docker compose -f .deployment/docker-compose.yml down --volumes --rmi all
 ```
 
 ## Integration with CI/CD
@@ -305,7 +302,7 @@ The local testing can be integrated into CI/CD pipelines:
 - name: Test Local Deployment
   run: |
     supervaizer deploy local --generate-api-key --timeout 300
-    docker-compose -f .deployment/docker-compose.yml down
+    docker compose -f .deployment/docker-compose.yml down
 ```
 
 ## Best Practices
