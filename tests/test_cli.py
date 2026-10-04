@@ -12,13 +12,16 @@
 
 """Test for CLI module to improve coverage."""
 
+import importlib.util
 import os
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 from rich.console import Console
 from typer.testing import CliRunner
@@ -263,6 +266,57 @@ class TestCLIInstall:
 
             assert result.exit_code == 0
             assert f"Success: Created an example file at {custom_path}" in result.stdout
+
+    def test_scaffold_template_is_a_working_v2_agent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The scaffolded control file serves its v2 surface and action in local mode."""
+        monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "true")
+        monkeypatch.setenv("SUPERVAIZER_API_KEY", "local-dev")
+        template = (
+            Path(__file__).parent.parent
+            / "src/supervaizer/examples/controller_template.py"
+        )
+        spec = importlib.util.spec_from_file_location("scaffolded_control", template)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        client = TestClient(module.sv_server.app)
+        params = {
+            "request_id": "r1",
+            "actor": {"user_id": "me"},
+            "workspace": {"id": "local"},
+            "mission_id": "m1",
+            "agent_slug": module.agent.slug,
+            "surface": "job.start",
+        }
+
+        def call(method: str, **extra: Any) -> dict[str, Any]:
+            response = client.post(
+                "/a2a",
+                headers={"X-API-Key": "local-dev"},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": method,
+                    "params": {**params, **extra},
+                },
+            )
+            result: dict[str, Any] = response.json()["result"]
+            return result
+
+        surface = call("supervaizer/surface.load")
+        assert surface["document"]["submit"]["action"] == "job.start"
+
+        started = call(
+            "supervaizer/action.invoke",
+            action="job.start",
+            input={"goal": "Say hello"},
+            job_id="job-1",
+        )
+        assert started["status"] == "ok"
+        assert started["job_state"]["cases"][0]["title"] == "Say hello"
 
     def test_scaffold_example_file_not_found(self, runner: CliRunner) -> None:
         """Test scaffold when example file doesn't exist."""
