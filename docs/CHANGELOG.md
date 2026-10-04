@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **Masked API keys in diagnostic curl logs** — Error logs now show only a short API-key prefix instead of the full credential.
+- **Safer HTTP error diagnostics** — Diagnostic curl output masks authorization and API-key headers, serialized event details redact API keys and token fields, and HTTP errors log the remote status and request ID.
 
 ### Changed
 
