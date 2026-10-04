@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Valid empty registration parameter setup** — Agents without parameter definitions now send an empty list instead of `null`.
 - **Safer HTTP error diagnostics** — Diagnostic curl output masks authorization and API-key headers, serialized event details redact API keys and token fields, and HTTP errors log the remote status and request ID.
 
 ### Changed

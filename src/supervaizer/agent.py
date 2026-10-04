@@ -888,7 +888,7 @@ class Agent(AgentAbstract):
             "methods": self.methods.registration_info if self.methods else {},
             "parameters_setup": self.parameters_setup.registration_info
             if self.parameters_setup
-            else None,
+            else [],
             "server_agent_id": f"{self.server_agent_id}",
             "server_agent_status": self.server_agent_status,
             "server_agent_onboarding_status": self.server_agent_onboarding_status,
