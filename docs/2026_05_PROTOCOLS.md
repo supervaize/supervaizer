@@ -23,7 +23,7 @@ SUPERVAIZER implements [A2A](https://a2a-protocol.org/)-style agent discovery an
 ### Implemented A2A Features
 
 - **Agent Discovery**: `/.well-known/agents.json` lists every agent served by the controller
-- **Agent Cards**: `/.well-known/agents/v{version}/{agent_slug}_agent.json`, plus the unversioned legacy route `/.well-known/agents/{agent_slug}_agent.json`
+- **Agent Cards**: `/.well-known/agents/v{version}/{agent_slug}_agent.json`, plus the unversioned legacy route `/.well-known/agents/{agent_slug}_agent.json`. The card's `api_endpoints[].url` points at `/api/supervaizer/agents/{agent_slug}`, `human_url` at that agent's instructions page, and `authentication` declares the `X-API-Key` header. `version_info.changelog_url` appears only when the agent sets `release_notes_url`
 - **Health Monitoring**: system and agent health at `/.well-known/health`
 - **JSON-RPC Controller Endpoint**: `POST /a2a` supports Supervaizer v2 methods including `supervaizer/action.invoke` and `supervaizer/surface.load`; requests require `X-API-Key` with write scope
 - **Server-Sent Events**: `GET /a2a/events` streams Supervaizer v2 action effects for observers that need a live feed; requests require `X-API-Key` with read scope
