@@ -993,7 +993,11 @@ class Agent(AgentAbstract):
         module_name, func_name = action.rsplit(".", 1)
         module = __import__(module_name, fromlist=[func_name])
         method = getattr(module, func_name)
-        log.debug(f"[Agent method] {method.__name__} with params {params}")
+        # agent_parameters holds decrypted secrets: never log it.
+        log.debug(
+            f"[Agent method] {method.__name__} with params "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
+        )
         result = method(**params)
         if not isinstance(result, JobResponse):
             raise TypeError(
@@ -1053,6 +1057,7 @@ class Agent(AgentAbstract):
         context: JobContext,
         server: "Server",
         method_name: str = "job_start",
+        agent_parameters: list[dict[str, Any]] | None = None,
     ) -> Job:
         """Execute the agent's start method in the background
 
@@ -1060,6 +1065,8 @@ class Agent(AgentAbstract):
             job (Job): The job instance to execute
             job_fields (dict): The job-specific parameters
             context (SupervaizeContextModel): The context of the job
+            agent_parameters (list | None): Decrypted parameters for this call
+                only; None uses job.agent_parameters
         Returns:
             Job: The updated job instance
         """
@@ -1091,10 +1098,16 @@ class Agent(AgentAbstract):
             method_params
             | {"fields": job_fields}
             | {"context": context}
-            | {"agent_parameters": job.agent_parameters}
+            | {
+                "agent_parameters": job.agent_parameters
+                if agent_parameters is None
+                else agent_parameters
+            }
         )
+        # agent_parameters holds decrypted secrets: never log it.
         log.debug(
-            f"[Agent job_start] action_method : {action_method} - params : {params}"
+            f"[Agent job_start] action_method : {action_method} - params : "
+            f"{ {k: v for k, v in params.items() if k != 'agent_parameters'} }"
         )
         try:
             if action.is_async:

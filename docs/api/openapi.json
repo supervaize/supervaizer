@@ -4303,21 +4303,6 @@
             ],
             "title": "Created At"
           },
-          "agent_parameters": {
-            "anyOf": [
-              {
-                "items": {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Agent Parameters"
-          },
           "case_ids": {
             "items": {
               "type": "string"

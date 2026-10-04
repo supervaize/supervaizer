@@ -313,6 +313,7 @@ async def test_service_job_custom_new_job(
         context_fixture,
         server_fixture,
         method_name,
+        agent_parameters=None,
     )
 
     assert result == mock_job
@@ -360,6 +361,7 @@ async def test_service_job_custom_existing_job(
         context_fixture,
         server_fixture,
         method_name,
+        agent_parameters=None,
     )
 
 
@@ -390,7 +392,7 @@ async def test_service_job_custom_with_parameters(
     # Mock decrypt_value
     mock_decrypt_value = mocker.patch(
         "supervaizer.job_service.decrypt_value",
-        return_value='{"custom_key": "custom_value"}',
+        return_value='[{"name": "custom_key", "value": "custom_value"}]',
     )
 
     result = await service_job_custom(
@@ -409,6 +411,37 @@ async def test_service_job_custom_with_parameters(
     )
 
     assert result == mock_job
+    # Passed per call, never written to the shared job.
+    assert background_tasks.add_task.call_args.kwargs["agent_parameters"] == [
+        {"name": "custom_key", "value": "custom_value"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_service_job_custom_rejects_bad_parameter_shape(
+    server_fixture: "Server",
+    agent_fixture: "Agent",
+    context_fixture: "JobContext",
+    mocker: MockerFixture,
+) -> None:
+    """A payload that is not a list of dicts fails before the task is queued."""
+    background_tasks = mocker.MagicMock()
+    mocker.patch(
+        "supervaizer.job_service.decrypt_value", return_value='{"API_KEY": "x"}'
+    )
+
+    with pytest.raises(ValueError, match="list of dictionaries"):
+        await service_job_custom(
+            method_name="custom_method",
+            server=server_fixture,
+            background_tasks=background_tasks,
+            agent=agent_fixture,
+            sv_context=context_fixture,
+            job_fields={},
+            encrypted_agent_parameters="encrypted_string",
+        )
+
+    background_tasks.add_task.assert_not_called()
 
 
 @pytest.mark.asyncio
