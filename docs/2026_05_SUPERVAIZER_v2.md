@@ -102,6 +102,56 @@ The v2 registration is exposed in the A2A Agent Card under `supervaizer.v2`.
 
 This does not replace the existing Studio server registration process. Server identity, public key exchange, and encrypted payload handling still belong to the normal Studio registration path. The v2 extension tells Studio how to operate the already-registered controller.
 
+## Rule checkpoints
+
+Rule checkpoints are an explicit opt-in for a controller that cooperatively gates an external effect. Agents that do not declare the capability do not advertise checkpoint support or the resume action.
+
+```python
+from supervaizer import RuleCheckpointGate
+from supervaizer.contracts import V2ActionRequest, build_v2_agent_registration
+
+registration = build_v2_agent_registration(
+    agent_id="research-agent",
+    agent_slug="research-agent",
+    display_name="Research Agent",
+    agent_card_url="/.well-known/agents/v1.0.0/research-agent_agent.json",
+    controller_url="/a2a",
+    a2ui_catalog_version="research-agent.2026-09-29",
+    rule_checkpoints={
+        "phases": ["before", "after"],
+        "secret_refs": ["case.metadata.customer_reference"],
+    },
+)
+
+
+async def perform_step(account, case, start_input):
+    # `start_input` is the full V2ActionRequest received by the controller.
+    # Studio supplies the opaque rule_snapshot when this job is governed.
+    job_start = V2ActionRequest.model_validate(start_input)
+    gate = RuleCheckpointGate.from_job_start(
+        account,
+        job_start,
+        secret_refs=("case.metadata.customer_reference",),
+    )
+
+    await case.run_guarded_step(
+        gate=gate,
+        occurrence_id="stable-occurrence-id",
+        step_id="opaque-proposed-step-id",
+        before_context={"operation": "opaque-operation"},
+        effect=perform_external_effect,
+        after_context=lambda result: {
+            "operation": "opaque-operation",
+            "outcome": result,
+        },
+        advance=advance_case,
+    )
+```
+
+`Case.run_guarded_step()` first reports the Case to Studio, then requests a `before` decision, performs the effect only after `allow`, requests an `after` decision, and advances only after that decision is also `allow`. A `pause` waits for the controller's `rule.checkpoint.resume` action; it does not poll. A persisted `before` allow safely continues the effect after restart. The helper records an effect as started before calling it, so recovery never replays an uncertain external effect. When an after response was lost, use `recover_guarded_step()` with the original gate, result, and after-context callback. It verifies that callback produces the same context, retries only the original after checkpoint, then advances once on `allow`.
+
+`rule_snapshot` and its checkpoint token are opaque controller input. Do not construct, alter, log, or place either in agent business context. The gate posts checkpoints only to `{account.api_url}/api/v1/rule-checkpoints/`; it ignores the snapshot's `checkpoint_url`, so a forged snapshot cannot send controller credentials to another host. A `rule.checkpoint.resume` decision is `allow` or `stop`; the controller rejects `pause`, and the checkpoint keeps waiting. A gate belongs to one agent, job, and case, and the controller rejects a resume for another one. A `V2ActionRequest` names its agent; for a v1 `JobStartRequest`, pass `agent_slug` to `RuleCheckpointGate.from_job_start()`. `secret_refs` declares paths whose values Studio must exclude from checkpoint context; declare every business secret path an agent author supplies. Platform credentials are excluded by the platform and must never be propagated as declared business secrets.
+
 ## Workspace Authorization
 
 Workspace slugs and tenant slugs are not authorization primitives. They are display and routing hints only.
