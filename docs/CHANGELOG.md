@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-04
+
 ### Added
 
 - **Local mode can invoke v2 actions and surfaces** (PR #117) — With `SUPERVAIZER_LOCAL_MODE=true`, no `supervisor_account`, and no `SUPERVAIZER_WORKSPACE_AUTH_*` trust setting, `POST /a2a` `supervaizer/action.invoke` and `supervaizer/surface.load` no longer answer `-32030 workspace_authorization_not_configured`. Handlers get an unverified workspace context with `grant_id="local-mode"` (`LOCAL_MODE_WORKSPACE_GRANT_ID`) and only the scopes the call needs, and startup logs a bypass warning. Any trust setting (even without `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true`) or an attached Studio account keeps the fail-closed check, and data-resource routes never bypass.
