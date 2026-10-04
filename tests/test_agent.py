@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import pytest
 from pydantic import BaseModel, ValidationError
 
@@ -24,6 +25,7 @@ from supervaizer import (
     Agent,
     AgentMethod,
     AgentMethods,
+    ApiError,
     ApiSuccess,
     Server,
     V2AgentMethod,
@@ -695,6 +697,57 @@ def test_agent_update_keeps_registration_agent_id_when_detail_omits_id(
     assert updated_agent is agent_fixture
     assert updated_agent.server_agent_id == "studio-agent-id"
     assert updated_agent.server_agent_onboarding_status == "new"
+
+
+def test_agent_update_raises_when_studio_agent_lookup_fails(
+    agent_fixture: Agent, server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agent_fixture.server_agent_id = "01KNXZKKSBXJEE3G2F9Z9Y893V"
+    url = "https://studio.test/w/ws/api/v1/agents/01KNXZKKSBXJEE3G2F9Z9Y893V"
+    request = httpx.Request("GET", url)
+    not_found = httpx.HTTPStatusError(
+        "Not Found", request=request, response=httpx.Response(404, request=request)
+    )
+    monkeypatch.setattr(
+        server_fixture.supervisor_account.__class__,
+        "get_agent_by",
+        lambda self, agent_id=None, agent_slug=None: ApiError(
+            message="Error GET Agent", url=url, exception=not_found
+        ),
+    )
+
+    with pytest.raises(RuntimeError) as error:
+        agent_fixture.update_agent_from_server(server_fixture)
+
+    message = str(error.value)
+    assert f"slug={agent_fixture.slug}" in message
+    assert "server_agent_id=01KNXZKKSBXJEE3G2F9Z9Y893V" in message
+    assert f"GET {url}" in message
+    assert "404" in message
+
+
+def test_agent_update_raises_on_real_agent_id_mismatch(
+    agent_fixture: Agent, server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agent_fixture.server_agent_id = "01KNXZKKSBXJEE3G2F9Z9Y893V"
+    monkeypatch.setattr(
+        server_fixture.supervisor_account.__class__,
+        "get_agent_by",
+        lambda self, agent_id=None, agent_slug=None: ApiSuccess(
+            message="Success", detail=GET_AGENT_BY_SUCCESS_RESPONSE_DETAIL, code=200
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Agent ID mismatch"):
+        agent_fixture.update_agent_from_server(server_fixture)
+
+
+def test_agent_update_skips_without_studio_account(
+    agent_fixture: Agent, server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(server_fixture, "supervisor_account", None)
+
+    assert agent_fixture.update_agent_from_server(server_fixture) is None
 
 
 def test_job_start_custom_async_uses_action_is_async(
