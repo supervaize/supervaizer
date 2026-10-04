@@ -214,17 +214,15 @@ def _settle(
 def resume_rule_checkpoint(
     decision: RuleCheckpointResume,
 ) -> RuleCheckpointResponse | None:
-    """Dispatch one explicit A2A resume decision to its live gate."""
-    gate = _PENDING_GATES.get(decision.checkpoint_id)
-    if gate is not None:
-        return gate.resume(decision)
-
-    # Local import breaks the Case -> rule_controls import cycle only during
-    # restart recovery, when no in-process waiter exists.
+    """Persist one explicit A2A resume decision, then wake its waiter."""
+    # Local import breaks the Case -> rule_controls import cycle.
     from supervaizer.case import Cases
 
     case = Cases().get_case(decision.case_id, decision.job_id)
     if case is None:
+        gate = _PENDING_GATES.get(decision.checkpoint_id)
+        if gate is not None:
+            return gate.resume(decision)
         _retain_decision(decision)
         return None
     if case.metadata.get("_rule_checkpoint_agent_slug") != decision.agent_slug:
@@ -252,9 +250,12 @@ def resume_rule_checkpoint(
             decision.input_hash,
         ):
             continue
+        # Persist before the waiter wakes and before the handler acknowledges, so
+        # a restart in between still finds the decision on the case.
         state["status"] = decision.status
         state["decision_id"] = decision.decision_id
         case._persist()
+        # Hands the decision to a live waiter, or keeps it for a later one.
         _retain_decision(decision)
         return RuleCheckpointResponse.model_validate(decision.model_dump())
     raise ValueError("Rule checkpoint resume does not match persisted occurrence")

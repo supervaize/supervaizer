@@ -724,6 +724,52 @@ async def test_decision_retained_after_waiter_registered_still_wakes_it(
     assert (await asyncio.wait_for(waiting, 1)).status == "allow"
 
 
+@pytest.mark.asyncio
+async def test_live_resume_is_persisted_before_the_waiter_wakes(
+    account_fixture: Any, storage_manager: Any
+) -> None:
+    state = {
+        "checkpoint_id": "checkpoint-durable",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    Case(
+        id="case-durable",
+        job_id="job-1",
+        account=account_fixture,
+        name="Durable rule case",
+        description="Persist a live resume",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"occurrence-1:before": state},
+        },
+    )
+    waiting = asyncio.create_task(
+        _gate(account_fixture).wait_for_resume(
+            _paused("checkpoint-durable"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-durable",
+        )
+    )
+    await asyncio.sleep(0)
+
+    resume_rule_checkpoint(_resume("checkpoint-durable", "case-durable"))
+
+    # A crash now must not lose the decision: it is stored, the job not yet woken.
+    assert not waiting.done()
+    stored = storage_manager.get_object_by_id("Case", "case-durable")
+    assert stored["metadata"]["_rule_checkpoints"]["occurrence-1:before"]["status"] == (
+        "allow"
+    )
+    assert (await waiting).status == "allow"
+
+
 def test_retained_decisions_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     retained: dict[str, RuleCheckpointResume] = {}
     monkeypatch.setattr("supervaizer.rule_controls._DELIVERED_DECISIONS", retained)
