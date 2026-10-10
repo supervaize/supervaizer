@@ -49,6 +49,7 @@ from supervaizer.protocol.a2a.model import _agent_health_status
 from supervaizer.protocol.a2a.controller import (
     JSON_RPC_ACTION_NOT_REGISTERED,
     JSON_RPC_INTERNAL_ERROR,
+    JSON_RPC_INVALID_PARAMS,
     JSON_RPC_METHOD_NOT_FOUND,
     JSON_RPC_SURFACE_NOT_REGISTERED,
     JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED,
@@ -396,6 +397,53 @@ def test_a2a_controller_rejects_unregistered_v2_action(
     assert payload["error"]["code"] == JSON_RPC_ACTION_NOT_REGISTERED
     assert payload["error"]["data"]["agent_slug"] == agent.slug
     assert payload["error"]["data"]["action"] == "job.start"
+
+
+@pytest.mark.parametrize(
+    ("method", "payload_key", "message"),
+    [
+        (
+            SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "action",
+            "Invalid Supervaizer v2 action request",
+        ),
+        (
+            SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "surface",
+            "Invalid Supervaizer v2 surface request",
+        ),
+    ],
+)
+def test_a2a_controller_rejects_mission_id_mismatch(
+    server_fixture: Server, method: str, payload_key: str, message: str
+) -> None:
+    agent = server_fixture.agents[0]
+    headers = _authorized_a2a_headers(
+        server_fixture, agent_slug=agent.slug, scopes=[method, "job.start"]
+    )
+    if payload_key == "action":
+        params = _v2_action_payload(action="job.start", agent_slug=agent.slug)
+    else:
+        params = _v2_surface_payload(surface="job.start", agent_slug=agent.slug)
+    params["mission"] = {"id": "other-mission", "metadata": {}}
+    client = TestClient(server_fixture.app)
+
+    response = client.post(
+        "/a2a",
+        headers=headers,
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-mission",
+            "method": method,
+            "params": params,
+        },
+    )
+
+    assert response.status_code == 200
+    error = response.json()["error"]
+    assert error["code"] == JSON_RPC_INVALID_PARAMS
+    assert error["message"] == message
+    assert "does not match mission_id" in json.dumps(error["data"])
 
 
 def test_a2a_controller_rejects_unregistered_v2_surface(

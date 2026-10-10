@@ -18,6 +18,7 @@ from io import StringIO
 from typing import Any
 
 import httpx
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -33,7 +34,11 @@ from supervaizer import (
     Server,
 )
 from supervaizer.common import log
-from supervaizer.contracts import V2WorkspaceAuthorizationSettings
+from supervaizer.contracts import (
+    MISSION_METADATA_HEADER,
+    V2WorkspaceAuthorizationSettings,
+    encode_mission_metadata_header,
+)
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.parameter import ParametersSetup
@@ -491,6 +496,127 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
     assert context.workspace_authorization is not None
     assert context.workspace_authorization.grant_id == "grant-1"
     assert context.workspace_authorization.agent_workspace_ref == "agent-workspace-1"
+
+
+def _list_items_with_headers(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    extra_headers: dict[str, str],
+) -> tuple[httpx.Response, dict[str, DataResourceContext]]:
+    captured: dict[str, DataResourceContext] = {}
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        captured["context"] = context
+        return []
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    key = _enable_workspace_authorization(server)
+    token = _workspace_authorization_token(
+        server,
+        key,
+        agent_slug=agent.slug,
+        scopes=["resource.items.list"],
+        workspace_id="team-1",
+        workspace_slug="team-slug",
+    )
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/",
+        headers={
+            "X-API-Key": "test-api-key",
+            WORKSPACE_AUTHORIZATION_HEADER: f"Bearer {token}",
+            "X-Supervaize-Workspace-Id": "team-1",
+            "X-Supervaize-Workspace-Slug": "team-slug",
+            **extra_headers,
+        },
+    )
+    return response, captured
+
+
+def test_data_resource_mission_metadata_header_sets_context_mission(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    metadata = {"filter": {"contact": {"client_name": "ACME CORP"}}}
+    response, captured = _list_items_with_headers(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        {
+            "X-Supervaize-Mission-Id": "mission-1",
+            MISSION_METADATA_HEADER: encode_mission_metadata_header(metadata),
+        },
+    )
+
+    assert response.status_code == 200
+    mission = captured["context"].mission
+    assert mission is not None
+    assert mission.id == "mission-1"
+    assert mission.metadata == metadata
+
+
+def test_data_resource_mission_id_without_metadata_header_has_no_mission(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        {"X-Supervaize-Mission-Id": "mission-1"},
+    )
+
+    assert response.status_code == 200
+    assert captured["context"].mission_id == "mission-1"
+    assert captured["context"].mission is None
+
+
+@pytest.mark.parametrize(
+    ("extra_headers", "detail"),
+    [
+        (
+            {MISSION_METADATA_HEADER: encode_mission_metadata_header({})},
+            "X-Supervaize-Mission-Metadata requires X-Supervaize-Mission-Id",
+        ),
+        (
+            {"X-Supervaize-Mission-Id": "mission-1", MISSION_METADATA_HEADER: "%%%"},
+            "X-Supervaize-Mission-Metadata is not base64url-encoded UTF-8 JSON",
+        ),
+        (
+            {
+                "X-Supervaize-Mission-Id": "mission-1",
+                MISSION_METADATA_HEADER: base64.urlsafe_b64encode(b'["a"]').decode(),
+            },
+            "X-Supervaize-Mission-Metadata must decode to a JSON object",
+        ),
+        (
+            {
+                "X-Supervaize-Mission-Id": "mission-1",
+                MISSION_METADATA_HEADER: "A" * 4097,
+            },
+            "X-Supervaize-Mission-Metadata is 4097 bytes; the limit is 4096",
+        ),
+    ],
+)
+def test_data_resource_bad_mission_metadata_header_returns_400(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    extra_headers: dict[str, str],
+    detail: str,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, extra_headers
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == detail
+    assert captured == {}
 
 
 def _make_data_resource_server(

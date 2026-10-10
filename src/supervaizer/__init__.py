@@ -177,6 +177,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2CaseLaneDefinition": ("supervaizer.contracts", "V2CaseLaneDefinition"),
     "V2CaseSnapshot": ("supervaizer.contracts", "V2CaseSnapshot"),
     "V2ContextAssignment": ("supervaizer.contracts", "V2ContextAssignment"),
+    "V2MissionContext": ("supervaizer.contracts", "V2MissionContext"),
     "V2ContextAssignmentItem": (
         "supervaizer.contracts",
         "V2ContextAssignmentItem",
@@ -269,6 +270,14 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "build_data_resource_context_headers": (
         "supervaizer.contracts",
         "build_data_resource_context_headers",
+    ),
+    "encode_mission_metadata_header": (
+        "supervaizer.contracts",
+        "encode_mission_metadata_header",
+    ),
+    "decode_mission_metadata_header": (
+        "supervaizer.contracts",
+        "decode_mission_metadata_header",
     ),
     "build_v2_agent_registration": (
         "supervaizer.contracts",

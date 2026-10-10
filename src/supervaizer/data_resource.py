@@ -26,7 +26,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from supervaizer.common import SvBaseModel
-from supervaizer.contracts import V2VerifiedWorkspaceContext
+from supervaizer.contracts import V2MissionContext, V2VerifiedWorkspaceContext
 
 # Used for URL path segments (/data/{name}/) and OpenAPI operation_id fragments.
 _DATA_RESOURCE_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
@@ -59,6 +59,7 @@ class DataResourceContext(SvBaseModel):
     workspace_id: str | None = None
     workspace_slug: str | None = None
     mission_id: str | None = None
+    mission: V2MissionContext | None = None
     agent_slug: str
     request_id: str | None = None
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
