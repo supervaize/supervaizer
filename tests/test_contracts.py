@@ -37,6 +37,7 @@ from supervaizer.contracts import (
     V2CaseSnapshot,
     V2ContextAssignment,
     V2ContextAssignmentItem,
+    V2MissionContext,
     V2DashboardWidgetDataRef,
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
@@ -55,8 +56,12 @@ from supervaizer.contracts import (
     V2WorkspaceAuthorizationSettings,
     V2WorkspaceBindingDefinition,
     V2_ACTION_CONTEXT_ASSIGN,
+    DataResourceContextContract,
+    MISSION_METADATA_HEADER,
     build_data_resource_context_headers,
     build_v2_agent_registration,
+    decode_mission_metadata_header,
+    encode_mission_metadata_header,
     controller_contract_info,
     resolve_controller_endpoint,
 )
@@ -926,6 +931,117 @@ def test_v2_action_result_requires_setup_plan_mapping() -> None:
     }
     with pytest.raises(ValidationError):
         V2ActionResult.model_validate({"status": "ok", "setup_plan": ["invalid"]})
+
+
+_MISSION_METADATA = {"filter": {"contact": {"client_name": "ACME CORP"}}}
+
+
+def _v2_request_payload(**overrides: Any) -> dict[str, Any]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": "agent-interviewer",
+        "surface": "job.configurator",
+        "action": "resource.contacts.list",
+        **overrides,
+    }
+
+
+def test_v2_mission_context_keeps_metadata_uninterpreted() -> None:
+    mission = V2MissionContext.model_validate({
+        "id": "mission-1",
+        "name": "ACME onboarding",
+        "metadata": _MISSION_METADATA,
+    })
+
+    assert mission.model_dump() == {
+        "id": "mission-1",
+        "name": "ACME onboarding",
+        "metadata": _MISSION_METADATA,
+    }
+
+
+@pytest.mark.parametrize("metadata", [json.dumps(_MISSION_METADATA), None, ["a"]])
+def test_v2_mission_context_rejects_non_object_metadata(metadata: Any) -> None:
+    with pytest.raises(ValidationError):
+        V2MissionContext.model_validate({"id": "mission-1", "metadata": metadata})
+
+
+def test_v2_mission_context_rejects_json_string_metadata_in_json_mode() -> None:
+    payload = json.dumps({"id": "mission-1", "metadata": json.dumps(_MISSION_METADATA)})
+
+    with pytest.raises(ValidationError):
+        V2MissionContext.model_validate_json(payload)
+
+
+def test_v2_mission_context_requires_id() -> None:
+    with pytest.raises(ValidationError):
+        V2MissionContext.model_validate({"id": ""})
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_carries_mission(
+    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+) -> None:
+    request = model.model_validate(
+        _v2_request_payload(mission={"id": "mission-1", "metadata": _MISSION_METADATA})
+    )
+
+    assert request.model_dump()["mission"] == {
+        "id": "mission-1",
+        "name": None,
+        "metadata": _MISSION_METADATA,
+    }
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_without_mission_still_validates(
+    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+) -> None:
+    assert model.model_validate(_v2_request_payload()).mission is None
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_rejects_mission_id_mismatch(
+    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+) -> None:
+    with pytest.raises(ValidationError, match="does not match mission_id"):
+        model.model_validate(_v2_request_payload(mission={"id": "mission-2"}))
+
+
+def test_data_resource_context_contract_rejects_mission_id_mismatch() -> None:
+    with pytest.raises(ValidationError, match="does not match mission_id"):
+        DataResourceContextContract.model_validate({
+            "mission_id": "mission-1",
+            "mission": {"id": "mission-2"},
+        })
+
+
+def test_mission_metadata_header_round_trip() -> None:
+    metadata = {"filter": {"contact": {"client_name": "Société ACME"}}}
+    headers = build_data_resource_context_headers(
+        mission_id="mission-1", mission_metadata=metadata
+    )
+
+    assert decode_mission_metadata_header(headers[MISSION_METADATA_HEADER]) == metadata
+
+
+def test_mission_metadata_header_decodes_unpadded_value() -> None:
+    encoded = encode_mission_metadata_header({"a": 1}).rstrip("=")
+
+    assert decode_mission_metadata_header(encoded) == {"a": 1}
+
+
+def test_mission_metadata_header_requires_mission_id() -> None:
+    with pytest.raises(ValueError, match="requires mission_id"):
+        build_data_resource_context_headers(mission_metadata=_MISSION_METADATA)
+
+
+def test_mission_metadata_header_rejects_oversized_metadata() -> None:
+    with pytest.raises(ValueError, match="the limit is 4096"):
+        encode_mission_metadata_header({"blob": "x" * 4096})
 
 
 def test_v2_surface_request_and_result_models() -> None:

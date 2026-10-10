@@ -127,7 +127,7 @@ async def dispatch_json_rpc(
             request_id=body.get("id"),
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid JSON-RPC request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     if request.method == SUPERVAIZER_ACTION_INVOKE_METHOD:
@@ -163,7 +163,7 @@ async def _dispatch_action(
             request_id=request.id,
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid Supervaizer v2 action request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     action_request = action_request.model_copy(update={"workspace_authorization": None})
@@ -258,7 +258,7 @@ async def _dispatch_surface(
             request_id=request.id,
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid Supervaizer v2 surface request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     surface_request = surface_request.model_copy(
