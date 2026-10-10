@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Mission context on v2 requests and DataResource calls** — New `V2MissionContext` (`id`, `name`, `metadata`) carries Studio `Mission.metadata` to the agent, uninterpreted. `V2SurfaceRequest`, `V2ActionRequest`, `DataResourceContext`, and `DataResourceContextContract` gain an optional `mission`; a model validator requires `mission.id == mission_id`, and `metadata` accepts a JSON object only. New header `X-Supervaize-Mission-Metadata` (base64url UTF-8 JSON, 4096 bytes max) on DataResource proxy calls: `build_data_resource_context_headers(..., mission_metadata=...)` writes it, `encode_mission_metadata_header` / `decode_mission_metadata_header` are exported, and the data routes set `context.mission` or return HTTP 400 on a bad header or a header without `X-Supervaize-Mission-Id`. Optional and additive: requests without `mission` behave as before. Requires a minor release.
+
 ## [1.7.0] - 2026-10-04
 
 ### Added

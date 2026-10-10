@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 1.6.0
+**Version:** 1.7.0
 
 ### `common.SvBaseModel`
 
@@ -244,6 +244,8 @@ something the caller controls.
 | `id` | `str` | **required** | Action identifier used to invoke the action. |
 | `mutating` | `bool` | True | Whether invoking the action changes agent-side state. Defaults to True so an undeclared action requires write permission. |
 | `scope` | `Literal['workspace', 'mission', 'job']` | 'job' | Context the action operates within. |
+| `label` | `str` | `None` | Short caption a consumer may show instead of one derived from the id. Plain text; display only, never an authorization input. |
+| `description` | `str` | `None` | One or two plain-language sentences a consumer may show as help text, such as a tooltip. Plain text; display only, never an authorization input. |
 
 ### `contracts.V2ActionRequest`
 
@@ -266,6 +268,7 @@ something the caller controls.
 | `job_id` | `str` | `None` |  |
 | `case_id` | `str` | `None` |  |
 | `step_id` | `str` | `None` |  |
+| `mission` | `V2MissionContext` | `None` |  |
 | `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
 
 ### `contracts.V2AgentMethod`
@@ -543,6 +546,7 @@ Canonical controller surface advertised by a Supervaizer server.
 | `workspace_id` | `str` | `None` |  |
 | `workspace_slug` | `str` | `None` |  |
 | `mission_id` | `str` | `None` |  |
+| `mission` | `V2MissionContext` | `None` |  |
 | `agent_slug` | `str` | `None` |  |
 | `request_id` | `str` | `None` |  |
 
@@ -606,6 +610,71 @@ Structured response shape for DataResource list operations.
 | `job_context` | `dict[str, Any]` | **required** |  |
 | `job_fields` | `dict[str, Any]` | — |  |
 | `encrypted_agent_parameters` | `str` | `None` |  |
+| `rule_snapshot` | `ForwardRef("'RuleCheckpointSnapshot | None'")` | `None` |  |
+
+### `contracts.RuleCheckpointRequest`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `occurrence_id` | `str` | **required** |  |
+| `phase` | `Literal['before', 'after']` | **required** |  |
+| `snapshot_hash` | `str` | **required** |  |
+| `job_id` | `str` | **required** |  |
+| `case_id` | `str` | **required** |  |
+| `step_id` | `str` | **required** |  |
+| `context` | `dict[str, Any]` | **required** |  |
+| `secret_refs` | `list[str]` | — |  |
+
+### `contracts.RuleCheckpointResponse`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `checkpoint_id` | `str` | **required** |  |
+| `status` | `Literal['allow', 'pause', 'stop']` | **required** |  |
+| `snapshot_hash` | `str` | **required** |  |
+| `input_hash` | `str` | **required** |  |
+
+### `contracts.RuleCheckpointResume`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `checkpoint_id` | `str` | **required** |  |
+| `job_id` | `str` | **required** |  |
+| `case_id` | `str` | **required** |  |
+| `agent_slug` | `str` | **required** |  |
+| `occurrence_id` | `str` | **required** |  |
+| `phase` | `Literal['before', 'after']` | **required** |  |
+| `status` | `Literal['allow', 'stop']` | **required** |  |
+| `snapshot_hash` | `str` | **required** |  |
+| `input_hash` | `str` | **required** |  |
+| `decision_id` | `str` | **required** |  |
+
+### `contracts.RuleCheckpointSnapshot`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Opaque frozen rule snapshot supplied by Studio for one governed job.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `hash` | `str` | **required** |  |
+| `checkpoint_url` | `str` | **required** |  |
+| `version` | `Literal[1]` | **required** |  |
+| `checkpoint_token` | `str` | **required** |  |
 
 ### `contracts.ServerRegistrationContract`
 
@@ -738,9 +807,11 @@ A2UI-shaped resource import surface consumed by Studio.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `surfaces` | `list[str]` | — |  |
+| `surface_definitions` | `list[contracts.V2SurfaceDefinition]` | — | Display text for declared surfaces, at most one per id. Omitted from the serialized registration when empty. |
 | `actions` | `list[contracts.V2ActionDefinition]` | — |  |
 | `case_lanes` | `list[contracts.V2CaseLaneDefinition]` | — |  |
 | `artifact_types` | `list[contracts.V2ArtifactTypeDefinition]` | — |  |
+| `rule_checkpoints` | `ForwardRef("'V2RuleCheckpointCapability | None'")` | `None` |  |
 
 ### `contracts.V2AgentIdentity`
 
@@ -1046,6 +1117,20 @@ Generic agent-declared job setup actions.
 | `sync_cursor` | `str` | `None` |  |
 | `observed_at` | `str` | `None` |  |
 
+### `contracts.V2MissionContext`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Studio mission sent with a request. The SDK does not read ``metadata`` keys.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** |  |
+| `name` | `str` | `None` |  |
+| `metadata` | `dict[str, Any]` | — |  |
+
 ### `contracts.V2MountedResourceViewDefinition`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -1144,6 +1229,20 @@ Agent override that mounts an A2UI surface on a full resource view.
 | `value_field` | `str` | 'id' |  |
 | `label_field` | `str` | `None` |  |
 
+### `contracts.V2RuleCheckpointCapability`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Opt-in support for Studio before/after rule checkpoints.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `version` | `Literal[1]` | 1 |  |
+| `phases` | `list[Literal['before', 'after']]` | **required** |  |
+| `secret_refs` | `list[str]` | — |  |
+
 ### `contracts.V2StepSnapshot`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -1159,6 +1258,24 @@ Agent override that mounts an A2UI surface on a full resource view.
 | `external_id` | `str` | `None` |  |
 | `awaiting` | `V2AwaitingState` | `None` |  |
 | `outputs` | `list[contracts.V2ArtifactRef]` | — |  |
+
+### `contracts.V2SurfaceDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Display text for one declared surface.
+
+`capabilities.surfaces` stays a list of ids, so consumers keep matching
+surfaces by string; a definition only adds human-readable text for one of
+those ids.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** | Surface id, as listed in `capabilities.surfaces`. |
+| `label` | `str` | `None` | Short caption a consumer may show instead of one derived from the id. Plain text; display only, never an authorization input. |
+| `description` | `str` | `None` | One or two plain-language sentences a consumer may show as help text, such as a tooltip. Plain text; display only, never an authorization input. |
 
 ### `contracts.V2SurfaceRequest`
 
@@ -1179,6 +1296,7 @@ Agent override that mounts an A2UI surface on a full resource view.
 | `job_id` | `str` | `None` |  |
 | `case_id` | `str` | `None` |  |
 | `step_id` | `str` | `None` |  |
+| `mission` | `V2MissionContext` | `None` |  |
 | `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
 
 ### `contracts.V2SurfaceResult`
@@ -1290,6 +1408,7 @@ Studio request context passed to DataResource callbacks.
 | `workspace_id` | `str` | `None` |  |
 | `workspace_slug` | `str` | `None` |  |
 | `mission_id` | `str` | `None` |  |
+| `mission` | `V2MissionContext` | `None` |  |
 | `agent_slug` | `str` | **required** |  |
 | `request_id` | `str` | `None` |  |
 | `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
@@ -1583,7 +1702,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 9, 25, 6, 9, 35, 443437) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 10, 10, 15, 49, 27, 133129) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1651,4 +1770,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-09-25 06:09:35*
+*Uploaded on 2026-10-10 15:49:27*

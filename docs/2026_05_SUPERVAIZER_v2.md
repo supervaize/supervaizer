@@ -327,6 +327,14 @@ Dynamic behavior should not be implemented as opaque Python callbacks. It should
 
 This avoids repeating the v1 dynamic-choice callback model.
 
+### Mission context on DataResource calls
+
+Studio sends the DataResource context in headers: `X-Supervaize-Workspace-Id`, `X-Supervaize-Workspace-Slug`, `X-Supervaize-Mission-Id`, `X-Supervaize-Agent-Slug`, and `X-Supervaize-Request-Id`. Since 1.8.0, a call in a mission scope can also send `X-Supervaize-Mission-Metadata`: the Studio `Mission.metadata` JSON object, UTF-8, base64url-encoded (padding optional), at most 4096 bytes encoded. Use `build_data_resource_context_headers(..., mission_metadata=...)` to write it.
+
+The SDK sets `DataResourceContext.mission` (a `V2MissionContext` with `id` from `X-Supervaize-Mission-Id` and the decoded `metadata`). Without the metadata header, `context.mission` is `None`. The route returns HTTP 400 and does not call the callback when the metadata header is present without `X-Supervaize-Mission-Id`, does not decode to a JSON object, or is too large.
+
+The header is not signed. Use mission metadata to scope results, not as an access boundary.
+
 ## Datasets
 
 Datasets are read-oriented tables or metric streams that Studio can query through typed actions.
@@ -443,6 +451,10 @@ Common action IDs:
 | `agent.refresh`, `agent.custom.<method>` | Agent-level methods declared through `V2AgentMethods`. |
 
 Action requests include `request_id`, `actor`, `workspace`, `mission_id`, `agent_slug`, `surface`, `action`, `input`, and optional correlation fields such as `job_id`, `case_id`, `step_id`, `draft_session_id`, and `idempotency_key`. After verification the SDK injects `workspace_authorization` (a `V2VerifiedWorkspaceContext`) so handlers use verified claims rather than headers.
+
+### Mission context
+
+Since 1.8.0, `V2ActionRequest` and `V2SurfaceRequest` have an optional `mission` (`V2MissionContext`: `id`, `name`, `metadata`). `metadata` is the Studio `Mission.metadata` JSON object. The SDK carries it without reading its keys; the agent owns any convention inside it (for example, Agent Interviewer reads `metadata.filter.contact`). Validation requires `mission.id == mission_id` and refuses a `metadata` that is not a JSON object, including a JSON-encoded string. Studio sends the current mission metadata on each request. Agents must not cache it in the job.
 
 ### Action metadata
 
