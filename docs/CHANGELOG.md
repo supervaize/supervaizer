@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Ruff 0.16 default lint rules** (PR #133) — `pyproject.toml` drops the `select = ["E4", "E7", "E9", "F"]` pin from PR #123 and lints with the Ruff 0.16 defaults. No-op findings are fixed: import order, quoted annotations, explicit `subprocess.run(check=False)`, string `os.getenv` defaults, and similar rewrites. Rules whose fix would change runtime behavior are ignored with a reason in `pyproject.toml` (BLE001, S110, DTZ005, TRY004, RUF012, UP040/UP046/UP047, plus per-file ignores); B008 accepts FastAPI `Body`, `Depends`, and `Query` defaults. No runtime change. The B023 ignore in `routes.py` marks a known bug: every v1 custom-method route runs the last registered method; the fix ships separately.
+- **Ruff 0.16 default lint rules** (PR #133) — `pyproject.toml` drops the `select = ["E4", "E7", "E9", "F"]` pin from PR #123 and lints with the Ruff 0.16 defaults. No-op findings are fixed: import order, quoted annotations, explicit `subprocess.run(check=False)`, string `os.getenv` defaults, and similar rewrites. Rules whose fix would change runtime behavior are ignored with a reason in `pyproject.toml` (BLE001, S110, DTZ005, TRY004, RUF012, UP040/UP046/UP047, plus per-file ignores); B008 accepts FastAPI `Body`, `Depends`, and `Query` defaults. No runtime change. A temporary B023 ignore in `routes.py` marked a known bug in v1 custom-method routes; PR #134 fixes it and removes the ignore.
 
 ### Fixed
 
