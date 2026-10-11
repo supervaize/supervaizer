@@ -11,6 +11,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 - Use `just` recipes from this repo for local commands.
 - Use `uv` for Python environment and package operations.
 - Add or update targeted tests for changed behavior.
+- When a user-facing workflow, route, or access rule changes, update `docs/product/feature-map.md` in the same change.
 - Keep public payloads and generated docs compatible with Studio unless both repos are updated together.
 - Use GitButler (`but`) for branch, commit, and push operations when available.
 - Personas (`backend-developer`, `tech-lead`, ...) are defined in `../.agent/personas/`; name one when requesting work.
@@ -19,6 +20,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 
 | Need | Read |
 | --- | --- |
+| Product feature map (workflows, routes, pytest) | `docs/product/feature-map.md` |
 | User-facing overview and quick start | `README.md` |
 | Supervaizer v2 contract (Jobs, Cases, Steps, Resources, Surfaces, Actions) | `docs/2026_05_SUPERVAIZER_v2.md` |
 | Protocol layering (A2A, A2UI, AG-UI) | `docs/2026_05_PROTOCOLS.md` |

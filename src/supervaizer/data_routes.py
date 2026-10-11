@@ -12,15 +12,19 @@
 
 """FastAPI route generation for DataResource CRUD endpoints.
 
-For each DataResource declared on an Agent, generates routes under:
-    GET    /agents/{slug}/data/{resource_name}/            — list
-    GET    /agents/{slug}/data/{resource_name}/{item_id}   — detail
-    POST   /agents/{slug}/data/{resource_name}/            — create
-    PUT    /agents/{slug}/data/{resource_name}/{item_id}   — update
-    DELETE /agents/{slug}/data/{resource_name}/{item_id}   — delete
-    POST   /agents/{slug}/data/{resource_name}/import/     — CSV bulk import
+For each DataResource declared on an Agent, generates routes under
+``/api`` plus ``agent.path`` (``/agents/{slug}``):
 
-All routes require the server API key (same auth as existing agent routes).
+    GET    /api/agents/{slug}/data/{resource_name}/            — list
+    GET    /api/agents/{slug}/data/{resource_name}/{item_id}   — detail
+    POST   /api/agents/{slug}/data/{resource_name}/            — create
+    PUT    /api/agents/{slug}/data/{resource_name}/{item_id}   — update
+    DELETE /api/agents/{slug}/data/{resource_name}/{item_id}   — delete
+    POST   /api/agents/{slug}/data/{resource_name}/import/     — CSV bulk import
+
+A route exists only when that callback is set. Every route requires
+``X-API-Key``; writes also require write scope. Workspace authorization
+is always checked, including in local mode.
 Uses factory functions per resource to avoid Python closure-in-loop capture bugs.
 """
 
