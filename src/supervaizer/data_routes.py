@@ -347,7 +347,7 @@ def _mission_from_request(
     encoded_metadata = request.headers.get(MISSION_METADATA_HEADER)
     if encoded_metadata is None:
         return None
-    if not mission_id:
+    if mission_id is None or not mission_id.strip():
         raise HTTPException(
             status_code=400,
             detail=f"{MISSION_METADATA_HEADER} requires {MISSION_ID_HEADER}",

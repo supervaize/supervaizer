@@ -124,9 +124,16 @@ class EventType(StrEnum):
 class V2MissionContext(ContractModel):
     """Studio mission sent with a request. The SDK does not read ``metadata`` keys."""
 
-    id: str = Field(min_length=1)
+    id: str
     name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict, strict=True)
+
+    @field_validator("id")
+    @classmethod
+    def _require_non_blank_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("mission.id must not be blank")
+        return value
 
 
 def _require_mission_matches_mission_id(

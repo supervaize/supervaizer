@@ -976,9 +976,18 @@ def test_v2_mission_context_rejects_json_string_metadata_in_json_mode() -> None:
         V2MissionContext.model_validate_json(payload)
 
 
-def test_v2_mission_context_requires_id() -> None:
-    with pytest.raises(ValidationError):
-        V2MissionContext.model_validate({"id": ""})
+@pytest.mark.parametrize("mission_id", ["", "   "])
+def test_v2_mission_context_rejects_blank_id(mission_id: str) -> None:
+    with pytest.raises(ValidationError, match="mission.id must not be blank"):
+        V2MissionContext.model_validate({"id": mission_id})
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_rejects_blank_mission_id(
+    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+) -> None:
+    with pytest.raises(ValidationError, match="mission.id must not be blank"):
+        model.model_validate(_v2_request_payload(mission_id=" ", mission={"id": " "}))
 
 
 @pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])

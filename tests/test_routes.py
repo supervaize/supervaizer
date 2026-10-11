@@ -584,6 +584,13 @@ def test_data_resource_mission_id_without_metadata_header_has_no_mission(
             "X-Supervaize-Mission-Metadata requires X-Supervaize-Mission-Id",
         ),
         (
+            {
+                "X-Supervaize-Mission-Id": "   ",
+                MISSION_METADATA_HEADER: encode_mission_metadata_header({}),
+            },
+            "X-Supervaize-Mission-Metadata requires X-Supervaize-Mission-Id",
+        ),
+        (
             {"X-Supervaize-Mission-Id": "mission-1", MISSION_METADATA_HEADER: "%%%"},
             "X-Supervaize-Mission-Metadata is not base64url-encoded UTF-8 JSON",
         ),
