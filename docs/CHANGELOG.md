@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`just ship-reconcile` opens a back-merge PR** (PR #137) — The script pushed `develop` directly, which passed only through an admin bypass of the `develop` PR rule. It now merges `origin/main` into a `chore/sync-main-<tag>` branch cut from `origin/develop`, pushes that branch, and opens a PR to `develop`; merge it with a merge commit. The `--mode` option (and the recipe's `mode` argument) is removed: `rebase` needed a non-fast-forward push to `develop`, which the ruleset blocks. `.claude/ship.md` records the release flow for agents.
+
 ## [1.8.0] - 2026-10-11
 
 ### Added
