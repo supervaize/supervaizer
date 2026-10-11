@@ -37,6 +37,7 @@ AGENT_REFRESH_EFFECT = "agent.refreshed"
 RULE_CHECKPOINT_RESUME_ACTION = "rule.checkpoint.resume"
 AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
 _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]*={0,2}$")
 V2_DISPLAY_TEXT_MAX_LENGTH = 300
 MISSION_ID_HEADER = "X-Supervaize-Mission-Id"
 MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
@@ -1458,7 +1459,7 @@ def build_data_resource_context_headers(
     if mission_id:
         headers[MISSION_ID_HEADER] = str(mission_id)
     if mission_metadata is not None:
-        if not mission_id:
+        if mission_id is None or not mission_id.strip():
             raise ValueError(f"{MISSION_METADATA_HEADER} requires mission_id")
         headers[MISSION_METADATA_HEADER] = encode_mission_metadata_header(
             mission_metadata
@@ -1490,6 +1491,10 @@ def decode_mission_metadata_header(value: str) -> dict[str, Any]:
         raise ValueError(
             f"{MISSION_METADATA_HEADER} is {len(value)} bytes; "
             f"the limit is {MISSION_METADATA_HEADER_MAX_LENGTH}"
+        )
+    if not _BASE64URL_RE.fullmatch(value):
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} is not base64url-encoded UTF-8 JSON"
         )
     padded = value + "=" * (-len(value) % 4)
     try:

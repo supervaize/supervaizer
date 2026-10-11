@@ -1043,9 +1043,19 @@ def test_mission_metadata_header_decodes_unpadded_value() -> None:
     assert decode_mission_metadata_header(encoded) == {"a": 1}
 
 
-def test_mission_metadata_header_requires_mission_id() -> None:
+@pytest.mark.parametrize("mission_id", [None, "", "   "])
+def test_mission_metadata_header_requires_mission_id(mission_id: str | None) -> None:
     with pytest.raises(ValueError, match="requires mission_id"):
-        build_data_resource_context_headers(mission_metadata=_MISSION_METADATA)
+        build_data_resource_context_headers(
+            mission_id=mission_id, mission_metadata=_MISSION_METADATA
+        )
+
+
+def test_mission_metadata_header_rejects_standard_base64_alphabet() -> None:
+    standard_base64 = "eyJ4Ijoi4KC+In0="  # {"x":"\u083e"}: "+" is not base64url
+
+    with pytest.raises(ValueError, match="not base64url-encoded"):
+        decode_mission_metadata_header(standard_base64)
 
 
 def test_mission_metadata_header_rejects_oversized_metadata() -> None:
