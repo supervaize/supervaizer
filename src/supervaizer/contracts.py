@@ -473,6 +473,7 @@ class V2AgentCapabilities(ContractModel):
     rule_checkpoints: "V2RuleCheckpointCapability | None" = Field(
         default=None, exclude_if=_is_none
     )
+    scheduled_start: bool = Field(default=False, exclude_if=lambda value: not value)
 
     @field_validator("actions", mode="before")
     @classmethod
@@ -878,6 +879,7 @@ def build_v2_agent_registration(
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
     rule_checkpoints: V2RuleCheckpointCapability | dict[str, Any] | None = None,
+    scheduled_start: bool = False,
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
     a2ui_version: str = SUPERVAIZER_V2_A2UI_VERSION,
     a2a_version: str = SUPERVAIZER_V2_A2A_VERSION,
@@ -954,6 +956,7 @@ def build_v2_agent_registration(
             rule_checkpoints=_contract_or_none(
                 rule_checkpoints, V2RuleCheckpointCapability
             ),
+            scheduled_start=scheduled_start,
         ),
         job_policy=job_policy_definition,
         resources=resource_definitions,

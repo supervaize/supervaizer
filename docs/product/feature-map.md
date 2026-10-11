@@ -80,6 +80,19 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Verification: `tests/test_local_mode_a2a.py`, `tests/test_a2a.py`
 - Known caveats: Pass `agent_slug` on every handler. Local mode adds Hello World, so a multi-agent server cannot infer the slug. A bare action id defaults to `mutating=True, scope="job"`.
 
+## Allow Studio to start a job on a schedule
+
+- Purpose: Let Studio offer a schedule for an agent that accepts scheduled starts.
+- Entry point: `scheduled_start=True` on `build_v2_agent_registration()`.
+- Access: Studio invokes the existing `job.start` action with its normal workspace authorization.
+- Preconditions: The v2 agent declares `job.start` and honors `idempotency_key` for each occurrence.
+- Main flow: The agent advertises `capabilities.scheduled_start: true`; Studio owns the clock and invokes `job.start` when due.
+- Expected result: A retry with the same key returns the original job. A manual start can arrive while a scheduled job runs.
+- Important states: The default and explicit `False` omit the key. Removing the capability pauses schedules until a mission manager resumes them.
+- Source: `src/supervaizer/contracts.py`, `docs/2026_10_SCHEDULED_START.md`
+- Verification: `tests/test_contracts.py::test_v2_scheduled_start_registration_round_trip`
+- Known caveats: v1 agents cannot advertise this capability. The agent does not parse cron or declare `job.schedule`.
+
 ## Load a surface
 
 - Purpose: Fetch the A2UI document for a named surface such as `job.start` or `case.step.awaiting`.

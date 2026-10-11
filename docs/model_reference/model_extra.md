@@ -812,6 +812,7 @@ A2UI-shaped resource import surface consumed by Studio.
 | `case_lanes` | `list[contracts.V2CaseLaneDefinition]` | — |  |
 | `artifact_types` | `list[contracts.V2ArtifactTypeDefinition]` | — |  |
 | `rule_checkpoints` | `ForwardRef("'V2RuleCheckpointCapability | None'")` | `None` |  |
+| `scheduled_start` | `bool` | False |  |
 
 ### `contracts.V2AgentIdentity`
 
