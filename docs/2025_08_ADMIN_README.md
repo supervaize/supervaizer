@@ -1,7 +1,7 @@
 # Supervaizer Admin Interface
 
 > **Created:** 2025-08-05
-> **Updated:** 2026-09-25
+> **Updated:** 2026-10-11
 
 A web UI mounted at `/manage` for inspecting Jobs and Cases, watching server and agent status, and exercising agents through a per-agent workbench. Built with FastAPI, Jinja templates, TinyDB, and HTMX/Alpine/Tailwind loaded from CDNs.
 
@@ -36,10 +36,12 @@ The whole `/manage` router (HTTP and WebSocket) is gated by `require_tailscale`.
 | `/manage/cases` | Case list with filters (`status`, `job_id`, `search`, `sort`), cost per case, link to parent job |
 | `/manage/server` | Server identity, registration state, public URL |
 | `/manage/agents` | Registered agents and their methods |
-| `/manage/agents/{slug}/workbench` | Workbench: start a job, follow cases and steps, answer HITL prompts, execute, cancel, or schedule steps, live console over WebSocket |
+| `/manage/agents/{slug}/workbench` | Workbench for v1 agents: start a job, follow cases and steps, answer HITL prompts, execute, cancel, or schedule steps. Job updates arrive on `/manage/agents/{slug}/workbench/jobs/{job_id}/ws` |
 | `/manage/console` | Live log console fed by `/manage/log-stream` (server-sent events) |
 
 Job and case lists auto-refresh every 30 seconds. Jobs are created through the workbench or the API, not from the job list.
+
+The workbench runs v1 `job_start` only. `POST /manage/agents/{slug}/workbench/start` returns HTTP 400 (`Agent has no methods defined: the workbench runs v1 jobs only`) for an agent that has a v2 registration and no `methods`, and it does not create a job. Operate that agent through `POST /a2a`. Workflow index: [product/feature-map.md](product/feature-map.md).
 
 ## Endpoints Under `/manage/api`
 
@@ -72,5 +74,6 @@ Jobs and Cases are `WorkflowEntity` objects stored through `StorageManager` in T
 | 403 behind a proxy | The proxy is not listed in `TRUSTED_PROXIES`, so the forwarded IP is ignored |
 | 404 on `/manage` | `admin_interface=False` |
 | Empty lists after restart | Persistence is off; set `SUPERVAIZER_PERSISTENCE=true` |
+| Workbench start returns 400 for a v2 agent | The agent has no v1 `methods`. The workbench cannot start it; use `POST /a2a` |
 
 Quick local check: `supervaizer start --local`, then open `http://127.0.0.1:8000/manage/`.

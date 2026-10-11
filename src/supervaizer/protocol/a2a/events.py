@@ -24,7 +24,7 @@ HEARTBEAT_SECONDS = 15.0
 
 
 def subscribe_v2_events(
-    server: "Server",
+    server: Server,
     *,
     max_size: int = DEFAULT_QUEUE_SIZE,
 ) -> asyncio.Queue[dict[str, Any]]:
@@ -34,22 +34,20 @@ def subscribe_v2_events(
     return queue
 
 
-def unsubscribe_v2_events(
-    server: "Server", queue: asyncio.Queue[dict[str, Any]]
-) -> None:
+def unsubscribe_v2_events(server: Server, queue: asyncio.Queue[dict[str, Any]]) -> None:
     _event_subscribers(server).discard(queue)
 
 
-def publish_v2_event(server: "Server", event: str, data: dict[str, Any]) -> None:
+def publish_v2_event(server: Server, event: str, data: dict[str, Any]) -> None:
     payload = {"event": event, "data": data}
     for queue in tuple(_event_subscribers(server)):
         _enqueue_event(queue, payload)
 
 
 async def stream_v2_events(
-    server: "Server",
+    server: Server,
     *,
-    request: "Request | None" = None,
+    request: Request | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     queue = subscribe_v2_events(server)
     try:
@@ -67,7 +65,7 @@ async def stream_v2_events(
         unsubscribe_v2_events(server, queue)
 
 
-def _event_subscribers(server: "Server") -> set[asyncio.Queue[dict[str, Any]]]:
+def _event_subscribers(server: Server) -> set[asyncio.Queue[dict[str, Any]]]:
     state = server.app.state
     subscribers = getattr(state, "supervaizer_v2_event_subscribers", None)
     if subscribers is None:

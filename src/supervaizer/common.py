@@ -188,7 +188,6 @@ class ApiSuccess(ApiResult):
                 log_message += f"{message}"
         else:
             id = None
-            detail = detail
             log_message += f"{message}"
 
         super().__init__(

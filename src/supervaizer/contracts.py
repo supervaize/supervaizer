@@ -13,6 +13,9 @@ the Supervaizer server/runtime surface.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import re
 from collections.abc import Iterable
 from enum import StrEnum
@@ -34,7 +37,11 @@ AGENT_REFRESH_EFFECT = "agent.refreshed"
 RULE_CHECKPOINT_RESUME_ACTION = "rule.checkpoint.resume"
 AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
 _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]*={0,2}$")
 V2_DISPLAY_TEXT_MAX_LENGTH = 300
+MISSION_ID_HEADER = "X-Supervaize-Mission-Id"
+MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
+MISSION_METADATA_HEADER_MAX_LENGTH = 4096
 
 
 class ContractModel(BaseModel):
@@ -115,12 +122,42 @@ class EventType(StrEnum):
     CASE_ERROR = "agent.case.error"
 
 
+class V2MissionContext(ContractModel):
+    """Studio mission sent with a request. The SDK does not read ``metadata`` keys."""
+
+    id: str
+    name: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict, strict=True)
+
+    @field_validator("id")
+    @classmethod
+    def _require_non_blank_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("mission.id must not be blank")
+        return value
+
+
+def _require_mission_matches_mission_id(
+    mission: V2MissionContext | None, mission_id: str | None
+) -> None:
+    if mission is not None and mission.id != mission_id:
+        raise ValueError(
+            f"mission.id {mission.id!r} does not match mission_id {mission_id!r}"
+        )
+
+
 class DataResourceContextContract(ContractModel):
     workspace_id: str | None = None
     workspace_slug: str | None = None
     mission_id: str | None = None
+    mission: V2MissionContext | None = None
     agent_slug: str | None = None
     request_id: str | None = None
+
+    @model_validator(mode="after")
+    def _require_mission_matches(self) -> DataResourceContextContract:
+        _require_mission_matches_mission_id(self.mission, self.mission_id)
+        return self
 
 
 class DataResourceFieldContract(ContractModel):
@@ -246,7 +283,7 @@ class JobStartRequest(ContractModel):
     job_context: dict[str, Any]
     job_fields: dict[str, Any] = Field(default_factory=dict)
     encrypted_agent_parameters: str | None = None
-    rule_snapshot: "RuleCheckpointSnapshot | None" = Field(
+    rule_snapshot: RuleCheckpointSnapshot | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
 
@@ -433,9 +470,10 @@ class V2AgentCapabilities(ContractModel):
     actions: list[V2ActionDefinition] = Field(default_factory=list)
     case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
-    rule_checkpoints: "V2RuleCheckpointCapability | None" = Field(
+    rule_checkpoints: V2RuleCheckpointCapability | None = Field(
         default=None, exclude_if=_is_none
     )
+    scheduled_start: bool = Field(default=False, exclude_if=lambda value: not value)
 
     @field_validator("actions", mode="before")
     @classmethod
@@ -474,6 +512,12 @@ class V2AgentCapabilities(ContractModel):
                     mutating=True,
                     scope="job",
                 )
+            )
+        if self.scheduled_start and not any(
+            action.id == "job.start" for action in self.actions
+        ):
+            raise ValueError(
+                "capabilities.scheduled_start requires a declared job.start action"
             )
         return self
 
@@ -841,6 +885,7 @@ def build_v2_agent_registration(
     case_lanes: Iterable[V2CaseLaneDefinition | dict[str, Any]] = (),
     artifact_types: Iterable[V2ArtifactTypeDefinition | dict[str, Any]] = (),
     rule_checkpoints: V2RuleCheckpointCapability | dict[str, Any] | None = None,
+    scheduled_start: bool = False,
     job_policy: V2JobPolicy | dict[str, Any] | None = None,
     a2ui_version: str = SUPERVAIZER_V2_A2UI_VERSION,
     a2a_version: str = SUPERVAIZER_V2_A2A_VERSION,
@@ -917,6 +962,7 @@ def build_v2_agent_registration(
             rule_checkpoints=_contract_or_none(
                 rule_checkpoints, V2RuleCheckpointCapability
             ),
+            scheduled_start=scheduled_start,
         ),
         job_policy=job_policy_definition,
         resources=resource_definitions,
@@ -1191,7 +1237,13 @@ class V2ActionRequest(ContractModel):
     job_id: str | None = None
     case_id: str | None = None
     step_id: str | None = None
+    mission: V2MissionContext | None = None
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
+
+    @model_validator(mode="after")
+    def _require_mission_matches(self) -> V2ActionRequest:
+        _require_mission_matches_mission_id(self.mission, self.mission_id)
+        return self
 
 
 V2_ACTION_CONTEXT_ASSIGN = "context.assign"
@@ -1211,7 +1263,7 @@ class V2ContextAssignment(ContractModel):
     assigned_at: str  # ISO-8601, stamped by Studio
 
     @model_validator(mode="after")
-    def _require_mission_id_for_mission_items(self) -> "V2ContextAssignment":
+    def _require_mission_id_for_mission_items(self) -> V2ContextAssignment:
         if (
             any(item.scope == "mission" for item in self.items)
             and not (self.mission_id or "").strip()
@@ -1234,7 +1286,13 @@ class V2SurfaceRequest(ContractModel):
     job_id: str | None = None
     case_id: str | None = None
     step_id: str | None = None
+    mission: V2MissionContext | None = None
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
+
+    @model_validator(mode="after")
+    def _require_mission_matches(self) -> V2SurfaceRequest:
+        _require_mission_matches_mission_id(self.mission, self.mission_id)
+        return self
 
 
 class V2Effect(ContractModel):
@@ -1399,6 +1457,7 @@ def build_data_resource_context_headers(
     mission_id: str | None = None,
     agent_slug: str | None = None,
     request_id: str | None = None,
+    mission_metadata: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Build Supervaize context headers for Studio DataResource proxy calls."""
     headers: dict[str, str] = {}
@@ -1407,12 +1466,67 @@ def build_data_resource_context_headers(
     if workspace_slug:
         headers["X-Supervaize-Workspace-Slug"] = str(workspace_slug)
     if mission_id:
-        headers["X-Supervaize-Mission-Id"] = str(mission_id)
+        headers[MISSION_ID_HEADER] = str(mission_id)
+    if mission_metadata is not None:
+        if mission_id is None or not mission_id.strip():
+            raise ValueError(f"{MISSION_METADATA_HEADER} requires mission_id")
+        headers[MISSION_METADATA_HEADER] = encode_mission_metadata_header(
+            mission_metadata
+        )
     if agent_slug:
         headers["X-Supervaize-Agent-Slug"] = str(agent_slug)
     if request_id:
         headers["X-Supervaize-Request-Id"] = str(request_id)
     return headers
+
+
+def encode_mission_metadata_header(metadata: dict[str, Any]) -> str:
+    """Encode mission metadata as base64url UTF-8 JSON for ``X-Supervaize-Mission-Metadata``."""
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{MISSION_METADATA_HEADER} must encode a JSON object")
+    try:
+        raw = json.dumps(
+            metadata, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} must encode JSON values only (no NaN or Infinity)"
+        ) from exc
+    encoded = base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+    if len(encoded) > MISSION_METADATA_HEADER_MAX_LENGTH:
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} is {len(encoded)} bytes; "
+            f"the limit is {MISSION_METADATA_HEADER_MAX_LENGTH}"
+        )
+    return encoded
+
+
+def _reject_json_constant(constant: str) -> Any:
+    raise ValueError(f"{constant} is not valid JSON")
+
+
+def decode_mission_metadata_header(value: str) -> dict[str, Any]:
+    """Decode ``X-Supervaize-Mission-Metadata``; raise ``ValueError`` on a bad value."""
+    if len(value) > MISSION_METADATA_HEADER_MAX_LENGTH:
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} is {len(value)} bytes; "
+            f"the limit is {MISSION_METADATA_HEADER_MAX_LENGTH}"
+        )
+    if not _BASE64URL_RE.fullmatch(value):
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} is not base64url-encoded UTF-8 JSON"
+        )
+    padded = value + "=" * (-len(value) % 4)
+    try:
+        raw = base64.b64decode(padded, altchars=b"-_", validate=True)
+        metadata = json.loads(raw.decode("utf-8"), parse_constant=_reject_json_constant)
+    except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} is not base64url-encoded UTF-8 JSON"
+        ) from exc
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{MISSION_METADATA_HEADER} must decode to a JSON object")
+    return metadata
 
 
 def controller_contract_info() -> dict[str, Any]:

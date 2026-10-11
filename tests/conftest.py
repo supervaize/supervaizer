@@ -447,8 +447,8 @@ def reset_supervaizer_environment():
     yield
 
     # Restore original values
-    for key in original_env:
-        os.environ[key] = original_env[key]
+    for key, value in original_env.items():
+        os.environ[key] = value
     # Remove any new SUPERVAIZER_ variables that were added
     for key in list(os.environ.keys()):
         if key.startswith("SUPERVAIZER_") and key not in original_env:

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
 import sys
@@ -20,9 +21,12 @@ from pydantic import ValidationError
 from supervaizer.contracts import (
     AGENT_REFRESH_ACTION,
     API_VERSION,
+    MISSION_METADATA_HEADER,
+    V2_ACTION_CONTEXT_ASSIGN,
     AgentMethodsContract,
-    ControllerEndpoint,
     ControllerContract,
+    ControllerEndpoint,
+    DataResourceContextContract,
     EventType,
     ServerRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
@@ -45,6 +49,7 @@ from supervaizer.contracts import (
     V2JobStateSnapshot,
     V2JobSyncPolicy,
     V2JobSyncResult,
+    V2MissionContext,
     V2ReplaySafetyMetadata,
     V2ResourceDefinition,
     V2ResourceFieldDefinition,
@@ -54,10 +59,11 @@ from supervaizer.contracts import (
     V2VerifiedWorkspaceContext,
     V2WorkspaceAuthorizationSettings,
     V2WorkspaceBindingDefinition,
-    V2_ACTION_CONTEXT_ASSIGN,
     build_data_resource_context_headers,
     build_v2_agent_registration,
     controller_contract_info,
+    decode_mission_metadata_header,
+    encode_mission_metadata_header,
     resolve_controller_endpoint,
 )
 
@@ -366,6 +372,51 @@ def test_build_v2_agent_registration_defaults_identity_and_urls() -> None:
     assert (
         explicit.a2a.agent_card_url == "/.well-known/agents/v1/hello-world_agent.json"
     )
+
+
+@pytest.mark.parametrize("scheduled_start", [None, False, True])
+def test_v2_scheduled_start_registration_round_trip(
+    scheduled_start: bool | None,
+) -> None:
+    options = {} if scheduled_start is None else {"scheduled_start": scheduled_start}
+    registration = build_v2_agent_registration(
+        agent_slug="hello-world",
+        display_name="Hello World",
+        a2ui_catalog_version="hello-ui.1",
+        actions=["job.start"] if scheduled_start else [],
+        **options,
+    )
+
+    payload = registration.model_dump(mode="json")
+    capabilities = payload["capabilities"]
+    assert capabilities.get("scheduled_start", False) is (scheduled_start is True)
+    assert ("scheduled_start" in capabilities) is (scheduled_start is True)
+    assert "job.schedule" not in [action["id"] for action in capabilities["actions"]]
+    restored = SupervaizerV2AgentRegistrationContract.model_validate(payload)
+    assert restored.capabilities.scheduled_start is (scheduled_start is True)
+    assert restored.model_dump(mode="json") == payload
+
+
+def test_v2_scheduled_start_requires_job_start_after_derived_actions() -> None:
+    details = {
+        "agent_slug": "hello-world",
+        "display_name": "Hello World",
+        "a2ui_catalog_version": "hello-ui.1",
+        "scheduled_start": True,
+    }
+
+    with pytest.raises(
+        ValidationError,
+        match="capabilities.scheduled_start requires a declared job.start action",
+    ):
+        build_v2_agent_registration(**details)
+
+    registration = build_v2_agent_registration(
+        **details,
+        job_policy={"setup": {}},
+    )
+    assert registration.capabilities.scheduled_start is True
+    assert "job.start" in [action.id for action in registration.capabilities.actions]
 
 
 def test_build_v2_agent_registration_derives_capabilities() -> None:
@@ -926,6 +977,154 @@ def test_v2_action_result_requires_setup_plan_mapping() -> None:
     }
     with pytest.raises(ValidationError):
         V2ActionResult.model_validate({"status": "ok", "setup_plan": ["invalid"]})
+
+
+_MISSION_METADATA = {"filter": {"contact": {"client_name": "ACME CORP"}}}
+
+
+def _v2_request_payload(**overrides: Any) -> dict[str, Any]:
+    return {
+        "request_id": "request-1",
+        "actor": {"user_id": "user-1"},
+        "workspace": {"id": "workspace-1", "slug": "workspace"},
+        "mission_id": "mission-1",
+        "agent_slug": "agent-interviewer",
+        "surface": "job.configurator",
+        "action": "resource.contacts.list",
+        **overrides,
+    }
+
+
+def test_v2_mission_context_keeps_metadata_uninterpreted() -> None:
+    mission = V2MissionContext.model_validate({
+        "id": "mission-1",
+        "name": "ACME onboarding",
+        "metadata": _MISSION_METADATA,
+    })
+
+    assert mission.model_dump() == {
+        "id": "mission-1",
+        "name": "ACME onboarding",
+        "metadata": _MISSION_METADATA,
+    }
+
+
+@pytest.mark.parametrize("metadata", [json.dumps(_MISSION_METADATA), None, ["a"]])
+def test_v2_mission_context_rejects_non_object_metadata(metadata: Any) -> None:
+    with pytest.raises(ValidationError):
+        V2MissionContext.model_validate({"id": "mission-1", "metadata": metadata})
+
+
+def test_v2_mission_context_rejects_json_string_metadata_in_json_mode() -> None:
+    payload = json.dumps({"id": "mission-1", "metadata": json.dumps(_MISSION_METADATA)})
+
+    with pytest.raises(ValidationError):
+        V2MissionContext.model_validate_json(payload)
+
+
+@pytest.mark.parametrize("mission_id", ["", "   "])
+def test_v2_mission_context_rejects_blank_id(mission_id: str) -> None:
+    with pytest.raises(ValidationError, match="mission.id must not be blank"):
+        V2MissionContext.model_validate({"id": mission_id})
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_rejects_blank_mission_id(
+    model: type[V2SurfaceRequest | V2ActionRequest],
+) -> None:
+    with pytest.raises(ValidationError, match="mission.id must not be blank"):
+        model.model_validate(_v2_request_payload(mission_id=" ", mission={"id": " "}))
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_carries_mission(
+    model: type[V2SurfaceRequest | V2ActionRequest],
+) -> None:
+    request = model.model_validate(
+        _v2_request_payload(mission={"id": "mission-1", "metadata": _MISSION_METADATA})
+    )
+
+    assert request.model_dump()["mission"] == {
+        "id": "mission-1",
+        "name": None,
+        "metadata": _MISSION_METADATA,
+    }
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_without_mission_still_validates(
+    model: type[V2SurfaceRequest | V2ActionRequest],
+) -> None:
+    assert model.model_validate(_v2_request_payload()).mission is None
+
+
+@pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
+def test_v2_request_rejects_mission_id_mismatch(
+    model: type[V2SurfaceRequest | V2ActionRequest],
+) -> None:
+    with pytest.raises(ValidationError, match="does not match mission_id"):
+        model.model_validate(_v2_request_payload(mission={"id": "mission-2"}))
+
+
+def test_data_resource_context_contract_rejects_mission_id_mismatch() -> None:
+    with pytest.raises(ValidationError, match="does not match mission_id"):
+        DataResourceContextContract.model_validate({
+            "mission_id": "mission-1",
+            "mission": {"id": "mission-2"},
+        })
+
+
+def test_mission_metadata_header_round_trip() -> None:
+    metadata = {"filter": {"contact": {"client_name": "Société ACME"}}}
+    headers = build_data_resource_context_headers(
+        mission_id="mission-1", mission_metadata=metadata
+    )
+
+    assert decode_mission_metadata_header(headers[MISSION_METADATA_HEADER]) == metadata
+
+
+def test_mission_metadata_header_decodes_unpadded_value() -> None:
+    encoded = encode_mission_metadata_header({"a": 1}).rstrip("=")
+
+    assert decode_mission_metadata_header(encoded) == {"a": 1}
+
+
+@pytest.mark.parametrize("mission_id", [None, "", "   "])
+def test_mission_metadata_header_requires_mission_id(mission_id: str | None) -> None:
+    with pytest.raises(ValueError, match="requires mission_id"):
+        build_data_resource_context_headers(
+            mission_id=mission_id, mission_metadata=_MISSION_METADATA
+        )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_mission_metadata_header_rejects_non_json_numbers_on_encode(
+    value: float,
+) -> None:
+    with pytest.raises(ValueError, match="no NaN or Infinity"):
+        encode_mission_metadata_header({"score": value})
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_mission_metadata_header_rejects_non_json_numbers_on_decode(
+    constant: str,
+) -> None:
+    encoded = base64.urlsafe_b64encode(f'{{"score":{constant}}}'.encode()).decode()
+
+    with pytest.raises(ValueError, match="not base64url-encoded UTF-8 JSON"):
+        decode_mission_metadata_header(encoded)
+
+
+def test_mission_metadata_header_rejects_standard_base64_alphabet() -> None:
+    standard_base64 = "eyJ4Ijoi4KC+In0="  # {"x":"\u083e"}: "+" is not base64url
+
+    with pytest.raises(ValueError, match="not base64url-encoded"):
+        decode_mission_metadata_header(standard_base64)
+
+
+def test_mission_metadata_header_rejects_oversized_metadata() -> None:
+    with pytest.raises(ValueError, match="the limit is 4096"):
+        encode_mission_metadata_header({"blob": "x" * 4096})
 
 
 def test_v2_surface_request_and_result_models() -> None:

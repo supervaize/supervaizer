@@ -945,7 +945,7 @@ class Agent(AgentAbstract):
             message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
             raise ValueError(message)
         if not self.server_agent_id and not server_agent_id:
-            response_keys = sorted(str(key) for key in agent_from_server.keys())
+            response_keys = sorted(str(key) for key in agent_from_server)
             message = (
                 "Agent update from Studio failed: response did not include agent id "
                 f"for slug={self.slug}. response_keys={response_keys}"

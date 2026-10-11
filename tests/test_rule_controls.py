@@ -34,8 +34,8 @@ from supervaizer.rule_controls import (
     _checkpoint_input_hash,
     _retain_decision,
     recover_guarded_step,
-    run_guarded_step,
     resume_rule_checkpoint,
+    run_guarded_step,
 )
 from supervaizer.server import _rule_checkpoint_resume_handler
 

@@ -36,11 +36,11 @@ logger = logging.getLogger("httpx")
 logger.setLevel(logging.DEBUG)
 
 _httpx_transport = httpx.AsyncHTTPTransport(
-    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", "2"))
 )
 _httpx_client = httpx.AsyncClient(transport=_httpx_transport)
 _sync_httpx_transport = httpx.HTTPTransport(
-    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", "2"))
 )
 _sync_httpx_client = httpx.Client(transport=_sync_httpx_transport)
 
@@ -190,7 +190,7 @@ async def send_event(
             "Connection refused or timed out. Is the controller server running?"
         )
         log.error(f"❌ Error sending event {event.type.name}: {e!s}")
-        raise e
+        raise
     except httpx.HTTPError as e:
         _handle_event_http_error(event, url_event, curl_cmd, e)
 
@@ -218,7 +218,7 @@ def send_event_sync(
             "Connection refused or timed out. Is the controller server running?"
         )
         log.error(f"❌ Error sending event {event.type.name}: {e!s}")
-        raise e
+        raise
     except httpx.HTTPError as e:
         _handle_event_http_error(event, url_event, curl_cmd, e)
 

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 ContextScope = Literal["workspace", "mission"]
 
 _sync_httpx_transport = httpx.HTTPTransport(
-    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", 2))
+    retries=int(os.getenv("SUPERVAIZE_HTTP_MAX_RETRIES", "2"))
 )
 _sync_httpx_client = httpx.Client(transport=_sync_httpx_transport)
 

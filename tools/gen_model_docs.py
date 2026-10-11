@@ -127,7 +127,7 @@ def format_json_in_doc(doc: str) -> str:
 
         # Detect start of potential JSON block
         if not in_json_block:
-            if stripped.startswith("{") or stripped.startswith("["):
+            if stripped.startswith(("{", "[")):
                 in_json_block = True
                 json_lines_raw = [line]
                 brace_count = line.count("{") - line.count("}")

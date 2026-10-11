@@ -6,6 +6,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Scheduled start capability** (PR #132) — v2 agents opt in with `capabilities.scheduled_start: true`; the default and explicit `False` omit the field. Registration rejects the opt-in unless the final actions declare `job.start`. Studio owns the clock and invokes the existing action with a stable occurrence `idempotency_key`. See `docs/2026_10_SCHEDULED_START.md`.
+- **Product feature map** (PR #131) — `docs/product/feature-map.md` indexes user workflows with routes, source, and pytest evidence. `AGENTS.md` and the README point at it. Update the map when a workflow, route, or access rule changes.
+- **Mission context on v2 requests and DataResource calls** (PR #130) — New `V2MissionContext` (`id`, `name`, `metadata`) carries Studio `Mission.metadata` to the agent, uninterpreted. `V2SurfaceRequest`, `V2ActionRequest`, `DataResourceContext`, and `DataResourceContextContract` gain an optional `mission`; a model validator requires a non-blank `mission.id` equal to `mission_id`, and `metadata` accepts a JSON object only. New header `X-Supervaize-Mission-Metadata` (base64url UTF-8 JSON, 4096 bytes max) on DataResource proxy calls: `build_data_resource_context_headers(..., mission_metadata=...)` writes it, `encode_mission_metadata_header` / `decode_mission_metadata_header` are exported, and the data routes set `context.mission` or return HTTP 400 on a bad header or a header without a non-blank `X-Supervaize-Mission-Id`. Optional and additive: requests without `mission` behave as before. Requires a minor release.
+
+### Changed
+
+- **Ruff 0.16 default lint rules** (PR #133) — `pyproject.toml` drops the `select = ["E4", "E7", "E9", "F"]` pin from PR #123 and lints with the Ruff 0.16 defaults. No-op findings are fixed: import order, quoted annotations, explicit `subprocess.run(check=False)`, string `os.getenv` defaults, and similar rewrites. Rules whose fix would change runtime behavior are ignored with a reason in `pyproject.toml` (BLE001, S110, DTZ005, TRY004, RUF012, UP040/UP046/UP047, plus per-file ignores); B008 accepts FastAPI `Body`, `Depends`, and `Query` defaults. No runtime change. A temporary B023 ignore in `routes.py` marked a known bug in v1 custom-method routes; PR #134 fixes it and removes the ignore.
+- **Dependencies** — `jaraco-context` 6.1.2 in `uv.lock` (`dev` extra, via hatch and keyring; fixes PYSEC-2026-1469 / GHSA-58pv-8j8x-9vj2) (PR #135); `astral-sh/setup-uv` 10.2.0 (PR #128); `softprops/action-gh-release` 3.0.3 (PR #126); `trufflesecurity/trufflehog` 3.97.9 (PR #129); `google/osv-scanner-action` reusable workflows 2.6.0 (PR #125, #127).
+
+### Fixed
+
+- **v1 custom-method routes ran the last registered method** (PR #134) — `POST /api/supervaizer/agents/{slug}/custom/{method}` now calls `service_job_custom` with its own method name, and the response message names that method. Before, every custom route ran the last method in `agent.methods.custom`. Route paths, operation names, and OpenAPI output do not change. The `B023` ignore from PR #133 is removed.
+- **README deploy section** — `deploy up` builds the image, pushes it to the platform registry, and stores generated `SUPERVAIZER_API_KEY` and `SUPERVAIZER_PRIVATE_KEY` as platform secrets. The previous "experimental, does not push" note described an older command.
+- **Workbench is v1-only** — `POST /manage/agents/{slug}/workbench/start` returns HTTP 400 for an agent with no v1 `methods` and does not create a job. v2-only agents run through `POST /a2a`.
+- **Data-resource routes were undocumented** — CRUD lives at `/api/agents/{slug}/data/{name}/`, requires `X-API-Key` plus a workspace token, and is not covered by the local-mode `/a2a` bypass.
+- **Local-mode host and workspace-auth docs** — Wildcard hosts (`0.0.0.0`, `::`, empty) bind `127.0.0.1`; an explicit `--host` is kept. The `/a2a` bypass ignores leeway and `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=false`. `POST /a2a` is mounted by default; only `/api` waits for a Studio account or local mode. JSON-RPC `-32030` uses `error.data.code` `workspace_authorization_missing` or `workspace_authorization_not_configured`.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 851   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 48s   |
+
 ## [1.7.0] - 2026-10-04
 
 ### Added
