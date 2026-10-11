@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-11
+
 ### Added
 
 - **Scheduled start capability** (PR #132) — v2 agents opt in with `capabilities.scheduled_start: true`; the default and explicit `False` omit the field. Registration rejects the opt-in unless the final actions declare `job.start`. Studio owns the clock and invokes the existing action with a stable occurrence `idempotency_key`. See `docs/2026_10_SCHEDULED_START.md`.
