@@ -21,10 +21,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import Field
 
 from supervaizer.common import (
+    STRUCTURED_LOG_FORMAT_ENV,
     ApiError,
     ApiSuccess,
     SvBaseModel,
-    STRUCTURED_LOG_FORMAT_ENV,
     configure_controller_logging,
     decrypt_value,
     encrypt_value,

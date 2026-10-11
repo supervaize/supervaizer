@@ -86,7 +86,7 @@ def main() -> None:
     server = Server(
         agents=agents,
         host=os.getenv("SUPERVAIZER_HOST", "0.0.0.0"),
-        port=int(os.getenv("SUPERVAIZER_PORT", 8000)),
+        port=int(os.getenv("SUPERVAIZER_PORT", "8000")),
         debug=True,
         reload=False,  # Set to False to avoid uvicorn import string issue
         api_key="admin-secret-key-123",  # Required for admin interface

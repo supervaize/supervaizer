@@ -13,14 +13,14 @@ external effect, and ambiguous recovery never replays one.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
-
 import asyncio
 import contextlib
 import hashlib
-import httpx
 import json
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
+
+import httpx
 
 from supervaizer.account_service import _httpx_client
 from supervaizer.contracts import (
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from supervaizer.case import Case
 
 T = TypeVar("T")
-_PENDING_GATES: dict[str, "RuleCheckpointGate"] = {}
+_PENDING_GATES: dict[str, RuleCheckpointGate] = {}
 _DELIVERED_DECISIONS: dict[str, RuleCheckpointResume] = {}
 # Early decisions wait milliseconds for their waiter, so past this many newer
 # deliveries an entry is abandoned. Switch to a TTL if a controller needs more.
@@ -64,7 +64,7 @@ class RuleCheckpointGate:
 
     def __init__(
         self,
-        account: "Account",
+        account: Account,
         snapshot: RuleCheckpointSnapshot,
         secret_refs: tuple[str, ...] = (),
         *,
@@ -80,12 +80,12 @@ class RuleCheckpointGate:
     @classmethod
     def from_job_start(
         cls,
-        account: "Account",
+        account: Account,
         request: JobStartRequest | V2ActionRequest,
         *,
         secret_refs: tuple[str, ...] = (),
         agent_slug: str | None = None,
-    ) -> "RuleCheckpointGate":
+    ) -> RuleCheckpointGate:
         """Require the frozen snapshot before running a governed job.
 
         A v1 ``JobStartRequest`` names no agent, so pass ``agent_slug``; a
@@ -279,7 +279,7 @@ def _retain_decision(decision: RuleCheckpointResume) -> None:
 async def run_guarded_step(
     *,
     gate: RuleCheckpointGate,
-    case: "Case",
+    case: Case,
     step_id: str,
     occurrence_id: str,
     before_context: dict[str, Any],
@@ -412,7 +412,7 @@ async def run_guarded_step(
 async def recover_guarded_step(
     *,
     gate: RuleCheckpointGate | None = None,
-    case: "Case",
+    case: Case,
     occurrence_id: str,
     result: T,
     after_context: Callable[[T], dict[str, Any]] | None = None,

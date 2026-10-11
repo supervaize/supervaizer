@@ -45,7 +45,6 @@ from supervaizer.protocol.a2a import (
     create_agents_list,
     create_health_data,
 )
-from supervaizer.protocol.a2a.model import _agent_health_status
 from supervaizer.protocol.a2a.controller import (
     JSON_RPC_ACTION_NOT_REGISTERED,
     JSON_RPC_INTERNAL_ERROR,
@@ -64,6 +63,7 @@ from supervaizer.protocol.a2a.events import (
     subscribe_v2_events,
     unsubscribe_v2_events,
 )
+from supervaizer.protocol.a2a.model import _agent_health_status
 from supervaizer.workspace_authorization import WORKSPACE_AUTHORIZATION_HEADER
 
 
@@ -167,7 +167,7 @@ def test_create_agent_card(agent_fixture: Agent) -> None:
 
     # Check that custom methods are included in tools
     if agent_fixture.methods.custom:
-        for name in agent_fixture.methods.custom.keys():
+        for name in agent_fixture.methods.custom:
             assert name in tool_names
 
     # No release notes declared: the card claims no changelog.

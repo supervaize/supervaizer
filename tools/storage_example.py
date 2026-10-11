@@ -206,7 +206,7 @@ def demo_persistent_lifecycle() -> None:
         print(f"Initial job status: {job.status}")
 
         # Use PersistentEntityLifecycle for automatic persistence
-        success, error = PersistentEntityLifecycle.transition(
+        success, _error = PersistentEntityLifecycle.transition(
             job, EntityStatus.IN_PROGRESS, storage
         )
 
@@ -218,7 +218,7 @@ def demo_persistent_lifecycle() -> None:
         print(f"Stored job status: {stored_job['status']}")
 
         # Handle an event with auto-persistence
-        success, error = PersistentEntityLifecycle.handle_event(
+        success, _error = PersistentEntityLifecycle.handle_event(
             job, EntityEvents.SUCCESSFULLY_DONE, storage
         )
 

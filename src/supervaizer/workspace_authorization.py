@@ -12,16 +12,16 @@ import asyncio
 import base64
 import binascii
 import json
-from collections import OrderedDict
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from typing import Any, TypeAlias
 
+import httpx
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
-import httpx
 from pydantic import Field, ValidationError, field_validator
 
 from supervaizer.common import is_local_mode

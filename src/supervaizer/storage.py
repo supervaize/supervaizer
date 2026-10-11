@@ -309,7 +309,7 @@ class PersistentEntityLifecycle:
 
     @staticmethod
     def transition(
-        entity: T, to_status: "EntityStatus", storage: StorageManager | None = None
+        entity: T, to_status: EntityStatus, storage: StorageManager | None = None
     ) -> tuple[bool, str]:
         """
         Transition an entity and automatically persist the change.
@@ -341,7 +341,7 @@ class PersistentEntityLifecycle:
 
     @staticmethod
     def handle_event(
-        entity: T, event: "EntityEvents", storage: StorageManager | None = None
+        entity: T, event: EntityEvents, storage: StorageManager | None = None
     ) -> tuple[bool, str]:
         """
         Handle an event and automatically persist the change.
@@ -372,14 +372,14 @@ class PersistentEntityLifecycle:
         return success, error
 
 
-def create_job_repository() -> "EntityRepository[Job]":
+def create_job_repository() -> EntityRepository[Job]:
     """Factory function to create a Job repository."""
     from supervaizer.job import Job
 
     return EntityRepository(Job)
 
 
-def create_case_repository() -> "EntityRepository[Case]":
+def create_case_repository() -> EntityRepository[Case]:
     """Factory function to create a Case repository."""
     from supervaizer.case import Case
 

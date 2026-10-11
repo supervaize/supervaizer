@@ -158,5 +158,5 @@ def _display_plan(plan: DeploymentPlan) -> None:
     # Display secrets
     if plan.target_secrets:
         console.print("\n[bold]Secrets:[/bold]")
-        for key in plan.target_secrets.keys():
+        for key in plan.target_secrets:
             console.print(f"  {key}=***")

@@ -478,10 +478,9 @@ def create_admin_routes() -> APIRouter:
             filtered_agents = []
             for agent in agents:
                 # Status filter (we'll add this to agent data later)
-                if status and status != "all":
-                    # For now, assume all agents are active since we don't have status
-                    if status != "active":
-                        continue
+                # For now, assume all agents are active since we don't have status
+                if status and status not in ("all", "active"):
+                    continue
 
                 # Agent type filter
                 if agent_type and agent_type != "":
