@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
 import sys
@@ -1049,6 +1050,24 @@ def test_mission_metadata_header_requires_mission_id(mission_id: str | None) -> 
         build_data_resource_context_headers(
             mission_id=mission_id, mission_metadata=_MISSION_METADATA
         )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_mission_metadata_header_rejects_non_json_numbers_on_encode(
+    value: float,
+) -> None:
+    with pytest.raises(ValueError, match="no NaN or Infinity"):
+        encode_mission_metadata_header({"score": value})
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_mission_metadata_header_rejects_non_json_numbers_on_decode(
+    constant: str,
+) -> None:
+    encoded = base64.urlsafe_b64encode(f'{{"score":{constant}}}'.encode()).decode()
+
+    with pytest.raises(ValueError, match="not base64url-encoded UTF-8 JSON"):
+        decode_mission_metadata_header(encoded)
 
 
 def test_mission_metadata_header_rejects_standard_base64_alphabet() -> None:

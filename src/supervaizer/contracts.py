@@ -1475,7 +1475,14 @@ def encode_mission_metadata_header(metadata: dict[str, Any]) -> str:
     """Encode mission metadata as base64url UTF-8 JSON for ``X-Supervaize-Mission-Metadata``."""
     if not isinstance(metadata, dict):
         raise ValueError(f"{MISSION_METADATA_HEADER} must encode a JSON object")
-    raw = json.dumps(metadata, separators=(",", ":"), ensure_ascii=False)
+    try:
+        raw = json.dumps(
+            metadata, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"{MISSION_METADATA_HEADER} must encode JSON values only (no NaN or Infinity)"
+        ) from exc
     encoded = base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
     if len(encoded) > MISSION_METADATA_HEADER_MAX_LENGTH:
         raise ValueError(
@@ -1483,6 +1490,10 @@ def encode_mission_metadata_header(metadata: dict[str, Any]) -> str:
             f"the limit is {MISSION_METADATA_HEADER_MAX_LENGTH}"
         )
     return encoded
+
+
+def _reject_json_constant(constant: str) -> Any:
+    raise ValueError(f"{constant} is not valid JSON")
 
 
 def decode_mission_metadata_header(value: str) -> dict[str, Any]:
@@ -1499,7 +1510,7 @@ def decode_mission_metadata_header(value: str) -> dict[str, Any]:
     padded = value + "=" * (-len(value) % 4)
     try:
         raw = base64.b64decode(padded, altchars=b"-_", validate=True)
-        metadata = json.loads(raw.decode("utf-8"))
+        metadata = json.loads(raw.decode("utf-8"), parse_constant=_reject_json_constant)
     except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
         raise ValueError(
             f"{MISSION_METADATA_HEADER} is not base64url-encoded UTF-8 JSON"
