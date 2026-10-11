@@ -998,31 +998,11 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
             return body_params.model_dump()
         raise ValueError("body_params must be an object")
 
-    # Create a route for each custom method
-    for method_name, method_config in agent.methods.custom.items():
-        # Create the dynamic model with the custom name for FastAPI documentation
-        custom_job_model_name = f"{agent.slug}_Custom_{method_name}_Job_Model"
-        _AgentCustomAbstractJob = type(
-            custom_job_model_name,
-            (method_config.job_model,),
-            {},
-        )
-
-        @router.post(
-            f"/custom/{method_name}",
-            summary=f"Trigger custom method '{method_name}' for agent: {agent.name}",
-            description=f"{method_config.description if hasattr(method_config, 'description') else f'Trigger custom method {method_name}'}",
-            response_model=JobResponse,
-            responses={
-                http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
-                http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
-                http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
-            },
-            dependencies=[
-                Depends(require_scope("write"))
-            ],  # <-- MODIFIED: scope-enforced write
-            name=f"{agent.slug}_custom_{method_name}",  # Unique operation ID
-        )
+    # A factory binds method_name per route. A closure defined in the loop
+    # would read the last registered method_name at request time.
+    def make_custom_method_endpoint(
+        method_name: str,
+    ) -> Callable[..., Awaitable[JobResponse | JSONResponse]]:
         @handle_route_errors()
         async def custom_method_endpoint(
             background_tasks: BackgroundTasks,
@@ -1064,5 +1044,33 @@ def create_agent_custom_routes(server: "Server", agent: Agent) -> APIRouter:
                 message=f"Custom method '{method_name}' job started for agent {agent.name}",
                 payload=new_job.payload,
             )
+
+        return custom_method_endpoint
+
+    # Create a route for each custom method
+    for method_name, method_config in agent.methods.custom.items():
+        # Create the dynamic model with the custom name for FastAPI documentation
+        custom_job_model_name = f"{agent.slug}_Custom_{method_name}_Job_Model"
+        _AgentCustomAbstractJob = type(
+            custom_job_model_name,
+            (method_config.job_model,),
+            {},
+        )
+
+        router.post(
+            f"/custom/{method_name}",
+            summary=f"Trigger custom method '{method_name}' for agent: {agent.name}",
+            description=f"{method_config.description if hasattr(method_config, 'description') else f'Trigger custom method {method_name}'}",
+            response_model=JobResponse,
+            responses={
+                http_status.HTTP_202_ACCEPTED: {"model": JobResponse},
+                http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
+                http_status.HTTP_405_METHOD_NOT_ALLOWED: {"model": ErrorResponse},
+            },
+            dependencies=[
+                Depends(require_scope("write"))
+            ],  # <-- MODIFIED: scope-enforced write
+            name=f"{agent.slug}_custom_{method_name}",  # Unique operation ID
+        )(make_custom_method_endpoint(method_name))
 
     return router
