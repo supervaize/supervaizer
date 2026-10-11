@@ -1,7 +1,7 @@
 # API Surfaces and Authentication
 
 > **Created:** 2025-08-06
-> **Updated:** 2026-09-25
+> **Updated:** 2026-10-11
 
 Supervaizer exposes FastAPI's generated documentation plus four route surfaces with different access rules.
 
@@ -13,6 +13,12 @@ Supervaizer exposes FastAPI's generated documentation plus four route surfaces w
 | `/api/*` (for example `/api/supervaizer/...`, `/api/agents/{slug}/...`) | `X-API-Key` header required; 401 when missing or wrong. Mounted only when Studio credentials are configured or local mode is on |
 | `POST /a2a`, `GET /a2a/events` | `X-API-Key` with `write` scope for `/a2a`, `read` scope for `/a2a/events`; 403 when the scope is insufficient |
 | `/manage/*` (admin UI and workbench) | Tailscale client IP only, no API key. See [2025_08_ADMIN_README.md](2025_08_ADMIN_README.md) |
+
+Workflow index: [product/feature-map.md](product/feature-map.md).
+
+## Data resources
+
+`DataResource` callbacks are mounted at `/api/agents/{slug}/data/{name}/` (list, detail, create, update, delete, and `import/`). They sit on the `/api` router, so they need `X-API-Key`; writes also need write scope. They are not under `/api/supervaizer`. A workspace authorization token is required on every call, including local mode. A route is registered only when that callback is set. See [product/feature-map.md](product/feature-map.md).
 
 ## API Key
 

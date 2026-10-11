@@ -1,7 +1,7 @@
 # Supervaizer
 
 > **Created:** 2024-12-28
-> **Updated:** 2026-10-05
+> **Updated:** 2026-10-11
 
 Supervaizer is the Python controller SDK for exposing AI agents to Supervaize Studio through the Supervaizer v2 operation contract.
 
@@ -17,6 +17,7 @@ Supervaizer does not contain agent business logic. Agents declare their resource
 
 ## Start Here
 
+- [Product feature map](docs/product/feature-map.md) — workflows, routes, and the pytest that covers each one
 - [Supervaizer v2 concepts](docs/2026_05_SUPERVAIZER_v2.md)
 - [Protocols: A2A, A2UI, AG-UI, and Supervaizer v2](docs/2026_05_PROTOCOLS.md)
 - [CLI reference](docs/2025_08_CLI.md)
@@ -299,9 +300,9 @@ supervaizer deploy local --name my-agent --generate-api-key
 supervaizer deploy up --platform cloud-run --name my-agent --project-id my-gcp-project --region us-central1
 ```
 
-Targets: Google Cloud Run, AWS App Runner, and DigitalOcean App Platform.
+`deploy up` builds the image, pushes it to the platform registry, and, when `--generate-api-key` or `--generate-rsa` is set, stores `SUPERVAIZER_API_KEY` and `SUPERVAIZER_PRIVATE_KEY` as platform secrets. Targets: Google Cloud Run, AWS App Runner, and DigitalOcean App Platform.
 
-> **Experimental:** `deploy up` builds the image locally but does not push it to a registry, and generated secrets are not injected under the variable names the server reads. Use `plan` and `local` today; finish cloud deployment with your provider's CLI.
+Cloud Run services start private, and the runtime service account needs access to those secrets. App Runner has no ECR or instance role, so treat that platform as experimental. `deploy up` prints failures and still exits 0. Options, registries, and the full limit list are in the [CLI reference](docs/2025_08_CLI.md#deploy).
 
 See:
 
@@ -310,7 +311,7 @@ See:
 
 ## Admin Interface
 
-The admin interface and agent workbench are mounted at `/manage` (`admin_interface=True`, the default). Access is restricted to Tailscale addresses (`100.64.0.0/10`), plus loopback in local mode; no API key is used. See [docs/2025_08_ADMIN_README.md](docs/2025_08_ADMIN_README.md).
+The admin interface and agent workbench are mounted at `/manage` (`admin_interface=True`, the default). Access is restricted to Tailscale addresses (`100.64.0.0/10`), plus loopback in local mode; no API key is used. The workbench starts v1 jobs only; a v2-only agent is operated through `POST /a2a`. See [docs/2025_08_ADMIN_README.md](docs/2025_08_ADMIN_README.md).
 
 ## Development
 
