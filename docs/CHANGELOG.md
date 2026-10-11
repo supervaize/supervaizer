@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **Ruff 0.16 default lint rules** (PR #133) — `pyproject.toml` drops the `select = ["E4", "E7", "E9", "F"]` pin from PR #123 and lints with the Ruff 0.16 defaults. No-op findings are fixed: import order, quoted annotations, explicit `subprocess.run(check=False)`, string `os.getenv` defaults, and similar rewrites. Rules whose fix would change runtime behavior are ignored with a reason in `pyproject.toml` (BLE001, S110, DTZ005, TRY004, RUF012, UP040/UP046/UP047, plus per-file ignores); B008 accepts FastAPI `Body`, `Depends`, and `Query` defaults. No runtime change. A temporary B023 ignore in `routes.py` marked a known bug in v1 custom-method routes; PR #134 fixes it and removes the ignore.
+- **Dependencies** — `jaraco-context` 6.1.2 in `uv.lock` (`dev` extra, via hatch and keyring; fixes PYSEC-2026-1469 / GHSA-58pv-8j8x-9vj2) (PR #135); `astral-sh/setup-uv` 10.2.0 (PR #128); `softprops/action-gh-release` 3.0.3 (PR #126); `trufflesecurity/trufflehog` 3.97.9 (PR #129); `google/osv-scanner-action` reusable workflows 2.6.0 (PR #125, #127).
 
 ### Fixed
 
