@@ -72,10 +72,10 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Access: `X-API-Key` with write scope. Outside the local-mode bypass, also `X-Supervaize-Workspace-Authorization: Bearer <token>`.
 - Preconditions: The agent declares the action and a handler is registered for that `agent_slug`. `POST /a2a` is mounted when `a2a_endpoints` is true, which is the default, including a standalone server with no Studio account and local mode off. `/api` is mounted only when a Studio account is set or local mode is on. Either of those forces `a2a_endpoints` back to true.
 - Main flow:
-  1. Send `supervaizer/action.invoke` with `agent_slug`, `action`, and `input`.
+  1. Send `supervaizer/action.invoke` with `agent_slug`, `action`, and `input`. Studio can add `mission` (`id`, `name`, `metadata`): the Studio `Mission.metadata`, passed to the handler on `request.mission` without changes.
   2. Read `effects` and optional `job_state`.
 - Expected result: The registered handler runs and the JSON-RPC result carries its effects.
-- Important states: Unknown action `-32010`. Missing handler for a declared action fails the same way. Unknown agent is rejected. Workspace auth failures are JSON-RPC `-32030`. `error.data.code` is `workspace_authorization_missing` when the verifier is enabled and the header is absent, and `workspace_authorization_not_configured` when no verifier is enabled. `supervaizer/surface.load` uses the same auth codes. Bootstrap actions `workspace_binding.options` and `workspace_binding.create` do not need a workspace token.
+- Important states: Unknown action `-32010`. Missing handler for a declared action fails the same way. Unknown agent is rejected. Workspace auth failures are JSON-RPC `-32030`. `error.data.code` is `workspace_authorization_missing` when the verifier is enabled and the header is absent, and `workspace_authorization_not_configured` when no verifier is enabled. `supervaizer/surface.load` uses the same auth codes. Bootstrap actions `workspace_binding.options` and `workspace_binding.create` do not need a workspace token. An invalid request is `-32602`, for example when `mission.id` differs from `mission_id` or `mission.metadata` is not a JSON object.
 - Source: `src/supervaizer/protocol/a2a/routes.py`, `src/supervaizer/protocol/a2a/controller.py`
 - Verification: `tests/test_local_mode_a2a.py`, `tests/test_a2a.py`
 - Known caveats: Pass `agent_slug` on every handler. Local mode adds Hello World, so a multi-agent server cannot infer the slug. A bare action id defaults to `mutating=True, scope="job"`.
@@ -89,12 +89,12 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Access: Same as invoking an action (write scope, plus a workspace token outside the local-mode bypass).
 - Preconditions: The surface is declared and a handler is registered.
 - Main flow:
-  1. Send `supervaizer/surface.load` with `agent_slug` and the surface id.
+  1. Send `supervaizer/surface.load` with `agent_slug` and the surface id. `mission` is optional, as for an action.
   2. Render the returned A2UI document in Studio. Supervaizer does not render it.
 - Expected result: The handler's document is returned for that surface.
-- Important states: Missing surface handler answers `-32011`. The `workspace_binding.create` surface is in the bootstrap set and does not need a workspace token.
+- Important states: Missing surface handler answers `-32011`. The `workspace_binding.create` surface is in the bootstrap set and does not need a workspace token. An invalid request, such as a `mission.id` mismatch, is `-32602`.
 - Source: `src/supervaizer/protocol/a2a/controller.py`
-- Verification: `tests/test_local_mode_a2a.py`
+- Verification: `tests/test_local_mode_a2a.py`, `tests/test_a2a.py`
 - Known caveats: A2UI version and `a2ui_catalog_version` are pinned on the registration. Incompatible versions should fail in Studio, not be best-effort rendered.
 
 ## Watch v2 effects
@@ -164,12 +164,12 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Main flow:
   1. Declare a `DataResource` on the agent.
   2. Studio calls the generated route with the API key and a workspace token.
-  3. The callback receives a `DataResourceContext`.
+  3. The callback receives a `DataResourceContext`. In a mission scope, Studio can also send `X-Supervaize-Mission-Id` and `X-Supervaize-Mission-Metadata` (base64url JSON object, 4096 bytes max). The callback then gets `context.mission` with the uninterpreted `Mission.metadata`.
 - Expected result: The callback's records are returned. Registration info includes the resource.
-- Important states: HTTP 403. No enabled verifier: the detail says workspace authorization is not configured. Verifier on and no token: the detail names the missing header. A callback `PermissionError` is also HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id.
+- Important states: HTTP 403. No enabled verifier: the detail says workspace authorization is not configured. Verifier on and no token: the detail names the missing header. A callback `PermissionError` is also HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id. HTTP 400 when `X-Supervaize-Mission-Metadata` has no `X-Supervaize-Mission-Id`, does not decode to a JSON object, or is too large; the callback is not called.
 - Source: `src/supervaizer/data_resource.py`, `src/supervaizer/data_routes.py`, `src/supervaizer/routers/api.py`
 - Verification: `tests/test_data_resource.py`, `tests/test_routes.py`, `tests/test_agent.py`
-- Known caveats: This is not a v2 `resources=[...]` declaration. That path derives `resource.<id>.<operation>` actions invoked through `POST /a2a`. Data-resource routes are a separate CRUD surface, they are not under `/api/supervaizer`, and local mode does not bypass their workspace check. Names must be unique per agent.
+- Known caveats: This is not a v2 `resources=[...]` declaration. That path derives `resource.<id>.<operation>` actions invoked through `POST /a2a`. Data-resource routes are a separate CRUD surface, they are not under `/api/supervaizer`, and local mode does not bypass their workspace check. Names must be unique per agent. The mission metadata header is not signed: use it to scope results, not as an access boundary.
 
 ## Declare a v2 resource
 
