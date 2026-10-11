@@ -11,9 +11,9 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from enum import Enum
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import shortuuid
@@ -286,7 +286,7 @@ class Case(CaseAbstractModel):
     def _prepare_update(self, update: CaseNodeUpdate) -> None:
         update.index = len(self.updates) + 1
         if update.error:
-            success, error = PersistentEntityLifecycle.handle_event(
+            _success, _error = PersistentEntityLifecycle.handle_event(
                 self, EntityEvents.ERROR_ENCOUNTERED
             )
             log.warning(
@@ -666,7 +666,7 @@ class Cases:
         now = datetime.now(UTC)
         due = []
         for job_cases in self.cases_by_job.values():
-            for case_id, case in job_cases.items():
+            for case in job_cases.values():
                 for i, update in enumerate(case.updates):
                     scheduled_at = getattr(update, "scheduled_at", None)
                     scheduled_status = getattr(update, "scheduled_status", None)

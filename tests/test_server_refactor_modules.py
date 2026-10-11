@@ -10,11 +10,8 @@ from typing import Any
 
 import pytest
 
-import supervaizer.scheduled_steps as scheduled_steps
 import supervaizer.server as server_module
-import supervaizer.server_config as server_config
-import supervaizer.server_info as server_info
-from supervaizer import Server
+from supervaizer import Server, scheduled_steps, server_config, server_info
 from supervaizer.common import ApiSuccess
 from supervaizer.server_registration import build_server_registration_info
 from supervaizer.studio_handshake import validate_registration_handshake

@@ -48,7 +48,11 @@ class TestLocalTesting:
 
         assert result is True
         mock_run.assert_called_once_with(
-            ["docker", "version"], capture_output=True, text=True, timeout=10
+            ["docker", "version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
         )
 
     def test_check_docker_available_failure(self, mocker: MockerFixture):
@@ -239,6 +243,7 @@ class TestLocalTesting:
             ["docker", "compose", "-f", ".deployment/docker-compose.yml", "down"],
             capture_output=True,
             text=True,
+            check=False,
         )
 
     def test_cleanup_test_resources_failure(self, mocker: MockerFixture):

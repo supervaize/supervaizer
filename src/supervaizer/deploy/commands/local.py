@@ -176,7 +176,11 @@ def _check_docker_available() -> bool:
     """Check if Docker is available and running."""
     try:
         result = subprocess.run(
-            ["docker", "version"], capture_output=True, text=True, timeout=10
+            ["docker", "version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -220,7 +224,9 @@ def _start_docker_compose(verbose: bool = False) -> None:
     if not Path(".deployment/docker-compose.yml").exists():
         raise RuntimeError("Docker Compose file not found")
 
-    result = subprocess.run([*COMPOSE, "up", "-d"], capture_output=True, text=True)
+    result = subprocess.run(
+        [*COMPOSE, "up", "-d"], capture_output=True, text=True, check=False
+    )
     if verbose:
         if result.stdout:
             console.print(result.stdout)
@@ -343,6 +349,7 @@ def _show_service_logs(service_name: str) -> None:
             [*COMPOSE, "logs", "--tail=100", service_name],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.stdout:
             console.print(result.stdout)
@@ -361,6 +368,7 @@ def _show_service_logs(service_name: str) -> None:
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             if docker_logs.stdout:
                 console.print(docker_logs.stdout)
@@ -370,7 +378,7 @@ def _show_service_logs(service_name: str) -> None:
         # Also try to get container status
         console.print("\n[bold]Container Status:[/]")
         status_result = subprocess.run(
-            [*COMPOSE, "ps", "-a"], capture_output=True, text=True
+            [*COMPOSE, "ps", "-a"], capture_output=True, text=True, check=False
         )
         if status_result.stdout:
             console.print(status_result.stdout)
@@ -382,7 +390,7 @@ def _cleanup_test_resources(service_name: str) -> None:
     """Clean up test resources."""
     console.print("\n[bold]Cleaning up test resources...[/]")
     try:
-        subprocess.run([*COMPOSE, "down"], capture_output=True, text=True)
+        subprocess.run([*COMPOSE, "down"], capture_output=True, text=True, check=False)
         console.print("[green]✓[/] Test resources cleaned up")
     except Exception as e:
         console.print(f"[yellow]Warning:[/] Failed to cleanup resources: {e}")

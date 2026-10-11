@@ -21,9 +21,12 @@ from pydantic import ValidationError
 from supervaizer.contracts import (
     AGENT_REFRESH_ACTION,
     API_VERSION,
+    MISSION_METADATA_HEADER,
+    V2_ACTION_CONTEXT_ASSIGN,
     AgentMethodsContract,
-    ControllerEndpoint,
     ControllerContract,
+    ControllerEndpoint,
+    DataResourceContextContract,
     EventType,
     ServerRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
@@ -38,7 +41,6 @@ from supervaizer.contracts import (
     V2CaseSnapshot,
     V2ContextAssignment,
     V2ContextAssignmentItem,
-    V2MissionContext,
     V2DashboardWidgetDataRef,
     V2DashboardWidgetDefinition,
     V2DashboardWidgetVisualization,
@@ -47,6 +49,7 @@ from supervaizer.contracts import (
     V2JobStateSnapshot,
     V2JobSyncPolicy,
     V2JobSyncResult,
+    V2MissionContext,
     V2ReplaySafetyMetadata,
     V2ResourceDefinition,
     V2ResourceFieldDefinition,
@@ -56,14 +59,11 @@ from supervaizer.contracts import (
     V2VerifiedWorkspaceContext,
     V2WorkspaceAuthorizationSettings,
     V2WorkspaceBindingDefinition,
-    V2_ACTION_CONTEXT_ASSIGN,
-    DataResourceContextContract,
-    MISSION_METADATA_HEADER,
     build_data_resource_context_headers,
     build_v2_agent_registration,
+    controller_contract_info,
     decode_mission_metadata_header,
     encode_mission_metadata_header,
-    controller_contract_info,
     resolve_controller_endpoint,
 )
 
@@ -1030,7 +1030,7 @@ def test_v2_mission_context_rejects_blank_id(mission_id: str) -> None:
 
 @pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
 def test_v2_request_rejects_blank_mission_id(
-    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+    model: type[V2SurfaceRequest | V2ActionRequest],
 ) -> None:
     with pytest.raises(ValidationError, match="mission.id must not be blank"):
         model.model_validate(_v2_request_payload(mission_id=" ", mission={"id": " "}))
@@ -1038,7 +1038,7 @@ def test_v2_request_rejects_blank_mission_id(
 
 @pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
 def test_v2_request_carries_mission(
-    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+    model: type[V2SurfaceRequest | V2ActionRequest],
 ) -> None:
     request = model.model_validate(
         _v2_request_payload(mission={"id": "mission-1", "metadata": _MISSION_METADATA})
@@ -1053,14 +1053,14 @@ def test_v2_request_carries_mission(
 
 @pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
 def test_v2_request_without_mission_still_validates(
-    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+    model: type[V2SurfaceRequest | V2ActionRequest],
 ) -> None:
     assert model.model_validate(_v2_request_payload()).mission is None
 
 
 @pytest.mark.parametrize("model", [V2SurfaceRequest, V2ActionRequest])
 def test_v2_request_rejects_mission_id_mismatch(
-    model: type[V2SurfaceRequest] | type[V2ActionRequest],
+    model: type[V2SurfaceRequest | V2ActionRequest],
 ) -> None:
     with pytest.raises(ValidationError, match="does not match mission_id"):
         model.model_validate(_v2_request_payload(mission={"id": "mission-2"}))

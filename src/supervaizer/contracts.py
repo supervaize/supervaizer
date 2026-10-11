@@ -155,7 +155,7 @@ class DataResourceContextContract(ContractModel):
     request_id: str | None = None
 
     @model_validator(mode="after")
-    def _require_mission_matches(self) -> "DataResourceContextContract":
+    def _require_mission_matches(self) -> DataResourceContextContract:
         _require_mission_matches_mission_id(self.mission, self.mission_id)
         return self
 
@@ -283,7 +283,7 @@ class JobStartRequest(ContractModel):
     job_context: dict[str, Any]
     job_fields: dict[str, Any] = Field(default_factory=dict)
     encrypted_agent_parameters: str | None = None
-    rule_snapshot: "RuleCheckpointSnapshot | None" = Field(
+    rule_snapshot: RuleCheckpointSnapshot | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
 
@@ -470,7 +470,7 @@ class V2AgentCapabilities(ContractModel):
     actions: list[V2ActionDefinition] = Field(default_factory=list)
     case_lanes: list[V2CaseLaneDefinition] = Field(default_factory=list)
     artifact_types: list[V2ArtifactTypeDefinition] = Field(default_factory=list)
-    rule_checkpoints: "V2RuleCheckpointCapability | None" = Field(
+    rule_checkpoints: V2RuleCheckpointCapability | None = Field(
         default=None, exclude_if=_is_none
     )
     scheduled_start: bool = Field(default=False, exclude_if=lambda value: not value)
@@ -1241,7 +1241,7 @@ class V2ActionRequest(ContractModel):
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
     @model_validator(mode="after")
-    def _require_mission_matches(self) -> "V2ActionRequest":
+    def _require_mission_matches(self) -> V2ActionRequest:
         _require_mission_matches_mission_id(self.mission, self.mission_id)
         return self
 
@@ -1263,7 +1263,7 @@ class V2ContextAssignment(ContractModel):
     assigned_at: str  # ISO-8601, stamped by Studio
 
     @model_validator(mode="after")
-    def _require_mission_id_for_mission_items(self) -> "V2ContextAssignment":
+    def _require_mission_id_for_mission_items(self) -> V2ContextAssignment:
         if (
             any(item.scope == "mission" for item in self.items)
             and not (self.mission_id or "").strip()
@@ -1290,7 +1290,7 @@ class V2SurfaceRequest(ContractModel):
     workspace_authorization: V2VerifiedWorkspaceContext | None = None
 
     @model_validator(mode="after")
-    def _require_mission_matches(self) -> "V2SurfaceRequest":
+    def _require_mission_matches(self) -> V2SurfaceRequest:
         _require_mission_matches_mission_id(self.mission, self.mission_id)
         return self
 

@@ -70,10 +70,11 @@ def deploy_down(
             console.print(f"  Status: {state.status}")
 
         # Confirmation prompt
-        if not yes:
-            if not Confirm.ask(f"\nAre you sure you want to destroy {name}-{env}?"):
-                console.print("[yellow]Destruction cancelled[/yellow]")
-                return
+        if not yes and not Confirm.ask(
+            f"\nAre you sure you want to destroy {name}-{env}?"
+        ):
+            console.print("[yellow]Destruction cancelled[/yellow]")
+            return
 
         # Create driver
         driver = create_driver(platform, region, project_id)

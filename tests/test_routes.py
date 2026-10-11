@@ -20,8 +20,7 @@ from typing import Any
 import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 from fastapi.testclient import TestClient
 
 from supervaizer import (
