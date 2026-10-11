@@ -294,6 +294,21 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Verification: `tests/test_validation_endpoints.py`
 - Known caveats: v2-only agents keep these routes and the instructions page, and they do not get `/jobs`, `/stop`, or `/status`. String type labels such as `"str"` are not type-checked. `True` passes an `int` check.
 
+## Trigger a v1 custom method
+
+- Purpose: Start a job that runs one named v1 custom method of an agent.
+- Entry points: `POST /api/supervaizer/agents/{agent_slug}/custom/{method}`, one route per key of `agent.methods.custom`
+- Access: `X-API-Key` with write scope. Mounted only with a Studio account or local mode.
+- Preconditions: The agent defines v1 `methods.custom`. v2-only agents do not get these routes.
+- Main flow:
+  1. Post a JSON object with `job_context` and, optionally, `job_fields` and `encrypted_agent_parameters`.
+  2. The route schedules `agent.job_start` in the background with the method name from the route path.
+- Expected result: HTTP 200 with `job_id`, `status`, and the message `Custom method '{method}' job started for agent {name}`.
+- Important states: A missing `job_context`, a body that is not an object, an empty `job_id`, or a bad agent-parameter shape returns HTTP 400. A known `job_context.job_id` reuses that job.
+- Source: `src/supervaizer/routes.py` (`create_agent_custom_routes`), `src/supervaizer/job_service.py` (`service_job_custom`)
+- Verification: `tests/test_server.py` (`test_custom_method_endpoint_accepts_dict_body`, `test_custom_method_endpoint_binds_its_own_method_name`)
+- Known caveats: Before PR #134, every custom route ran the last method in `agent.methods.custom`. The OpenAPI request body is untyped.
+
 ## Smoke-test the container
 
 - Purpose: Run the image that `deploy up` ships, on this machine.
