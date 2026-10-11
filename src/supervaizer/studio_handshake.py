@@ -23,7 +23,7 @@ def validate_registration_handshake(server: Any, result: ApiSuccess) -> None:
         )
     handshake = response_object.get("supervaizer_handshake")
     if not isinstance(handshake, dict):
-        response_keys = sorted(str(key) for key in response_object.keys())
+        response_keys = sorted(str(key) for key in response_object)
         raise RuntimeError(
             "Studio registration handshake failed: server.register response did not "
             "include supervaizer_handshake. Studio-to-agent API key persistence could "

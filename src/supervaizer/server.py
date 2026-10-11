@@ -25,11 +25,11 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPubl
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse  # <-- MODIFIED: removed unused HTMLResponse
-from starlette.datastructures import MutableHeaders
 
 # <-- REMOVED: Jinja2Templates (home page moved to routers/public.py)
 from pydantic import ConfigDict, Field, field_validator
 from rich import inspect
+from starlette.datastructures import MutableHeaders
 
 from supervaizer.__version__ import VERSION
 from supervaizer.account import Account
@@ -49,9 +49,9 @@ from supervaizer.common import (
 from supervaizer.contracts import (
     API_VERSION,
     RULE_CHECKPOINT_RESUME_ACTION,
+    RuleCheckpointResume,
     V2ActionResult,
     V2Effect,
-    RuleCheckpointResume,
     V2WorkspaceAuthorizationSettings,
 )
 from supervaizer.instructions import display_instructions

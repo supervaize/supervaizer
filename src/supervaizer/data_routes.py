@@ -12,15 +12,19 @@
 
 """FastAPI route generation for DataResource CRUD endpoints.
 
-For each DataResource declared on an Agent, generates routes under:
-    GET    /agents/{slug}/data/{resource_name}/            — list
-    GET    /agents/{slug}/data/{resource_name}/{item_id}   — detail
-    POST   /agents/{slug}/data/{resource_name}/            — create
-    PUT    /agents/{slug}/data/{resource_name}/{item_id}   — update
-    DELETE /agents/{slug}/data/{resource_name}/{item_id}   — delete
-    POST   /agents/{slug}/data/{resource_name}/import/     — CSV bulk import
+For each DataResource declared on an Agent, generates routes under
+``/api`` plus ``agent.path`` (``/agents/{slug}``):
 
-All routes require the server API key (same auth as existing agent routes).
+    GET    /api/agents/{slug}/data/{resource_name}/            — list
+    GET    /api/agents/{slug}/data/{resource_name}/{item_id}   — detail
+    POST   /api/agents/{slug}/data/{resource_name}/            — create
+    PUT    /api/agents/{slug}/data/{resource_name}/{item_id}   — update
+    DELETE /api/agents/{slug}/data/{resource_name}/{item_id}   — delete
+    POST   /api/agents/{slug}/data/{resource_name}/import/     — CSV bulk import
+
+A route exists only when that callback is set. Every route requires
+``X-API-Key``; writes also require write scope. Workspace authorization
+is always checked, including in local mode.
 Uses factory functions per resource to avoid Python closure-in-loop capture bugs.
 """
 
@@ -41,7 +45,13 @@ from fastapi.responses import JSONResponse
 
 from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.common import log
-from supervaizer.contracts import V2WorkspaceContext
+from supervaizer.contracts import (
+    MISSION_ID_HEADER,
+    MISSION_METADATA_HEADER,
+    V2MissionContext,
+    V2WorkspaceContext,
+    decode_mission_metadata_header,
+)
 from supervaizer.data_resource import DataResource, DataResourceContext
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationError,
@@ -319,14 +329,34 @@ def _context_from_request(
         )
     workspace_id = verified_workspace.workspace_id
     workspace_slug = verified_workspace.workspace_slug
+    mission_id = request.headers.get(MISSION_ID_HEADER)
     return DataResourceContext(
         workspace_id=workspace_id,
         workspace_slug=workspace_slug,
-        mission_id=request.headers.get("X-Supervaize-Mission-Id"),
+        mission_id=mission_id,
+        mission=_mission_from_request(request, mission_id),
         agent_slug=agent_slug,
         request_id=request.headers.get("X-Supervaize-Request-Id"),
         workspace_authorization=verified_workspace,
     )
+
+
+def _mission_from_request(
+    request: Request, mission_id: str | None
+) -> V2MissionContext | None:
+    encoded_metadata = request.headers.get(MISSION_METADATA_HEADER)
+    if encoded_metadata is None:
+        return None
+    if mission_id is None or not mission_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail=f"{MISSION_METADATA_HEADER} requires {MISSION_ID_HEADER}",
+        )
+    try:
+        metadata = decode_mission_metadata_header(encoded_metadata)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return V2MissionContext(id=mission_id, metadata=metadata)
 
 
 def _resource_scope(resource: DataResource, operation: str) -> str:

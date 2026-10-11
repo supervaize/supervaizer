@@ -4,10 +4,11 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from unittest.mock import AsyncMock, MagicMock
+
 import httpx
 import pytest
 from pytest_mock import MockerFixture
-from unittest.mock import AsyncMock, MagicMock
 
 from supervaizer.deploy.health import (
     HealthCheckConfig,

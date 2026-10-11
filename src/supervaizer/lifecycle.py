@@ -153,9 +153,9 @@ class Lifecycle:
             list: List of EntityStatus enum values representing terminal states
         """
         # Get all states that appear as 'from_status' in transitions
-        states_with_outgoing = set(
+        states_with_outgoing = {
             from_status for _, (from_status, _) in cls.EVENT_TRANSITIONS.items()
-        )
+        }
 
         # Terminal states are those that have no outgoing transitions
         terminal_states = [
@@ -177,14 +177,14 @@ class Lifecycle:
             list: List of EntityStatus enum values representing start states
         """
         # Get all states that appear as 'to_status' in transitions
-        target_states = set(
+        target_states = {
             to_status for _, (_, to_status) in cls.EVENT_TRANSITIONS.items()
-        )
+        }
 
         # Get all states that appear as 'from_status' in transitions
-        source_states = set(
+        source_states = {
             from_status for _, (from_status, _) in cls.EVENT_TRANSITIONS.items()
-        )
+        }
 
         # Find states that are source states but never target states
         # (except for cycles where they might transition to themselves)
@@ -211,7 +211,7 @@ class Lifecycle:
     @classmethod
     def can_transition(cls, from_status: EntityStatus, to_status: EntityStatus) -> bool:
         """Check if transition from current status to target status is valid."""
-        for event, (event_from, event_to) in cls.EVENT_TRANSITIONS.items():
+        for event_from, event_to in cls.EVENT_TRANSITIONS.values():
             if event_from == from_status and event_to == to_status:
                 return True
         return False

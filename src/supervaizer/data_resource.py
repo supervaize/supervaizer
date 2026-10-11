@@ -13,8 +13,9 @@
 """Data Resource model for exposing agent-owned CRUD endpoints to Studio.
 
 Agents declare DataResource objects on their Agent instance. The SDK
-auto-generates FastAPI CRUD routes for each declared resource, secured
-with the same API key as all other agent routes.
+auto-generates FastAPI CRUD routes at ``/api/agents/{slug}/data/{name}/``.
+Those routes require ``X-API-Key`` and a workspace authorization token.
+Local mode does not bypass the token check.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from supervaizer.common import SvBaseModel
-from supervaizer.contracts import V2VerifiedWorkspaceContext
+from supervaizer.contracts import V2MissionContext, V2VerifiedWorkspaceContext
 
 # Used for URL path segments (/data/{name}/) and OpenAPI operation_id fragments.
 _DATA_RESOURCE_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
@@ -59,6 +60,7 @@ class DataResourceContext(SvBaseModel):
     workspace_id: str | None = None
     workspace_slug: str | None = None
     mission_id: str | None = None
+    mission: V2MissionContext | None = None
     agent_slug: str
     request_id: str | None = None
     workspace_authorization: V2VerifiedWorkspaceContext | None = None

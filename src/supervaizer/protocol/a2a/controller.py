@@ -16,6 +16,9 @@ from pydantic import Field, ValidationError
 
 from supervaizer.common import log
 from supervaizer.contracts import (
+    WORKSPACE_BINDING_CREATE_ACTION,
+    WORKSPACE_BINDING_CREATE_SURFACE,
+    WORKSPACE_BINDING_OPTIONS_ACTION,
     ContractModel,
     V2ActionRequest,
     V2ActionResult,
@@ -23,9 +26,6 @@ from supervaizer.contracts import (
     V2SurfaceResult,
     V2VerifiedWorkspaceContext,
     V2WorkspaceContext,
-    WORKSPACE_BINDING_CREATE_ACTION,
-    WORKSPACE_BINDING_CREATE_SURFACE,
-    WORKSPACE_BINDING_OPTIONS_ACTION,
 )
 from supervaizer.protocol.a2a.events import A2A_EFFECT_EVENT, publish_v2_event
 from supervaizer.workspace_authorization import (
@@ -86,7 +86,7 @@ class JsonRpcResponse(ContractModel):
 
 
 def register_v2_action_handler(
-    server: "Server",
+    server: Server,
     action: str,
     handler: ActionHandler,
     *,
@@ -100,7 +100,7 @@ def register_v2_action_handler(
 
 
 def register_v2_surface_handler(
-    server: "Server",
+    server: Server,
     surface: str,
     handler: SurfaceHandler,
     *,
@@ -114,7 +114,7 @@ def register_v2_surface_handler(
 
 
 async def dispatch_json_rpc(
-    server: "Server",
+    server: Server,
     body: dict[str, Any],
     *,
     workspace_authorization_token: str | None = None,
@@ -127,7 +127,7 @@ async def dispatch_json_rpc(
             request_id=body.get("id"),
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid JSON-RPC request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     if request.method == SUPERVAIZER_ACTION_INVOKE_METHOD:
@@ -151,7 +151,7 @@ async def dispatch_json_rpc(
 
 
 async def _dispatch_action(
-    server: "Server",
+    server: Server,
     request: JsonRpcRequest,
     *,
     workspace_authorization_token: str | None = None,
@@ -163,7 +163,7 @@ async def _dispatch_action(
             request_id=request.id,
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid Supervaizer v2 action request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     action_request = action_request.model_copy(update={"workspace_authorization": None})
@@ -246,7 +246,7 @@ async def _dispatch_action(
 
 
 async def _dispatch_surface(
-    server: "Server",
+    server: Server,
     request: JsonRpcRequest,
     *,
     workspace_authorization_token: str | None = None,
@@ -258,7 +258,7 @@ async def _dispatch_surface(
             request_id=request.id,
             code=JSON_RPC_INVALID_PARAMS,
             message="Invalid Supervaizer v2 surface request",
-            data={"errors": exc.errors()},
+            data={"errors": exc.errors(include_context=False)},
         )
 
     surface_request = surface_request.model_copy(
@@ -327,7 +327,7 @@ async def _dispatch_surface(
 
 
 async def _authorize_workspace(
-    server: "Server",
+    server: Server,
     *,
     token: str | None,
     required_scopes: list[str],
@@ -371,7 +371,7 @@ def _surface_requires_workspace_authorization(surface: str) -> bool:
     return surface not in WORKSPACE_BINDING_BOOTSTRAP_SURFACES
 
 
-def _get_action_handlers(server: "Server") -> dict[ActionHandlerKey, ActionHandler]:
+def _get_action_handlers(server: Server) -> dict[ActionHandlerKey, ActionHandler]:
     state = server.app.state
     handlers = getattr(state, "supervaizer_v2_action_handlers", None)
     if handlers is None:
@@ -381,7 +381,7 @@ def _get_action_handlers(server: "Server") -> dict[ActionHandlerKey, ActionHandl
 
 
 def _get_surface_handlers(
-    server: "Server",
+    server: Server,
 ) -> dict[SurfaceHandlerKey, SurfaceHandler]:
     state = server.app.state
     handlers = getattr(state, "supervaizer_v2_surface_handlers", None)
@@ -391,7 +391,7 @@ def _get_surface_handlers(
     return handlers
 
 
-def _resolve_agent_slug(server: "Server", agent_slug: str | None) -> str:
+def _resolve_agent_slug(server: Server, agent_slug: str | None) -> str:
     agent_slugs = {agent.slug for agent in server.agents}
     if agent_slug:
         if agent_slug not in agent_slugs:

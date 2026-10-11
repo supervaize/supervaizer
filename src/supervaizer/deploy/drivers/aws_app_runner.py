@@ -25,13 +25,13 @@ from rich.console import Console
 
 from supervaizer.common import log
 from supervaizer.deploy.drivers.base import (
+    SECRET_ENV_VARS,
     ActionType,
     BaseDriver,
     DeploymentPlan,
     DeploymentResult,
     ResourceAction,
     ResourceType,
-    SECRET_ENV_VARS,
     split_image_tag,
 )
 

@@ -105,12 +105,40 @@ path = "src/supervaizer/__version__.py"
 
 
 [tool.ruff.lint]
-# Explicit rule set: Ruff 0.16 enlarged its defaults.
-select = ["E4", "E7", "E9", "F"]
+# Ruff 0.16 default rule set. Each ignore keeps current runtime behavior of
+# this published package; fixing it would change payloads, errors, or APIs.
+ignore = [
+    "BLE001", # broad catches at agent, Studio, and CLI boundaries are deliberate
+    "S110",   # silent catches in logging and best-effort paths are deliberate
+    "DTZ005", # naive now() timestamps ship in payloads and storage; aware
+    #           values change them and break naive/aware comparisons
+    "TRY004", # ValueError is the public error for invalid input
+    "RUF012", # Pydantic copies mutable field defaults; ClassVar drops fields
+    "UP040",  # PEP 695 syntax creates other runtime objects than TypeAlias
+    "UP046",  #   and TypeVar generics
+    "UP047",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers in parameter defaults are the framework idiom.
+extend-immutable-calls = ["fastapi.Body", "fastapi.Depends", "fastapi.Query"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]             # unused imports
-"tests/*" = ["N802", "N803", "N806"] # test function naming
+"tests/*" = ["N802", "N803", "N806", "DTZ001"] # test naming; naive fixtures
+"tools/*" = ["EXE001"]               # scripts run with `uv run python`
+"src/supervaizer/__init__.py" = ["PLE0605"] # __all__ is built from _EXPORTS
+"src/supervaizer/agent.py" = [
+    "B006",   # public method signatures keep their `{}` defaults
+    "SIM102", # keep the per-type elif chain in method field validation
+]
+"src/supervaizer/routes.py" = ["ASYNC230"] # small local instructions file, read inline
+"src/supervaizer/server.py" = ["PLC0414"] # `X as X` marks explicit re-exports
+"src/supervaizer/admin/workbench_routes.py" = [
+    "DTZ901",  # datetime.min sorts with the naive created_at values
+    "FURB162", # replace() keeps non-str input on the 400 path
+]
+"src/supervaizer/deploy/templates/debug_env.py" = ["EXE001"] # shipped template
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

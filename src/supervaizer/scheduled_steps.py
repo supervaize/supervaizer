@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 SCHEDULED_STEP_POLL_SECONDS = 60
 
 
-def _resolve_case_job(jobs: Jobs, case: "Case") -> "Job | None":
+def _resolve_case_job(jobs: Jobs, case: Case) -> Job | None:
     """Resolve the job that explicitly owns this case."""
     matches = [
         job
