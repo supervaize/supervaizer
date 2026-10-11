@@ -513,6 +513,12 @@ class V2AgentCapabilities(ContractModel):
                     scope="job",
                 )
             )
+        if self.scheduled_start and not any(
+            action.id == "job.start" for action in self.actions
+        ):
+            raise ValueError(
+                "capabilities.scheduled_start requires a declared job.start action"
+            )
         return self
 
 

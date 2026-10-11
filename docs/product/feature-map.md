@@ -88,7 +88,7 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Preconditions: The v2 agent declares `job.start` and honors `idempotency_key` for each occurrence.
 - Main flow: The agent advertises `capabilities.scheduled_start: true`; Studio owns the clock and invokes `job.start` when due.
 - Expected result: A retry with the same key returns the original job. A manual start can arrive while a scheduled job runs.
-- Important states: The default and explicit `False` omit the key. Removing the capability pauses schedules until a mission manager resumes them.
+- Important states: The default and explicit `False` omit the key. `scheduled_start=True` without a declared `job.start` fails validation. Removing the capability pauses schedules until a mission manager resumes them.
 - Source: `src/supervaizer/contracts.py`, `docs/2026_10_SCHEDULED_START.md`
 - Verification: `tests/test_contracts.py::test_v2_scheduled_start_registration_round_trip`
 - Known caveats: v1 agents cannot advertise this capability. The agent does not parse cron or declare `job.schedule`.

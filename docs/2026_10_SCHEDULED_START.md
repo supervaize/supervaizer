@@ -21,6 +21,8 @@ Put it on `capabilities`, next to `rule_checkpoints`. It is not an action and no
 
 `build_v2_agent_registration` grows an optional `scheduled_start: bool = False`. `False` omits the key. Only `True` serializes `"scheduled_start": true`.
 
+When `scheduled_start` is `true`, the final capabilities must declare `job.start`. The SDK rejects the registration if it does not.
+
 v1 registrations do not get this field. Studio will not schedule a v1 agent.
 
 Every later registration carries the current value. Dropping the key, or sending `false`, is how an agent withdraws the capability. Studio then pauses existing schedules. It does not delete them, and it does not fire again until a registration sends `true` and a mission manager resumes.

@@ -105,7 +105,7 @@ This does not replace the existing Studio server registration process. Server id
 
 ### Scheduled start
 
-Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents.
+Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents. The registration must declare `job.start` in its actions, including actions derived from `job_policy.setup`.
 
 Studio owns the schedule and calls the existing `job.start` action when a firing is due. It sends the same action input as a manual start, with a stable `idempotency_key` for each occurrence. An agent that advertises scheduled start must return the original job when Studio retries the same key. The agent does not declare a `job.schedule` action or run a clock.
 
