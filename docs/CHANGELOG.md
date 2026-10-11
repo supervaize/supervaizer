@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **v1 custom-method routes ran the last registered method** (PR #134) — `POST /api/supervaizer/agents/{slug}/custom/{method}` now calls `service_job_custom` with its own method name, and the response message names that method. Before, every custom route ran the last method in `agent.methods.custom`. Route paths, operation names, and OpenAPI output do not change. The `B023` ignore from PR #133 is removed.
 - **README deploy section** — `deploy up` builds the image, pushes it to the platform registry, and stores generated `SUPERVAIZER_API_KEY` and `SUPERVAIZER_PRIVATE_KEY` as platform secrets. The previous "experimental, does not push" note described an older command.
 - **Workbench is v1-only** — `POST /manage/agents/{slug}/workbench/start` returns HTTP 400 for an agent with no v1 `methods` and does not create a job. v2-only agents run through `POST /a2a`.
 - **Data-resource routes were undocumented** — CRUD lives at `/api/agents/{slug}/data/{name}/`, requires `X-API-Key` plus a workspace token, and is not covered by the local-mode `/a2a` bypass.
@@ -29,7 +30,7 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 850   |
+| ✅ Passed  | 851   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 48s   |
