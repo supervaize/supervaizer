@@ -8,8 +8,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Product feature map** — `docs/product/feature-map.md` indexes user workflows with routes, source, and pytest evidence. `AGENTS.md` and the README point at it. Update the map when a workflow, route, or access rule changes.
-- **Mission context on v2 requests and DataResource calls** — New `V2MissionContext` (`id`, `name`, `metadata`) carries Studio `Mission.metadata` to the agent, uninterpreted. `V2SurfaceRequest`, `V2ActionRequest`, `DataResourceContext`, and `DataResourceContextContract` gain an optional `mission`; a model validator requires a non-blank `mission.id` equal to `mission_id`, and `metadata` accepts a JSON object only. New header `X-Supervaize-Mission-Metadata` (base64url UTF-8 JSON, 4096 bytes max) on DataResource proxy calls: `build_data_resource_context_headers(..., mission_metadata=...)` writes it, `encode_mission_metadata_header` / `decode_mission_metadata_header` are exported, and the data routes set `context.mission` or return HTTP 400 on a bad header or a header without a non-blank `X-Supervaize-Mission-Id`. Optional and additive: requests without `mission` behave as before. Requires a minor release.
+- **Scheduled start capability** (PR #132) — v2 agents opt in with `capabilities.scheduled_start: true`; the default and explicit `False` omit the field. Registration rejects the opt-in unless the final actions declare `job.start`. Studio owns the clock and invokes the existing action with a stable occurrence `idempotency_key`. See `docs/2026_10_SCHEDULED_START.md`.
+- **Product feature map** (PR #131) — `docs/product/feature-map.md` indexes user workflows with routes, source, and pytest evidence. `AGENTS.md` and the README point at it. Update the map when a workflow, route, or access rule changes.
+- **Mission context on v2 requests and DataResource calls** (PR #130) — New `V2MissionContext` (`id`, `name`, `metadata`) carries Studio `Mission.metadata` to the agent, uninterpreted. `V2SurfaceRequest`, `V2ActionRequest`, `DataResourceContext`, and `DataResourceContextContract` gain an optional `mission`; a model validator requires a non-blank `mission.id` equal to `mission_id`, and `metadata` accepts a JSON object only. New header `X-Supervaize-Mission-Metadata` (base64url UTF-8 JSON, 4096 bytes max) on DataResource proxy calls: `build_data_resource_context_headers(..., mission_metadata=...)` writes it, `encode_mission_metadata_header` / `decode_mission_metadata_header` are exported, and the data routes set `context.mission` or return HTTP 400 on a bad header or a header without a non-blank `X-Supervaize-Mission-Id`. Optional and additive: requests without `mission` behave as before. Requires a minor release.
 
 ### Fixed
 
@@ -24,10 +25,10 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 846   |
+| ✅ Passed  | 850   |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 43s   |
+| ⏱️ in      | 48s   |
 
 ## [1.7.0] - 2026-10-04
 

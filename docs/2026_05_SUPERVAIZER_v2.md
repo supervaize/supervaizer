@@ -2,7 +2,7 @@
 
 
 > **Created:** 2026-05-16
-> **Updated:** 2026-10-05
+> **Updated:** 2026-10-11
 
 Supervaizer v2 is the new operation contract between an agent controller and Supervaize Studio.
 
@@ -102,6 +102,14 @@ The other identity arguments have defaults: `agent_id` is the slug, `controller_
 The v2 registration is exposed in the A2A Agent Card under `supervaizer.v2`.
 
 This does not replace the existing Studio server registration process. Server identity, public key exchange, and encrypted payload handling still belong to the normal Studio registration path. The v2 extension tells Studio how to operate the already-registered controller.
+
+### Scheduled start
+
+Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents. The registration must declare `job.start` in its actions, including actions derived from `job_policy.setup`.
+
+Studio owns the schedule and calls the existing `job.start` action when a firing is due. It sends the same action input as a manual start, with a stable `idempotency_key` for each occurrence. An agent that advertises scheduled start must return the original job when Studio retries the same key. The agent does not declare a `job.schedule` action or run a clock.
+
+Each registration publishes the current value. If an agent later omits the key or sends `false`, Studio pauses its schedules. A mission manager must resume them after the agent advertises `true` again. See [Scheduled start](2026_10_SCHEDULED_START.md) for the complete contract.
 
 ## Rule checkpoints
 

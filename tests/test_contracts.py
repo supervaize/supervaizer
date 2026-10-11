@@ -374,6 +374,51 @@ def test_build_v2_agent_registration_defaults_identity_and_urls() -> None:
     )
 
 
+@pytest.mark.parametrize("scheduled_start", [None, False, True])
+def test_v2_scheduled_start_registration_round_trip(
+    scheduled_start: bool | None,
+) -> None:
+    options = {} if scheduled_start is None else {"scheduled_start": scheduled_start}
+    registration = build_v2_agent_registration(
+        agent_slug="hello-world",
+        display_name="Hello World",
+        a2ui_catalog_version="hello-ui.1",
+        actions=["job.start"] if scheduled_start else [],
+        **options,
+    )
+
+    payload = registration.model_dump(mode="json")
+    capabilities = payload["capabilities"]
+    assert capabilities.get("scheduled_start", False) is (scheduled_start is True)
+    assert ("scheduled_start" in capabilities) is (scheduled_start is True)
+    assert "job.schedule" not in [action["id"] for action in capabilities["actions"]]
+    restored = SupervaizerV2AgentRegistrationContract.model_validate(payload)
+    assert restored.capabilities.scheduled_start is (scheduled_start is True)
+    assert restored.model_dump(mode="json") == payload
+
+
+def test_v2_scheduled_start_requires_job_start_after_derived_actions() -> None:
+    details = {
+        "agent_slug": "hello-world",
+        "display_name": "Hello World",
+        "a2ui_catalog_version": "hello-ui.1",
+        "scheduled_start": True,
+    }
+
+    with pytest.raises(
+        ValidationError,
+        match="capabilities.scheduled_start requires a declared job.start action",
+    ):
+        build_v2_agent_registration(**details)
+
+    registration = build_v2_agent_registration(
+        **details,
+        job_policy={"setup": {}},
+    )
+    assert registration.capabilities.scheduled_start is True
+    assert "job.start" in [action.id for action in registration.capabilities.actions]
+
+
 def test_build_v2_agent_registration_derives_capabilities() -> None:
     registration = build_v2_agent_registration(
         agent_id="hello",
