@@ -18,6 +18,17 @@ All notable changes to this project will be documented in this file.
 - **Data-resource routes were undocumented** — CRUD lives at `/api/agents/{slug}/data/{name}/`, requires `X-API-Key` plus a workspace token, and is not covered by the local-mode `/a2a` bypass.
 - **Local-mode host and workspace-auth docs** — Wildcard hosts (`0.0.0.0`, `::`, empty) bind `127.0.0.1`; an explicit `--host` is kept. The `/a2a` bypass ignores leeway and `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=false`. `POST /a2a` is mounted by default; only `/api` waits for a Studio account or local mode. JSON-RPC `-32030` uses `error.data.code` `workspace_authorization_missing` or `workspace_authorization_not_configured`.
 
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 833   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 43s   |
+
 ## [1.7.0] - 2026-10-04
 
 ### Added
