@@ -164,12 +164,12 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Main flow:
   1. Declare a `DataResource` on the agent.
   2. Studio calls the generated route with the API key and a workspace token.
-  3. The callback receives a `DataResourceContext`.
+  3. The callback receives a `DataResourceContext`. In a mission scope, Studio can also send `X-Supervaize-Mission-Id` and `X-Supervaize-Mission-Metadata` (base64url JSON object, 4096 bytes max). The callback then gets `context.mission` with the uninterpreted `Mission.metadata`.
 - Expected result: The callback's records are returned. Registration info includes the resource.
-- Important states: HTTP 403. No enabled verifier: the detail says workspace authorization is not configured. Verifier on and no token: the detail names the missing header. A callback `PermissionError` is also HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id.
+- Important states: HTTP 403. No enabled verifier: the detail says workspace authorization is not configured. Verifier on and no token: the detail names the missing header. A callback `PermissionError` is also HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id. HTTP 400 when `X-Supervaize-Mission-Metadata` has no `X-Supervaize-Mission-Id`, does not decode to a JSON object, or is too large; the callback is not called.
 - Source: `src/supervaizer/data_resource.py`, `src/supervaizer/data_routes.py`, `src/supervaizer/routers/api.py`
 - Verification: `tests/test_data_resource.py`, `tests/test_routes.py`, `tests/test_agent.py`
-- Known caveats: This is not a v2 `resources=[...]` declaration. That path derives `resource.<id>.<operation>` actions invoked through `POST /a2a`. Data-resource routes are a separate CRUD surface, they are not under `/api/supervaizer`, and local mode does not bypass their workspace check. Names must be unique per agent.
+- Known caveats: This is not a v2 `resources=[...]` declaration. That path derives `resource.<id>.<operation>` actions invoked through `POST /a2a`. Data-resource routes are a separate CRUD surface, they are not under `/api/supervaizer`, and local mode does not bypass their workspace check. Names must be unique per agent. The mission metadata header is not signed: use it to scope results, not as an access boundary.
 
 ## Declare a v2 resource
 
