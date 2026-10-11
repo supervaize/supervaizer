@@ -813,6 +813,48 @@ async def test_custom_method_endpoint_accepts_dict_body(
 
 
 @pytest.mark.asyncio
+async def test_custom_method_endpoint_binds_its_own_method_name(
+    server_fixture: Server,
+    agent_fixture: Agent,
+    job_fixture: Job,
+    context_fixture: JobContext,
+    mocker: Any,
+) -> None:
+    # method1 is not the last registered method, so a late-bound closure
+    # would call method2 instead.
+    captured: dict[str, Any] = {}
+
+    async def mock_service_job_custom(*args: Any) -> Job:
+        captured["method_name"] = args[0]
+        return job_fixture
+
+    mocker.patch(
+        "supervaizer.routes.service_job_custom",
+        new=mock_service_job_custom,
+    )
+
+    client = TestClient(server_fixture.app)
+    response = client.post(
+        f"/api/supervaizer{agent_fixture.path}/custom/method1",
+        json={
+            "job_context": {
+                "workspace_id": context_fixture.workspace_id,
+                "job_id": context_fixture.job_id,
+                "started_by": context_fixture.started_by,
+                "started_at": context_fixture.started_at.isoformat(),
+                "mission_id": context_fixture.mission_id,
+                "mission_name": context_fixture.mission_name,
+            },
+        },
+        headers={"X-API-Key": server_fixture.api_key},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert captured["method_name"] == "method1"
+    assert "'method1'" in response.json()["message"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "exception,status_filter,expected_error_type,expected_status",
     [

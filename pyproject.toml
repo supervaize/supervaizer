@@ -132,11 +132,7 @@ extend-immutable-calls = ["fastapi.Body", "fastapi.Depends", "fastapi.Query"]
     "B006",   # public method signatures keep their `{}` defaults
     "SIM102", # keep the per-type elif chain in method field validation
 ]
-"src/supervaizer/routes.py" = [
-    "ASYNC230", # small local instructions file, read inline
-    "B023",     # known bug: custom-method routes bind the last method_name;
-    #             the fix changes behavior and ships separately
-]
+"src/supervaizer/routes.py" = ["ASYNC230"] # small local instructions file, read inline
 "src/supervaizer/server.py" = ["PLC0414"] # `X as X` marks explicit re-exports
 "src/supervaizer/admin/workbench_routes.py" = [
     "DTZ901",  # datetime.min sorts with the naive created_at values
