@@ -14,16 +14,16 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Entry points:
   - `supervaizer start --local`
   - No control file: Hello World alone. With `supervaizer_control.py`: that server plus Hello World.
-- Access: Loopback. API key `local-dev` unless `SUPERVAIZER_API_KEY` is set.
+- Access: API key `local-dev` unless `SUPERVAIZER_API_KEY` is set. `--host 0.0.0.0`, `--host ::`, and an empty host bind `127.0.0.1`. Any other `--host` is kept and overrides the control script's `Server.host`.
 - Preconditions: None. `SUPERVAIZER_DISABLE_HELLO_WORLD=true` skips the built-in agent.
 - Main flow:
   1. Start in local mode.
-  2. Open `http://127.0.0.1:8000/docs` or `POST /a2a` with `X-API-Key: local-dev`.
-- Expected result: The server binds `127.0.0.1`, skips Studio registration, and `/a2a` actions and surfaces run without a workspace token.
-- Important states: Any `SUPERVAIZER_WORKSPACE_AUTH_*` setting, or a `supervisor_account` on the server, turns the bypass off and calls fail closed. A partial trust setup answers `workspace_authorization_not_configured`.
+  2. Open `/docs` on the bound host, or `POST /a2a` with `X-API-Key: local-dev`.
+- Expected result: Studio registration is skipped. `/a2a` actions and surfaces run without a workspace token while the bypass below is on.
+- Important states: The bypass is off when the server has a `supervisor_account`, when workspace auth is enabled, or when issuer, audience, public key, or JWKS URL is nonempty. `SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS` does not count. `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=false` leaves the bypass on. With the verifier enabled, a missing token is JSON-RPC `-32030` and `error.data.code` `workspace_authorization_missing`. With no enabled verifier, `error.data.code` is `workspace_authorization_not_configured`.
 - Source: `src/supervaizer/cli.py`, `src/supervaizer/examples/local_server.py`, `src/supervaizer/workspace_authorization.py`
 - Verification: `tests/test_local_mode_a2a.py`, `tests/test_cli.py`
-- Known caveats: The bypass covers `/a2a` actions and surfaces only. Data-resource routes never bypass. Do not expose the port: the key is well known. `--host` is ignored. The public [supervaize_hello_world](https://github.com/supervaize/supervaize_hello_world) repo is still the v1 `AgentMethod` style; model new agents on the built-in agent.
+- Known caveats: The bypass covers `/a2a` actions and surfaces only. Data-resource routes never bypass. Do not expose the port: the key is well known, and a non-loopback `--host` publishes it. The public [supervaize_hello_world](https://github.com/supervaize/supervaize_hello_world) repo is still the v1 `AgentMethod` style; model new agents on the built-in agent.
 
 ## Scaffold a v2 control file
 
@@ -70,12 +70,12 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
   - Direct route: `POST /a2a`
   - JSON-RPC method: `supervaizer/action.invoke`
 - Access: `X-API-Key` with write scope. Outside the local-mode bypass, also `X-Supervaize-Workspace-Authorization: Bearer <token>`.
-- Preconditions: The agent declares the action and a handler is registered for that `agent_slug`. `/api` and `/a2a` are mounted only when a Studio account is set or local mode is on.
+- Preconditions: The agent declares the action and a handler is registered for that `agent_slug`. `POST /a2a` is mounted when `a2a_endpoints` is true, which is the default, including a standalone server with no Studio account and local mode off. `/api` is mounted only when a Studio account is set or local mode is on. Either of those forces `a2a_endpoints` back to true.
 - Main flow:
   1. Send `supervaizer/action.invoke` with `agent_slug`, `action`, and `input`.
   2. Read `effects` and optional `job_state`.
 - Expected result: The registered handler runs and the JSON-RPC result carries its effects.
-- Important states: Unknown action `-32010`. Missing handler for a declared action fails the same way. Unknown agent is rejected. No workspace token outside the bypass: `-32030 workspace_authorization_not_configured`. Bootstrap actions `workspace_binding.options` and `workspace_binding.create` do not need a workspace token.
+- Important states: Unknown action `-32010`. Missing handler for a declared action fails the same way. Unknown agent is rejected. Workspace auth failures are JSON-RPC `-32030`. `error.data.code` is `workspace_authorization_missing` when the verifier is enabled and the header is absent, and `workspace_authorization_not_configured` when no verifier is enabled. `supervaizer/surface.load` uses the same auth codes. Bootstrap actions `workspace_binding.options` and `workspace_binding.create` do not need a workspace token.
 - Source: `src/supervaizer/protocol/a2a/routes.py`, `src/supervaizer/protocol/a2a/controller.py`
 - Verification: `tests/test_local_mode_a2a.py`, `tests/test_a2a.py`
 - Known caveats: Pass `agent_slug` on every handler. Local mode adds Hello World, so a multi-agent server cannot infer the slug. A bare action id defaults to `mutating=True, scope="job"`.
@@ -166,7 +166,7 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
   2. Studio calls the generated route with the API key and a workspace token.
   3. The callback receives a `DataResourceContext`.
 - Expected result: The callback's records are returned. Registration info includes the resource.
-- Important states: No token, or local mode with no verifier: the call is blocked (`workspace_authorization_not_configured` or missing token). Permission errors become HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id.
+- Important states: HTTP 403. No enabled verifier: the detail says workspace authorization is not configured. Verifier on and no token: the detail names the missing header. A callback `PermissionError` is also HTTP 403. Update or delete callbacks that report a missing item become HTTP 404. Create must return an id.
 - Source: `src/supervaizer/data_resource.py`, `src/supervaizer/data_routes.py`, `src/supervaizer/routers/api.py`
 - Verification: `tests/test_data_resource.py`, `tests/test_routes.py`, `tests/test_agent.py`
 - Known caveats: This is not a v2 `resources=[...]` declaration. That path derives `resource.<id>.<operation>` actions invoked through `POST /a2a`. Data-resource routes are a separate CRUD surface, they are not under `/api/supervaizer`, and local mode does not bypass their workspace check. Names must be unique per agent.

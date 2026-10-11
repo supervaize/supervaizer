@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **README deploy section** — `deploy up` builds the image, pushes it to the platform registry, and stores generated `SUPERVAIZER_API_KEY` and `SUPERVAIZER_PRIVATE_KEY` as platform secrets. The previous "experimental, does not push" note described an older command.
 - **Workbench is v1-only** — `POST /manage/agents/{slug}/workbench/start` returns HTTP 400 for an agent with no v1 `methods` and does not create a job. v2-only agents run through `POST /a2a`.
 - **Data-resource routes were undocumented** — CRUD lives at `/api/agents/{slug}/data/{name}/`, requires `X-API-Key` plus a workspace token, and is not covered by the local-mode `/a2a` bypass.
+- **Local-mode host and workspace-auth docs** — Wildcard hosts (`0.0.0.0`, `::`, empty) bind `127.0.0.1`; an explicit `--host` is kept. The `/a2a` bypass ignores leeway and `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=false`. `POST /a2a` is mounted by default; only `/api` waits for a Studio account or local mode. JSON-RPC `-32030` uses `error.data.code` `workspace_authorization_missing` or `workspace_authorization_not_configured`.
 
 ## [1.7.0] - 2026-10-04
 

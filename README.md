@@ -68,7 +68,7 @@ curl -s http://127.0.0.1:8000/a2a \
                   "action": "job.start", "input": {"count": 1}, "job_id": "job-1"}}'
 ```
 
-Handlers receive an unverified `workspace_authorization` whose `grant_id` is `local-mode`, and the server logs a startup warning. The bypass applies only while the server has no Studio account and none of `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED`, `_ISSUER`, `_AUDIENCE`, `_PUBLIC_KEY`, or `_JWKS_URL` is set. Otherwise every call needs a real Studio token, and a partial setup answers `workspace_authorization_not_configured`. Never expose a local-mode port: anyone who reaches it can run your agents with the well-known key.
+Handlers receive an unverified `workspace_authorization` whose `grant_id` is `local-mode`, and the server logs a startup warning. The bypass applies only while the server has no Studio account, workspace auth is not enabled, and issuer, audience, public key, and JWKS URL are all empty. `SUPERVAIZER_WORKSPACE_AUTH_LEEWAY_SECONDS` does not count, and `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=false` leaves the bypass on. Otherwise every call needs a real Studio token. JSON-RPC `-32030` then carries `error.data.code` `workspace_authorization_missing` when the verifier is enabled and the header is absent, or `workspace_authorization_not_configured` when no verifier is enabled. Never expose a local-mode port: anyone who reaches it can run your agents with the well-known key. `--host 0.0.0.0`, `--host ::`, and an empty host bind `127.0.0.1`; any other `--host` is kept.
 
 Open these endpoints:
 
