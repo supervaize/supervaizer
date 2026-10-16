@@ -297,6 +297,29 @@ V2SurfaceResult(
 )
 ```
 
+#### File fields
+
+An awaiting step can ask the operator for a file. The agent declares a field with `type: "file"` in the `fields` list. The `id` and `label` are chosen by the agent; the other keys are protocol keys:
+
+```json
+{"id": "report_file", "label": "Insights report (.md)", "type": "file",
+ "accept": ".md,text/markdown", "max_bytes": 1048576, "storage": "studio",
+ "required": true}
+```
+
+- `accept` lists the allowed extensions and media types.
+- `max_bytes` is the largest file size Studio accepts for this field.
+- `storage` selects where the bytes live and what the agent receives (see the table).
+
+| `storage` | Value in the HITL answer | Who keeps the bytes |
+| --- | --- | --- |
+| `studio` | `{"storage": "studio", "file_id", "filename", "media_type", "size", "sha256"}` | Studio, in private storage. The agent receives a reference only. |
+| `inline` | `{"storage": "inline", "filename", "media_type", "size", "encoding", "content"}` inside the action JSON | The agent. The content travels in the action request. |
+
+With `storage: "inline"`, the whole action JSON, content included, must stay under Studio's request body limit. Choose `studio` for files that can approach that limit.
+
+File fields are supported in `case.step.awaiting` steps only for now. The contract models already accept these keys as extra keys, so agents need no SDK change.
+
 ### Artifact
 
 Artifacts are agent-owned outputs. The protocol only defines the reference shape:
@@ -304,6 +327,17 @@ Artifacts are agent-owned outputs. The protocol only defines the reference shape
 - `id`
 - `type`
 - optional `title`, external id, and media type
+
+#### Studio-stored artifacts
+
+An agent can emit an artifact whose bytes Studio already holds, for example a file the operator uploaded through a `storage: "studio"` file field. The ref carries the normal keys plus two more: `"storage": "studio"` and `"file_id"` (the Studio file id):
+
+```json
+{"id": "report:<report_id>", "type": "report", "title": "Quarterly report",
+ "media_type": "text/markdown", "storage": "studio", "file_id": "<studio file id>"}
+```
+
+Studio serves such an artifact from its own storage. It does not call the agent's `artifact.get` action for it. Access control is unchanged: the caller still needs the `artifact.get` grant to read the artifact.
 
 Artifact types such as `transcript`, `synthesis`, `report`, `metric`, or `decision` belong to the agent registration. Studio can render known artifact types richly and fall back to generic previews for unknown types.
 
