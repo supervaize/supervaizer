@@ -1,6 +1,6 @@
 # Model Reference Core
 
-**Version:** 1.7.0
+**Version:** 1.8.0
 
 ### `account.Account`
 
@@ -118,6 +118,7 @@ _No additional fields beyond parent class._
 | `version` | `str` | '' | Version string |
 | `release_notes_url` | `str` | `None` | URL for release notes matching this agent version |
 | `description` | `str` | '' | Description of what the agent does |
+| `introduction` | `V2AgentIntroduction` | `None` | Optional roster block (tagline, summary, example goals, avatar) |
 | `tags` | `list[str]` | `None` | Tags for categorizing the agent |
 | `methods` | `AgentMethods` | `None` | Methods supported by this agent |
 | `parameters_setup` | `ParametersSetup` | `None` | Parameter configuration |
@@ -442,4 +443,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-10-10 15:49:27*
+*Uploaded on 2026-10-28 17:38:02*
