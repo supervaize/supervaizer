@@ -41,6 +41,8 @@ from supervaizer.contracts import (
     SupervaizerV2AgentRegistrationContract,
     V2ActionDefinition,
     V2ActionRequest,
+    V2AgentFullDescription,
+    V2AgentIntroduction,
     V2AgentMethod,
     V2AgentMethods,
 )
@@ -658,6 +660,17 @@ class AgentAbstract(SvBaseModel):
     description: str = Field(
         default="", description="Description of what the agent does"
     )
+    introduction: V2AgentIntroduction | None = Field(
+        default=None,
+        description="Optional roster block (tagline, summary, example goals, avatar)",
+    )
+    full_description: V2AgentFullDescription | None = Field(
+        default=None,
+        description=(
+            "Optional long-form markdown or HTML for the agent detail page. "
+            "The SDK only types and bounds it; Studio sanitizes it."
+        ),
+    )
     tags: list[str] | None = Field(
         default=None, description="Tags for categorizing the agent"
     )
@@ -740,6 +753,8 @@ class Agent(AgentAbstract):
         | dict[str, Any]
         | None = None,
         v2_methods: V2AgentMethods | dict[str, Any] | None = None,
+        introduction: V2AgentIntroduction | dict[str, Any] | None = None,
+        full_description: V2AgentFullDescription | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -767,6 +782,11 @@ class Agent(AgentAbstract):
             server_agent_status (str, optional): Current status on server
             server_agent_onboarding_status (str, optional): Onboarding status
             max_execution_time (int):  Maximum execution time in seconds, defaults to 1 hour
+            introduction (V2AgentIntroduction, optional): Roster block Studio shows
+                before any job exists; sent as ``introduction`` only when set
+            full_description (V2AgentFullDescription, optional): Long-form markdown
+                or HTML Studio shows on the agent detail page; sent as
+                ``full_description`` only when set. Studio sanitizes it.
 
         Tested in tests/test_agent.py
         """
@@ -794,6 +814,10 @@ class Agent(AgentAbstract):
             v2_method_declarations = V2AgentMethods.model_validate(
                 v2_method_declarations
             )
+        if isinstance(introduction, dict):
+            introduction = V2AgentIntroduction.model_validate(introduction)
+        if isinstance(full_description, dict):
+            full_description = V2AgentFullDescription.model_validate(full_description)
 
         # Initialize using Pydantic's mechanism
         super().__init__(
@@ -817,6 +841,8 @@ class Agent(AgentAbstract):
             data_resources=data_resources or [],
             supervaizer_v2_registration=v2_registration,
             v2_methods=v2_method_declarations,
+            introduction=introduction,
+            full_description=full_description,
             **kwargs,
         )
 
@@ -871,8 +897,12 @@ class Agent(AgentAbstract):
 
     @property
     def registration_info(self) -> dict[str, Any]:
-        """Returns registration info for the agent"""
-        return {
+        """Returns registration info for the agent.
+
+        ``introduction`` and ``full_description`` are added only when set, so
+        agents without them send exactly the keys they sent before.
+        """
+        info = {
             "name": self.name,
             "id": f"{self.id}",
             "author": self.author,
@@ -899,6 +929,11 @@ class Agent(AgentAbstract):
             if self.supervaizer_v2_registration
             else None,
         }
+        if self.introduction is not None:
+            info["introduction"] = self.introduction.model_dump(mode="json")
+        if self.full_description is not None:
+            info["full_description"] = self.full_description.model_dump(mode="json")
+        return info
 
     def update_agent_from_server(self, server: "Server") -> "Agent | None":
         """

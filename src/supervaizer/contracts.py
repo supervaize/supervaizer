@@ -18,10 +18,17 @@ import binascii
 import json
 import re
 from collections.abc import Iterable
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 CONTROLLER_CONTRACT_VERSION = "1.0"
 API_VERSION = "v1"
@@ -39,6 +46,8 @@ AGENT_CUSTOM_ACTION_PREFIX = "agent.custom."
 _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]*={0,2}$")
 V2_DISPLAY_TEXT_MAX_LENGTH = 300
+V2_SHORT_TEXT_MAX_LENGTH = 120
+V2_FULL_DESCRIPTION_MAX_LENGTH = 100_000
 MISSION_ID_HEADER = "X-Supervaize-Mission-Id"
 MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
 MISSION_METADATA_HEADER_MAX_LENGTH = 4096
@@ -265,6 +274,20 @@ class AgentRegistrationContract(ContractModel):
     data_resources: list[DataResourceContract | dict[str, Any]] = Field(
         default_factory=_default_registration_data_resources
     )
+    introduction: V2AgentIntroduction | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Roster text a consumer shows for the agent; omitted when unset.",
+    )
+    full_description: V2AgentFullDescription | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Long-form markdown or HTML a consumer shows on the agent detail "
+            "page; omitted when unset. The SDK only types and bounds it; the "
+            "consumer sanitizes it before rendering."
+        ),
+    )
 
 
 class ServerRegistrationContract(ControllerContract):
@@ -375,6 +398,68 @@ _DESCRIPTION_FIELD_HELP = (
 )
 
 
+class V2AgentIntroduction(ContractModel):
+    """Plain-text roster block a consumer renders before any job exists."""
+
+    tagline: str = Field(min_length=1, max_length=V2_SHORT_TEXT_MAX_LENGTH)
+    summary: str = Field(
+        min_length=1,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        description="What the agent does, in one or two sentences.",
+    )
+    example_goals: list[str] = Field(
+        min_length=1,
+        max_length=5,
+        description="Suggested first requests a consumer may offer verbatim.",
+    )
+    avatar_url: str | None = Field(default=None, exclude_if=_is_none)
+
+    @field_validator("example_goals")
+    @classmethod
+    def validate_example_goals(cls, value: list[str]) -> list[str]:
+        for goal in value:
+            if not goal.strip() or len(goal) > V2_SHORT_TEXT_MAX_LENGTH:
+                raise ValueError(
+                    "example_goals items must be non-empty and at most "
+                    f"{V2_SHORT_TEXT_MAX_LENGTH} characters"
+                )
+        return value
+
+    @field_validator("avatar_url")
+    @classmethod
+    def validate_avatar_url(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("https://"):
+            raise ValueError("avatar_url must be an https URL")
+        return value
+
+
+class V2AgentFullDescription(ContractModel):
+    """Long-form description a consumer shows on the agent detail page.
+
+    The SDK only types and bounds the content. The consumer sanitizes HTML
+    (and the HTML it renders from markdown) before display.
+    """
+
+    format: Literal["markdown", "html"] = Field(
+        default="markdown", description="Markup of ``content``."
+    )
+    content: str = Field(
+        min_length=1,
+        max_length=V2_FULL_DESCRIPTION_MAX_LENGTH,
+        description=(
+            "Markdown or HTML body, 1 to 100,000 characters, not whitespace "
+            "only. Not sanitized by the SDK; the consumer sanitizes it."
+        ),
+    )
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must not be whitespace only")
+        return value
+
+
 class V2ActionDefinition(ContractModel):
     """Declared metadata for one invokable agent action.
 
@@ -408,6 +493,28 @@ class V2ActionDefinition(ContractModel):
         exclude_if=_is_none,
         description=_DESCRIPTION_FIELD_HELP,
     )
+    kind: Literal["command", "help"] = Field(
+        default="command",
+        exclude_if=lambda value: value == "command",
+        description=(
+            "`help` actions propose or check a draft for `target_field` and must "
+            "declare `mutating=False`. Omitted when `command`."
+        ),
+    )
+    target_field: str | None = Field(
+        default=None,
+        exclude_if=_is_none,
+        description="Setup field id whose draft a `help` action result fills.",
+    )
+    dry_run: bool = Field(
+        default=False,
+        exclude_if=_is_empty,
+        description=(
+            "Test run defined by outcome: may create temporary agent-side data "
+            "and incur model cost, never sends external communication and never "
+            "appears in results or sync counts. Omitted when False."
+        ),
+    )
 
     @field_validator("id")
     @classmethod
@@ -420,6 +527,16 @@ class V2ActionDefinition(ContractModel):
     @classmethod
     def strip_display_text(cls, value: Any) -> Any:
         return _strip_display_text(value)
+
+    @model_validator(mode="after")
+    def validate_kind(self) -> V2ActionDefinition:
+        if self.kind == "help" and self.mutating:
+            raise ValueError(f"help action {self.id!r} must declare mutating=False")
+        if self.target_field is not None and self.kind != "help":
+            raise ValueError(
+                f"action {self.id!r} declares target_field but is not kind='help'"
+            )
+        return self
 
 
 class V2SurfaceDefinition(ContractModel):
@@ -660,7 +777,11 @@ class V2JobSetupPolicy(ContractModel):
     action_scopes: list[Literal["workspace", "job", "case", "step"]] = Field(
         default_factory=list
     )
-    plan: dict[str, Any] | None = None
+    # dict first, left to right: a dict passes through untouched (compat); a
+    # V2SetupPlan instance is kept typed. Smart-mode unions would coerce dicts.
+    plan: dict[str, Any] | V2SetupPlan | None = Field(
+        default=None, union_mode="left_to_right"
+    )
 
     @field_validator("preview_action", "start_action", "submit_action")
     @classmethod
@@ -691,6 +812,214 @@ class V2ResourceFieldOptionsSource(ContractModel):
     label_field: str | None = None
 
 
+class V2FieldOption(ContractModel):
+    """One selectable choice. Bare strings are rejected so labels stay explicit."""
+
+    value: str
+    label: str
+
+
+class V2FieldDependsOn(ContractModel):
+    """Activate a field only while a parent field holds one of the listed values."""
+
+    model_config = {
+        "validate_by_name": True,
+        "validate_by_alias": True,
+        "serialize_by_alias": True,
+    }
+
+    field: str = Field(description="Parent field id; parents may chain.")
+    in_: list[str] = Field(
+        alias="in",
+        description="Stringified parent values that activate this field.",
+    )
+
+
+class V2FieldValidation(ContractModel):
+    """Rules a consumer enforces before submit. Each rule must fit the field type."""
+
+    min_length: int | None = Field(default=None, ge=0, exclude_if=_is_none)
+    max_length: int | None = Field(default=None, ge=0, exclude_if=_is_none)
+    pattern: str | None = Field(
+        default=None,
+        exclude_if=_is_none,
+        description="Regular expression, ECMAScript-safe subset.",
+    )
+    min: float | None = Field(default=None, exclude_if=_is_none)
+    max: float | None = Field(default=None, exclude_if=_is_none)
+    min_items: int | None = Field(default=None, ge=0, exclude_if=_is_none)
+    max_items: int | None = Field(default=None, ge=0, exclude_if=_is_none)
+    message: str | None = Field(
+        default=None,
+        exclude_if=_is_none,
+        description="Shown instead of the generic validation error.",
+    )
+
+
+_STRING_FIELD_RULES = frozenset({"min_length", "max_length", "pattern"})
+_NUMBER_FIELD_RULES = frozenset({"min", "max"})
+_LIST_FIELD_RULES = frozenset({"min_items", "max_items"})
+_FIELD_TYPE_RULES: dict[str, frozenset[str]] = {
+    "string": _STRING_FIELD_RULES,
+    "text": _STRING_FIELD_RULES,
+    "integer": _NUMBER_FIELD_RULES,
+    "number": _NUMBER_FIELD_RULES,
+    "multi_select": _LIST_FIELD_RULES,
+    "list": _LIST_FIELD_RULES,
+    "boolean": frozenset(),
+    "date": frozenset(),
+    "select": frozenset(),
+    "resource_ref": frozenset(),
+    "file": frozenset(),
+}
+
+
+def _reject_bare_string_options(value: Any) -> Any:
+    if isinstance(value, list) and any(isinstance(item, str) for item in value):
+        raise ValueError("options must be {value, label} objects, not bare strings")
+    return value
+
+
+_FieldOptions = Annotated[
+    list[V2FieldOption] | None, BeforeValidator(_reject_bare_string_options)
+]
+
+
+def _validate_field_rules(field: Any) -> None:
+    """Shared checks for setup, awaiting and resource field definitions."""
+    if field.min_rows is not None and not field.multiline:
+        raise ValueError(f"field {field.id!r} sets min_rows without multiline")
+    if field.type == "list":
+        if not field.item_fields:
+            raise ValueError(f"field {field.id!r} of type 'list' requires item_fields")
+        nested = [item.id for item in field.item_fields if item.type == "list"]
+        if nested:
+            raise ValueError(
+                f"field {field.id!r}: item fields {nested} cannot be of type 'list'"
+            )
+    elif field.item_fields is not None:
+        raise ValueError(
+            f"field {field.id!r} declares item_fields but is not of type 'list'"
+        )
+    if field.validation is None:
+        return
+    # Unknown types render as string, so they take the string rules.
+    allowed = _FIELD_TYPE_RULES.get(field.type, _STRING_FIELD_RULES)
+    unfit = sorted(
+        name
+        for name in V2FieldValidation.model_fields
+        if name != "message"
+        and getattr(field.validation, name) is not None
+        and name not in allowed
+    )
+    if unfit:
+        raise ValueError(
+            f"field {field.id!r} of type {field.type!r} does not accept "
+            f"validation rules {unfit}"
+        )
+
+
+class V2SetupFieldDefinition(ContractModel):
+    """One input a consumer renders during guided setup.
+
+    Known types: string, text, boolean, integer, number, date, select,
+    multi_select, resource_ref, file, list. Unknown types render as string.
+    A `list` field declares `item_fields` (one nesting level) and its value is
+    a list of dicts keyed by item field id, never free text.
+    """
+
+    id: str
+    label: str
+    type: str = "string"
+    item_fields: list[V2SetupFieldDefinition] | None = Field(
+        default=None, exclude_if=_is_none
+    )
+    required: bool = False
+    default: Any | None = Field(default=None, exclude_if=_is_none)
+    description: str | None = Field(
+        default=None, max_length=V2_DISPLAY_TEXT_MAX_LENGTH, exclude_if=_is_none
+    )
+    placeholder: str | None = Field(default=None, exclude_if=_is_none)
+    multiline: bool = Field(default=False, exclude_if=_is_empty)
+    min_rows: int | None = Field(default=None, ge=1, exclude_if=_is_none)
+    options: _FieldOptions = Field(default=None, exclude_if=_is_none)
+    options_source: V2ResourceFieldOptionsSource | None = Field(
+        default=None, exclude_if=_is_none
+    )
+    depends_on: V2FieldDependsOn | None = Field(default=None, exclude_if=_is_none)
+    validation: V2FieldValidation | None = Field(default=None, exclude_if=_is_none)
+
+    @model_validator(mode="after")
+    def validate_rules(self) -> V2SetupFieldDefinition:
+        _validate_field_rules(self)
+        return self
+
+
+class V2CostEstimate(ContractModel):
+    """A cost range or an explicit unknown, never a single number."""
+
+    status: Literal["estimated", "unknown"]
+    unit: str | None = Field(
+        default=None,
+        exclude_if=_is_none,
+        description="Free label shown verbatim, such as USD, tokens or credits.",
+    )
+    min: float | None = Field(default=None, ge=0, exclude_if=_is_none)
+    max: float | None = Field(default=None, ge=0, exclude_if=_is_none)
+    basis: str | None = Field(
+        default=None,
+        max_length=V2_DISPLAY_TEXT_MAX_LENGTH,
+        exclude_if=_is_none,
+        description="Plain text, for example 'for 50 responses'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_range(self) -> V2CostEstimate:
+        if self.status == "unknown":
+            if (self.unit, self.min, self.max) != (None, None, None):
+                raise ValueError(
+                    "cost estimate with status 'unknown' must not set unit, min or max"
+                )
+            return self
+        if self.unit is None or self.min is None or self.max is None:
+            raise ValueError("estimated cost requires unit, min and max")
+        if self.max < self.min:
+            raise ValueError("cost estimate max must be >= min")
+        return self
+
+
+class V2SetupStep(ContractModel):
+    id: str
+    title: str = Field(max_length=V2_SHORT_TEXT_MAX_LENGTH)
+    description: str | None = Field(
+        default=None, max_length=V2_DISPLAY_TEXT_MAX_LENGTH, exclude_if=_is_none
+    )
+    status: Literal["pending", "awaiting", "done", "skipped"] = "pending"
+    fields: list[V2SetupFieldDefinition] = Field(default_factory=list)
+    help_actions: list[str] = Field(
+        default_factory=list,
+        exclude_if=_is_empty,
+        description="Ids of actions declared with kind='help' in the registration.",
+    )
+
+
+class V2SetupPlan(ContractModel):
+    """Typed setup plan; serializes to `confirmation_required` and `steps[]`."""
+
+    confirmation_required: bool = True
+    steps: list[V2SetupStep] = Field(default_factory=list)
+    cost_estimate: V2CostEstimate | None = Field(default=None, exclude_if=_is_none)
+
+    @field_validator("steps")
+    @classmethod
+    def validate_step_ids_unique(cls, value: list[V2SetupStep]) -> list[V2SetupStep]:
+        ids = [step.id for step in value]
+        duplicates = sorted({step_id for step_id in ids if ids.count(step_id) > 1})
+        if duplicates:
+            raise ValueError(f"setup plan step ids must be unique: {duplicates}")
+        return value
+
+
 class V2ResourceFieldDefinition(ContractModel):
     id: str
     label: str
@@ -699,6 +1028,23 @@ class V2ResourceFieldDefinition(ContractModel):
     read_only: bool = False
     multiline: bool = False
     options_source: V2ResourceFieldOptionsSource | None = None
+    item_fields: list[V2SetupFieldDefinition] | None = Field(
+        default=None, exclude_if=_is_none
+    )
+    default: Any | None = Field(default=None, exclude_if=_is_none)
+    description: str | None = Field(
+        default=None, max_length=V2_DISPLAY_TEXT_MAX_LENGTH, exclude_if=_is_none
+    )
+    placeholder: str | None = Field(default=None, exclude_if=_is_none)
+    min_rows: int | None = Field(default=None, ge=1, exclude_if=_is_none)
+    options: _FieldOptions = Field(default=None, exclude_if=_is_none)
+    depends_on: V2FieldDependsOn | None = Field(default=None, exclude_if=_is_none)
+    validation: V2FieldValidation | None = Field(default=None, exclude_if=_is_none)
+
+    @model_validator(mode="after")
+    def validate_rules(self) -> V2ResourceFieldDefinition:
+        _validate_field_rules(self)
+        return self
 
 
 class V2A2UISubmitDefinition(ContractModel):
@@ -865,6 +1211,29 @@ class SupervaizerV2AgentRegistrationContract(ContractModel):
     datasets: list[V2DatasetDefinition] = Field(default_factory=list)
     dashboards: list[V2DashboardDefinition] = Field(default_factory=list)
     workspace_binding: V2WorkspaceBindingDefinition | None = None
+
+    @model_validator(mode="after")
+    def validate_setup_plan_help_actions(
+        self,
+    ) -> SupervaizerV2AgentRegistrationContract:
+        """A step's help_actions must be declared actions with kind='help'.
+
+        Checked on the assembled registration, where derived and declared
+        actions are already merged, not on the step model alone.
+        """
+        setup = self.job_policy.setup
+        if setup is None or not isinstance(setup.plan, V2SetupPlan):
+            return self
+        help_ids = {a.id for a in self.capabilities.actions if a.kind == "help"}
+        for step in setup.plan.steps:
+            for action_id in step.help_actions:
+                if action_id not in help_ids:
+                    raise ValueError(
+                        f"setup step {step.id!r} references help action "
+                        f"{action_id!r}, which is not declared in "
+                        "capabilities.actions with kind='help'"
+                    )
+        return self
 
 
 def build_v2_agent_registration(
@@ -1323,12 +1692,44 @@ class V2ReplaySafetyMetadata(ContractModel):
     convergent: bool = True
 
 
+class V2Suggestion(ContractModel):
+    message: str
+    severity: Literal["info", "warning", "error"]
+    field: str | None = Field(default=None, exclude_if=_is_none)
+    proposed_value: Any | None = Field(default=None, exclude_if=_is_none)
+
+
+class V2FieldDraft(ContractModel):
+    """Help-action output: a proposed value for one setup field, never auto-applied."""
+
+    field: str = Field(description="Target setup field id.")
+    value: Any | None = Field(
+        default=None,
+        exclude_if=_is_none,
+        description="Proposed value; None for a validate-only result.",
+    )
+    suggestions: list[V2Suggestion] = Field(default_factory=list, exclude_if=_is_empty)
+
+
+class V2DryRunOutcome(ContractModel):
+    """What a dry-run action left behind."""
+
+    expires_at: datetime | None = Field(default=None, exclude_if=_is_none)
+    deletable: bool
+    cost_incurred: V2CostEstimate | None = Field(default=None, exclude_if=_is_none)
+
+
 class V2ActionResult(ContractModel):
     status: Literal["ok", "error"]
     effects: list[V2Effect] = Field(default_factory=list)
     job_state: V2JobStateSnapshot | None = None
     replay_safety: V2ReplaySafetyMetadata | None = None
-    setup_plan: dict[str, Any] | None = None
+    # dict first, left to right: see V2JobSetupPolicy.plan.
+    setup_plan: dict[str, Any] | V2SetupPlan | None = Field(
+        default=None, union_mode="left_to_right"
+    )
+    draft: V2FieldDraft | None = Field(default=None, exclude_if=_is_none)
+    dry_run: V2DryRunOutcome | None = Field(default=None, exclude_if=_is_none)
 
 
 class V2SurfaceResult(ContractModel):
@@ -1351,6 +1752,27 @@ class V2AwaitingFieldDefinition(ContractModel):
     label: str
     type: str = "boolean"
     required: bool = False
+    item_fields: list[V2SetupFieldDefinition] | None = Field(
+        default=None, exclude_if=_is_none
+    )
+    default: Any | None = Field(default=None, exclude_if=_is_none)
+    description: str | None = Field(
+        default=None, max_length=V2_DISPLAY_TEXT_MAX_LENGTH, exclude_if=_is_none
+    )
+    placeholder: str | None = Field(default=None, exclude_if=_is_none)
+    multiline: bool = Field(default=False, exclude_if=_is_empty)
+    min_rows: int | None = Field(default=None, ge=1, exclude_if=_is_none)
+    options: _FieldOptions = Field(default=None, exclude_if=_is_none)
+    options_source: V2ResourceFieldOptionsSource | None = Field(
+        default=None, exclude_if=_is_none
+    )
+    depends_on: V2FieldDependsOn | None = Field(default=None, exclude_if=_is_none)
+    validation: V2FieldValidation | None = Field(default=None, exclude_if=_is_none)
+
+    @model_validator(mode="after")
+    def validate_rules(self) -> V2AwaitingFieldDefinition:
+        _validate_field_rules(self)
+        return self
 
 
 class V2AwaitingState(ContractModel):

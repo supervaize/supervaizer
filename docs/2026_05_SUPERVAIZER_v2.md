@@ -103,6 +103,61 @@ The v2 registration is exposed in the A2A Agent Card under `supervaizer.v2`.
 
 This does not replace the existing Studio server registration process. Server identity, public key exchange, and encrypted payload handling still belong to the normal Studio registration path. The v2 extension tells Studio how to operate the already-registered controller.
 
+### Introduction
+
+An agent may pass `introduction=` to `Agent` (a `V2AgentIntroduction` or a dict). Studio renders the roster entry and the chat opening from this block alone. Without it the agent shows with `name` and `description` only, as before.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `tagline` | `str` | required, at most 120 characters, plain text |
+| `summary` | `str` | required, at most 300 characters, what the agent does |
+| `example_goals` | `list[str]` | 1 to 5 items of at most 120 characters each; Studio offers them as suggested first messages |
+| `avatar_url` | `str \| None` | https URL, optional |
+
+```python
+agent = Agent(
+    name="Research Agent",
+    version="1.0.0",
+    supervaizer_v2_registration=registration,
+    introduction={
+        "tagline": "Turns a question into a sourced brief",
+        "summary": "Collects sources, drafts a synthesis and asks for review.",
+        "example_goals": ["Brief me on a market", "Review these three reports"],
+    },
+)
+```
+
+The block travels as the `introduction` key of the agent registration payload (`AgentRegistrationContract.introduction`) and is omitted when unset.
+
+### Full description
+
+An agent may pass `full_description=` to `Agent` (a `V2AgentFullDescription` or a dict) to ship a long-form description of itself: what it does, how it works, its limits, examples. Studio shows it on the agent detail page. `description` stays the one-line summary and `introduction` stays the short roster block; neither is required for `full_description`.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `format` | `"markdown"` or `"html"` | defaults to `markdown` |
+| `content` | `str` | required, 1 to 100,000 characters, not whitespace only |
+
+The SDK only types and bounds the content. Studio sanitizes HTML, including the HTML it renders from markdown, before display: scripts, event handlers and unsafe URLs are stripped. Write content that reads well without them.
+
+```python
+agent = Agent(
+    name="Research Agent",
+    version="1.0.0",
+    supervaizer_v2_registration=registration,
+    full_description={
+        "format": "markdown",
+        "content": (
+            "# Research Agent\n\n"
+            "Collects sources, drafts a synthesis and asks for review.\n\n"
+            "## Limits\n\n- Public web sources only\n- One brief per job\n"
+        ),
+    },
+)
+```
+
+The block travels as the `full_description` key of the agent registration payload (`AgentRegistrationContract.full_description`) and is omitted when unset.
+
 ### Scheduled start
 
 Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents. The registration must declare `job.start` in its actions, including actions derived from `job_policy.setup`.
@@ -297,6 +352,29 @@ V2SurfaceResult(
 )
 ```
 
+#### File fields
+
+An awaiting step can ask the operator for a file. The agent declares a field with `type: "file"` in the `fields` list. The `id` and `label` are chosen by the agent; the other keys are protocol keys:
+
+```json
+{"id": "report_file", "label": "Insights report (.md)", "type": "file",
+ "accept": ".md,text/markdown", "max_bytes": 1048576, "storage": "studio",
+ "required": true}
+```
+
+- `accept` lists the allowed extensions and media types.
+- `max_bytes` is the largest file size Studio accepts for this field.
+- `storage` selects where the bytes live and what the agent receives (see the table).
+
+| `storage` | Value in the HITL answer | Who keeps the bytes |
+| --- | --- | --- |
+| `studio` | `{"storage": "studio", "file_id", "filename", "media_type", "size", "sha256"}` | Studio, in private storage. The agent receives a reference only. |
+| `inline` | `{"storage": "inline", "filename", "media_type", "size", "encoding", "content"}` inside the action JSON | The agent. The content travels in the action request. |
+
+With `storage: "inline"`, the whole action JSON, content included, must stay under Studio's request body limit. Choose `studio` for files that can approach that limit.
+
+File fields are supported in `case.step.awaiting` steps only for now. The contract models already accept these keys as extra keys, so agents need no SDK change.
+
 ### Artifact
 
 Artifacts are agent-owned outputs. The protocol only defines the reference shape:
@@ -304,6 +382,17 @@ Artifacts are agent-owned outputs. The protocol only defines the reference shape
 - `id`
 - `type`
 - optional `title`, external id, and media type
+
+#### Studio-stored artifacts
+
+An agent can emit an artifact whose bytes Studio already holds, for example a file the operator uploaded through a `storage: "studio"` file field. The ref carries the normal keys plus two more: `"storage": "studio"` and `"file_id"` (the Studio file id):
+
+```json
+{"id": "report:<report_id>", "type": "report", "title": "Quarterly report",
+ "media_type": "text/markdown", "storage": "studio", "file_id": "<studio file id>"}
+```
+
+Studio serves such an artifact from its own storage. It does not call the agent's `artifact.get` action for it. Access control is unchanged: the caller still needs the `artifact.get` grant to read the artifact.
 
 Artifact types such as `transcript`, `synthesis`, `report`, `metric`, or `decision` belong to the agent registration. Studio can render known artifact types richly and fall back to generic previews for unknown types.
 
@@ -471,7 +560,103 @@ Since 1.6.0, `capabilities.actions` serializes as a list of `V2ActionDefinition`
 - Bare strings are still accepted in `build_v2_agent_registration(actions=...)` and coerce to `mutating=True, scope="job"`, the fail-closed reading.
 - Derived actions inherit metadata from their definition: resource operations take `V2ResourceDefinition.scope` and stay `mutating=True` unless declared otherwise, dataset queries are `mutating=False`, `job_policy.setup.preview_action` is `mutating=False`, and workspace binding actions are `workspace`-scoped.
 - Precedence is explicit > derived > bare: an explicit `V2ActionDefinition` in `actions=` overrides derived metadata regardless of position, and the earliest mention fixes the order.
-- `job_policy.setup` (`V2JobSetupPolicy`) declares `preview_action`, `start_action`, and `submit_action` (defaults `job.start.preview`, `job.start`, `step.awaiting.submit`), the `action_scopes` they apply to (default empty), and an opaque `plan`. `V2ActionResult.setup_plan` carries the plan back to Studio.
+- `job_policy.setup` (`V2JobSetupPolicy`) declares `preview_action`, `start_action`, and `submit_action` (defaults `job.start.preview`, `job.start`, `step.awaiting.submit`), the `action_scopes` they apply to (default empty), and a `plan`. `V2ActionResult.setup_plan` carries the plan back to Studio. Both accept a `V2SetupPlan` or a dict: a dict passes through untouched; a `V2SetupPlan` serializes to `confirmation_required` (default `true`), `steps[]` and an optional `cost_estimate`. See [Setup plan and field schema](#setup-plan-and-field-schema).
+
+### Setup plan and field schema
+
+A `V2SetupPlan` is the typed form of `job_policy.setup.plan` and of `V2ActionResult.setup_plan`. Each `V2SetupStep` has `id` (unique in the plan), `title` (at most 120 characters), optional `description` (at most 300), `status` (`pending` default, `awaiting`, `done`, `skipped`), `fields` and `help_actions`. Every id in `help_actions` must be declared in `capabilities.actions` with `kind="help"`; the registration validator checks this once declared and derived actions are merged.
+
+`V2SetupFieldDefinition` describes one input. `V2AwaitingFieldDefinition` and `V2ResourceFieldDefinition` accept the same optional keys; unset keys stay off the wire, so existing registrations serialize as before.
+
+| Key | Rule |
+| --- | --- |
+| `id`, `label` | required |
+| `type` | default `string`. Known: `string`, `text`, `boolean`, `integer`, `number`, `date`, `select`, `multi_select`, `resource_ref`, `file`, `list`. Unknown types render as `string`. |
+| `item_fields` | required when `type="list"`, rejected otherwise. One nesting level: an item field cannot be a `list`. The value of a `list` field is a list of dicts keyed by item field id, never free text. |
+| `required` | default `false` |
+| `default`, `placeholder` | optional |
+| `description` | at most 300 characters, shown as a tooltip |
+| `multiline`, `min_rows` | `min_rows` is at least 1 and allowed only with `multiline` |
+| `options` | `[{"value", "label"}]`; bare strings are rejected |
+| `options_source` | `V2ResourceFieldOptionsSource`, unchanged |
+| `depends_on` | `{"field": "<parent id>", "in": [<stringified parent values>]}`; the field is active only while the parent's value is listed, and parents chain |
+| `validation` | `V2FieldValidation`: `min_length`, `max_length`, `pattern` fit `string`, `text` and unknown types; `min`, `max` fit `integer` and `number`; `min_items`, `max_items` fit `multi_select` and `list`; `message` replaces the generic error. A rule that does not fit the field type is rejected. |
+
+`V2CostEstimate` carries `status` (`estimated` or `unknown`), `unit` (a free label such as `USD`, `tokens` or `credits`, shown verbatim), `min`, `max` (at least `min`, both at least 0) and `basis` (plain text, at most 300 characters). With `status="unknown"`, `unit`, `min` and `max` must be absent. Clients render a range or "unknown", never a single number.
+
+```python
+from supervaizer import V2CostEstimate, V2SetupFieldDefinition, V2SetupPlan, V2SetupStep
+
+plan = V2SetupPlan(
+    steps=[
+        V2SetupStep(
+            id="scope",
+            title="Scope",
+            fields=[
+                V2SetupFieldDefinition(
+                    id="goal",
+                    label="Goal",
+                    type="text",
+                    multiline=True,
+                    min_rows=4,
+                    required=True,
+                ),
+                V2SetupFieldDefinition(
+                    id="mode",
+                    label="Mode",
+                    type="select",
+                    options=[
+                        {"value": "fast", "label": "Fast"},
+                        {"value": "custom", "label": "Custom"},
+                    ],
+                ),
+                V2SetupFieldDefinition(
+                    id="budget",
+                    label="Budget",
+                    type="number",
+                    depends_on={"field": "mode", "in": ["custom"]},
+                    validation={"min": 0, "message": "Budget cannot be negative"},
+                ),
+            ],
+            help_actions=["goal.suggest"],
+        )
+    ],
+    cost_estimate=V2CostEstimate(
+        status="estimated", unit="credits", min=5, max=20, basis="for 50 runs"
+    ),
+)
+registration = build_v2_agent_registration(
+    ...,
+    actions=[
+        {
+            "id": "goal.suggest",
+            "kind": "help",
+            "mutating": False,
+            "target_field": "goal",
+        }
+    ],
+    job_policy={"setup": {"plan": plan}},
+)
+```
+
+### Help actions and dry runs
+
+`V2ActionDefinition` has three optional keys, all omitted from the wire at their default:
+
+- `kind`: `"command"` (default) or `"help"`. A help action proposes or checks a draft for one setup field during guided setup. It must declare `mutating=False`; the SDK rejects a help action that mutates.
+- `target_field`: the setup field id whose draft the result fills. Allowed only with `kind="help"`.
+- `dry_run`: `False` by default. A dry-run action is a test run defined by its outcome, not by where it stores data. It MAY create temporary agent-side data and MAY incur model cost. It MUST NOT send any external communication. It MUST NOT appear in results, datasets, dashboards or `job.sync` counts.
+
+A help action receives `input = {"field": "<target field id>", "values": {<current draft values>}}` and answers with `V2ActionResult.draft` (`V2FieldDraft`): `field`, `value` (the proposed value, `None` for a validate-only check) and `suggestions` (`V2Suggestion`: `message`, `severity` `info`, `warning` or `error`, optional `field` and `proposed_value`). Studio shows `value` as an editable draft of the target field and never applies it on its own. For a `list` field, `draft.value` has the field's value shape: a list of dicts keyed by item field id.
+
+A dry-run action answers with `V2ActionResult.dry_run` (`V2DryRunOutcome`): `expires_at`, `deletable` and `cost_incurred` (a `V2CostEstimate`, shown when present). Studio labels dry-run actions distinctly.
+
+```python
+actions = [
+    {"id": "goal.suggest", "kind": "help", "mutating": False, "target_field": "goal"},
+    {"id": "job.test", "dry_run": True, "label": "Test run"},
+]
+```
 
 ### Display text
 
@@ -522,6 +707,24 @@ Recommended behavior:
 - repeated sync calls should be convergent
 - offline agents block new starts
 - if Studio marks a running Job failed because the agent is offline, resuming later should use a new Job plus `job.sync`
+
+## Idempotency
+
+Confirming a setup (`job.start`) must be safe to retry. These rules are part of the v2 contract; they add no field.
+
+- The **operation key** is `V2ActionRequest.idempotency_key`. Studio's `job_setup` already requires it on preview and confirm; it stays the same value across preview, confirm and every retry.
+- The **identities** are `mission_id` and `job_id`, allocated by Studio before confirm and sent unchanged on every retry.
+- Agent rules for `job.start`: same key + same identities → return the original result, create nothing. Same key + different input or identities → `status: "error"` with `errors[0].code = "idempotency_conflict"`. Result sets `replay_safety.strictly_idempotent_response = True`.
+- Client rules after an uncertain result (timeout, expired token): reuse the same key and identities. Never mint a new key for a retry. Resolve the outcome before offering a new setup.
+- Conformance helper in the SDK test utilities: `assert_confirm_idempotent(handler, request)` (exported from `supervaizer`, implemented in `supervaizer.testing`) calls the handler twice and asserts equal results and no new effects on the second call. Agents must ship a test that calls it.
+
+```python
+from supervaizer import assert_confirm_idempotent
+
+
+def test_job_start_is_idempotent() -> None:
+    assert_confirm_idempotent(start_job, request_with_idempotency_key)
+```
 
 ## A2A, A2UI, and AG-UI
 

@@ -1,0 +1,748 @@
+{
+  "v2_only_agent.registration_info": {
+    "name": "V2 Only Agent",
+    "id": "NRa939JB9mNyTHejxVJ5zk",
+    "author": null,
+    "developer": null,
+    "maintainer": null,
+    "editor": null,
+    "version": "1.0.0",
+    "release_notes_url": null,
+    "description": "Agent with a v2 registration and no v1 methods.",
+    "api_path": "/agents/v2-only-agent",
+    "slug": "v2-only-agent",
+    "tags": null,
+    "methods": {},
+    "parameters_setup": [],
+    "server_agent_id": "None",
+    "server_agent_status": null,
+    "server_agent_onboarding_status": null,
+    "max_execution_time": 3600,
+    "instructions_path": "supervaize_instructions.html",
+    "data_resources": [],
+    "supervaizer_v2": {
+      "supervaizer_contract_version": 2,
+      "agent": {
+        "id": "v2-only-agent",
+        "slug": "v2-only-agent",
+        "display_name": "V2 Only Agent"
+      },
+      "versions": {
+        "a2ui_version": "v0.8",
+        "a2ui_catalog_version": "v2-only-ui.1",
+        "a2a_version": "0.2.6",
+        "ag_ui_version": null
+      },
+      "a2a": {
+        "agent_card_url": "/.well-known/agents/v1.0.0/v2-only-agent_agent.json",
+        "controller_url": "/a2a",
+        "transport": {
+          "json_rpc": true,
+          "sse": true,
+          "push_notifications": false
+        },
+        "external_interop": {
+          "inbound_tasks": false,
+          "outbound_delegation": false
+        }
+      },
+      "capabilities": {
+        "surfaces": [
+          "job.start"
+        ],
+        "actions": [
+          {
+            "id": "job.start",
+            "mutating": true,
+            "scope": "job"
+          }
+        ],
+        "case_lanes": [],
+        "artifact_types": []
+      },
+      "job_policy": {
+        "default_timeout_seconds": null,
+        "offline_start_policy": "block",
+        "offline_running_policy": "fail_in_studio",
+        "sync": null,
+        "setup": null
+      },
+      "resources": [],
+      "datasets": [],
+      "dashboards": [],
+      "workspace_binding": null
+    }
+  },
+  "local_agent.registration_info": {
+    "name": "Hello World AI Agent",
+    "id": "ZbdXaxVurYBVbDcr9cDhXS",
+    "author": "Supervaizer (local test)",
+    "developer": null,
+    "maintainer": null,
+    "editor": null,
+    "version": "1.0",
+    "release_notes_url": null,
+    "description": "Built-in Hello World agent for local testing without Studio.",
+    "api_path": "/agents/hello-world-ai-agent",
+    "slug": "hello-world-ai-agent",
+    "tags": [
+      "hello world",
+      "ai agent",
+      "local"
+    ],
+    "methods": {
+      "job_start": {
+        "name": "start",
+        "method": "supervaizer.examples.hello_world_agent.job_start",
+        "params": {
+          "action": "start"
+        },
+        "fields": [
+          {
+            "name": "How many times to say hello",
+            "field_type": "IntegerField",
+            "description": null,
+            "choices": null,
+            "default": 3,
+            "widget": null,
+            "required": true,
+            "type": "int"
+          },
+          {
+            "name": "Enable human review",
+            "field_type": "BooleanField",
+            "description": null,
+            "choices": null,
+            "default": false,
+            "widget": null,
+            "required": false,
+            "type": "bool"
+          }
+        ],
+        "description": "Say hello N times (local test)",
+        "is_async": false,
+        "timeout": 600,
+        "nodes": null
+      },
+      "job_stop": {
+        "name": "stop",
+        "method": "supervaizer.examples.hello_world_agent.job_stop",
+        "params": {
+          "action": "stop"
+        },
+        "fields": [],
+        "description": "Stop the running job",
+        "is_async": false,
+        "timeout": 600,
+        "nodes": null
+      },
+      "job_status": {
+        "name": "status",
+        "method": "supervaizer.examples.hello_world_agent.job_status",
+        "params": {
+          "action": "status"
+        },
+        "fields": [],
+        "description": "Get the status of the agent",
+        "is_async": false,
+        "timeout": 600,
+        "nodes": null
+      },
+      "human_answer": {
+        "name": "human_answer",
+        "method": "supervaizer.examples.hello_world_agent.human_answer",
+        "params": {
+          "action": "human_answer"
+        },
+        "fields": [],
+        "description": "Handle human-in-the-loop answers",
+        "is_async": false,
+        "timeout": 600,
+        "nodes": null
+      },
+      "chat": null,
+      "custom": {}
+    },
+    "parameters_setup": [
+      {
+        "name": "SIMPLE AGENT PARAMETER",
+        "description": "Setup agent parameter in this workspace",
+        "is_environment": true,
+        "is_secret": false,
+        "is_required": false
+      },
+      {
+        "name": "SIMPLE AGENT SECRET",
+        "description": "Setup agent secret in this workspace",
+        "is_environment": true,
+        "is_secret": true,
+        "is_required": false
+      }
+    ],
+    "server_agent_id": "None",
+    "server_agent_status": null,
+    "server_agent_onboarding_status": null,
+    "max_execution_time": 3600,
+    "instructions_path": "supervaize_instructions.html",
+    "data_resources": [],
+    "supervaizer_v2": {
+      "supervaizer_contract_version": 2,
+      "agent": {
+        "id": "hello-world-ai-agent",
+        "slug": "hello-world-ai-agent",
+        "display_name": "Hello World AI Agent"
+      },
+      "versions": {
+        "a2ui_version": "v0.8",
+        "a2ui_catalog_version": "supervaizer-v2-local.0",
+        "a2a_version": "0.2.6",
+        "ag_ui_version": null
+      },
+      "a2a": {
+        "agent_card_url": "/.well-known/agents/v1.0/hello-world-ai-agent_agent.json",
+        "controller_url": "/a2a",
+        "transport": {
+          "json_rpc": true,
+          "sse": true,
+          "push_notifications": false
+        },
+        "external_interop": {
+          "inbound_tasks": false,
+          "outbound_delegation": false
+        }
+      },
+      "capabilities": {
+        "surfaces": [
+          "job.start",
+          "case.step.awaiting",
+          "mission.agent.resource.hello_messages"
+        ],
+        "actions": [
+          {
+            "id": "job.start.preview",
+            "mutating": true,
+            "scope": "job"
+          },
+          {
+            "id": "job.start",
+            "mutating": true,
+            "scope": "job"
+          },
+          {
+            "id": "step.awaiting.submit",
+            "mutating": true,
+            "scope": "job"
+          },
+          {
+            "id": "resource.hello_messages.list",
+            "mutating": true,
+            "scope": "workspace"
+          },
+          {
+            "id": "job.sync",
+            "mutating": true,
+            "scope": "job"
+          }
+        ],
+        "case_lanes": [
+          {
+            "id": "work",
+            "label": "Work",
+            "default": true
+          }
+        ],
+        "artifact_types": []
+      },
+      "job_policy": {
+        "default_timeout_seconds": null,
+        "offline_start_policy": "block",
+        "offline_running_policy": "fail_in_studio",
+        "sync": {
+          "action": "job.sync",
+          "supported_statuses": []
+        },
+        "setup": null
+      },
+      "resources": [
+        {
+          "id": "hello_messages",
+          "label": "Hello Messages",
+          "auto_surface": true,
+          "scope": "workspace",
+          "requires_context": [
+            "workspace.id"
+          ],
+          "operations": [
+            "list"
+          ],
+          "display": null,
+          "fields": [],
+          "mounted_views": []
+        }
+      ],
+      "datasets": [],
+      "dashboards": [],
+      "workspace_binding": null
+    }
+  },
+  "fixture.registration": {
+    "supervaizer_contract_version": 2,
+    "agent": {
+      "id": "agent_interviewer",
+      "slug": "agent_interviewer",
+      "display_name": "Agent Interviewer"
+    },
+    "versions": {
+      "a2ui_version": "v0.8",
+      "a2ui_catalog_version": "supervaizer-v2-mvp.0",
+      "a2a_version": "0.2.6",
+      "ag_ui_version": null
+    },
+    "a2a": {
+      "agent_card_url": "https://agent.example.com/.well-known/agent-card.json",
+      "controller_url": "https://agent.example.com/a2a",
+      "transport": {
+        "json_rpc": true,
+        "sse": true,
+        "push_notifications": false
+      },
+      "external_interop": {
+        "inbound_tasks": false,
+        "outbound_delegation": false
+      }
+    },
+    "capabilities": {
+      "surfaces": [
+        "mission.agent.overview",
+        "mission.agent.resource.campaigns",
+        "mission.agent.resource.contacts",
+        "mission.agent.resource.prompts",
+        "mission.agent.resource.scenarios",
+        "mission.agent.resource.campaign_contacts",
+        "mission.agent.surface.contact_import",
+        "mission.agent.surface.prompt_editor",
+        "mission.agent.surface.scenario_builder",
+        "job.start",
+        "case.step.awaiting",
+        "case.step.detail",
+        "mission.analytics"
+      ],
+      "actions": [
+        {
+          "id": "job.start.preview",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "job.start",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "job.stop",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "job.sync",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "agent.refresh",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "artifact.get",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaigns.list",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaigns.create",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaigns.update",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.contacts.list",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.contacts.create",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.contacts.update",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.contacts.import",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.prompts.list",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.prompts.update",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.scenarios.list",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.scenarios.update",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaign_contacts.list",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaign_contacts.create",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "resource.campaign_contacts.delete",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "dataset.campaign_progress.query",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "dataset.session_metrics.query",
+          "mutating": true,
+          "scope": "job"
+        },
+        {
+          "id": "step.awaiting.submit",
+          "mutating": true,
+          "scope": "job"
+        }
+      ],
+      "case_lanes": [
+        {
+          "id": "setup",
+          "label": "Setup",
+          "default": false
+        },
+        {
+          "id": "work",
+          "label": "Work",
+          "default": true
+        },
+        {
+          "id": "deliverable",
+          "label": "Deliverables",
+          "default": false
+        }
+      ],
+      "artifact_types": [
+        {
+          "type": "agent_interviewer.transcript",
+          "label": "Transcript",
+          "renderer_surface": "case.step.detail"
+        },
+        {
+          "type": "agent_interviewer.synthesis",
+          "label": "Synthesis",
+          "renderer_surface": "case.step.detail"
+        }
+      ]
+    },
+    "job_policy": {
+      "default_timeout_seconds": 3600,
+      "offline_start_policy": "block",
+      "offline_running_policy": "fail_in_studio",
+      "sync": {
+        "action": "job.sync",
+        "supported_statuses": [
+          "active",
+          "awaiting",
+          "failed",
+          "completed"
+        ]
+      },
+      "setup": null
+    },
+    "resources": [
+      {
+        "id": "campaigns",
+        "label": "Campaigns",
+        "auto_surface": true,
+        "scope": "workspace",
+        "requires_context": [
+          "workspace.id"
+        ],
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update"
+        ],
+        "display": {
+          "title_field": "name",
+          "columns": [
+            "name",
+            "status",
+            "contact_count",
+            "updated_at"
+          ],
+          "search_fields": [
+            "name"
+          ]
+        },
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true,
+            "read_only": false,
+            "multiline": false,
+            "options_source": null
+          }
+        ],
+        "mounted_views": []
+      },
+      {
+        "id": "contacts",
+        "label": "Contacts",
+        "auto_surface": true,
+        "scope": "workspace",
+        "requires_context": [
+          "workspace.id"
+        ],
+        "operations": [
+          "list",
+          "get",
+          "create",
+          "update",
+          "import"
+        ],
+        "display": {
+          "title_field": "email",
+          "columns": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ],
+          "search_fields": [
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number"
+          ]
+        },
+        "fields": [
+          {
+            "id": "first_name",
+            "label": "First name",
+            "type": "string",
+            "required": false,
+            "read_only": false,
+            "multiline": false,
+            "options_source": null
+          },
+          {
+            "id": "last_name",
+            "label": "Last name",
+            "type": "string",
+            "required": false,
+            "read_only": false,
+            "multiline": false,
+            "options_source": null
+          },
+          {
+            "id": "email",
+            "label": "Email",
+            "type": "email",
+            "required": true,
+            "read_only": false,
+            "multiline": false,
+            "options_source": null
+          }
+        ],
+        "mounted_views": [
+          {
+            "view": "import",
+            "surface": "mission.agent.surface.contact_import"
+          }
+        ]
+      },
+      {
+        "id": "prompts",
+        "label": "Prompts",
+        "auto_surface": true,
+        "scope": "workspace",
+        "requires_context": [
+          "workspace.id"
+        ],
+        "operations": [
+          "list",
+          "get",
+          "update"
+        ],
+        "display": null,
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "string",
+            "required": true,
+            "read_only": false,
+            "multiline": false,
+            "options_source": null
+          },
+          {
+            "id": "content",
+            "label": "Content",
+            "type": "text",
+            "required": true,
+            "read_only": false,
+            "multiline": true,
+            "options_source": null
+          }
+        ],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.prompt_editor"
+          }
+        ]
+      },
+      {
+        "id": "scenarios",
+        "label": "Scenarios",
+        "auto_surface": true,
+        "scope": "workspace",
+        "requires_context": [
+          "workspace.id"
+        ],
+        "operations": [
+          "list",
+          "get",
+          "update"
+        ],
+        "display": null,
+        "fields": [],
+        "mounted_views": [
+          {
+            "view": "edit",
+            "surface": "mission.agent.surface.scenario_builder"
+          }
+        ]
+      },
+      {
+        "id": "campaign_contacts",
+        "label": "Campaign Contacts",
+        "auto_surface": true,
+        "scope": "workspace",
+        "requires_context": [
+          "workspace.id"
+        ],
+        "operations": [
+          "list",
+          "create",
+          "delete"
+        ],
+        "display": {
+          "title_field": "contact_id",
+          "columns": [
+            "contact_id",
+            "interview_status",
+            "is_inactive"
+          ],
+          "search_fields": [
+            "contact_id",
+            "interview_status"
+          ]
+        },
+        "fields": [
+          {
+            "id": "campaign_id",
+            "label": "Campaign",
+            "type": "resource_ref",
+            "required": true,
+            "read_only": false,
+            "multiline": false,
+            "options_source": {
+              "type": "resource",
+              "resource": "campaigns",
+              "value_field": "id",
+              "label_field": "name"
+            }
+          },
+          {
+            "id": "contact_id",
+            "label": "Contact",
+            "type": "resource_ref",
+            "required": true,
+            "read_only": false,
+            "multiline": false,
+            "options_source": {
+              "type": "resource",
+              "resource": "contacts",
+              "value_field": "id",
+              "label_field": "email"
+            }
+          }
+        ],
+        "mounted_views": []
+      }
+    ],
+    "datasets": [
+      {
+        "id": "campaign_progress",
+        "label": "Campaign Progress",
+        "auto_surface": true,
+        "scope": "workspace",
+        "display": null
+      },
+      {
+        "id": "session_metrics",
+        "label": "Session Metrics",
+        "auto_surface": true,
+        "scope": "workspace",
+        "display": null
+      }
+    ],
+    "dashboards": [],
+    "workspace_binding": null
+  },
+  "v2_only_agent.AgentRegistrationContract": {
+    "id": "NRa939JB9mNyTHejxVJ5zk",
+    "slug": "v2-only-agent",
+    "name": "V2 Only Agent",
+    "api_path": "/agents/v2-only-agent",
+    "release_notes_url": null,
+    "methods": {},
+    "parameters_setup": [],
+    "data_resources": []
+  }
+}

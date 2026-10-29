@@ -3,18 +3,19 @@
 # Reconcile release after `just ship`:
 # 1. Detect latest tag on `origin/main` vs latest tag on `origin/develop`.
 # 2. Wait until the PyPI package version for that tag is published.
-# 3. Merge (or rebase) `origin/main` back into `develop` and push `develop`.
+# 3. Merge `origin/main` into a `chore/sync-main-<tag>` branch cut from `origin/develop`,
+#    push it, and open a PR to `develop`. `develop` requires PRs, so the script never
+#    pushes it. Merge that PR with a merge commit, not a squash.
 # 4. Overwrite GitHub Release notes using the matching changelog section.
 #
-# This script is intentionally side-effecting (git merge/rebase + GitHub release edit),
-# but it will refuse to run with a dirty working tree.
+# This script is intentionally side-effecting (git merge + branch push + PR + GitHub
+# release edit), but it will refuse to run with a dirty working tree.
 
 set -euo pipefail
 
 REPO_SLUG="${1:-supervaize/supervaizer}"
 shift || true
 
-MODE="merge"
 TIMEOUT_SECONDS=1800
 POLL_SECONDS=15
 
@@ -25,10 +26,6 @@ PYPI_BASE_URL="${PYPI_BASE_URL:-https://pypi.org/pypi}"
 
 while [[ $# -gt 0 ]]; do
   case "${1}" in
-    --mode)
-      MODE="${2}"
-      shift 2
-      ;;
     --timeout-seconds)
       TIMEOUT_SECONDS="${2}"
       shift 2
@@ -43,11 +40,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-if [[ "${MODE}" != "merge" && "${MODE}" != "rebase" ]]; then
-  echo "Invalid --mode: ${MODE} (expected merge|rebase)" >&2
-  exit 2
-fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -120,18 +112,15 @@ while true; do
   sleep "${POLL_SECONDS}"
 done
 
-echo "Syncing ${MAIN_BRANCH} -> ${DEVELOP_BRANCH} (${MODE})..."
-git checkout "${DEVELOP_BRANCH}"
-git pull --ff-only origin "${DEVELOP_BRANCH}"
-
-if [[ "${MODE}" == "rebase" ]]; then
-  git rebase "origin/${MAIN_BRANCH}"
-else
-  git merge --no-ff "origin/${MAIN_BRANCH}" -m "chore: sync ${MAIN_BRANCH} back to ${DEVELOP_BRANCH} (${LATEST_TAG})"
-fi
-
-echo "Pushing ${DEVELOP_BRANCH}..."
-git push origin "${DEVELOP_BRANCH}"
+SYNC_BRANCH="chore/sync-${MAIN_BRANCH}-${LATEST_TAG}"
+SYNC_TITLE="chore: sync ${MAIN_BRANCH} back to ${DEVELOP_BRANCH} (${LATEST_TAG})"
+echo "Syncing ${MAIN_BRANCH} -> ${DEVELOP_BRANCH} through ${SYNC_BRANCH}..."
+git switch -c "${SYNC_BRANCH}" "origin/${DEVELOP_BRANCH}"
+git merge --no-ff "origin/${MAIN_BRANCH}" -m "${SYNC_TITLE}"
+git push -u origin "${SYNC_BRANCH}"
+gh pr create --repo "${REPO_SLUG}" --base "${DEVELOP_BRANCH}" --head "${SYNC_BRANCH}" \
+  --title "${SYNC_TITLE}" \
+  --body "Back-merge after ${LATEST_TAG}, opened by \`just ship-reconcile\`. Merge with a merge commit, not a squash, so \`${DEVELOP_BRANCH}\` keeps the release commit of \`${MAIN_BRANCH}\`."
 
 echo "Extracting changelog notes for ${LATEST_TAG}..."
 

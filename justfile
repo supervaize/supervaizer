@@ -196,6 +196,6 @@ gh-release:
     bash tools/gh-release-latest-tag.sh supervaize/supervaizer
 
 # After `just ship`, wait for the PyPI publish to be available, then
-# merge main back into develop and refresh release notes from CHANGELOG.md.
-ship-reconcile repo="supervaize/supervaizer" mode="merge" timeout_seconds="1800" poll_seconds="15":
-    bash tools/reconcile-release-after-ship.sh "{{repo}}" --mode "{{mode}}" --timeout-seconds {{timeout_seconds}} --poll-seconds {{poll_seconds}}
+# open a PR that merges main back into develop, and refresh release notes from CHANGELOG.md.
+ship-reconcile repo="supervaize/supervaizer" timeout_seconds="1800" poll_seconds="15":
+    bash tools/reconcile-release-after-ship.sh "{{repo}}" --timeout-seconds {{timeout_seconds}} --poll-seconds {{poll_seconds}}
