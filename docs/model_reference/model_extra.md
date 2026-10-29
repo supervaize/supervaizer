@@ -1,6 +1,6 @@
 # Model Reference extra
 
-**Version:** 1.7.0
+**Version:** 1.8.0
 
 ### `common.SvBaseModel`
 
@@ -246,6 +246,9 @@ something the caller controls.
 | `scope` | `Literal['workspace', 'mission', 'job']` | 'job' | Context the action operates within. |
 | `label` | `str` | `None` | Short caption a consumer may show instead of one derived from the id. Plain text; display only, never an authorization input. |
 | `description` | `str` | `None` | One or two plain-language sentences a consumer may show as help text, such as a tooltip. Plain text; display only, never an authorization input. |
+| `kind` | `Literal['command', 'help']` | 'command' | `help` actions propose or check a draft for `target_field` and must declare `mutating=False`. Omitted when `command`. |
+| `target_field` | `str` | `None` | Setup field id whose draft a `help` action result fills. |
+| `dry_run` | `bool` | False | Test run defined by outcome: may create temporary agent-side data and incur model cost, never sends external communication and never appears in results or sync counts. Omitted when False. |
 
 ### `contracts.V2ActionRequest`
 
@@ -270,6 +273,37 @@ something the caller controls.
 | `step_id` | `str` | `None` |  |
 | `mission` | `V2MissionContext` | `None` |  |
 | `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
+
+### `contracts.V2AgentFullDescription`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Long-form description a consumer shows on the agent detail page.
+
+The SDK only types and bounds the content. The consumer sanitizes HTML
+(and the HTML it renders from markdown) before display.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `format` | `Literal['markdown', 'html']` | 'markdown' | Markup of ``content``. |
+| `content` | `str` | **required** | Markdown or HTML body, 1 to 100,000 characters, not whitespace only. Not sanitized by the SDK; the consumer sanitizes it. |
+
+### `contracts.V2AgentIntroduction`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Plain-text roster block a consumer renders before any job exists.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `tagline` | `str` | **required** |  |
+| `summary` | `str` | **required** | What the agent does, in one or two sentences. |
+| `example_goals` | `list[str]` | **required** | Suggested first requests a consumer may offer verbatim. |
+| `avatar_url` | `str` | `None` |  |
 
 ### `contracts.V2AgentMethod`
 
@@ -489,6 +523,8 @@ Minimal schema for agent registration payloads consumed by Studio.
 | `methods` | `AgentMethodsContract` \| `dict[str, typing.Any]` | — |  |
 | `parameters_setup` | `list[dict[str, Any]]` | — |  |
 | `data_resources` | `list[contracts.DataResourceContract | dict[str, Any]]` | — |  |
+| `introduction` | `ForwardRef('V2AgentIntroduction | None')` | `None` | Roster text a consumer shows for the agent; omitted when unset. |
+| `full_description` | `ForwardRef('V2AgentFullDescription | None')` | `None` | Long-form markdown or HTML a consumer shows on the agent detail page; omitted when unset. The SDK only types and bounds it; the consumer sanitizes it before rendering. |
 
 ### `contracts.CaseUpdateEvent`
 
@@ -610,7 +646,7 @@ Structured response shape for DataResource list operations.
 | `job_context` | `dict[str, Any]` | **required** |  |
 | `job_fields` | `dict[str, Any]` | — |  |
 | `encrypted_agent_parameters` | `str` | `None` |  |
-| `rule_snapshot` | `ForwardRef("'RuleCheckpointSnapshot | None'")` | `None` |  |
+| `rule_snapshot` | `ForwardRef('RuleCheckpointSnapshot | None')` | `None` |  |
 
 ### `contracts.RuleCheckpointRequest`
 
@@ -786,7 +822,9 @@ A2UI-shaped resource import surface consumed by Studio.
 | `effects` | `list[contracts.V2Effect]` | — |  |
 | `job_state` | `ForwardRef('V2JobStateSnapshot | None')` | `None` |  |
 | `replay_safety` | `V2ReplaySafetyMetadata` | `None` |  |
-| `setup_plan` | `dict[str, typing.Any]` | `None` |  |
+| `setup_plan` | `dict[str, typing.Any]` \| `V2SetupPlan` | `None` |  |
+| `draft` | `V2FieldDraft` | `None` |  |
+| `dry_run` | `V2DryRunOutcome` | `None` |  |
 
 ### `contracts.V2ActorContext`
 
@@ -811,7 +849,7 @@ A2UI-shaped resource import surface consumed by Studio.
 | `actions` | `list[contracts.V2ActionDefinition]` | — |  |
 | `case_lanes` | `list[contracts.V2CaseLaneDefinition]` | — |  |
 | `artifact_types` | `list[contracts.V2ArtifactTypeDefinition]` | — |  |
-| `rule_checkpoints` | `ForwardRef("'V2RuleCheckpointCapability | None'")` | `None` |  |
+| `rule_checkpoints` | `ForwardRef('V2RuleCheckpointCapability | None')` | `None` |  |
 | `scheduled_start` | `bool` | False |  |
 
 ### `contracts.V2AgentIdentity`
@@ -864,6 +902,16 @@ A2UI-shaped resource import surface consumed by Studio.
 | `label` | `str` | **required** |  |
 | `type` | `str` | 'boolean' |  |
 | `required` | `bool` | False |  |
+| `item_fields` | `list[supervaizer.contracts.V2SetupFieldDefinition]` | `None` |  |
+| `default` | `Any` | `None` |  |
+| `description` | `str` | `None` |  |
+| `placeholder` | `str` | `None` |  |
+| `multiline` | `bool` | False |  |
+| `min_rows` | `int` | `None` |  |
+| `options` | `list[supervaizer.contracts.V2FieldOption]` | `None` |  |
+| `options_source` | `V2ResourceFieldOptionsSource` | `None` |  |
+| `depends_on` | `V2FieldDependsOn` | `None` |  |
+| `validation` | `V2FieldValidation` | `None` |  |
 
 ### `contracts.V2AwaitingState`
 
@@ -933,6 +981,22 @@ A2UI-shaped resource import surface consumed by Studio.
 | `scope` | `Literal['workspace', 'mission']` | **required** |  |
 | `title` | `str` | **required** |  |
 
+### `contracts.V2CostEstimate`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+A cost range or an explicit unknown, never a single number.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `status` | `Literal['estimated', 'unknown']` | **required** |  |
+| `unit` | `str` | `None` | Free label shown verbatim, such as USD, tokens or credits. |
+| `min` | `float` | `None` |  |
+| `max` | `float` | `None` |  |
+| `basis` | `str` | `None` | Plain text, for example 'for 50 responses'. |
+
 ### `contracts.V2DashboardDefinition`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -999,6 +1063,20 @@ A2UI-shaped resource import surface consumed by Studio.
 | `scope` | `Literal['workspace', 'mission', 'job']` | 'workspace' |  |
 | `display` | `V2ResourceDisplayDefinition` | `None` |  |
 
+### `contracts.V2DryRunOutcome`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+What a dry-run action left behind.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `expires_at` | `datetime` | `None` |  |
+| `deletable` | `bool` | **required** |  |
+| `cost_incurred` | `V2CostEstimate` | `None` |  |
+
 ### `contracts.V2Effect`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -1025,6 +1103,65 @@ A2UI-shaped resource import surface consumed by Studio.
 | `summary` | `dict[str, typing.Any]` | `None` |  |
 | `case` | `dict[str, typing.Any]` | `None` |  |
 | `data` | `dict[str, typing.Any]` | `None` |  |
+
+### `contracts.V2FieldDependsOn`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Activate a field only while a parent field holds one of the listed values.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `field` | `str` | **required** | Parent field id; parents may chain. |
+| `in_` | `list[str]` | **required** | Stringified parent values that activate this field. |
+
+### `contracts.V2FieldDraft`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Help-action output: a proposed value for one setup field, never auto-applied.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `field` | `str` | **required** | Target setup field id. |
+| `value` | `Any` | `None` | Proposed value; None for a validate-only result. |
+| `suggestions` | `list[contracts.V2Suggestion]` | — |  |
+
+### `contracts.V2FieldOption`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+One selectable choice. Bare strings are rejected so labels stay explicit.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `value` | `str` | **required** |  |
+| `label` | `str` | **required** |  |
+
+### `contracts.V2FieldValidation`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Rules a consumer enforces before submit. Each rule must fit the field type.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `min_length` | `int` | `None` |  |
+| `max_length` | `int` | `None` |  |
+| `pattern` | `str` | `None` | Regular expression, ECMAScript-safe subset. |
+| `min` | `float` | `None` |  |
+| `max` | `float` | `None` |  |
+| `min_items` | `int` | `None` |  |
+| `max_items` | `int` | `None` |  |
+| `message` | `str` | `None` | Shown instead of the generic validation error. |
 
 ### `contracts.V2JobPolicy`
 
@@ -1054,7 +1191,7 @@ Generic agent-declared job setup actions.
 | `start_action` | `str` | 'job.start' |  |
 | `submit_action` | `str` | 'step.awaiting.submit' |  |
 | `action_scopes` | `list[Literal['workspace', 'job', 'case', 'step']]` | — |  |
-| `plan` | `dict[str, typing.Any]` | `None` |  |
+| `plan` | `ForwardRef('dict[str, Any] | V2SetupPlan | None')` | `None` |  |
 
 ### `contracts.V2JobSnapshot`
 
@@ -1216,6 +1353,14 @@ Agent override that mounts an A2UI surface on a full resource view.
 | `read_only` | `bool` | False |  |
 | `multiline` | `bool` | False |  |
 | `options_source` | `V2ResourceFieldOptionsSource` | `None` |  |
+| `item_fields` | `list[supervaizer.contracts.V2SetupFieldDefinition]` | `None` |  |
+| `default` | `Any` | `None` |  |
+| `description` | `str` | `None` |  |
+| `placeholder` | `str` | `None` |  |
+| `min_rows` | `int` | `None` |  |
+| `options` | `list[supervaizer.contracts.V2FieldOption]` | `None` |  |
+| `depends_on` | `V2FieldDependsOn` | `None` |  |
+| `validation` | `V2FieldValidation` | `None` |  |
 
 ### `contracts.V2ResourceFieldOptionsSource`
 
@@ -1244,6 +1389,65 @@ Opt-in support for Studio before/after rule checkpoints.
 | `phases` | `list[Literal['before', 'after']]` | **required** |  |
 | `secret_refs` | `list[str]` | — |  |
 
+### `contracts.V2SetupFieldDefinition`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+One input a consumer renders during guided setup.
+
+Known types: string, text, boolean, integer, number, date, select,
+multi_select, resource_ref, file, list. Unknown types render as string.
+A `list` field declares `item_fields` (one nesting level) and its value is
+a list of dicts keyed by item field id, never free text.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** |  |
+| `label` | `str` | **required** |  |
+| `type` | `str` | 'string' |  |
+| `item_fields` | `list[supervaizer.contracts.V2SetupFieldDefinition]` | `None` |  |
+| `required` | `bool` | False |  |
+| `default` | `Any` | `None` |  |
+| `description` | `str` | `None` |  |
+| `placeholder` | `str` | `None` |  |
+| `multiline` | `bool` | False |  |
+| `min_rows` | `int` | `None` |  |
+| `options` | `list[supervaizer.contracts.V2FieldOption]` | `None` |  |
+| `options_source` | `V2ResourceFieldOptionsSource` | `None` |  |
+| `depends_on` | `V2FieldDependsOn` | `None` |  |
+| `validation` | `V2FieldValidation` | `None` |  |
+
+### `contracts.V2SetupPlan`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Typed setup plan; serializes to `confirmation_required` and `steps[]`.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `confirmation_required` | `bool` | True |  |
+| `steps` | `list[contracts.V2SetupStep]` | — |  |
+| `cost_estimate` | `V2CostEstimate` | `None` |  |
+
+### `contracts.V2SetupStep`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `str` | **required** |  |
+| `title` | `str` | **required** |  |
+| `description` | `str` | `None` |  |
+| `status` | `Literal['pending', 'awaiting', 'done', 'skipped']` | 'pending' |  |
+| `fields` | `list[contracts.V2SetupFieldDefinition]` | — |  |
+| `help_actions` | `list[str]` | — | Ids of actions declared with kind='help' in the registration. |
+
 ### `contracts.V2StepSnapshot`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -1259,6 +1463,19 @@ Opt-in support for Studio before/after rule checkpoints.
 | `external_id` | `str` | `None` |  |
 | `awaiting` | `V2AwaitingState` | `None` |  |
 | `outputs` | `list[contracts.V2ArtifactRef]` | — |  |
+
+### `contracts.V2Suggestion`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `message` | `str` | **required** |  |
+| `severity` | `Literal['info', 'warning', 'error']` | **required** |  |
+| `field` | `str` | `None` |  |
+| `proposed_value` | `Any` | `None` |  |
 
 ### `contracts.V2SurfaceDefinition`
 
@@ -1703,7 +1920,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 10, 10, 15, 49, 27, 133129) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 10, 29, 11, 50, 59, 784956) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1771,4 +1988,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-10-10 15:49:27*
+*Uploaded on 2026-10-29 11:50:59*
