@@ -129,6 +129,35 @@ agent = Agent(
 
 The block travels as the `introduction` key of the agent registration payload (`AgentRegistrationContract.introduction`) and is omitted when unset.
 
+### Full description
+
+An agent may pass `full_description=` to `Agent` (a `V2AgentFullDescription` or a dict) to ship a long-form description of itself: what it does, how it works, its limits, examples. Studio shows it on the agent detail page. `description` stays the one-line summary and `introduction` stays the short roster block; neither is required for `full_description`.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `format` | `"markdown"` or `"html"` | defaults to `markdown` |
+| `content` | `str` | required, 1 to 100,000 characters, not whitespace only |
+
+The SDK only types and bounds the content. Studio sanitizes HTML, including the HTML it renders from markdown, before display: scripts, event handlers and unsafe URLs are stripped. Write content that reads well without them.
+
+```python
+agent = Agent(
+    name="Research Agent",
+    version="1.0.0",
+    supervaizer_v2_registration=registration,
+    full_description={
+        "format": "markdown",
+        "content": (
+            "# Research Agent\n\n"
+            "Collects sources, drafts a synthesis and asks for review.\n\n"
+            "## Limits\n\n- Public web sources only\n- One brief per job\n"
+        ),
+    },
+)
+```
+
+The block travels as the `full_description` key of the agent registration payload (`AgentRegistrationContract.full_description`) and is omitted when unset.
+
 ### Scheduled start
 
 Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents. The registration must declare `job.start` in its actions, including actions derived from `job_policy.setup`.

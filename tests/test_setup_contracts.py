@@ -380,6 +380,7 @@ def test_action_result_serializes_draft_and_dry_run_only_when_set() -> None:
 def test_guided_setup_models_are_public_sdk_exports() -> None:
     for name in (
         "V2AgentIntroduction",
+        "V2AgentFullDescription",
         "V2SetupFieldDefinition",
         "V2FieldOption",
         "V2FieldDependsOn",
