@@ -274,6 +274,22 @@ something the caller controls.
 | `mission` | `V2MissionContext` | `None` |  |
 | `workspace_authorization` | `V2VerifiedWorkspaceContext` | `None` |  |
 
+### `contracts.V2AgentFullDescription`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Long-form description a consumer shows on the agent detail page.
+
+The SDK only types and bounds the content. The consumer sanitizes HTML
+(and the HTML it renders from markdown) before display.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `format` | `Literal['markdown', 'html']` | 'markdown' | Markup of ``content``. |
+| `content` | `str` | **required** | Markdown or HTML body, 1 to 100,000 characters, not whitespace only. Not sanitized by the SDK; the consumer sanitizes it. |
+
 ### `contracts.V2AgentIntroduction`
 
 **Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
@@ -508,6 +524,7 @@ Minimal schema for agent registration payloads consumed by Studio.
 | `parameters_setup` | `list[dict[str, Any]]` | — |  |
 | `data_resources` | `list[contracts.DataResourceContract | dict[str, Any]]` | — |  |
 | `introduction` | `ForwardRef('V2AgentIntroduction | None')` | `None` | Roster text a consumer shows for the agent; omitted when unset. |
+| `full_description` | `ForwardRef('V2AgentFullDescription | None')` | `None` | Long-form markdown or HTML a consumer shows on the agent detail page; omitted when unset. The SDK only types and bounds it; the consumer sanitizes it before rendering. |
 
 ### `contracts.CaseUpdateEvent`
 
@@ -1903,7 +1920,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 10, 28, 17, 38, 2, 388719) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 10, 29, 11, 50, 59, 784956) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1971,4 +1988,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-10-28 17:38:02*
+*Uploaded on 2026-10-29 11:50:59*

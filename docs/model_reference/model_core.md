@@ -119,6 +119,7 @@ _No additional fields beyond parent class._
 | `release_notes_url` | `str` | `None` | URL for release notes matching this agent version |
 | `description` | `str` | '' | Description of what the agent does |
 | `introduction` | `V2AgentIntroduction` | `None` | Optional roster block (tagline, summary, example goals, avatar) |
+| `full_description` | `V2AgentFullDescription` | `None` | Optional long-form markdown or HTML for the agent detail page. The SDK only types and bounds it; Studio sanitizes it. |
 | `tags` | `list[str]` | `None` | Tags for categorizing the agent |
 | `methods` | `AgentMethods` | `None` | Methods supported by this agent |
 | `parameters_setup` | `ParametersSetup` | `None` | Parameter configuration |
@@ -443,4 +444,4 @@ public_url: full url (including scheme and port) to use for outbound connections
 ```
 
 
-*Uploaded on 2026-10-28 17:38:02*
+*Uploaded on 2026-10-29 11:50:59*

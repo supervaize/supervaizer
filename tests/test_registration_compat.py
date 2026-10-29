@@ -24,6 +24,7 @@ from supervaizer import Agent, build_v2_agent_registration
 from supervaizer.contracts import (
     AgentRegistrationContract,
     SupervaizerV2AgentRegistrationContract,
+    V2AgentFullDescription,
     V2AgentIntroduction,
 )
 from supervaizer.examples.local_server import get_default_local_agent
@@ -36,6 +37,10 @@ INTRODUCTION = {
     "summary": "Collects a goal, plans the work and reports back.",
     "example_goals": ["Prepare a weekly digest", "Review a document"],
     "avatar_url": "https://example.com/avatar.png",
+}
+FULL_DESCRIPTION = {
+    "format": "markdown",
+    "content": "# Runner\n\nCollects a goal, plans the work and reports back.",
 }
 
 
@@ -127,3 +132,56 @@ def test_agent_introduction_rejects_out_of_contract_values(
 ) -> None:
     with pytest.raises(ValidationError):
         V2AgentIntroduction.model_validate({**INTRODUCTION, **override})
+
+
+def test_registration_without_full_description_has_no_key() -> None:
+    contract = AgentRegistrationContract(slug="a", name="A", api_path="/agents/a")
+
+    assert "full_description" not in contract.model_dump(mode="json")
+    assert "full_description" not in _v2_only_agent().registration_info
+
+
+def test_agent_full_description_rides_on_registration_info() -> None:
+    agent = Agent(
+        name="Described Agent",
+        version="1.0.0",
+        supervaizer_v2_registration=build_v2_agent_registration(
+            agent_slug="described-agent",
+            display_name="Described Agent",
+            a2ui_catalog_version="described.1",
+            actions=["job.start"],
+        ),
+        full_description=FULL_DESCRIPTION,
+    )
+    info = agent.registration_info
+
+    assert isinstance(agent.full_description, V2AgentFullDescription)
+    assert info["full_description"] == FULL_DESCRIPTION
+    contract = AgentRegistrationContract.model_validate({
+        key: info[key] for key in ("slug", "name", "api_path", "full_description")
+    })
+    assert contract.model_dump(mode="json")["full_description"] == FULL_DESCRIPTION
+
+
+def test_agent_full_description_formats_and_size_cap() -> None:
+    assert V2AgentFullDescription(content="<p>Hi</p>").format == "markdown"
+    html = V2AgentFullDescription(format="html", content="x" * 100_000)
+
+    assert html.model_dump(mode="json") == {"format": "html", "content": "x" * 100_000}
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"format": "plain"},
+        {"format": "Markdown"},
+        {"content": "x" * 100_001},
+        {"content": ""},
+        {"content": " \n\t "},
+    ],
+)
+def test_agent_full_description_rejects_out_of_contract_values(
+    override: dict[str, Any],
+) -> None:
+    with pytest.raises(ValidationError):
+        V2AgentFullDescription.model_validate({**FULL_DESCRIPTION, **override})

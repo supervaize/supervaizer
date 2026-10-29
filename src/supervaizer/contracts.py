@@ -47,6 +47,7 @@ _AGENT_CUSTOM_METHOD_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]*={0,2}$")
 V2_DISPLAY_TEXT_MAX_LENGTH = 300
 V2_SHORT_TEXT_MAX_LENGTH = 120
+V2_FULL_DESCRIPTION_MAX_LENGTH = 100_000
 MISSION_ID_HEADER = "X-Supervaize-Mission-Id"
 MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
 MISSION_METADATA_HEADER_MAX_LENGTH = 4096
@@ -278,6 +279,15 @@ class AgentRegistrationContract(ContractModel):
         exclude_if=lambda value: value is None,
         description="Roster text a consumer shows for the agent; omitted when unset.",
     )
+    full_description: V2AgentFullDescription | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Long-form markdown or HTML a consumer shows on the agent detail "
+            "page; omitted when unset. The SDK only types and bounds it; the "
+            "consumer sanitizes it before rendering."
+        ),
+    )
 
 
 class ServerRegistrationContract(ControllerContract):
@@ -420,6 +430,33 @@ class V2AgentIntroduction(ContractModel):
     def validate_avatar_url(cls, value: str | None) -> str | None:
         if value is not None and not value.startswith("https://"):
             raise ValueError("avatar_url must be an https URL")
+        return value
+
+
+class V2AgentFullDescription(ContractModel):
+    """Long-form description a consumer shows on the agent detail page.
+
+    The SDK only types and bounds the content. The consumer sanitizes HTML
+    (and the HTML it renders from markdown) before display.
+    """
+
+    format: Literal["markdown", "html"] = Field(
+        default="markdown", description="Markup of ``content``."
+    )
+    content: str = Field(
+        min_length=1,
+        max_length=V2_FULL_DESCRIPTION_MAX_LENGTH,
+        description=(
+            "Markdown or HTML body, 1 to 100,000 characters, not whitespace "
+            "only. Not sanitized by the SDK; the consumer sanitizes it."
+        ),
+    )
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must not be whitespace only")
         return value
 
 

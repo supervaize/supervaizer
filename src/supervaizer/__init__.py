@@ -284,6 +284,7 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
         "build_v2_agent_registration",
     ),
     "V2AgentIntroduction": ("supervaizer.contracts", "V2AgentIntroduction"),
+    "V2AgentFullDescription": ("supervaizer.contracts", "V2AgentFullDescription"),
     "V2SetupFieldDefinition": ("supervaizer.contracts", "V2SetupFieldDefinition"),
     "V2FieldOption": ("supervaizer.contracts", "V2FieldOption"),
     "V2FieldDependsOn": ("supervaizer.contracts", "V2FieldDependsOn"),
