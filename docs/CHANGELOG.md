@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-29
+
 ### Added
 - **Agent full description** — `Agent(full_description=...)` and `AgentRegistrationContract.full_description` (`V2AgentFullDescription`: `format` is `markdown` (default) or `html`, `content` is 1 to 100,000 characters and not whitespace only) are sent only when set, so an agent without one registers with the same keys as before. The SDK types and bounds the content; Studio sanitizes it before rendering it on the agent detail page. Requires a minor release.
 
