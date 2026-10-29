@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **`just ship-reconcile` opens a back-merge PR** (PR #137) — The script pushed `develop` directly, which passed only through an admin bypass of the `develop` PR rule. It now merges `origin/main` into a `chore/sync-main-<tag>` branch cut from `origin/develop`, pushes that branch, and opens a PR to `develop`; merge it with a merge commit. The `--mode` option (and the recipe's `mode` argument) is removed: `rebase` needed a non-fast-forward push to `develop`, which the ruleset blocks. `.claude/ship.md` records the release flow for agents.
+- **Dependencies** — `uv.lock`: `opentelemetry-api` 1.45.1 (PR #150), `virtualenv` 21.14.13 (PR #146), `uv` 0.13.4 (PR #144), `certifi` 2026.10.19 (PR #145), `filelock` 4.2.1 (PR #147). GitHub Actions: `astral-sh/setup-uv` 10.3.0 (PR #142), `trufflesecurity/trufflehog` 3.99.3 (PR #138, #148), `google/osv-scanner-action` reusable workflows 2.7.0 (PR #140, #143). No runtime change.
 
 ## [1.8.0] - 2026-10-11
 
