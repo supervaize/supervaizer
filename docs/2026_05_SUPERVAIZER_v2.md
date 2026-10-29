@@ -565,13 +565,21 @@ plan = V2SetupPlan(
             title="Scope",
             fields=[
                 V2SetupFieldDefinition(
-                    id="goal", label="Goal", type="text", multiline=True, min_rows=4, required=True
+                    id="goal",
+                    label="Goal",
+                    type="text",
+                    multiline=True,
+                    min_rows=4,
+                    required=True,
                 ),
                 V2SetupFieldDefinition(
                     id="mode",
                     label="Mode",
                     type="select",
-                    options=[{"value": "fast", "label": "Fast"}, {"value": "custom", "label": "Custom"}],
+                    options=[
+                        {"value": "fast", "label": "Fast"},
+                        {"value": "custom", "label": "Custom"},
+                    ],
                 ),
                 V2SetupFieldDefinition(
                     id="budget",
@@ -584,11 +592,20 @@ plan = V2SetupPlan(
             help_actions=["goal.suggest"],
         )
     ],
-    cost_estimate=V2CostEstimate(status="estimated", unit="credits", min=5, max=20, basis="for 50 runs"),
+    cost_estimate=V2CostEstimate(
+        status="estimated", unit="credits", min=5, max=20, basis="for 50 runs"
+    ),
 )
 registration = build_v2_agent_registration(
     ...,
-    actions=[{"id": "goal.suggest", "kind": "help", "mutating": False, "target_field": "goal"}],
+    actions=[
+        {
+            "id": "goal.suggest",
+            "kind": "help",
+            "mutating": False,
+            "target_field": "goal",
+        }
+    ],
     job_policy={"setup": {"plan": plan}},
 )
 ```
@@ -606,7 +623,7 @@ A help action receives `input = {"field": "<target field id>", "values": {<curre
 A dry-run action answers with `V2ActionResult.dry_run` (`V2DryRunOutcome`): `expires_at`, `deletable` and `cost_incurred` (a `V2CostEstimate`, shown when present). Studio labels dry-run actions distinctly.
 
 ```python
-actions=[
+actions = [
     {"id": "goal.suggest", "kind": "help", "mutating": False, "target_field": "goal"},
     {"id": "job.test", "dry_run": True, "label": "Test run"},
 ]
@@ -674,6 +691,7 @@ Confirming a setup (`job.start`) must be safe to retry. These rules are part of 
 
 ```python
 from supervaizer import assert_confirm_idempotent
+
 
 def test_job_start_is_idempotent() -> None:
     assert_confirm_idempotent(start_job, request_with_idempotency_key)
