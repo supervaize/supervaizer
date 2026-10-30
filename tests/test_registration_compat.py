@@ -23,10 +23,12 @@ from pydantic import ValidationError
 from supervaizer import Agent, build_v2_agent_registration
 from supervaizer.contracts import (
     AgentRegistrationContract,
+    BillingCatalogItem,
     SupervaizerV2AgentRegistrationContract,
     V2AgentFullDescription,
     V2AgentIntroduction,
 )
+from supervaizer.examples.hello_world_agent import HELLO_WORLD_BILLING_CATALOG
 from supervaizer.examples.local_server import get_default_local_agent
 from tests.test_v2_only_agents import _v2_only_agent
 
@@ -42,6 +44,10 @@ FULL_DESCRIPTION = {
     "format": "markdown",
     "content": "# Runner\n\nCollects a goal, plans the work and reports back.",
 }
+BILLING_CATALOG = [
+    {"sku": "interview_minute", "unit": "minute", "description": "Voice time"},
+    {"sku": "transcript_token", "unit": "token", "description": ""},
+]
 
 
 def _registration_payloads() -> dict[str, Any]:
@@ -185,3 +191,66 @@ def test_agent_full_description_rejects_out_of_contract_values(
 ) -> None:
     with pytest.raises(ValidationError):
         V2AgentFullDescription.model_validate({**FULL_DESCRIPTION, **override})
+
+
+def _billed_agent(billing_catalog: list[dict[str, Any]] | None) -> Agent:
+    return Agent(
+        name="Billed Agent",
+        version="1.0.0",
+        supervaizer_v2_registration=build_v2_agent_registration(
+            agent_slug="billed-agent",
+            display_name="Billed Agent",
+            a2ui_catalog_version="billed.1",
+            actions=["job.start"],
+        ),
+        billing_catalog=billing_catalog,
+    )
+
+
+def test_registration_without_billing_catalog_has_no_key() -> None:
+    contract = AgentRegistrationContract(slug="a", name="A", api_path="/agents/a")
+
+    assert "billing_catalog" not in contract.model_dump(mode="json")
+    assert "billing_catalog" not in _v2_only_agent().registration_info
+    assert "billing_catalog" not in _billed_agent(None).registration_info
+
+
+def test_agent_billing_catalog_rides_on_registration_info() -> None:
+    agent = _billed_agent(BILLING_CATALOG)
+    info = agent.registration_info
+
+    assert agent.billing_catalog is not None
+    assert all(isinstance(item, BillingCatalogItem) for item in agent.billing_catalog)
+    assert info["billing_catalog"] == BILLING_CATALOG
+    contract = AgentRegistrationContract.model_validate({
+        key: info[key] for key in ("slug", "name", "api_path", "billing_catalog")
+    })
+    assert contract.model_dump(mode="json")["billing_catalog"] == BILLING_CATALOG
+
+
+def test_empty_billing_catalog_is_sent_as_empty_list() -> None:
+    assert _billed_agent([]).registration_info["billing_catalog"] == []
+
+
+def test_billing_catalog_rejects_duplicate_skus() -> None:
+    duplicated = [*BILLING_CATALOG, {"sku": "interview_minute", "unit": "second"}]
+
+    with pytest.raises(ValidationError, match="interview_minute"):
+        _billed_agent(duplicated)
+    with pytest.raises(ValidationError, match="interview_minute"):
+        AgentRegistrationContract.model_validate({
+            "slug": "a",
+            "name": "A",
+            "api_path": "/agents/a",
+            "billing_catalog": duplicated,
+        })
+
+
+def test_hello_world_example_declares_one_sku_outside_the_baseline() -> None:
+    catalog = [item.model_dump(mode="json") for item in HELLO_WORLD_BILLING_CATALOG]
+
+    assert catalog == [
+        {"sku": "hello_message", "unit": "message", "description": "One hello"}
+    ]
+    assert _billed_agent(catalog).registration_info["billing_catalog"] == catalog
+    assert "billing_catalog" not in get_default_local_agent().registration_info

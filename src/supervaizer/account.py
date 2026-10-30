@@ -11,6 +11,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
 
 import httpx
@@ -19,6 +20,7 @@ from pydantic import ConfigDict, Field, field_validator
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
 from supervaizer.context import ContextClient
+from supervaizer.contracts import BillableConsumption, ConsumptionReceipt
 from supervaizer.telemetry import Telemetry
 
 if TYPE_CHECKING:
@@ -95,6 +97,7 @@ class Account(AccountAbstract):
         "agent_by_id": "{api_url}/w/{workspace_id}/api/v1/agents/{agent_id}",
         "agent_by_slug": "{api_url}/w/{workspace_id}/api/v1/agents/by-slug/{agent_slug}",
         "telemetry": "{api_url}/{telemetry_version}/telemetry",
+        "billing_consumption": "{api_url}/w/{workspace_id}/api/v1/billing/consumption/",
     }
 
     def __init__(self, **kwargs: Any) -> None:
@@ -206,6 +209,70 @@ class Account(AccountAbstract):
         from supervaizer.account_service import send_event_sync as service_send_event
 
         return service_send_event(self, sender, event)
+
+    async def report_consumption(
+        self,
+        records: Sequence[BillableConsumption | dict[str, Any]],
+        *,
+        agent_slug: str,
+        workspace_id: str | None = None,
+    ) -> list[ConsumptionReceipt]:
+        """Report billable consumption to Studio for one agent.
+
+        Posts ``{"agent_slug", "records"}`` (1 to 200 records) to
+        ``{api_url}/w/{workspace_id}/api/v1/billing/consumption/``.
+
+        Args:
+            records: ``BillableConsumption`` objects or dicts to report; each
+                ``idempotency_key`` books once.
+            agent_slug: Slug of the agent that consumed.
+            workspace_id: Workspace that runs the jobs; defaults to the account's.
+
+        Returns:
+            One ``ConsumptionReceipt`` per record, in the order sent:
+            ``accepted``, ``duplicate``, or ``rejected`` (final) with a reason.
+            In local mode every record is ``accepted``.
+
+        Raises:
+            httpx.HTTPError: on a transport failure (retry with the same keys)
+                or a whole-batch 400/403, like ``send_event``.
+            ValueError: when ``workspace_id`` is blank, or when the response
+                does not hold one result per record in the order sent.
+            pydantic.ValidationError: when a record is invalid or the batch
+                holds 0 or more than 200 records; nothing is sent.
+
+        Tested in tests/test_report_consumption.py
+        """
+        # Import here so importing Account does not build the shared HTTP clients.
+        from supervaizer import account_service
+
+        return await account_service.report_consumption(
+            self, agent_slug, records, workspace_id
+        )
+
+    def report_consumption_sync(
+        self,
+        records: Sequence[BillableConsumption | dict[str, Any]],
+        *,
+        agent_slug: str,
+        workspace_id: str | None = None,
+    ) -> list[ConsumptionReceipt]:
+        """Report billable consumption from sync-only contexts.
+
+        Same arguments and return value as ``report_consumption``.
+
+        Raises:
+            httpx.HTTPError: on a transport failure or a whole-batch 400/403.
+            ValueError: blank ``workspace_id``, or results that do not match
+                the records in count or order.
+            pydantic.ValidationError: invalid record, or 0 or more than 200.
+        """
+        # Import here so importing Account does not build the shared HTTP clients.
+        from supervaizer import account_service
+
+        return account_service.report_consumption_sync(
+            self, agent_slug, records, workspace_id
+        )
 
     async def register_server(self, server: "Server") -> ApiResult:
         """Register a server with the Supervaize Control API.

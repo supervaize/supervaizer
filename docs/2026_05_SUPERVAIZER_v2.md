@@ -158,6 +158,29 @@ agent = Agent(
 
 The block travels as the `full_description` key of the agent registration payload (`AgentRegistrationContract.full_description`) and is omitted when unset.
 
+### Billing catalog
+
+An agent that bills its work may pass `billing_catalog=` to `Agent` (a list of `BillingCatalogItem` or dicts). Each item names one SKU the agent may report consumption for. The catalog has no prices: the owner workspace prices each SKU in Studio.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `sku` | `str` | 1 to 64 characters, `^[a-z0-9_]+$`, unique within the catalog |
+| `unit` | `str` | 1 to 32 characters, for example `minute` or `token` |
+| `description` | `str` | at most 255 characters, defaults to `""` |
+
+```python
+agent = Agent(
+    name="Research Agent",
+    version="1.0.0",
+    supervaizer_v2_registration=registration,
+    billing_catalog=[
+        {"sku": "brief", "unit": "brief", "description": "One sourced brief"}
+    ],
+)
+```
+
+The list travels as the `billing_catalog` key of the agent registration payload (`AgentRegistrationContract.billing_catalog`) and is omitted when unset. The agent then reports `BillableConsumption` records with `Account.report_consumption`. See [Billable consumption](2026_10_BILLABLE_CONSUMPTION.md) for the records, the receipts and the idempotency rules.
+
 ### Scheduled start
 
 Set `scheduled_start=True` on `build_v2_agent_registration()` to advertise `capabilities.scheduled_start: true`. The default `False` omits the key, including from existing registrations. This capability is available only to v2 agents. The registration must declare `job.start` in its actions, including actions derived from `job_policy.setup`.
