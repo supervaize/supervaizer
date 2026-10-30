@@ -13,7 +13,7 @@ One billable quantity an agent used for a Studio job.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `sku` | `str` | **required** | SKU declared in the agent billing_catalog. |
-| `quantity` | `Decimal` | **required** | Positive quantity of unit; sent as a decimal string. |
+| `quantity` | `Decimal` | **required** | Positive quantity of unit, at most 18 digits with 6 decimal places; sent as a decimal string. |
 | `unit` | `str` | **required** | Unit of the quantity. |
 | `job_id` | `str` | **required** | Studio job the record bills. |
 | `case_id` | `str` | `None` | Studio case, if any. |
@@ -1996,7 +1996,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 10, 30, 8, 49, 49, 223186) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 10, 30, 9, 9, 43, 241638) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -2064,4 +2064,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-10-30 08:49:49*
+*Uploaded on 2026-10-30 09:09:43*

@@ -69,15 +69,17 @@ receipts = account.report_consumption_sync(
 
 ### Record fields (`BillableConsumption`)
 
+The limits match Studio's serializer. The SDK refuses an out-of-range record when you build it, so one bad record does not turn the whole batch into a `400`.
+
 | Field | Type | Rule |
 | --- | --- | --- |
 | `sku` | `str` | a SKU of the agent's catalog, same pattern as the catalog |
-| `quantity` | `Decimal` | greater than 0, finite; sent as a decimal string such as `"12.50"` |
+| `quantity` | `Decimal` | greater than 0, finite, at most 18 digits and 6 decimal places (trailing zeros count, so `1.5000000` is refused); sent as a decimal string such as `"12.50"` |
 | `unit` | `str` | 1 to 32 characters |
-| `job_id` | `str` | the Studio job the record bills, not empty |
-| `case_id` | `str \| None` | the Studio case, if any; sent as `null` when unset |
+| `job_id` | `str` | the Studio job the record bills, 1 to 64 characters |
+| `case_id` | `str \| None` | the Studio case, if any, at most 64 characters; sent as `null` when unset |
 | `idempotency_key` | `str` | 1 to 128 characters |
-| `agent_cost_usd` | `Decimal \| None` | optional hint of what the agent paid, at least 0, sent as a string; Studio does not bill it |
+| `agent_cost_usd` | `Decimal \| None` | optional hint of what the agent paid, at least 0, at most 18 digits and 6 decimal places, sent as a string; Studio does not bill it |
 | `description` | `str \| None` | at most 255 characters, plain text, no personal data |
 | `occurred_at` | `datetime` | timezone-aware; a naive datetime is rejected. Sent as ISO 8601 |
 
@@ -96,7 +98,7 @@ Reasons: `unknown_job`, `wrong_workspace`, `agent_mismatch`, `no_grant`, `unknow
 Whole-batch errors raise the httpx error, as `send_event` does:
 
 - `403`: the API key may not act for this agent in this workspace. The key user must belong to the agent's owner workspace while the target workspace holds an accepted grant for the agent, or belong to the target workspace when the agent is its own.
-- `400`: Studio could not parse the body.
+- `400`: Studio could not parse the body. The SDK logs the redacted response body, which names the record or field.
 - Connection errors and timeouts: the batch may or may not have reached Studio. Resend the same records with the same keys.
 
 In local mode (`SUPERVAIZER_LOCAL_MODE=true`) no request is sent and every record comes back `accepted`.
@@ -116,6 +118,6 @@ In local mode (`SUPERVAIZER_LOCAL_MODE=true`) no request is sent and every recor
 
 ## Compatibility
 
-- Every field is optional for agents. An agent without `billing_catalog` sends exactly the registration keys it sent before; `tests/test_registration_compat.py` holds the golden payloads.
+- Every field is optional for agents. An agent without `billing_catalog` sends exactly the registration keys it sent before. The golden payloads live in `tests/fixtures/supervaizer_v2/registration_baseline.json`; `tests/test_registration_compat.py` compares against them.
 - `V2ActionRequest` and the A2A routes are unchanged.
 - Verification: `tests/test_billing_contracts.py`, `tests/test_report_consumption.py`, `tests/test_registration_compat.py`.
