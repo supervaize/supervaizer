@@ -10,6 +10,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 SCRIPT = (
     Path(__file__).resolve().parents[1] / "tools" / "reconcile-release-after-ship.sh"
 )
@@ -28,15 +30,20 @@ def test_script_refuses_arguments_before_any_side_effect() -> None:
     assert result.stdout == ""
 
 
-def test_script_refuses_a_malformed_override_without_printing_it() -> None:
+@pytest.mark.parametrize(
+    ("name", "value"), [("TIMEOUT_SECONDS", "not-a-number"), ("POLL_SECONDS", "0")]
+)
+def test_script_refuses_a_bad_override_without_printing_it(
+    name: str, value: str
+) -> None:
     result = subprocess.run(
         ["bash", str(SCRIPT)],
         capture_output=True,
         text=True,
         check=False,
-        env={"PATH": os.environ["PATH"], "TIMEOUT_SECONDS": "not-a-number"},
+        env={"PATH": os.environ["PATH"], name: value},
     )
 
     assert result.returncode == 2
-    assert "whole numbers" in result.stderr
-    assert "not-a-number" not in result.stdout + result.stderr
+    assert "POLL_SECONDS at least 1" in result.stderr
+    assert f"={value}" not in result.stdout + result.stderr
