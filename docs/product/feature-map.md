@@ -1,6 +1,6 @@
 # Product feature map
 
-> **Updated:** 2026-10-11
+> **Updated:** 2026-10-30
 
 Compact index of what a person is trying to do with Supervaizer. Each entry names the workflow, where it starts, who can use it, what should happen, and where the code and pytest evidence live.
 
@@ -145,6 +145,24 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Source: `src/supervaizer/account.py`, `src/supervaizer/server.py`, `src/supervaizer/studio_handshake.py`
 - Verification: `tests/test_admin_routes.py`, `tests/test_routes.py`
 - Known caveats: `--local` is exempt from the launch check and ignores `supervisor_account`. Set `SUPERVAIZER_SERVER_ID` and `SUPERVAIZER_PRIVATE_KEY` when more than one process must keep the same identity.
+
+## Report billable consumption to Studio
+
+- Purpose: Let an agent bill a workspace for the work it did, per SKU.
+- Entry points:
+  - `Agent(billing_catalog=[...])` at registration
+  - `Account.report_consumption(records, agent_slug=..., workspace_id=None)` and `report_consumption_sync(...)`, which `POST {api_url}/w/<workspace>/api/v1/billing/consumption/`
+- Access: The agent-to-Studio key (`SUPERVAIZE_API_KEY` on the `Account`). Its user must belong to the agent's owner workspace while the target workspace holds an accepted grant, or to the target workspace for its own agent.
+- Preconditions: The SKU is in the registered catalog and the owner workspace has priced it. Studio has workspace credits on for the target workspace.
+- Main flow:
+  1. Declare the catalog and register.
+  2. After the work is final, build one `BillableConsumption` per SKU with a stable `idempotency_key`.
+  3. Report the batch (1 to 200 records) to the workspace that ran the jobs.
+- Expected result: One receipt per record, in order: `accepted`, `duplicate` (seen before, nothing booked twice), or `rejected` with a reason (final, do not resend).
+- Important states: `403` (key may not act for this agent in this workspace) and `400` (bad body) raise the httpx error for the whole batch and are final. `404` with `code` `workspace_credits_off` (credits off for the workspace) and connection failures also raise; resend those later with the same keys. Local mode answers `accepted` for every record without HTTP. Without a catalog the registration payload is unchanged.
+- Source: `src/supervaizer/contracts.py`, `src/supervaizer/account.py`, `src/supervaizer/account_service.py`, `docs/2026_10_BILLABLE_CONSUMPTION.md`
+- Verification: `tests/test_report_consumption.py`, `tests/test_billing_contracts.py`, `tests/test_registration_compat.py`
+- Known caveats: The SDK carries no prices and does not retry; the agent keeps failed records (for example in an outbox) and resends them.
 
 ## Call a shared agent with a workspace grant
 

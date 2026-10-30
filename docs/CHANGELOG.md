@@ -6,17 +6,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.9.0] - 2026-10-29
-
 ### Added
-- **Agent full description** — `Agent(full_description=...)` and `AgentRegistrationContract.full_description` (`V2AgentFullDescription`: `format` is `markdown` (default) or `html`, `content` is 1 to 100,000 characters and not whitespace only) are sent only when set, so an agent without one registers with the same keys as before. The SDK types and bounds the content; Studio sanitizes it before rendering it on the agent detail page. Requires a minor release.
 
-- **Guided setup contract** (freeze of 2026-10-28) — Typed, optional additions for chat-guided job setup. An unmodified v2 agent registers byte-for-byte as before; `tests/test_registration_compat.py` holds the golden payloads. `Agent(introduction=...)` and `AgentRegistrationContract.introduction` (`V2AgentIntroduction`: `tagline`, `summary`, `example_goals`, `avatar_url`) are sent only when set. `V2SetupFieldDefinition` with `V2FieldOption`, `V2FieldDependsOn` (wire key `in`), `V2FieldValidation` and `list` fields with `item_fields`; `V2AwaitingFieldDefinition` and `V2ResourceFieldDefinition` gain the same optional keys. Validators reject bare-string `options`, rules that do not fit the field type, `min_rows` without `multiline`, and nested `list` items. `V2JobSetupPolicy.plan` and `V2ActionResult.setup_plan` accept a `V2SetupPlan` (`confirmation_required`, `steps[]` of `V2SetupStep`, `cost_estimate`) or a dict that passes through untouched; a step's `help_actions` must be declared in `capabilities.actions` with `kind="help"`. `V2ActionDefinition.kind` (`command` or `help`; help actions must be `mutating=False`), `target_field` and `dry_run`; `V2ActionResult.draft` (`V2FieldDraft`, `V2Suggestion`) and `V2ActionResult.dry_run` (`V2DryRunOutcome`). `V2CostEstimate` is an `estimated` range or `unknown`. Confirm idempotency rules are documented in `docs/2026_05_SUPERVAIZER_v2.md`, with the conformance helper `assert_confirm_idempotent(handler, request)` in `supervaizer.testing`. Requires a minor release.
+- **Agent billable consumption** (PR #155) — `Agent(billing_catalog=[...])` and `AgentRegistrationContract.billing_catalog` (`BillingCatalogItem`: `sku` of 1 to 64 characters matching `^[a-z0-9_]+$` and unique in the list, `unit` of 1 to 32 characters, `description` of at most 255) are sent only when set, so an agent without a catalog registers with the same keys as before. `Account.report_consumption(records, *, agent_slug, workspace_id=None)` and `report_consumption_sync` post a `ConsumptionReport` (`agent_slug`, 1 to 200 `BillableConsumption` records) to `/w/<workspace>/api/v1/billing/consumption/` with the `workspace` header set to the same workspace, and return one `ConsumptionReceipt` (`accepted`, `duplicate`, or `rejected` with a `reason`) per record, in order, parsed through `ConsumptionReportResponse`. `quantity` and `agent_cost_usd` are `Decimal` values sent as strings; `occurred_at` must be timezone-aware. Transport errors and whole-batch `400`/`403` are re-raised like `send_event`; local mode accepts every record without HTTP. `HELLO_WORLD_BILLING_CATALOG` in the Hello World example shows a one-SKU catalog. See `docs/2026_10_BILLABLE_CONSUMPTION.md`. Requires a minor release.
 
 ### Changed
 
+- **`just ship-reconcile` takes no arguments** (PR #156) — The recipe only forwarded its own defaults, so the script's repo argument and `--timeout-seconds`/`--poll-seconds` parser are gone. Override with environment variables: `TIMEOUT_SECONDS` (default 1800), `POLL_SECONDS` (default 15), e.g. `TIMEOUT_SECONDS=7200 just ship-reconcile`. The script refuses any argument (exit 2), so a stale command cannot run against a repo it did not name; the repo is fixed to `supervaize/supervaizer`. Tooling only, no package change.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 999   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 43s   |
+
+## [1.9.0] - 2026-10-29
+
+### Added
+
+- **Agent full description** (PR #151) — `Agent(full_description=...)` and `AgentRegistrationContract.full_description` (`V2AgentFullDescription`: `format` is `markdown` (default) or `html`, `content` is 1 to 100,000 characters and not whitespace only) are sent only when set, so an agent without one registers with the same keys as before. The SDK types and bounds the content; Studio sanitizes it before rendering it on the agent detail page. Requires a minor release.
+
+- **Guided setup contract** (freeze of 2026-10-28) (PR #149) — Typed, optional additions for chat-guided job setup. An unmodified v2 agent registers byte-for-byte as before; `tests/test_registration_compat.py` holds the golden payloads. `Agent(introduction=...)` and `AgentRegistrationContract.introduction` (`V2AgentIntroduction`: `tagline`, `summary`, `example_goals`, `avatar_url`) are sent only when set. `V2SetupFieldDefinition` with `V2FieldOption`, `V2FieldDependsOn` (wire key `in`), `V2FieldValidation` and `list` fields with `item_fields`; `V2AwaitingFieldDefinition` and `V2ResourceFieldDefinition` gain the same optional keys. Validators reject bare-string `options`, rules that do not fit the field type, `min_rows` without `multiline`, and nested `list` items. `V2JobSetupPolicy.plan` and `V2ActionResult.setup_plan` accept a `V2SetupPlan` (`confirmation_required`, `steps[]` of `V2SetupStep`, `cost_estimate`) or a dict that passes through untouched; a step's `help_actions` must be declared in `capabilities.actions` with `kind="help"`. `V2ActionDefinition.kind` (`command` or `help`; help actions must be `mutating=False`), `target_field` and `dry_run`; `V2ActionResult.draft` (`V2FieldDraft`, `V2Suggestion`) and `V2ActionResult.dry_run` (`V2DryRunOutcome`). `V2CostEstimate` is an `estimated` range or `unknown`. Confirm idempotency rules are documented in `docs/2026_05_SUPERVAIZER_v2.md`, with the conformance helper `assert_confirm_idempotent(handler, request)` in `supervaizer.testing`. Requires a minor release.
+
+### Changed
+
+- **A2UI file fields and Studio-stored artifacts** (PR #139) — `docs/2026_05_SUPERVAIZER_v2.md` documents `type: "file"` awaiting fields (`accept`, `max_bytes`, `storage`), the HITL answer shapes for `storage: "studio"` and `storage: "inline"`, the inline request-body limit, and artifact refs that point at Studio-held bytes (`"storage": "studio"` + `file_id`). File fields are case awaiting steps only for now.
 - **`just ship-reconcile` opens a back-merge PR** (PR #137) — The script pushed `develop` directly, which passed only through an admin bypass of the `develop` PR rule. It now merges `origin/main` into a `chore/sync-main-<tag>` branch cut from `origin/develop`, pushes that branch, and opens a PR to `develop`; merge it with a merge commit. The `--mode` option (and the recipe's `mode` argument) is removed: `rebase` needed a non-fast-forward push to `develop`, which the ruleset blocks. `.claude/ship.md` records the release flow for agents.
 - **Dependencies** — `uv.lock`: `opentelemetry-api` 1.45.1 (PR #150), `virtualenv` 21.14.13 (PR #146), `uv` 0.13.4 (PR #144), `certifi` 2026.10.19 (PR #145), `filelock` 4.2.1 (PR #147). GitHub Actions: `astral-sh/setup-uv` 10.3.0 (PR #142), `trufflesecurity/trufflehog` 3.99.3 (PR #138, #148), `google/osv-scanner-action` reusable workflows 2.7.0 (PR #140, #143). No runtime change.
+
+### Tests
+
+`just test`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 930   |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 44s   |
 
 ## [1.8.0] - 2026-10-11
 

@@ -19,10 +19,12 @@ import json
 import re
 from collections.abc import Iterable
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     BeforeValidator,
     Field,
@@ -51,6 +53,11 @@ V2_FULL_DESCRIPTION_MAX_LENGTH = 100_000
 MISSION_ID_HEADER = "X-Supervaize-Mission-Id"
 MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
 MISSION_METADATA_HEADER_MAX_LENGTH = 4096
+BILLING_SKU_PATTERN = r"^[a-z0-9_]+$"
+BILLING_CONSUMPTION_MAX_RECORDS = 200
+BILLING_DECIMAL_MAX_DIGITS = 18
+BILLING_DECIMAL_PLACES = 6
+BILLING_REFERENCE_MAX_LENGTH = 64
 
 
 class ContractModel(BaseModel):
@@ -288,6 +295,21 @@ class AgentRegistrationContract(ContractModel):
             "consumer sanitizes it before rendering."
         ),
     )
+    billing_catalog: list[BillingCatalogItem] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Billable SKUs the agent may report consumption for; omitted when "
+            "unset. No prices: the owner workspace prices each SKU in Studio."
+        ),
+    )
+
+    @field_validator("billing_catalog")
+    @classmethod
+    def check_billing_catalog(
+        cls, value: list[BillingCatalogItem] | None
+    ) -> list[BillingCatalogItem] | None:
+        return validate_billing_catalog(value)
 
 
 class ServerRegistrationContract(ControllerContract):
@@ -458,6 +480,132 @@ class V2AgentFullDescription(ContractModel):
         if not value.strip():
             raise ValueError("content must not be whitespace only")
         return value
+
+
+BillingSku = Annotated[
+    str, Field(min_length=1, max_length=64, pattern=BILLING_SKU_PATTERN)
+]
+BillingUnit = Annotated[str, Field(min_length=1, max_length=32)]
+
+
+class BillingCatalogItem(ContractModel):
+    """One billable SKU an agent declares at registration.
+
+    The catalog carries no prices: the owner workspace prices each SKU in Studio.
+    """
+
+    sku: BillingSku = Field(
+        description="SKU id: 1 to 64 lowercase letters, digits or underscores."
+    )
+    unit: BillingUnit = Field(
+        description="Unit one quantity counts, such as minute or token (1 to 32)."
+    )
+    description: str = Field(
+        default="", max_length=255, description="Plain text shown with the SKU."
+    )
+
+
+def validate_billing_catalog(
+    items: list[BillingCatalogItem] | None,
+) -> list[BillingCatalogItem] | None:
+    """Reject a billing catalog that declares the same SKU twice."""
+    if items is None:
+        return None
+    seen: set[str] = set()
+    for item in items:
+        if item.sku in seen:
+            raise ValueError(f"billing_catalog declares sku {item.sku!r} twice")
+        seen.add(item.sku)
+    return items
+
+
+class BillableConsumption(ContractModel):
+    """One billable quantity an agent used for a Studio job."""
+
+    sku: BillingSku = Field(description="SKU declared in the agent billing_catalog.")
+    quantity: Decimal = Field(
+        gt=0,
+        max_digits=BILLING_DECIMAL_MAX_DIGITS,
+        decimal_places=BILLING_DECIMAL_PLACES,
+        description=(
+            "Positive quantity of unit, at most 18 digits with 6 decimal "
+            "places; sent as a decimal string."
+        ),
+    )
+    unit: BillingUnit = Field(description="Unit of the quantity.")
+    job_id: str = Field(
+        min_length=1,
+        max_length=BILLING_REFERENCE_MAX_LENGTH,
+        description="Studio job the record bills.",
+    )
+    case_id: str | None = Field(
+        default=None,
+        max_length=BILLING_REFERENCE_MAX_LENGTH,
+        description="Studio case, if any.",
+    )
+    idempotency_key: str = Field(
+        min_length=1,
+        max_length=128,
+        description=(
+            "One key per unit of work and SKU. Studio books a key once; a "
+            "resend answers duplicate."
+        ),
+    )
+    agent_cost_usd: Decimal | None = Field(
+        default=None,
+        ge=0,
+        max_digits=BILLING_DECIMAL_MAX_DIGITS,
+        decimal_places=BILLING_DECIMAL_PLACES,
+        description="Optional hint of what the agent paid, in USD. Not billed.",
+    )
+    description: str | None = Field(
+        default=None, max_length=255, description="Short plain text; no personal data."
+    )
+    occurred_at: AwareDatetime = Field(
+        description="When the consumption happened; timezone-aware ISO 8601."
+    )
+
+    @field_validator("quantity", "agent_cost_usd")
+    @classmethod
+    def check_written_decimal_places(cls, value: Decimal | None) -> Decimal | None:
+        """Count trailing zeros as Studio does: ``1.5000000`` has 7 places."""
+        exponent = None if value is None else value.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -BILLING_DECIMAL_PLACES:
+            raise ValueError(
+                f"at most {BILLING_DECIMAL_PLACES} decimal places, trailing "
+                "zeros included"
+            )
+        return value
+
+
+class ConsumptionReport(ContractModel):
+    """Body of ``POST /w/<workspace>/api/v1/billing/consumption/``."""
+
+    agent_slug: str = Field(min_length=1, description="Slug of the reporting agent.")
+    records: list[BillableConsumption] = Field(
+        min_length=1, max_length=BILLING_CONSUMPTION_MAX_RECORDS
+    )
+
+
+class ConsumptionReceipt(ContractModel):
+    """Studio's answer for one record of a consumption report."""
+
+    idempotency_key: str
+    status: Literal["accepted", "duplicate", "rejected"] = Field(
+        description=(
+            "accepted: booked. duplicate: the key was received before; nothing "
+            "is booked again. rejected: final, do not resend."
+        )
+    )
+    reason: str | None = Field(
+        default=None, description="Why a record was rejected, such as unknown_sku."
+    )
+
+
+class ConsumptionReportResponse(ContractModel):
+    """Studio's answer to a consumption report: one receipt per record, in order."""
+
+    results: list[ConsumptionReceipt]
 
 
 class V2ActionDefinition(ContractModel):

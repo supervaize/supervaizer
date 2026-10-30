@@ -38,6 +38,7 @@ from supervaizer.__version__ import VERSION
 from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
 from supervaizer.contracts import (
+    BillingCatalogItem,
     SupervaizerV2AgentRegistrationContract,
     V2ActionDefinition,
     V2ActionRequest,
@@ -45,6 +46,7 @@ from supervaizer.contracts import (
     V2AgentIntroduction,
     V2AgentMethod,
     V2AgentMethods,
+    validate_billing_catalog,
 )
 from supervaizer.data_resource import DataResource
 from supervaizer.event import JobStartConfirmationEvent
@@ -671,6 +673,13 @@ class AgentAbstract(SvBaseModel):
             "The SDK only types and bounds it; Studio sanitizes it."
         ),
     )
+    billing_catalog: list[BillingCatalogItem] | None = Field(
+        default=None,
+        description=(
+            "Optional billable SKUs (sku, unit, description) the agent reports "
+            "consumption for. No prices; Studio prices them per workspace."
+        ),
+    )
     tags: list[str] | None = Field(
         default=None, description="Tags for categorizing the agent"
     )
@@ -725,6 +734,13 @@ class AgentAbstract(SvBaseModel):
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
     )
 
+    @field_validator("billing_catalog")
+    @classmethod
+    def check_billing_catalog(
+        cls, value: list[BillingCatalogItem] | None
+    ) -> list[BillingCatalogItem] | None:
+        return validate_billing_catalog(value)
+
 
 class Agent(AgentAbstract):
     _server_encrypted_parameters: str | None = PrivateAttr(default=None)
@@ -755,6 +771,7 @@ class Agent(AgentAbstract):
         v2_methods: V2AgentMethods | dict[str, Any] | None = None,
         introduction: V2AgentIntroduction | dict[str, Any] | None = None,
         full_description: V2AgentFullDescription | dict[str, Any] | None = None,
+        billing_catalog: list[BillingCatalogItem | dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -787,6 +804,9 @@ class Agent(AgentAbstract):
             full_description (V2AgentFullDescription, optional): Long-form markdown
                 or HTML Studio shows on the agent detail page; sent as
                 ``full_description`` only when set. Studio sanitizes it.
+            billing_catalog (list[BillingCatalogItem], optional): Billable SKUs the
+                agent reports consumption for; sent as ``billing_catalog`` only
+                when set. SKUs must be unique.
 
         Tested in tests/test_agent.py
         """
@@ -818,6 +838,11 @@ class Agent(AgentAbstract):
             introduction = V2AgentIntroduction.model_validate(introduction)
         if isinstance(full_description, dict):
             full_description = V2AgentFullDescription.model_validate(full_description)
+        catalog = (
+            None
+            if billing_catalog is None
+            else [BillingCatalogItem.model_validate(item) for item in billing_catalog]
+        )
 
         # Initialize using Pydantic's mechanism
         super().__init__(
@@ -843,6 +868,7 @@ class Agent(AgentAbstract):
             v2_methods=v2_method_declarations,
             introduction=introduction,
             full_description=full_description,
+            billing_catalog=catalog,
             **kwargs,
         )
 
@@ -899,8 +925,9 @@ class Agent(AgentAbstract):
     def registration_info(self) -> dict[str, Any]:
         """Returns registration info for the agent.
 
-        ``introduction`` and ``full_description`` are added only when set, so
-        agents without them send exactly the keys they sent before.
+        ``introduction``, ``full_description`` and ``billing_catalog`` are added
+        only when set, so agents without them send exactly the keys they sent
+        before.
         """
         info = {
             "name": self.name,
@@ -933,6 +960,10 @@ class Agent(AgentAbstract):
             info["introduction"] = self.introduction.model_dump(mode="json")
         if self.full_description is not None:
             info["full_description"] = self.full_description.model_dump(mode="json")
+        if self.billing_catalog is not None:
+            info["billing_catalog"] = [
+                item.model_dump(mode="json") for item in self.billing_catalog
+            ]
         return info
 
     def update_agent_from_server(self, server: "Server") -> "Agent | None":
