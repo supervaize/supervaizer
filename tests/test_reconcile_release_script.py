@@ -31,7 +31,12 @@ def test_script_refuses_arguments_before_any_side_effect() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "value"), [("TIMEOUT_SECONDS", "not-a-number"), ("POLL_SECONDS", "0")]
+    ("name", "value"),
+    [
+        ("TIMEOUT_SECONDS", "not-a-number"),
+        ("TIMEOUT_SECONDS", "01800"),
+        ("POLL_SECONDS", "0"),
+    ],
 )
 def test_script_refuses_a_bad_override_without_printing_it(
     name: str, value: str

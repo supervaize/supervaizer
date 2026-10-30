@@ -24,8 +24,9 @@ REPO_SLUG="supervaize/supervaizer"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 # Never echo the values: a malformed override would otherwise reach the logs through $(( )) or sleep.
-if ! [[ "${TIMEOUT_SECONDS}" =~ ^[0-9]+$ && "${POLL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
-  echo "ERROR: TIMEOUT_SECONDS must be a whole number of seconds and POLL_SECONDS at least 1." >&2
+# No leading zeros: bash arithmetic reads 01800 as octal.
+if ! [[ "${TIMEOUT_SECONDS}" =~ ^(0|[1-9][0-9]*)$ && "${POLL_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: TIMEOUT_SECONDS must be a whole number of seconds without leading zeros and POLL_SECONDS at least 1." >&2
   exit 2
 fi
 
