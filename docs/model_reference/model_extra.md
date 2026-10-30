@@ -1,6 +1,40 @@
 # Model Reference extra
 
-**Version:** 1.8.0
+**Version:** 1.9.0
+
+### `contracts.BillableConsumption`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+One billable quantity an agent used for a Studio job.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `sku` | `str` | **required** | SKU declared in the agent billing_catalog. |
+| `quantity` | `Decimal` | **required** | Positive quantity of unit; sent as a decimal string. |
+| `unit` | `str` | **required** | Unit of the quantity. |
+| `job_id` | `str` | **required** | Studio job the record bills. |
+| `case_id` | `str` | `None` | Studio case, if any. |
+| `idempotency_key` | `str` | **required** | One key per unit of work and SKU. Studio books a key once; a resend answers duplicate. |
+| `agent_cost_usd` | `Decimal` | `None` | Optional hint of what the agent paid, in USD. Not billed. |
+| `description` | `str` | `None` | Short plain text; no personal data. |
+| `occurred_at` | `AwareDatetime` | **required** | When the consumption happened; timezone-aware ISO 8601. |
+
+### `contracts.ConsumptionReceipt`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Studio's answer for one record of a consumption report.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `idempotency_key` | `str` | **required** |  |
+| `status` | `Literal['accepted', 'duplicate', 'rejected']` | **required** | accepted: booked. duplicate: the key was received before; nothing is booked again. rejected: final, do not resend. |
+| `reason` | `str` | `None` | Why a record was rejected, such as unknown_sku. |
 
 ### `common.SvBaseModel`
 
@@ -25,6 +59,31 @@ Inherits from TelemetryModel which defines the core telemetry attributes:
     - details: A dictionary containing telemetry-specific details
 
 _No additional fields beyond parent class._
+
+### `contracts.ConsumptionReport`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Body of ``POST /w/<workspace>/api/v1/billing/consumption/``.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `agent_slug` | `str` | **required** | Slug of the reporting agent. |
+| `records` | `list[contracts.BillableConsumption]` | **required** |  |
+
+### `contracts.ConsumptionReportResponse`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+Studio's answer to a consumption report: one receipt per record, in order.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `results` | `list[contracts.ConsumptionReceipt]` | **required** |  |
 
 ### `agent.AgentCustomMethodParams`
 
@@ -94,6 +153,22 @@ Response model for agent endpoints - values provided by Agent.registration_info
 | `server_agent_id` | `str` | `None` |  |
 | `server_agent_status` | `str` | `None` |  |
 | `server_agent_onboarding_status` | `str` | `None` |  |
+
+### `contracts.BillingCatalogItem`
+
+**Inherits from:** [`contracts.ContractModel`](#contractscontractmodel)
+
+One billable SKU an agent declares at registration.
+
+The catalog carries no prices: the owner workspace prices each SKU in Studio.
+
+#### Model Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `sku` | `str` | **required** | SKU id: 1 to 64 lowercase letters, digits or underscores. |
+| `unit` | `str` | **required** | Unit one quantity counts, such as minute or token (1 to 32). |
+| `description` | `str` | '' | Plain text shown with the SKU. |
 
 ### `case.CaseNodes`
 
@@ -525,6 +600,7 @@ Minimal schema for agent registration payloads consumed by Studio.
 | `data_resources` | `list[contracts.DataResourceContract | dict[str, Any]]` | — |  |
 | `introduction` | `ForwardRef('V2AgentIntroduction | None')` | `None` | Roster text a consumer shows for the agent; omitted when unset. |
 | `full_description` | `ForwardRef('V2AgentFullDescription | None')` | `None` | Long-form markdown or HTML a consumer shows on the agent detail page; omitted when unset. The SDK only types and bounds it; the consumer sanitizes it before rendering. |
+| `billing_catalog` | `ForwardRef('list[BillingCatalogItem] | None')` | `None` | Billable SKUs the agent may report consumption for; omitted when unset. No prices: the owner workspace prices each SKU in Studio. |
 
 ### `contracts.CaseUpdateEvent`
 
@@ -1920,7 +1996,7 @@ Standard error response model
 | `error` | `str` | **required** |  |
 | `error_type` | `<enum 'ErrorType'>` | **required** |  |
 | `detail` | `str` | `None` |  |
-| `timestamp` | `datetime` | datetime.datetime(2026, 10, 29, 11, 50, 59, 784956) |  |
+| `timestamp` | `datetime` | datetime.datetime(2026, 10, 30, 8, 49, 49, 223186) |  |
 | `status_code` | `int` | **required** |  |
 
 ### `routes.RegistrationRefreshRequest`
@@ -1988,4 +2064,4 @@ A base class for creating Pydantic models.
 | `jti` | `str` | `None` |  |
 
 
-*Uploaded on 2026-10-29 11:50:59*
+*Uploaded on 2026-10-30 08:49:49*
