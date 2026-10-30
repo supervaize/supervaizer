@@ -23,6 +23,11 @@ fi
 REPO_SLUG="supervaize/supervaizer"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
+# Never echo the values: a malformed override would otherwise reach the logs through $(( )) or sleep.
+if ! [[ "${TIMEOUT_SECONDS}" =~ ^[0-9]+$ && "${POLL_SECONDS}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: TIMEOUT_SECONDS and POLL_SECONDS must be whole numbers of seconds." >&2
+  exit 2
+fi
 
 DEVELOP_BRANCH="${DEVELOP_BRANCH:-develop}"
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
