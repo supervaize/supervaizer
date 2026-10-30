@@ -1,4 +1,10 @@
-"""The release reconcile script takes no arguments: a stale command must not fall back to the default repo."""
+# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, you can obtain one at
+# https://mozilla.org/MPL/2.0/.
+
+"""The release reconcile script takes no arguments: a stale command must stop before any side effect."""
 
 import subprocess
 from pathlib import Path
