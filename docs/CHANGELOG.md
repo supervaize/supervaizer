@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **`just ship-reconcile` takes no arguments** — The recipe only forwarded its own defaults, so the script's repo argument and `--timeout-seconds`/`--poll-seconds` parser are gone. Override with environment variables: `REPO_SLUG`, `TIMEOUT_SECONDS` (default 1800), `POLL_SECONDS` (default 15), e.g. `TIMEOUT_SECONDS=7200 just ship-reconcile`. The script refuses any argument (exit 2), so a stale command cannot fall back to the default repo. Tooling only, no package change.
+- **`just ship-reconcile` takes no arguments** — The recipe only forwarded its own defaults, so the script's repo argument and `--timeout-seconds`/`--poll-seconds` parser are gone. Override with environment variables: `TIMEOUT_SECONDS` (default 1800), `POLL_SECONDS` (default 15), e.g. `TIMEOUT_SECONDS=7200 just ship-reconcile`. The script refuses any argument (exit 2), so a stale command cannot run against a repo it did not name; the repo is fixed to `supervaize/supervaizer`. Tooling only, no package change.
 
 ## [1.9.0] - 2026-10-29
 

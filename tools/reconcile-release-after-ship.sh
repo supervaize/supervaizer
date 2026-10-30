@@ -15,12 +15,12 @@ set -euo pipefail
 
 # Positional args and flags were removed; refuse them so a stale command cannot fall back to the default repo.
 if [[ $# -gt 0 ]]; then
-  echo "ERROR: this script takes no arguments. Set REPO_SLUG, TIMEOUT_SECONDS or POLL_SECONDS instead." >&2
+  echo "ERROR: this script takes no arguments. Set TIMEOUT_SECONDS or POLL_SECONDS instead." >&2
   exit 2
 fi
 
 # Override with env vars, e.g. a slow PyPI approval: `TIMEOUT_SECONDS=7200 just ship-reconcile`.
-REPO_SLUG="${REPO_SLUG:-supervaize/supervaizer}"
+REPO_SLUG="supervaize/supervaizer"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
 POLL_SECONDS="${POLL_SECONDS:-15}"
 
