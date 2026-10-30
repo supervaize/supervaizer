@@ -18,6 +18,7 @@ import asyncio
 import atexit
 import logging
 import os
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NoReturn, Union
 
 import httpx
@@ -29,6 +30,12 @@ from supervaizer.common import (
     SvBaseModel,
     is_local_mode,
     log,
+)
+from supervaizer.contracts import (
+    BillableConsumption,
+    ConsumptionReceipt,
+    ConsumptionReport,
+    ConsumptionReportResponse,
 )
 
 logger = logging.getLogger("httpx")
@@ -221,6 +228,115 @@ def send_event_sync(
         raise
     except httpx.HTTPError as e:
         _handle_event_http_error(event, url_event, curl_cmd, e)
+
+
+def _consumption_request(
+    account: "Account",
+    agent_slug: str,
+    records: Sequence[BillableConsumption],
+    workspace_id: str | None,
+) -> tuple[str, dict[str, str], ConsumptionReport]:
+    workspace = account.workspace_id if workspace_id is None else workspace_id
+    if not workspace.strip():
+        raise ValueError("report_consumption workspace_id must not be blank")
+    report = ConsumptionReport(agent_slug=agent_slug, records=list(records))
+    url = account.get_url("billing_consumption", workspace_id=workspace)
+    headers = {**account.api_headers, "workspace": workspace}
+    return url, headers, report
+
+
+def _local_consumption_receipts(
+    report: ConsumptionReport,
+) -> list[ConsumptionReceipt] | None:
+    if not is_local_mode():
+        return None
+    log.debug(f"[Report consumption] Local mode — accepting {len(report.records)}")
+    return [
+        ConsumptionReceipt(idempotency_key=record.idempotency_key, status="accepted")
+        for record in report.records
+    ]
+
+
+def _consumption_receipts(
+    report: ConsumptionReport, response: httpx.Response
+) -> list[ConsumptionReceipt]:
+    results = ConsumptionReportResponse.model_validate(response.json()).results
+    sent = [record.idempotency_key for record in report.records]
+    received = [result.idempotency_key for result in results]
+    if received != sent:
+        raise ValueError(
+            "Studio consumption response must hold one result per record, in "
+            f"order: sent {len(sent)} records, received {len(received)} results"
+        )
+    return results
+
+
+def _handle_consumption_error(url: str, error: httpx.HTTPError) -> NoReturn:
+    if isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout)):
+        log.error(
+            f"Supervaize Studio is not available at {url}. "
+            "Connection refused or timed out."
+        )
+    elif isinstance(error, httpx.HTTPStatusError):
+        request_id = error.response.headers.get("X-Request-ID", "unavailable")[:80]
+        log.error(
+            f"[Report consumption] Remote response "
+            f"status={error.response.status_code} request_id={request_id!r}"
+        )
+    log.error(f"❌ Error reporting consumption: {error!s}")
+    raise error
+
+
+async def report_consumption(
+    account: "Account",
+    agent_slug: str,
+    records: Sequence[BillableConsumption],
+    workspace_id: str | None = None,
+) -> list[ConsumptionReceipt]:
+    """Push billable consumption to Studio; return one receipt per record, in order.
+
+    Raises the httpx error of a transport failure or a whole-batch 400/403,
+    like ``send_event``. In local mode every record is accepted without HTTP.
+
+    Tested in tests/test_report_consumption.py
+    """
+    url, headers, report = _consumption_request(
+        account, agent_slug, records, workspace_id
+    )
+    local_receipts = _local_consumption_receipts(report)
+    if local_receipts is not None:
+        return local_receipts
+    try:
+        response = await _httpx_client.post(
+            url, headers=headers, json=report.model_dump(mode="json")
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as error:
+        _handle_consumption_error(url, error)
+    return _consumption_receipts(report, response)
+
+
+def report_consumption_sync(
+    account: "Account",
+    agent_slug: str,
+    records: Sequence[BillableConsumption],
+    workspace_id: str | None = None,
+) -> list[ConsumptionReceipt]:
+    """Sync variant of ``report_consumption`` for non-async callers."""
+    url, headers, report = _consumption_request(
+        account, agent_slug, records, workspace_id
+    )
+    local_receipts = _local_consumption_receipts(report)
+    if local_receipts is not None:
+        return local_receipts
+    try:
+        response = _sync_httpx_client.post(
+            url, headers=headers, json=report.model_dump(mode="json")
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as error:
+        _handle_consumption_error(url, error)
+    return _consumption_receipts(report, response)
 
 
 async def close_httpx_client() -> None:

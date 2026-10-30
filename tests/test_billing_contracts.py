@@ -15,6 +15,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+import supervaizer
+from supervaizer import contracts
 from supervaizer.contracts import (
     BillableConsumption,
     BillingCatalogItem,
@@ -194,3 +196,18 @@ def test_receipt_reason_defaults_to_none() -> None:
     receipt = ConsumptionReceipt(idempotency_key="a", status="accepted")
 
     assert receipt.reason is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "BillingCatalogItem",
+        "BillableConsumption",
+        "ConsumptionReceipt",
+        "ConsumptionReport",
+        "ConsumptionReportResponse",
+    ],
+)
+def test_billing_models_are_public_exports(name: str) -> None:
+    assert getattr(supervaizer, name) is getattr(contracts, name)
+    assert name in supervaizer.__all__
