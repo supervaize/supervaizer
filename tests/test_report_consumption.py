@@ -8,7 +8,11 @@
 
 from __future__ import annotations
 
+import inspect
 import json
+import subprocess
+import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -18,7 +22,8 @@ import pytest
 from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
-from supervaizer import Account, BillableConsumption, ConsumptionReceipt
+from supervaizer import BillableConsumption, ConsumptionReceipt
+from supervaizer.account import Account
 
 RESULTS: list[dict[str, Any]] = [
     {"idempotency_key": "s1:minute", "status": "accepted", "reason": None},
@@ -155,11 +160,10 @@ def test_report_consumption_sync_reraises_whole_batch_error(
 
 @pytest.mark.asyncio
 async def test_report_consumption_reraises_connect_error(
-    account_fixture: Account, mocker: MockerFixture
+    account_fixture: Account, respx_mock: Any
 ) -> None:
-    mocker.patch(
-        "supervaizer.account_service._httpx_client.post",
-        new=mocker.AsyncMock(side_effect=httpx.ConnectError("refused")),
+    respx_mock.post(_url(account_fixture, account_fixture.workspace_id)).mock(
+        side_effect=httpx.ConnectError("refused")
     )
 
     with pytest.raises(httpx.ConnectError, match="refused"):
@@ -167,11 +171,10 @@ async def test_report_consumption_reraises_connect_error(
 
 
 def test_report_consumption_sync_reraises_connect_error(
-    account_fixture: Account, mocker: MockerFixture
+    account_fixture: Account, respx_mock: Any
 ) -> None:
-    mocker.patch(
-        "supervaizer.account_service._sync_httpx_client.post",
-        side_effect=httpx.ConnectTimeout("timed out"),
+    respx_mock.post(_url(account_fixture, account_fixture.workspace_id)).mock(
+        side_effect=httpx.ConnectTimeout("timed out")
     )
 
     with pytest.raises(httpx.ConnectTimeout, match="timed out"):
@@ -218,3 +221,64 @@ def test_report_consumption_rejects_blank_workspace(account_fixture: Account) ->
         account_fixture.report_consumption_sync(
             _records(), agent_slug="aidan", workspace_id="  "
         )
+
+
+def test_report_consumption_logs_the_redacted_body_of_a_4xx(
+    account_fixture: Account, respx_mock: Any, mocker: MockerFixture
+) -> None:
+    respx_mock.post(_url(account_fixture, account_fixture.workspace_id)).respond(
+        400,
+        json={
+            "records": [{"quantity": ["Ensure no more than 6 decimal places."]}],
+            "api_key": "leaked-value",
+        },
+    )
+    mock_log = mocker.patch("supervaizer.account_service.log")
+
+    with pytest.raises(httpx.HTTPStatusError):
+        account_fixture.report_consumption_sync(_records(), agent_slug="aidan")
+
+    errors = " ".join(str(call.args[0]) for call in mock_log.error.call_args_list)
+    assert "6 decimal places" in errors
+    assert "leaked-value" not in errors
+
+
+@pytest.mark.parametrize(
+    "method", [Account.report_consumption, Account.report_consumption_sync]
+)
+def test_report_consumption_documents_its_errors(method: Callable[..., Any]) -> None:
+    doc = inspect.getdoc(method) or ""
+
+    for name in ("httpx.HTTPError", "ValueError", "ValidationError"):
+        assert name in doc
+
+
+def test_importing_account_does_not_build_the_http_clients() -> None:
+    code = (
+        "import sys, supervaizer.account; "
+        "print('supervaizer.account_service' in sys.modules)"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+
+    assert result.stdout.strip() == "False"
+
+
+def test_report_consumption_accepts_dict_records(
+    account_fixture: Account, respx_mock: Any
+) -> None:
+    route = respx_mock.post(_url(account_fixture, account_fixture.workspace_id))
+    route.respond(200, json={"results": RESULTS[:1]})
+    record: dict[str, Any] = {
+        **_record("s1:minute").model_dump(mode="json"),
+        "quantity": "3.5",
+    }
+
+    receipts = account_fixture.report_consumption_sync([record], agent_slug="aidan")
+
+    assert _statuses(receipts) == [("s1:minute", "accepted")]
+    assert json.loads(route.calls.last.request.content)["records"][0]["quantity"] == (
+        "3.5"
+    )

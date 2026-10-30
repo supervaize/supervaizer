@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
 import httpx
 from pydantic import ConfigDict, Field, field_validator
 
-from supervaizer import account_service
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
 from supervaizer.context import ContextClient
@@ -213,7 +212,7 @@ class Account(AccountAbstract):
 
     async def report_consumption(
         self,
-        records: Sequence[BillableConsumption],
+        records: Sequence[BillableConsumption | dict[str, Any]],
         *,
         agent_slug: str,
         workspace_id: str | None = None,
@@ -224,7 +223,8 @@ class Account(AccountAbstract):
         ``{api_url}/w/{workspace_id}/api/v1/billing/consumption/``.
 
         Args:
-            records: Records to report; each ``idempotency_key`` books once.
+            records: ``BillableConsumption`` objects or dicts to report; each
+                ``idempotency_key`` books once.
             agent_slug: Slug of the agent that consumed.
             workspace_id: Workspace that runs the jobs; defaults to the account's.
 
@@ -236,21 +236,40 @@ class Account(AccountAbstract):
         Raises:
             httpx.HTTPError: on a transport failure (retry with the same keys)
                 or a whole-batch 400/403, like ``send_event``.
+            ValueError: when ``workspace_id`` is blank, or when the response
+                does not hold one result per record in the order sent.
+            pydantic.ValidationError: when a record is invalid or the batch
+                holds 0 or more than 200 records; nothing is sent.
 
         Tested in tests/test_report_consumption.py
         """
+        # Import here so importing Account does not build the shared HTTP clients.
+        from supervaizer import account_service
+
         return await account_service.report_consumption(
             self, agent_slug, records, workspace_id
         )
 
     def report_consumption_sync(
         self,
-        records: Sequence[BillableConsumption],
+        records: Sequence[BillableConsumption | dict[str, Any]],
         *,
         agent_slug: str,
         workspace_id: str | None = None,
     ) -> list[ConsumptionReceipt]:
-        """Report billable consumption from sync-only contexts."""
+        """Report billable consumption from sync-only contexts.
+
+        Same arguments and return value as ``report_consumption``.
+
+        Raises:
+            httpx.HTTPError: on a transport failure or a whole-batch 400/403.
+            ValueError: blank ``workspace_id``, or results that do not match
+                the records in count or order.
+            pydantic.ValidationError: invalid record, or 0 or more than 200.
+        """
+        # Import here so importing Account does not build the shared HTTP clients.
+        from supervaizer import account_service
+
         return account_service.report_consumption_sync(
             self, agent_slug, records, workspace_id
         )

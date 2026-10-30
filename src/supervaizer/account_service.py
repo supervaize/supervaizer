@@ -233,13 +233,16 @@ def send_event_sync(
 def _consumption_request(
     account: "Account",
     agent_slug: str,
-    records: Sequence[BillableConsumption],
+    records: Sequence[BillableConsumption | dict[str, Any]],
     workspace_id: str | None,
 ) -> tuple[str, dict[str, str], ConsumptionReport]:
     workspace = account.workspace_id if workspace_id is None else workspace_id
     if not workspace.strip():
         raise ValueError("report_consumption workspace_id must not be blank")
-    report = ConsumptionReport(agent_slug=agent_slug, records=list(records))
+    report = ConsumptionReport.model_validate({
+        "agent_slug": agent_slug,
+        "records": list(records),
+    })
     url = account.get_url("billing_consumption", workspace_id=workspace)
     headers = {**account.api_headers, "workspace": workspace}
     return url, headers, report
@@ -271,6 +274,13 @@ def _consumption_receipts(
     return results
 
 
+def _response_body(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return response.text[:1000]
+
+
 def _handle_consumption_error(url: str, error: httpx.HTTPError) -> NoReturn:
     if isinstance(error, (httpx.ConnectError, httpx.ConnectTimeout)):
         log.error(
@@ -283,6 +293,9 @@ def _handle_consumption_error(url: str, error: httpx.HTTPError) -> NoReturn:
             f"[Report consumption] Remote response "
             f"status={error.response.status_code} request_id={request_id!r}"
         )
+        if error.response.is_client_error:
+            body = _redact_sensitive_value(_response_body(error.response))
+            log.error(f"[Report consumption] Response body: {body}")
     log.error(f"❌ Error reporting consumption: {error!s}")
     raise error
 
@@ -290,7 +303,7 @@ def _handle_consumption_error(url: str, error: httpx.HTTPError) -> NoReturn:
 async def report_consumption(
     account: "Account",
     agent_slug: str,
-    records: Sequence[BillableConsumption],
+    records: Sequence[BillableConsumption | dict[str, Any]],
     workspace_id: str | None = None,
 ) -> list[ConsumptionReceipt]:
     """Push billable consumption to Studio; return one receipt per record, in order.
@@ -319,7 +332,7 @@ async def report_consumption(
 def report_consumption_sync(
     account: "Account",
     agent_slug: str,
-    records: Sequence[BillableConsumption],
+    records: Sequence[BillableConsumption | dict[str, Any]],
     workspace_id: str | None = None,
 ) -> list[ConsumptionReceipt]:
     """Sync variant of ``report_consumption`` for non-async callers."""
