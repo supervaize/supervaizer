@@ -55,6 +55,9 @@ MISSION_METADATA_HEADER = "X-Supervaize-Mission-Metadata"
 MISSION_METADATA_HEADER_MAX_LENGTH = 4096
 BILLING_SKU_PATTERN = r"^[a-z0-9_]+$"
 BILLING_CONSUMPTION_MAX_RECORDS = 200
+BILLING_DECIMAL_MAX_DIGITS = 18
+BILLING_DECIMAL_PLACES = 6
+BILLING_REFERENCE_MAX_LENGTH = 64
 
 
 class ContractModel(BaseModel):
@@ -521,11 +524,25 @@ class BillableConsumption(ContractModel):
 
     sku: BillingSku = Field(description="SKU declared in the agent billing_catalog.")
     quantity: Decimal = Field(
-        gt=0, description="Positive quantity of unit; sent as a decimal string."
+        gt=0,
+        max_digits=BILLING_DECIMAL_MAX_DIGITS,
+        decimal_places=BILLING_DECIMAL_PLACES,
+        description=(
+            "Positive quantity of unit, at most 18 digits with 6 decimal "
+            "places; sent as a decimal string."
+        ),
     )
     unit: BillingUnit = Field(description="Unit of the quantity.")
-    job_id: str = Field(min_length=1, description="Studio job the record bills.")
-    case_id: str | None = Field(default=None, description="Studio case, if any.")
+    job_id: str = Field(
+        min_length=1,
+        max_length=BILLING_REFERENCE_MAX_LENGTH,
+        description="Studio job the record bills.",
+    )
+    case_id: str | None = Field(
+        default=None,
+        max_length=BILLING_REFERENCE_MAX_LENGTH,
+        description="Studio case, if any.",
+    )
     idempotency_key: str = Field(
         min_length=1,
         max_length=128,
@@ -537,6 +554,8 @@ class BillableConsumption(ContractModel):
     agent_cost_usd: Decimal | None = Field(
         default=None,
         ge=0,
+        max_digits=BILLING_DECIMAL_MAX_DIGITS,
+        decimal_places=BILLING_DECIMAL_PLACES,
         description="Optional hint of what the agent paid, in USD. Not billed.",
     )
     description: str | None = Field(
@@ -545,6 +564,18 @@ class BillableConsumption(ContractModel):
     occurred_at: AwareDatetime = Field(
         description="When the consumption happened; timezone-aware ISO 8601."
     )
+
+    @field_validator("quantity", "agent_cost_usd")
+    @classmethod
+    def check_written_decimal_places(cls, value: Decimal | None) -> Decimal | None:
+        """Count trailing zeros as Studio does: ``1.5000000`` has 7 places."""
+        exponent = None if value is None else value.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -BILLING_DECIMAL_PLACES:
+            raise ValueError(
+                f"at most {BILLING_DECIMAL_PLACES} decimal places, trailing "
+                "zeros included"
+            )
+        return value
 
 
 class ConsumptionReport(ContractModel):

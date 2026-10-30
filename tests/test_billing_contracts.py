@@ -122,6 +122,36 @@ def test_consumption_rejects_out_of_contract_values(override: dict[str, Any]) ->
         BillableConsumption.model_validate({**RECORD, **override})
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"quantity": "1.1234567"},
+        {"quantity": "1.5000000"},
+        {"quantity": "1000000000000"},
+        {"agent_cost_usd": "0.0000001"},
+        {"agent_cost_usd": "0.1000000"},
+        {"agent_cost_usd": "1000000000000"},
+        {"job_id": "j" * 65},
+        {"case_id": "c" * 65},
+    ],
+)
+def test_consumption_rejects_values_studio_refuses(override: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        BillableConsumption.model_validate({**RECORD, **override})
+
+
+def test_consumption_accepts_studio_bounds() -> None:
+    record = BillableConsumption.model_validate({
+        **RECORD,
+        "quantity": "999999999999.999999",
+        "agent_cost_usd": "0.000001",
+        "job_id": "j" * 64,
+        "case_id": "c" * 64,
+    })
+
+    assert record.model_dump(mode="json")["quantity"] == "999999999999.999999"
+
+
 def test_consumption_accepts_bounds() -> None:
     record = BillableConsumption.model_validate({
         **RECORD,
