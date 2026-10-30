@@ -24,7 +24,6 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    AfterValidator,
     AwareDatetime,
     BaseModel,
     BeforeValidator,
@@ -293,7 +292,7 @@ class AgentRegistrationContract(ContractModel):
             "consumer sanitizes it before rendering."
         ),
     )
-    billing_catalog: BillingCatalog | None = Field(
+    billing_catalog: list[BillingCatalogItem] | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
         description=(
@@ -301,6 +300,13 @@ class AgentRegistrationContract(ContractModel):
             "unset. No prices: the owner workspace prices each SKU in Studio."
         ),
     )
+
+    @field_validator("billing_catalog")
+    @classmethod
+    def check_billing_catalog(
+        cls, value: list[BillingCatalogItem] | None
+    ) -> list[BillingCatalogItem] | None:
+        return validate_billing_catalog(value)
 
 
 class ServerRegistrationContract(ControllerContract):
@@ -496,16 +502,18 @@ class BillingCatalogItem(ContractModel):
     )
 
 
-def _unique_skus(items: list[BillingCatalogItem]) -> list[BillingCatalogItem]:
+def validate_billing_catalog(
+    items: list[BillingCatalogItem] | None,
+) -> list[BillingCatalogItem] | None:
+    """Reject a billing catalog that declares the same SKU twice."""
+    if items is None:
+        return None
     seen: set[str] = set()
     for item in items:
         if item.sku in seen:
             raise ValueError(f"billing_catalog declares sku {item.sku!r} twice")
         seen.add(item.sku)
     return items
-
-
-BillingCatalog = Annotated[list[BillingCatalogItem], AfterValidator(_unique_skus)]
 
 
 class BillableConsumption(ContractModel):

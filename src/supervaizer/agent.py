@@ -38,7 +38,6 @@ from supervaizer.__version__ import VERSION
 from supervaizer.case import CaseNodes
 from supervaizer.common import ApiSuccess, SvBaseModel, log
 from supervaizer.contracts import (
-    BillingCatalog,
     BillingCatalogItem,
     SupervaizerV2AgentRegistrationContract,
     V2ActionDefinition,
@@ -47,6 +46,7 @@ from supervaizer.contracts import (
     V2AgentIntroduction,
     V2AgentMethod,
     V2AgentMethods,
+    validate_billing_catalog,
 )
 from supervaizer.data_resource import DataResource
 from supervaizer.event import JobStartConfirmationEvent
@@ -673,7 +673,7 @@ class AgentAbstract(SvBaseModel):
             "The SDK only types and bounds it; Studio sanitizes it."
         ),
     )
-    billing_catalog: BillingCatalog | None = Field(
+    billing_catalog: list[BillingCatalogItem] | None = Field(
         default=None,
         description=(
             "Optional billable SKUs (sku, unit, description) the agent reports "
@@ -733,6 +733,13 @@ class AgentAbstract(SvBaseModel):
     model_config = cast(
         ConfigDict, {"reference_group": "Core", "arbitrary_types_allowed": True}
     )
+
+    @field_validator("billing_catalog")
+    @classmethod
+    def check_billing_catalog(
+        cls, value: list[BillingCatalogItem] | None
+    ) -> list[BillingCatalogItem] | None:
+        return validate_billing_catalog(value)
 
 
 class Agent(AgentAbstract):
