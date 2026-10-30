@@ -25,7 +25,7 @@ import shortuuid
 from supervaizer.account import Account
 from supervaizer.case import Case, CaseNodeUpdate
 from supervaizer.common import ApiSuccess, log
-from supervaizer.contracts import SUPERVAIZER_V2_A2UI_VERSION
+from supervaizer.contracts import SUPERVAIZER_V2_A2UI_VERSION, BillingCatalogItem
 from supervaizer.job import JobInstructions, JobResponse, Jobs
 from supervaizer.lifecycle import EntityStatus
 
@@ -33,6 +33,14 @@ STEPS_WITH_HITL = ["Begin", "Progress", "Human Review", "End"]
 STEPS_WITHOUT_HITL = ["Begin", "Progress", "End"]
 HITL_POLL_INTERVAL = 1.0  # seconds between polls while waiting for human input
 HELLO_WORLD_A2UI_CATALOG_VERSION = "supervaizer-v2-local.0"
+
+# Billing catalog example: one SKU, no price (the owner workspace prices it in
+# Studio). An agent declares it with Agent(billing_catalog=...) and reports use
+# with Account.report_consumption. The built-in local agent does not pass it, so
+# its registration stays byte-identical to tests/fixtures/.../registration_baseline.json.
+HELLO_WORLD_BILLING_CATALOG = [
+    BillingCatalogItem(sku="hello_message", unit="message", description="One hello"),
+]
 
 
 class _LocalAccount(Account):

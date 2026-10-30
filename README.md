@@ -246,6 +246,8 @@ account = Account(
 server = Server(agents=[agent], supervisor_account=account)
 ```
 
+To bill workspaces for the agent's work, declare `Agent(billing_catalog=[...])` and push records with `account.report_consumption(...)`; see [docs/2026_10_BILLABLE_CONSUMPTION.md](docs/2026_10_BILLABLE_CONSUMPTION.md).
+
 Without the three `SUPERVAIZER_WORKSPACE_AUTH_*` variables, a Studio-registered controller refuses to launch (`Studio-registered Supervaizer v2 A2A requires workspace authorization`). Local mode does not need them. See [docs/2026_05_WORKSPACE_AGENT_GRANTS.md](docs/2026_05_WORKSPACE_AGENT_GRANTS.md).
 
 Then start the controller:
