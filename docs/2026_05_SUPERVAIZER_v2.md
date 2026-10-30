@@ -173,7 +173,9 @@ agent = Agent(
     name="Research Agent",
     version="1.0.0",
     supervaizer_v2_registration=registration,
-    billing_catalog=[{"sku": "brief", "unit": "brief", "description": "One sourced brief"}],
+    billing_catalog=[
+        {"sku": "brief", "unit": "brief", "description": "One sourced brief"}
+    ],
 )
 ```
 

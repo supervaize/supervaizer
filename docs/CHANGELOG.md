@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 
 - **Agent billable consumption** — `Agent(billing_catalog=[...])` and `AgentRegistrationContract.billing_catalog` (`BillingCatalogItem`: `sku` of 1 to 64 characters matching `^[a-z0-9_]+$` and unique in the list, `unit` of 1 to 32 characters, `description` of at most 255) are sent only when set, so an agent without a catalog registers with the same keys as before. `Account.report_consumption(records, *, agent_slug, workspace_id=None)` and `report_consumption_sync` post a `ConsumptionReport` (`agent_slug`, 1 to 200 `BillableConsumption` records) to `/w/<workspace>/api/v1/billing/consumption/` with the `workspace` header set to the same workspace, and return one `ConsumptionReceipt` (`accepted`, `duplicate`, or `rejected` with a `reason`) per record, in order, parsed through `ConsumptionReportResponse`. `quantity` and `agent_cost_usd` are `Decimal` values sent as strings; `occurred_at` must be timezone-aware. Transport errors and whole-batch `400`/`403` are re-raised like `send_event`; local mode accepts every record without HTTP. `HELLO_WORLD_BILLING_CATALOG` in the Hello World example shows a one-SKU catalog. See `docs/2026_10_BILLABLE_CONSUMPTION.md`. Requires a minor release.
 
+### Changed
+
+- **`just ship-reconcile` takes no arguments** — The recipe only forwarded its own defaults, so the script's repo argument and `--timeout-seconds`/`--poll-seconds` parser are gone. Override with environment variables: `TIMEOUT_SECONDS` (default 1800), `POLL_SECONDS` (default 15), e.g. `TIMEOUT_SECONDS=7200 just ship-reconcile`. The script refuses any argument (exit 2), so a stale command cannot run against a repo it did not name; the repo is fixed to `supervaize/supervaizer`. Tooling only, no package change.
+
 ## [1.9.0] - 2026-10-29
 
 ### Added

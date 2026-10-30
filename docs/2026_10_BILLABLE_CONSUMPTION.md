@@ -28,8 +28,14 @@ agent = Agent(
     version="1.0.0",
     supervaizer_v2_registration=registration,
     billing_catalog=[
-        BillingCatalogItem(sku="interview_minute", unit="minute", description="Voice interview time"),
-        {"sku": "transcript_token", "unit": "token", "description": "Transcript tokens processed"},
+        BillingCatalogItem(
+            sku="interview_minute", unit="minute", description="Voice interview time"
+        ),
+        {
+            "sku": "transcript_token",
+            "unit": "token",
+            "description": "Transcript tokens processed",
+        },
     ],
 )
 ```
