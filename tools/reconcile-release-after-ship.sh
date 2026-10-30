@@ -13,33 +13,21 @@
 
 set -euo pipefail
 
-REPO_SLUG="${1:-supervaize/supervaizer}"
-shift || true
+# Positional args and flags were removed; refuse them so a stale command cannot fall back to the default repo.
+if [[ $# -gt 0 ]]; then
+  echo "ERROR: this script takes no arguments. Set REPO_SLUG, TIMEOUT_SECONDS or POLL_SECONDS instead." >&2
+  exit 2
+fi
 
-TIMEOUT_SECONDS=1800
-POLL_SECONDS=15
+# Override with env vars, e.g. a slow PyPI approval: `TIMEOUT_SECONDS=7200 just ship-reconcile`.
+REPO_SLUG="${REPO_SLUG:-supervaize/supervaizer}"
+TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1800}"
+POLL_SECONDS="${POLL_SECONDS:-15}"
 
 DEVELOP_BRANCH="${DEVELOP_BRANCH:-develop}"
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
 PYPI_PACKAGE="${PYPI_PACKAGE:-supervaizer}"
 PYPI_BASE_URL="${PYPI_BASE_URL:-https://pypi.org/pypi}"
-
-while [[ $# -gt 0 ]]; do
-  case "${1}" in
-    --timeout-seconds)
-      TIMEOUT_SECONDS="${2}"
-      shift 2
-      ;;
-    --poll-seconds)
-      POLL_SECONDS="${2}"
-      shift 2
-      ;;
-    *)
-      echo "Unknown argument: ${1}" >&2
-      exit 2
-      ;;
-  esac
-done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -108,7 +96,7 @@ while true; do
     exit 1
   fi
 
-  echo "  still waiting... (next check in ${POLL_SECONDS}s)"
+  echo "  still waiting..."
   sleep "${POLL_SECONDS}"
 done
 
