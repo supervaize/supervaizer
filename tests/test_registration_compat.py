@@ -28,6 +28,7 @@ from supervaizer.contracts import (
     V2AgentFullDescription,
     V2AgentIntroduction,
 )
+from supervaizer.examples.hello_world_agent import HELLO_WORLD_BILLING_CATALOG
 from supervaizer.examples.local_server import get_default_local_agent
 from tests.test_v2_only_agents import _v2_only_agent
 
@@ -243,3 +244,13 @@ def test_billing_catalog_rejects_duplicate_skus() -> None:
             "api_path": "/agents/a",
             "billing_catalog": duplicated,
         })
+
+
+def test_hello_world_example_declares_one_sku_outside_the_baseline() -> None:
+    catalog = [item.model_dump(mode="json") for item in HELLO_WORLD_BILLING_CATALOG]
+
+    assert catalog == [
+        {"sku": "hello_message", "unit": "message", "description": "One hello"}
+    ]
+    assert _billed_agent(catalog).registration_info["billing_catalog"] == catalog
+    assert "billing_catalog" not in get_default_local_agent().registration_info
