@@ -159,7 +159,7 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
   2. After the work is final, build one `BillableConsumption` per SKU with a stable `idempotency_key`.
   3. Report the batch (1 to 200 records) to the workspace that ran the jobs.
 - Expected result: One receipt per record, in order: `accepted`, `duplicate` (seen before, nothing booked twice), or `rejected` with a reason (final, do not resend).
-- Important states: `403` (key may not act for this agent in this workspace) and `400` (bad body) raise the httpx error for the whole batch, as do connection failures; resend those with the same keys. Local mode answers `accepted` for every record without HTTP. Without a catalog the registration payload is unchanged.
+- Important states: `403` (key may not act for this agent in this workspace) and `400` (bad body) raise the httpx error for the whole batch and are final. `404` with `code` `workspace_credits_off` (credits off for the workspace) and connection failures also raise; resend those later with the same keys. Local mode answers `accepted` for every record without HTTP. Without a catalog the registration payload is unchanged.
 - Source: `src/supervaizer/contracts.py`, `src/supervaizer/account.py`, `src/supervaizer/account_service.py`, `docs/2026_10_BILLABLE_CONSUMPTION.md`
 - Verification: `tests/test_report_consumption.py`, `tests/test_billing_contracts.py`, `tests/test_registration_compat.py`
 - Known caveats: The SDK carries no prices and does not retry; the agent keeps failed records (for example in an outbox) and resends them.

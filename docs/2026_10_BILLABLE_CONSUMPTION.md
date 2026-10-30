@@ -91,14 +91,15 @@ The limits match Studio's serializer. The SDK refuses an out-of-range record whe
 | `duplicate` | Studio received a record with the same `(agent, idempotency_key)` before, whatever its status. Nothing is booked twice. | Nothing. |
 | `rejected` | Studio stored the record and booked nothing. `reason` says why. | Log it. Do not resend: a rejection is final. |
 
-Reasons: `unknown_job`, `wrong_workspace`, `agent_mismatch`, `no_grant`, `unknown_sku`, `no_price`, `invalid_quantity`, `workspace_credits_off`. `reason` is an open string; handle unknown values like any other rejection.
+Reasons: `unknown_job`, `unknown_case`, `wrong_workspace`, `agent_mismatch`, `no_grant`, `unknown_sku`, `no_price`, `invalid_quantity`. `reason` is an open string; handle unknown values like any other rejection.
 
 ### Errors
 
 Whole-batch errors raise the httpx error, as `send_event` does:
 
-- `403`: the API key may not act for this agent in this workspace. The key user must belong to the agent's owner workspace while the target workspace holds an accepted grant for the agent, or belong to the target workspace when the agent is its own.
-- `400`: Studio could not parse the body. The SDK logs the redacted response body, which names the record or field.
+- `403`: the API key may not act for this agent in this workspace. The key user must belong to the agent's owner workspace while the target workspace holds an accepted grant for the agent, or belong to the target workspace when the agent is its own. This is final: do not resend the batch.
+- `400`: Studio could not parse the body. The SDK logs the redacted response body, which names the record or field. This is final: do not resend the batch.
+- `404` with `{"detail": "...", "code": "workspace_credits_off"}`: the target workspace has workspace credits turned off. Studio answers the whole batch this way while the setting is off. The SDK raises its usual httpx error. Keep the records and resend them later with the same keys.
 - Connection errors and timeouts: the batch may or may not have reached Studio. Resend the same records with the same keys.
 
 In local mode (`SUPERVAIZER_LOCAL_MODE=true`) no request is sent and every record comes back `accepted`.
