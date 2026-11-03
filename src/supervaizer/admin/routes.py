@@ -14,7 +14,8 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -377,6 +378,21 @@ async def _log_events() -> AsyncGenerator[str, None]:
         yield _sse_event(_system_entry("ERROR", f"Log stream error: {e!s}"))
 
 
+@contextmanager
+def _http_errors(label: str, *, keep_http: bool = True) -> Iterator[None]:
+    """Log an unexpected error and answer 500 with its message.
+
+    An HTTPException passes through unchanged when `keep_http` is true.
+    """
+    try:
+        yield
+    except Exception as e:
+        if keep_http and isinstance(e, HTTPException):
+            raise
+        log.error(f"{label} error: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 async def _resolve_server(request: Request) -> Any | None:
     """The live server: `app.state.server` (set at launch), else the dependency override."""
     server = getattr(request.app.state, "server", None)
@@ -416,7 +432,7 @@ class AdminHandlers:
 
     async def admin_dashboard(self, request: Request) -> Response:
         """Admin dashboard page."""
-        try:
+        with _http_errors("Admin dashboard", keep_http=False):
             # Get stats
             stats = get_dashboard_stats(self.storage)
 
@@ -434,9 +450,6 @@ class AdminHandlers:
                     "server_id": os.getenv("SUPERVAIZER_SERVER_ID"),
                 },
             )
-        except Exception as e:
-            log.error(f"Admin dashboard error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
 
     async def admin_jobs_page(self, request: Request) -> Response:
         """Jobs management page."""
@@ -464,7 +477,7 @@ class AdminHandlers:
 
     async def admin_server_page(self, request: Request) -> Response:
         """Server status and configuration page."""
-        try:
+        with _http_errors("Admin server page", keep_http=False):
             # Get initial server data (from storage or live when no persistence)
             server_status = get_server_status(request)
             server_config = get_server_configuration(self.storage, request)
@@ -480,9 +493,6 @@ class AdminHandlers:
                     "local_mode": _is_local_mode(request),
                 },
             )
-        except Exception as e:
-            log.error(f"Admin server page error: {e}")
-            raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def admin_agents_page(self, request: Request) -> Response:
         """Agents management page."""
@@ -542,7 +552,7 @@ class AdminHandlers:
 
     async def get_server_status_api(self, request: Request) -> Response:
         """Get current server status for HTMX refresh."""
-        try:
+        with _http_errors("Get server status API", keep_http=False):
             server_status = get_server_status(request)
 
             return templates.TemplateResponse(
@@ -553,13 +563,10 @@ class AdminHandlers:
                     "server_status": server_status,
                 },
             )
-        except Exception as e:
-            log.error(f"Get server status API error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
 
     async def register_server_with_supervisor(self, request: Request) -> JSONResponse:
         """Trigger SERVER_REGISTER to the supervaizer supervisor (no frontend API key; backend sends to SUPERVAIZE_API_URL)."""
-        try:
+        with _http_errors("Server register API"):
             server = await _resolve_server(request)
             if server is None:
                 raise HTTPException(
@@ -573,11 +580,6 @@ class AdminHandlers:
                 )
             result = await server.supervisor_account.register_server(server=server)
             return _registration_response(result)
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Server register API error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
 
     async def get_agents_api(
         self,
@@ -588,7 +590,7 @@ class AdminHandlers:
         sort: str = Query("-created_at"),
     ) -> Response:
         """Get agents with filtering for HTMX refresh."""
-        try:
+        with _http_errors("Get agents API", keep_http=False):
             server_info = _get_server_info(request)
             if not server_info:
                 raise HTTPException(
@@ -608,17 +610,13 @@ class AdminHandlers:
                 {"request": request, "agents": agents},
             )
 
-        except Exception as e:
-            log.error(f"Get agents API error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_agent_details(
         self,
         request: Request,
         agent_slug: str,
     ) -> Response:
         """Get detailed agent information."""
-        try:
+        with _http_errors("Get agent details"):
             server_info = _get_server_info(request)
             if not server_info:
                 raise HTTPException(
@@ -644,12 +642,6 @@ class AdminHandlers:
                 },
             )
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Get agent details error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_jobs_api(
         self,
         request: Request,
@@ -661,7 +653,7 @@ class AdminHandlers:
         skip: int = Query(0, ge=0),
     ) -> Response:
         """Get jobs with filtering and pagination."""
-        try:
+        with _http_errors("Get jobs API", keep_http=False):
             jobs = [
                 j
                 for j in self.storage.get_objects("Job")
@@ -680,13 +672,9 @@ class AdminHandlers:
                 },
             )
 
-        except Exception as e:
-            log.error(f"Get jobs API error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_job_details(self, request: Request, job_id: str) -> Response:
         """Get detailed job information."""
-        try:
+        with _http_errors("Get job details"):
             job_data = self.storage.get_object_by_id("Job", job_id)
             if not job_data:
                 raise HTTPException(status_code=404, detail="Job not found")
@@ -704,12 +692,6 @@ class AdminHandlers:
                 },
             )
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Get job details error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_cases_api(
         self,
         request: Request,
@@ -721,7 +703,7 @@ class AdminHandlers:
         skip: int = Query(0, ge=0),
     ) -> Response:
         """Get cases with filtering and pagination."""
-        try:
+        with _http_errors("Get cases API", keep_http=False):
             cases = [
                 c
                 for c in self.storage.get_objects("Case")
@@ -740,13 +722,9 @@ class AdminHandlers:
                 },
             )
 
-        except Exception as e:
-            log.error(f"Get cases API error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_case_details(self, request: Request, case_id: str) -> Response:
         """Get detailed case information."""
-        try:
+        with _http_errors("Get case details"):
             case_data = self.storage.get_object_by_id("Case", case_id)
             if not case_data:
                 raise HTTPException(status_code=404, detail="Case not found")
@@ -766,19 +744,13 @@ class AdminHandlers:
                 },
             )
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Get case details error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def update_job_status(
         self,
         job_id: str,
         status_data: dict[str, str],
     ) -> dict[str, str]:
         """Update job status."""
-        try:
+        with _http_errors("Update job status"):
             new_status = status_data.get("status")
             if not new_status or new_status not in [s.value for s in EntityStatus]:
                 raise HTTPException(status_code=400, detail="Invalid status")
@@ -796,19 +768,13 @@ class AdminHandlers:
 
             return {"message": "Job status updated successfully"}
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Update job status error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def update_case_status(
         self,
         case_id: str,
         status_data: dict[str, str],
     ) -> dict[str, str]:
         """Update case status."""
-        try:
+        with _http_errors("Update case status"):
             new_status = status_data.get("status")
             if not new_status or new_status not in [s.value for s in EntityStatus]:
                 raise HTTPException(status_code=400, detail="Invalid status")
@@ -826,15 +792,9 @@ class AdminHandlers:
 
             return {"message": "Case status updated successfully"}
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Update case status error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def delete_job(self, job_id: str) -> dict[str, str]:
         """Delete a job and its related cases."""
-        try:
+        with _http_errors("Delete job"):
             # Delete related cases first
             cases_data = self.storage.get_cases_for_job(job_id)
             for case_data in cases_data:
@@ -847,30 +807,18 @@ class AdminHandlers:
 
             return {"message": "Job and related cases deleted successfully"}
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Delete job error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def delete_case(self, case_id: str) -> dict[str, str]:
         """Delete a case."""
-        try:
+        with _http_errors("Delete case"):
             deleted = self.storage.delete_object("Case", case_id)
             if not deleted:
                 raise HTTPException(status_code=404, detail="Case not found")
 
             return {"message": "Case deleted successfully"}
 
-        except HTTPException:
-            raise
-        except Exception as e:
-            log.error(f"Delete case error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
     async def get_recent_activity(self, request: Request) -> Response:
         """Get recent entity activity."""
-        try:
+        with _http_errors("Get recent activity", keep_http=False):
             # Get recent jobs and cases
             recent_jobs = self.storage.get_objects("Job")[-5:]  # Last 5 jobs
             recent_cases = self.storage.get_objects("Case")[-5:]  # Last 5 cases
@@ -909,10 +857,6 @@ class AdminHandlers:
                     "activities": activities,
                 },
             )
-
-        except Exception as e:
-            log.error(f"Get recent activity error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
 
     async def log_stream(self) -> EventSourceResponse:
         """Stream log messages via Server-Sent Events."""
