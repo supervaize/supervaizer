@@ -68,7 +68,7 @@ else:
 class AWSAppRunnerDriver(BaseDriver):
     """Driver for deploying to AWS App Runner."""
 
-    def __init__(self, region: str, project_id: str | None = None):
+    def __init__(self, region: str, project_id: str | None = None) -> None:
         """Initialize AWS App Runner driver."""
         if not AWS_AVAILABLE:
             raise ImportError(
