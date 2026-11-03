@@ -1553,21 +1553,13 @@ def _job_policy(value: V2JobPolicy | dict[str, Any] | None) -> V2JobPolicy:
 def _workspace_binding(
     value: V2WorkspaceBindingDefinition | dict[str, Any] | None,
 ) -> V2WorkspaceBindingDefinition | None:
-    if value is None:
-        return None
-    if isinstance(value, V2WorkspaceBindingDefinition):
-        return value
-    return V2WorkspaceBindingDefinition.model_validate(value)
+    return _contract_or_none(value, V2WorkspaceBindingDefinition)
 
 
 def _agent_methods(
     value: V2AgentMethods | dict[str, Any] | None,
 ) -> V2AgentMethods | None:
-    if value is None:
-        return None
-    if isinstance(value, V2AgentMethods):
-        return value
-    return V2AgentMethods.model_validate(value)
+    return _contract_or_none(value, V2AgentMethods)
 
 
 def _unique_strings(values: Iterable[str]) -> list[str]:
