@@ -239,6 +239,103 @@ def get_server_configuration(
     )
 
 
+# Sort keys each list endpoint supports, with the value used when a row lacks the key.
+_JOB_SORT_DEFAULTS: dict[str, Any] = {"created_at": "", "name": "", "status": ""}
+_CASE_SORT_DEFAULTS: dict[str, Any] = {**_JOB_SORT_DEFAULTS, "total_cost": 0}
+_AGENT_SORT_DEFAULTS: dict[str, Any] = {"name": ""}
+
+
+def _contains_text(record: dict[str, Any], term: str, fields: tuple[str, ...]) -> bool:
+    """True when `term` appears, ignoring case, in any of the record's `fields`."""
+    needle = term.lower()
+    return any(needle in record.get(field, "").lower() for field in fields)
+
+
+def _sort_rows(rows: list[dict[str, Any]], sort: str, defaults: dict[str, Any]) -> None:
+    """Sort in place by `sort` ("-key" for descending); unknown keys keep the order."""
+    reverse = sort.startswith("-")
+    key = sort[1:] if reverse else sort
+    if key in defaults:
+        rows.sort(key=lambda row: row.get(key, defaults[key]), reverse=reverse)
+
+
+def _paginate(
+    rows: list[dict[str, Any]], skip: int, limit: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Return the requested page and the paging fields the table templates use."""
+    total = len(rows)
+    paging = {
+        "total": total,
+        "limit": limit,
+        "skip": skip,
+        "has_next": skip + limit < total,
+        "has_prev": skip > 0,
+    }
+    return rows[skip : skip + limit], paging
+
+
+def _job_matches(
+    job: dict[str, Any], status: str | None, agent_name: str | None, search: str | None
+) -> bool:
+    if status and job.get("status") != status:
+        return False
+    if agent_name and agent_name.lower() not in job.get("agent_name", "").lower():
+        return False
+    return not search or _contains_text(job, search, ("name", "id"))
+
+
+def _case_matches(
+    case: dict[str, Any], status: str | None, job_id: str | None, search: str | None
+) -> bool:
+    if status and case.get("status") != status:
+        return False
+    if job_id and case.get("job_id") != job_id:
+        return False
+    return not search or _contains_text(case, search, ("name", "id", "description"))
+
+
+def _agent_matches(
+    agent: dict[str, Any],
+    status: str | None,
+    agent_type: str | None,
+    search: str | None,
+) -> bool:
+    # Agents carry no status yet: every agent counts as active.
+    if status and status not in ("all", "active"):
+        return False
+    # An agent without a type counts as "conversational".
+    if agent_type and agent_type.lower() != agent.get("type", "conversational").lower():
+        return False
+    return not search or _contains_text(agent, search, ("name", "description"))
+
+
+def _job_row(job: dict[str, Any]) -> dict[str, Any]:
+    """The fields of a job the jobs table shows."""
+    return {
+        "id": job.get("id", ""),
+        "name": job.get("name", ""),
+        "agent_name": job.get("agent_name", ""),
+        "status": job.get("status", ""),
+        "created_at": job.get("created_at", ""),
+        "finished_at": job.get("finished_at"),
+        "case_count": len(job.get("case_ids", [])),
+    }
+
+
+def _case_row(case: dict[str, Any]) -> dict[str, Any]:
+    """The fields of a case the cases table shows."""
+    return {
+        "id": case.get("id", ""),
+        "name": case.get("name", ""),
+        "description": case.get("description", ""),
+        "status": case.get("status", ""),
+        "job_id": case.get("job_id", ""),
+        "created_at": case.get("created_at", ""),
+        "finished_at": case.get("finished_at"),
+        "total_cost": case.get("total_cost", 0.0),
+    }
+
+
 class AdminHandlers:
     """Request handlers of the admin router, bound to one storage manager."""
 
@@ -455,55 +552,17 @@ class AdminHandlers:
                     status_code=503, detail="Server information not available"
                 )
 
-            agents = server_info.agents
-
-            # Apply filters
-            filtered_agents = []
-            for agent in agents:
-                # Status filter (we'll add this to agent data later)
-                # For now, assume all agents are active since we don't have status
-                if status and status not in ("all", "active"):
-                    continue
-
-                # Agent type filter
-                if agent_type and agent_type != "":
-                    # Default to "conversational" if no type specified
-                    agent_agent_type = agent.get("type", "conversational")
-                    if agent_type.lower() != agent_agent_type.lower():
-                        continue
-
-                # Search filter
-                if search:
-                    search_lower = search.lower()
-                    if not (
-                        search_lower in agent.get("name", "").lower()
-                        or search_lower in agent.get("description", "").lower()
-                    ):
-                        continue
-
-                filtered_agents.append(agent)
-
-            # Sort agents
-            if sort.startswith("-"):
-                reverse = True
-                sort_key = sort[1:]
-            else:
-                reverse = False
-                sort_key = sort
-
-            if sort_key == "name":
-                filtered_agents.sort(key=lambda x: x.get("name", ""), reverse=reverse)
-            elif sort_key == "created_at":
-                # For now, maintain original order since we don't have created_at
-                pass
+            agents = [
+                a
+                for a in server_info.agents
+                if _agent_matches(a, status, agent_type, search)
+            ]
+            _sort_rows(agents, sort, _AGENT_SORT_DEFAULTS)
 
             return templates.TemplateResponse(
                 request,
                 "agents_grid.html",
-                {
-                    "request": request,
-                    "agents": filtered_agents,
-                },
+                {"request": request, "agents": agents},
             )
 
         except Exception as e:
@@ -560,74 +619,21 @@ class AdminHandlers:
     ) -> Response:
         """Get jobs with filtering and pagination."""
         try:
-            # Get all jobs
-            jobs_data = self.storage.get_objects("Job")
-
-            # Apply filters
-            filtered_jobs = []
-            for job_data in jobs_data:
-                # Status filter
-                if status and job_data.get("status") != status:
-                    continue
-
-                # Agent name filter
-                if (
-                    agent_name
-                    and agent_name.lower() not in job_data.get("agent_name", "").lower()
-                ):
-                    continue
-
-                # Search filter
-                if search:
-                    search_lower = search.lower()
-                    if not (
-                        search_lower in job_data.get("name", "").lower()
-                        or search_lower in job_data.get("id", "").lower()
-                    ):
-                        continue
-
-                filtered_jobs.append(job_data)
-
-            # Sort jobs
-            if sort.startswith("-"):
-                reverse = True
-                sort_key = sort[1:]
-            else:
-                reverse = False
-                sort_key = sort
-
-            if sort_key in ["created_at", "name", "status"]:
-                filtered_jobs.sort(key=lambda x: x.get(sort_key, ""), reverse=reverse)
-
-            # Apply pagination
-            total = len(filtered_jobs)
-            jobs_page = filtered_jobs[skip : skip + limit]
-
-            # Format for display
-            jobs = []
-            for job_data in jobs_page:
-                job = {
-                    "id": job_data.get("id", ""),
-                    "name": job_data.get("name", ""),
-                    "agent_name": job_data.get("agent_name", ""),
-                    "status": job_data.get("status", ""),
-                    "created_at": job_data.get("created_at", ""),
-                    "finished_at": job_data.get("finished_at"),
-                    "case_count": len(job_data.get("case_ids", [])),
-                }
-                jobs.append(job)
+            jobs = [
+                j
+                for j in self.storage.get_objects("Job")
+                if _job_matches(j, status, agent_name, search)
+            ]
+            _sort_rows(jobs, sort, _JOB_SORT_DEFAULTS)
+            jobs_page, paging = _paginate(jobs, skip, limit)
 
             return templates.TemplateResponse(
                 request,
                 "jobs_table.html",
                 {
                     "request": request,
-                    "jobs": jobs,
-                    "total": total,
-                    "limit": limit,
-                    "skip": skip,
-                    "has_next": skip + limit < total,
-                    "has_prev": skip > 0,
+                    "jobs": [_job_row(j) for j in jobs_page],
+                    **paging,
                 },
             )
 
@@ -673,80 +679,21 @@ class AdminHandlers:
     ) -> Response:
         """Get cases with filtering and pagination."""
         try:
-            # Get all cases
-            cases_data = self.storage.get_objects("Case")
-
-            # Apply filters
-            filtered_cases = []
-            for case_data in cases_data:
-                # Status filter
-                if status and case_data.get("status") != status:
-                    continue
-
-                # Job ID filter
-                if job_id and case_data.get("job_id") != job_id:
-                    continue
-
-                # Search filter
-                if search:
-                    search_lower = search.lower()
-                    if not (
-                        search_lower in case_data.get("name", "").lower()
-                        or search_lower in case_data.get("id", "").lower()
-                        or search_lower in case_data.get("description", "").lower()
-                    ):
-                        continue
-
-                filtered_cases.append(case_data)
-
-            # Sort cases
-            if sort.startswith("-"):
-                reverse = True
-                sort_key = sort[1:]
-            else:
-                reverse = False
-                sort_key = sort
-
-            if sort_key in ["created_at", "name", "status", "total_cost"]:
-                if sort_key == "total_cost":
-                    filtered_cases.sort(
-                        key=lambda x: x.get(sort_key, 0), reverse=reverse
-                    )
-                else:
-                    filtered_cases.sort(
-                        key=lambda x: x.get(sort_key, ""), reverse=reverse
-                    )
-
-            # Apply pagination
-            total = len(filtered_cases)
-            cases_page = filtered_cases[skip : skip + limit]
-
-            # Format for display
-            cases = []
-            for case_data in cases_page:
-                case = {
-                    "id": case_data.get("id", ""),
-                    "name": case_data.get("name", ""),
-                    "description": case_data.get("description", ""),
-                    "status": case_data.get("status", ""),
-                    "job_id": case_data.get("job_id", ""),
-                    "created_at": case_data.get("created_at", ""),
-                    "finished_at": case_data.get("finished_at"),
-                    "total_cost": case_data.get("total_cost", 0.0),
-                }
-                cases.append(case)
+            cases = [
+                c
+                for c in self.storage.get_objects("Case")
+                if _case_matches(c, status, job_id, search)
+            ]
+            _sort_rows(cases, sort, _CASE_SORT_DEFAULTS)
+            cases_page, paging = _paginate(cases, skip, limit)
 
             return templates.TemplateResponse(
                 request,
                 "cases_table.html",
                 {
                     "request": request,
-                    "cases": cases,
-                    "total": total,
-                    "limit": limit,
-                    "skip": skip,
-                    "has_next": skip + limit < total,
-                    "has_prev": skip > 0,
+                    "cases": [_case_row(c) for c in cases_page],
+                    **paging,
                 },
             )
 
