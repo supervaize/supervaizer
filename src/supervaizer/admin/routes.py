@@ -423,6 +423,41 @@ def _registration_response(result: ApiSuccess | ApiError) -> JSONResponse:
     )
 
 
+def _list_page(request: Request, template: str) -> Response:
+    """A list page shell; the rows load through the /api endpoints."""
+    return templates.TemplateResponse(
+        request,
+        template,
+        {
+            "request": request,
+            "api_version": API_VERSION,
+            "local_mode": _is_local_mode(request),
+        },
+    )
+
+
+_FINISHED_STATUSES = ("completed", "failed", "cancelled")
+
+
+def _set_status(
+    storage: StorageManager, kind: str, entity_id: str, status_data: dict[str, str]
+) -> dict[str, str]:
+    """Set the status of a stored Job or Case; a final status also stamps finished_at."""
+    new_status = status_data.get("status")
+    if not new_status or new_status not in [s.value for s in EntityStatus]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    entity = storage.get_object_by_id(kind, entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail=f"{kind} not found")
+
+    entity["status"] = new_status
+    if new_status in _FINISHED_STATUSES:
+        entity["finished_at"] = datetime.now().isoformat()
+    storage.save_object(kind, entity)
+    return {"message": f"{kind} status updated successfully"}
+
+
 class AdminHandlers:
     """Request handlers of the admin router, bound to one storage manager."""
 
@@ -453,27 +488,11 @@ class AdminHandlers:
 
     async def admin_jobs_page(self, request: Request) -> Response:
         """Jobs management page."""
-        return templates.TemplateResponse(
-            request,
-            "jobs_list.html",
-            {
-                "request": request,
-                "api_version": API_VERSION,
-                "local_mode": _is_local_mode(request),
-            },
-        )
+        return _list_page(request, "jobs_list.html")
 
     async def admin_cases_page(self, request: Request) -> Response:
         """Cases management page."""
-        return templates.TemplateResponse(
-            request,
-            "cases_list.html",
-            {
-                "request": request,
-                "api_version": API_VERSION,
-                "local_mode": _is_local_mode(request),
-            },
-        )
+        return _list_page(request, "cases_list.html")
 
     async def admin_server_page(self, request: Request) -> Response:
         """Server status and configuration page."""
@@ -751,22 +770,7 @@ class AdminHandlers:
     ) -> dict[str, str]:
         """Update job status."""
         with _http_errors("Update job status"):
-            new_status = status_data.get("status")
-            if not new_status or new_status not in [s.value for s in EntityStatus]:
-                raise HTTPException(status_code=400, detail="Invalid status")
-
-            job_data = self.storage.get_object_by_id("Job", job_id)
-            if not job_data:
-                raise HTTPException(status_code=404, detail="Job not found")
-
-            # Update job status
-            job_data["status"] = new_status
-            if new_status in ["completed", "failed", "cancelled"]:
-                job_data["finished_at"] = datetime.now().isoformat()
-
-            self.storage.save_object("Job", job_data)
-
-            return {"message": "Job status updated successfully"}
+            return _set_status(self.storage, "Job", job_id, status_data)
 
     async def update_case_status(
         self,
@@ -775,22 +779,7 @@ class AdminHandlers:
     ) -> dict[str, str]:
         """Update case status."""
         with _http_errors("Update case status"):
-            new_status = status_data.get("status")
-            if not new_status or new_status not in [s.value for s in EntityStatus]:
-                raise HTTPException(status_code=400, detail="Invalid status")
-
-            case_data = self.storage.get_object_by_id("Case", case_id)
-            if not case_data:
-                raise HTTPException(status_code=404, detail="Case not found")
-
-            # Update case status
-            case_data["status"] = new_status
-            if new_status in ["completed", "failed", "cancelled"]:
-                case_data["finished_at"] = datetime.now().isoformat()
-
-            self.storage.save_object("Case", case_data)
-
-            return {"message": "Case status updated successfully"}
+            return _set_status(self.storage, "Case", case_id, status_data)
 
     async def delete_job(self, job_id: str) -> dict[str, str]:
         """Delete a job and its related cases."""
