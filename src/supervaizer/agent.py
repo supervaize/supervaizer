@@ -301,6 +301,101 @@ class AgentMethodAbstract(BaseModel):
         return value
 
 
+_FIELD_TYPE_RULES: tuple[
+    tuple[type[Any], type[Any] | tuple[type[Any], ...], str], ...
+] = (
+    (str, str, "a string"),
+    (int, int, "an integer"),
+    (bool, bool, "a boolean"),
+    (list, list, "a list"),
+    (dict, dict, "a dictionary"),
+    (float, (int, float), "a number"),
+)
+
+_DYNAMIC_FIELD_TYPES: tuple[tuple[type[Any], type[Any]], ...] = (
+    (str, str),
+    (int, int),
+    (bool, bool),
+    (list, list),
+    (dict, dict),
+    (float, float),
+)
+
+
+def _field_annotation(field: AgentMethodField) -> Any:
+    """Return the dynamic Pydantic annotation for an agent method field."""
+    annotation_type = _normalize_field_annotation_type(field.type)
+    return annotation_type if field.required else annotation_type | None
+
+
+def _normalize_field_annotation_type(field_type: Any) -> type[Any]:
+    """Map supported field types to the annotations used in dynamic models."""
+    for supported_type, annotation_type in _DYNAMIC_FIELD_TYPES:
+        if field_type is supported_type:
+            return annotation_type
+
+    origin = getattr(field_type, "__origin__", None)
+    if origin is list:
+        return list
+    if origin is dict:
+        return dict
+    return Any
+
+
+def _field_type_validation_error(
+    field_name: str, field_value: Any, expected_type: Any
+) -> str | None:
+    """Return the public type-validation error for one supplied field value."""
+    for supported_type, value_type, type_name in _FIELD_TYPE_RULES:
+        if expected_type is supported_type and not isinstance(field_value, value_type):
+            return (
+                f"Field '{field_name}' must be {type_name}, "
+                f"got {type(field_value).__name__}"
+            )
+    return None
+
+
+def _missing_required_field_errors(
+    fields: list[AgentMethodField], job_fields: dict[str, Any]
+) -> tuple[list[str], dict[str, str]]:
+    """Collect missing required-field errors in declared field order."""
+    errors: list[str] = []
+    invalid_fields: dict[str, str] = {}
+    for field in fields:
+        if field.required and field.name not in job_fields:
+            error_msg = f"Required field '{field.name}' is missing"
+            errors.append(error_msg)
+            invalid_fields[field.name] = error_msg
+    return errors, invalid_fields
+
+
+def _provided_field_validation_errors(
+    fields: list[AgentMethodField], job_fields: dict[str, Any]
+) -> tuple[list[str], dict[str, str]]:
+    """Collect unknown and type errors in supplied field order."""
+    errors: list[str] = []
+    invalid_fields: dict[str, str] = {}
+    for field_name, field_value in job_fields.items():
+        error_msg: str | None
+        field_def = next((field for field in fields if field.name == field_name), None)
+        if not field_def:
+            error_msg = f"Unknown field '{field_name}'"
+        elif field_value is None:
+            continue
+        else:
+            try:
+                error_msg = _field_type_validation_error(
+                    field_name, field_value, field_def.type
+                )
+            except Exception as e:
+                error_msg = f"Field '{field_name}' validation failed: {e!s}"
+
+        if error_msg:
+            errors.append(error_msg)
+            invalid_fields[field_name] = error_msg
+    return errors, invalid_fields
+
+
 class AgentMethod(AgentMethodAbstract):
     @property
     def fields_definitions(self) -> list[dict[str, Any]]:
@@ -332,38 +427,9 @@ class AgentMethod(AgentMethodAbstract):
         if not self.fields:
             return type("EmptyFieldsModel", (BaseModel,), {"to_dict": lambda self: {}})
 
-        field_annotations = {}
-        for field in self.fields:
-            field_name = field.name
-            field_type = field.type
-
-            # Convert Python types to proper typing annotations
-            if field_type is str:
-                annotation_type: type = str
-            elif field_type is int:
-                annotation_type = int
-            elif field_type is bool:
-                annotation_type = bool
-            elif field_type is list:
-                annotation_type = list
-            elif field_type is dict:
-                annotation_type = dict
-            elif field_type is float:
-                annotation_type = float
-            elif hasattr(field_type, "__origin__") and field_type.__origin__ is list:
-                # Handle generic list types like list[str]
-                annotation_type = list
-            elif hasattr(field_type, "__origin__") and field_type.__origin__ is dict:
-                # Handle generic dict types like dict[str, Any]
-                annotation_type = dict
-            else:
-                # Default to Any for unknown types
-                annotation_type = Any
-
-            # Make field optional if not required
-            field_annotations[field_name] = (
-                annotation_type if field.required else annotation_type | None
-            )
+        field_annotations = {
+            field.name: _field_annotation(field) for field in self.fields
+        }
 
         # Create the dynamic model with proper module information
         model_dict = {
@@ -404,69 +470,12 @@ class AgentMethod(AgentMethodAbstract):
                 "invalid_fields": {},
             }
 
-        errors = []
-        invalid_fields = {}
-
-        # First check for missing required fields
-        for field in self.fields:
-            if field.required and field.name not in job_fields:
-                error_msg = f"Required field '{field.name}' is missing"
-                errors.append(error_msg)
-                invalid_fields[field.name] = error_msg
-
-        # Then validate the provided fields
-        for field_name, field_value in job_fields.items():
-            # Find the field definition
-            field_def = next((f for f in self.fields if f.name == field_name), None)
-            if not field_def:
-                error_msg = f"Unknown field '{field_name}'"
-                errors.append(error_msg)
-                invalid_fields[field_name] = error_msg
-                continue
-
-            # Skip validation for None values (optional fields)
-            if field_value is None:
-                continue
-
-            # Type validation
-            expected_type = field_def.type
-            if expected_type:
-                try:
-                    # Handle special cases for type validation
-                    if expected_type is str:
-                        if not isinstance(field_value, str):
-                            error_msg = f"Field '{field_name}' must be a string, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is int:
-                        if not isinstance(field_value, int):
-                            error_msg = f"Field '{field_name}' must be an integer, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is bool:
-                        if not isinstance(field_value, bool):
-                            error_msg = f"Field '{field_name}' must be a boolean, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is list:
-                        if not isinstance(field_value, list):
-                            error_msg = f"Field '{field_name}' must be a list, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is dict:
-                        if not isinstance(field_value, dict):
-                            error_msg = f"Field '{field_name}' must be a dictionary, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is float:
-                        if not isinstance(field_value, (int, float)):
-                            error_msg = f"Field '{field_name}' must be a number, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                except Exception as e:
-                    error_msg = f"Field '{field_name}' validation failed: {e!s}"
-                    errors.append(error_msg)
-                    invalid_fields[field_name] = error_msg
+        errors, invalid_fields = _missing_required_field_errors(self.fields, job_fields)
+        provided_errors, provided_invalid_fields = _provided_field_validation_errors(
+            self.fields, job_fields
+        )
+        errors.extend(provided_errors)
+        invalid_fields.update(provided_invalid_fields)
 
         return {
             "valid": len(errors) == 0,
