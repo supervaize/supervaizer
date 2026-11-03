@@ -39,10 +39,8 @@ class Page:
 class AdminRig:
     """An admin router bound to a real in-memory storage, with template calls recorded."""
 
-    def __init__(self, mocker: MockerFixture) -> None:
-        self.storage = StorageManager(":memory:")
-        # In-memory StorageManager instances share their data: start from empty.
-        self.storage._db.drop_tables()
+    def __init__(self, mocker: MockerFixture, storage: StorageManager) -> None:
+        self.storage = storage
         mocker.patch(
             "supervaizer.admin.routes.StorageManager", return_value=self.storage
         )

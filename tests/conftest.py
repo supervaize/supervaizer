@@ -459,11 +459,9 @@ def reset_supervaizer_environment():
 
 
 @pytest.fixture
-def rig(mocker: MockerFixture) -> Iterator[AdminRig]:
-    """An admin router on empty in-memory storage (see tests/admin_rig.py)."""
-    admin_rig = AdminRig(mocker)
-    yield admin_rig
-    admin_rig.storage._db.drop_tables()
+def rig(mocker: MockerFixture, storage_manager: StorageManager) -> AdminRig:
+    """An admin router on a clean StorageManager (see tests/admin_rig.py)."""
+    return AdminRig(mocker, storage_manager)
 
 
 @pytest.fixture
