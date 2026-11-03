@@ -14,6 +14,7 @@ import asyncio
 import collections
 import hashlib
 import os
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -143,6 +144,590 @@ def _compute_job_state_hash(job: "Job") -> str:
     return hashlib.md5(raw.encode()).hexdigest()
 
 
+async def workbench_page(request: Request, slug: str) -> Response:
+    """Render the main workbench page."""
+    agent = get_agent_by_slug(request, slug)
+
+    # Gather agent info for the template
+    parameters = []
+    if agent.parameters_setup:
+        env_values = get_agent_parameters_from_env(agent)
+        for name, param in agent.parameters_setup.definitions.items():
+            env_info = env_values.get(name, {})
+            parameters.append({
+                "name": param.name,
+                "description": param.description,
+                "is_required": param.is_required,
+                "is_secret": param.is_secret,
+                "value": env_info.get("value", ""),
+                "from_env": env_info.get("from_env", False),
+            })
+
+    job_fields = []
+    if agent.methods and agent.methods.job_start and agent.methods.job_start.fields:
+        for field in agent.methods.job_start.fields:
+            job_fields.append({
+                "name": field.name,
+                "field_type": field.field_type.value
+                if hasattr(field.field_type, "value")
+                else str(field.field_type),
+                "description": field.description,
+                "choices": field.choices,
+                "default": field.default,
+                "required": field.required,
+                "widget": field.widget,
+            })
+
+    # Check for active job
+    active_job = None
+    agent_jobs = Jobs().get_agent_jobs(agent.name)
+    for job in agent_jobs.values():
+        if job.status == EntityStatus.IN_PROGRESS:
+            active_job = job
+            break
+
+    return templates.TemplateResponse(
+        request,
+        "workbench.html",
+        {
+            "request": request,
+            "agent": agent,
+            "agent_slug": slug,
+            "parameters": parameters,
+            "job_fields": job_fields,
+            "active_job": active_job,
+            "api_version": API_VERSION,
+            "local_mode": _is_workbench_local_mode(request),
+            "has_human_answer": agent.methods
+            and getattr(agent.methods, "human_answer", None) is not None,
+            "agents": [
+                {"slug": a.slug, "name": a.name}
+                for a in request.app.state.server.agents
+            ],
+        },
+    )
+
+
+async def workbench_start_job(request: Request, slug: str) -> Response:
+    """Start a job from the workbench — no Studio communication."""
+    agent = get_agent_by_slug(request, slug)
+    # Check before any side effect: a rejected start must not leave a Job.
+    if not agent.methods:
+        raise HTTPException(
+            status_code=400,
+            detail="Agent has no methods defined: the workbench runs v1 jobs only",
+        )
+
+    body = await request.json()
+    parameters = body.get("parameters", {})
+    fields = body.get("fields", {})
+
+    # Set parameters via os.environ (matching agent convention).
+    # Fall back to env values for empty fields (local mode pre-fill).
+    if agent.parameters_setup:
+        env_values = get_agent_parameters_from_env(agent)
+        for name in agent.parameters_setup.definitions:
+            value = parameters.get(name, "")
+            if not value:
+                env_info = env_values.get(name, {})
+                value = env_info.get("value", "")
+            if value:
+                agent.parameters_setup.definitions[name].set_value(value)
+
+    # Create job context and job (Job.__init__ auto-registers in Jobs() singleton)
+    job_id = shortuuid.uuid()
+
+    context = JobContext(
+        workspace_id="workbench",
+        job_id=job_id,
+        started_by="workbench-admin",
+        started_at=datetime.now(),
+        mission_id="local",
+        mission_name="Workbench Test",
+    )
+
+    # Build agent_parameters as list of dicts (matching AbstractJob.agent_parameters type)
+    # Merge submitted values with env fallbacks
+    merged_params = {}
+    if agent.parameters_setup:
+        for name in agent.parameters_setup.definitions:
+            value = parameters.get(name, "")
+            if not value:
+                env_info = env_values.get(name, {})
+                value = env_info.get("value", "")
+            if value:
+                merged_params[name] = value
+    # Also include any extra params not in definitions
+    for k, v in parameters.items():
+        if v and k not in merged_params:
+            merged_params[k] = v
+    agent_params_list = (
+        [{"name": k, "value": v} for k, v in merged_params.items()]
+        if merged_params
+        else None
+    )
+
+    job = Job(
+        id=job_id,
+        name="Workbench Test",
+        agent_name=agent.name,
+        status=EntityStatus.STOPPED,
+        job_context=context,
+        agent_parameters=agent_params_list,
+    )
+
+    # Execute job_start directly, bypassing agent.job_start() which sends Studio events
+    action_method = agent.methods.job_start.method
+    method_params = agent.methods.job_start.params or {}
+    params = method_params | {
+        "fields": fields,
+        "context": context,
+        "agent_parameters": agent_params_list or [],
+    }
+
+    # Run in background thread to not block the response
+    loop = asyncio.get_running_loop()
+
+    async def run_job() -> None:
+        try:
+            job.add_response(
+                JobResponse(
+                    job_id=job.id,
+                    status=EntityStatus.IN_PROGRESS,
+                    message="Starting job execution",
+                    payload=None,
+                )
+            )
+            result = await loop.run_in_executor(
+                None, lambda: agent._execute(action_method, params)
+            )
+            job.add_response(result)
+        except Exception as e:
+            log.error(f"[Workbench] Job {job.id} failed: {e}")
+            job.add_response(
+                JobResponse(
+                    job_id=job.id,
+                    status=EntityStatus.FAILED,
+                    message=f"Job failed: {e!s}",
+                    error=e,
+                )
+            )
+
+    asyncio.create_task(run_job())
+
+    return JSONResponse({
+        "id": job.id,
+        "status": "STARTING",
+        "message": "Job started from workbench",
+    })
+
+
+async def workbench_job_monitor(request: Request, slug: str, job_id: str) -> Response:
+    """HTMX partial — returns execution monitor HTML for polling."""
+    agent = get_agent_by_slug(request, slug)
+
+    job = Jobs().get_job(job_id, agent_name=agent.name)
+
+    if not job:
+        return HTMLResponse("<div class='text-gray-500 text-sm'>Job not found</div>")
+
+    cases = get_job_cases(job)
+
+    # For each case, check if it's awaiting and extract HITL form data
+    cases_data = []
+    for case in cases:
+        case_info = {
+            "case": case,
+            "hitl_form": None,
+            "hitl_dialog": None,
+        }
+        if case.status == EntityStatus.AWAITING:
+            # Find the HITL update in case.updates
+            for update in reversed(case.updates):
+                if hasattr(update, "payload") and update.payload:
+                    payload = update.payload
+                    if isinstance(payload, dict):
+                        if "supervaizer_dialog" in payload:
+                            case_info["hitl_dialog"] = payload["supervaizer_dialog"]
+                            break
+                        elif "supervaizer_form" in payload:
+                            case_info["hitl_form"] = _normalize_hitl_form(
+                                payload["supervaizer_form"]
+                            )
+                            break
+        cases_data.append(case_info)
+
+    return templates.TemplateResponse(
+        request,
+        "workbench_monitor.html",
+        {
+            "request": request,
+            "agent_slug": slug,
+            "job": job,
+            "cases_data": cases_data,
+            "has_human_answer": agent.methods
+            and getattr(agent.methods, "human_answer", None) is not None,
+        },
+    )
+
+
+async def workbench_stop_job(request: Request, slug: str, job_id: str) -> Response:
+    """Stop a running job."""
+    agent = get_agent_by_slug(request, slug)
+
+    if not agent.methods or not agent.methods.job_stop:
+        raise HTTPException(status_code=400, detail="Agent has no job_stop method")
+
+    job_stop_method = agent.methods.job_stop.method
+
+    # Update job status in registry so the running loop can detect it
+    job = Jobs().get_job(job_id, agent_name=agent.name)
+    if job:
+        job.add_response(
+            JobResponse(
+                job_id=job_id,
+                status=EntityStatus.STOPPED,
+                message="Stopped by user",
+            )
+        )
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: agent._execute(job_stop_method, {"job_id": job_id}),
+        )
+        return JSONResponse({"status": "stopped", "message": str(result.message)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
+
+
+async def workbench_job_status(request: Request, slug: str, job_id: str) -> Response:
+    """Get job status via agent's job_status method."""
+    agent = get_agent_by_slug(request, slug)
+
+    if not agent.methods or not agent.methods.job_status:
+        # Fall back to reading job state directly
+        job = Jobs().get_job(job_id, agent_name=agent.name)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return JSONResponse({
+            "job_id": job.id,
+            "status": job.status.value,
+        })
+
+    job_status_method = agent.methods.job_status.method
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: agent._execute(job_status_method, {"job_id": job_id}),
+        )
+        return JSONResponse({
+            "status": result.status.value,
+            "message": result.message,
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {e}")
+
+
+async def workbench_answer_hitl(
+    request: Request, slug: str, job_id: str, case_id: str
+) -> Response:
+    """Submit HITL answer — two-step dispatch (receive + invoke human_answer)."""
+    agent = get_agent_by_slug(request, slug)
+
+    body = await request.json()
+    answer_data = body.get("answer", {})
+
+    # Find the case
+    case = Cases().get_case(case_id, job_id=job_id)
+
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+    if case.status != EntityStatus.AWAITING:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Case '{case_id}' is not awaiting input (current status: {case.status})",
+        )
+
+    # Derive a human-readable label from the HITL step that prompted this answer
+    hitl_label = "User response"
+    for prev_update in reversed(case.updates):
+        if hasattr(prev_update, "payload") and prev_update.payload:
+            p = prev_update.payload
+            if isinstance(p, dict) and (
+                "supervaizer_form" in p or "supervaizer_dialog" in p
+            ):
+                hitl_label = prev_update.name or hitl_label
+                break
+
+    # Step 1: Transition case state AWAITING -> IN_PROGRESS
+    answer_with_label = (
+        dict(answer_data) if isinstance(answer_data, dict) else answer_data
+    )
+    if isinstance(answer_with_label, dict):
+        answer_with_label["_hitl_label"] = hitl_label
+    update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
+    await case.receive_human_input(update)
+
+    # Step 2: Invoke agent's human_answer method if defined
+    if agent.methods:
+        human_answer_def = getattr(agent.methods, "human_answer", None)
+        if human_answer_def is not None:
+            human_answer_method = human_answer_def.method
+            try:
+                params = {
+                    "fields": answer_data,
+                    "context": {"job_id": job_id, "case_id": case_id},
+                    "payload": answer_data,
+                    "case_id": case_id,
+                    "job_id": job_id,
+                }
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: agent._execute(human_answer_method, params),
+                )
+            except Exception as e:
+                log.error(f"[Workbench] human_answer failed for case {case_id}: {e}")
+                return JSONResponse(
+                    {"status": "error", "message": f"human_answer failed: {e}"},
+                    status_code=500,
+                )
+
+    return JSONResponse({
+        "status": "answered",
+        "case_id": case_id,
+        "message": "HITL answer submitted and dispatched",
+    })
+
+
+async def workbench_execute_step(
+    request: Request, slug: str, job_id: str, case_id: str, step_index: int
+) -> Response:
+    """Execute a scheduled step immediately."""
+    agent = get_agent_by_slug(request, slug)
+
+    # Verify the job and case are both owned by this agent before using
+    # the agent's method allow-list.
+    job = Jobs().get_job(job_id, agent_name=agent.name)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job '{job_id}' not found for agent '{slug}'",
+        )
+
+    case = Cases().get_case(case_id, job_id=job_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+    if case.id not in job.case_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{case_id}' not found for agent '{slug}'",
+        )
+
+    if step_index < 0 or step_index >= len(case.updates):
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    update = case.updates[step_index]
+    if getattr(update, "scheduled_at", None) is None:
+        raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+    if getattr(update, "scheduled_status", None) != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+        )
+
+    object.__setattr__(update, "scheduled_status", "executing")
+    try:
+        if update.scheduled_method:
+            _execute_scheduled_method(
+                update.scheduled_method,
+                update.scheduled_params or {},
+                allowed_methods=agent._declared_method_paths(),
+            )
+        object.__setattr__(update, "scheduled_status", "completed")
+        return JSONResponse({
+            "status": "completed",
+            "message": "Step executed successfully",
+        })
+    except Exception as e:
+        object.__setattr__(update, "scheduled_status", "failed")
+        log.error(f"[Workbench] Scheduled step execute failed: {e}")
+        return JSONResponse(
+            {"status": "failed", "message": f"Execution failed: {e}"},
+            status_code=500,
+        )
+
+
+async def workbench_cancel_step(
+    request: Request, slug: str, job_id: str, case_id: str, step_index: int
+) -> Response:
+    """Cancel a pending scheduled step."""
+    get_agent_by_slug(request, slug)
+
+    case = Cases().get_case(case_id, job_id=job_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+    if step_index < 0 or step_index >= len(case.updates):
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    update = case.updates[step_index]
+    if getattr(update, "scheduled_at", None) is None:
+        raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+    if getattr(update, "scheduled_status", None) != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+        )
+
+    object.__setattr__(update, "scheduled_status", "cancelled")
+    return JSONResponse({"status": "cancelled", "message": "Step cancelled"})
+
+
+async def workbench_reschedule_step(
+    request: Request, slug: str, job_id: str, case_id: str, step_index: int
+) -> Response:
+    """Reschedule a pending scheduled step."""
+    get_agent_by_slug(request, slug)
+
+    case = Cases().get_case(case_id, job_id=job_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
+
+    if step_index < 0 or step_index >= len(case.updates):
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    update = case.updates[step_index]
+    if getattr(update, "scheduled_at", None) is None:
+        raise HTTPException(status_code=400, detail="Step is not a scheduled step")
+    if getattr(update, "scheduled_status", None) != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+        )
+
+    body = await request.json()
+    new_scheduled_at = body.get("scheduled_at")
+    if not new_scheduled_at:
+        raise HTTPException(status_code=400, detail="scheduled_at is required")
+
+    try:
+        new_dt = datetime.fromisoformat(new_scheduled_at.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid datetime format")
+
+    object.__setattr__(update, "scheduled_at", new_dt)
+    return JSONResponse({
+        "status": "rescheduled",
+        "message": f"Step rescheduled to {new_dt.isoformat()}",
+    })
+
+
+async def workbench_console(request: Request, slug: str) -> Response:
+    """HTMX partial — returns recent console log entries."""
+    try:
+        last_index = int(request.query_params.get("last_index", 0))
+    except (ValueError, TypeError):
+        last_index = 0
+
+    buf = list(_workbench_log_buffer)
+    entries_to_send = buf[last_index:]
+
+    return templates.TemplateResponse(
+        request,
+        "workbench_console.html",
+        {
+            "request": request,
+            "entries": entries_to_send,
+            "next_index": len(buf),
+            "agent_slug": slug,
+        },
+    )
+
+
+async def workbench_jobs_list(request: Request, slug: str) -> Response:
+    """HTMX partial — returns job history list."""
+    agent = get_agent_by_slug(request, slug)
+    agent_jobs = Jobs().get_agent_jobs(agent.name)
+
+    # Sort by created_at descending (most recent first)
+    jobs_list = sorted(
+        agent_jobs.values(),
+        key=lambda j: getattr(j, "created_at", None) or datetime.min,
+        reverse=True,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "workbench_jobs_list.html",
+        {
+            "request": request,
+            "agent_slug": slug,
+            "jobs": jobs_list,
+        },
+    )
+
+
+# (HTTP method, path, handler, extra add_api_route options).
+_WORKBENCH_ROUTES: list[tuple[str, str, Callable[..., Any], dict[str, Any]]] = [
+    (
+        "GET",
+        "/agents/{slug}/workbench",
+        workbench_page,
+        {"response_class": HTMLResponse},
+    ),
+    ("POST", "/agents/{slug}/workbench/start", workbench_start_job, {}),
+    (
+        "GET",
+        "/agents/{slug}/workbench/jobs/{job_id}",
+        workbench_job_monitor,
+        {"response_class": HTMLResponse},
+    ),
+    ("POST", "/agents/{slug}/workbench/jobs/{job_id}/stop", workbench_stop_job, {}),
+    ("GET", "/agents/{slug}/workbench/jobs/{job_id}/status", workbench_job_status, {}),
+    (
+        "POST",
+        "/agents/{slug}/workbench/jobs/{job_id}/cases/{case_id}/answer",
+        workbench_answer_hitl,
+        {},
+    ),
+    (
+        "POST",
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/execute",
+        workbench_execute_step,
+        {},
+    ),
+    (
+        "POST",
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/cancel",
+        workbench_cancel_step,
+        {},
+    ),
+    (
+        "PATCH",
+        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/schedule",
+        workbench_reschedule_step,
+        {},
+    ),
+    (
+        "GET",
+        "/agents/{slug}/workbench/console",
+        workbench_console,
+        {"response_class": HTMLResponse},
+    ),
+    (
+        "GET",
+        "/agents/{slug}/workbench/jobs",
+        workbench_jobs_list,
+        {"response_class": HTMLResponse},
+    ),
+]
+
+
 def create_workbench_routes() -> APIRouter:
     """Create workbench sub-router."""
     from supervaizer.admin.routes import register_log_listener
@@ -150,629 +735,90 @@ def create_workbench_routes() -> APIRouter:
     register_log_listener(workbench_log_listener)
 
     router = APIRouter(tags=["workbench"])
+    for method, route_path, handler, options in _WORKBENCH_ROUTES:
+        router.add_api_route(route_path, handler, methods=[method], **options)
+    return router
 
-    @router.get("/agents/{slug}/workbench", response_class=HTMLResponse)
-    async def workbench_page(request: Request, slug: str) -> Response:
-        """Render the main workbench page."""
-        agent = get_agent_by_slug(request, slug)
 
-        # Gather agent info for the template
-        parameters = []
-        if agent.parameters_setup:
-            env_values = get_agent_parameters_from_env(agent)
-            for name, param in agent.parameters_setup.definitions.items():
-                env_info = env_values.get(name, {})
-                parameters.append({
-                    "name": param.name,
-                    "description": param.description,
-                    "is_required": param.is_required,
-                    "is_secret": param.is_secret,
-                    "value": env_info.get("value", ""),
-                    "from_env": env_info.get("from_env", False),
-                })
+async def workbench_job_ws(websocket: WebSocket, slug: str, job_id: str) -> None:
+    """WebSocket that pushes typed refresh signals when state changes.
 
-        job_fields = []
-        if agent.methods and agent.methods.job_start and agent.methods.job_start.fields:
-            for field in agent.methods.job_start.fields:
-                job_fields.append({
-                    "name": field.name,
-                    "field_type": field.field_type.value
-                    if hasattr(field.field_type, "value")
-                    else str(field.field_type),
-                    "description": field.description,
-                    "choices": field.choices,
-                    "default": field.default,
-                    "required": field.required,
-                    "widget": field.widget,
-                })
+    Sends: "monitor" (job/case state changed), "console" (new log entries),
+           "jobs" (job list changed). Client fetches the relevant partial.
+    """
+    await websocket.accept()
+    last_monitor_hash = ""
+    last_log_version = _workbench_log_version
+    last_jobs_count = -1
+    # Cache agent outside the loop — it doesn't change during a WS session
+    try:
+        agent = get_agent_by_slug(websocket, slug)
+    except Exception:
+        await websocket.close()
+        return
+    try:
+        while True:
+            try:
+                job = Jobs().get_job(job_id, agent_name=agent.name)
+            except Exception:
+                job = None
 
-        # Check for active job
-        active_job = None
-        agent_jobs = Jobs().get_agent_jobs(agent.name)
-        for job in agent_jobs.values():
-            if job.status == EntityStatus.IN_PROGRESS:
-                active_job = job
+            if not job:
+                await websocket.send_text("monitor")
                 break
 
-        return templates.TemplateResponse(
-            request,
-            "workbench.html",
-            {
-                "request": request,
-                "agent": agent,
-                "agent_slug": slug,
-                "parameters": parameters,
-                "job_fields": job_fields,
-                "active_job": active_job,
-                "api_version": API_VERSION,
-                "local_mode": _is_workbench_local_mode(request),
-                "has_human_answer": agent.methods
-                and getattr(agent.methods, "human_answer", None) is not None,
-                "agents": [
-                    {"slug": a.slug, "name": a.name}
-                    for a in request.app.state.server.agents
-                ],
-            },
-        )
+            # Monitor: job/case state changes
+            current_hash = _compute_job_state_hash(job)
+            if current_hash != last_monitor_hash:
+                last_monitor_hash = current_hash
+                await websocket.send_text("monitor")
 
-    @router.post("/agents/{slug}/workbench/start")
-    async def workbench_start_job(request: Request, slug: str) -> Response:
-        """Start a job from the workbench — no Studio communication."""
-        agent = get_agent_by_slug(request, slug)
-        # Check before any side effect: a rejected start must not leave a Job.
-        if not agent.methods:
-            raise HTTPException(
-                status_code=400,
-                detail="Agent has no methods defined: the workbench runs v1 jobs only",
+            # Console: only meaningful log entries (filtered, no admin HTTP noise)
+            if _workbench_log_version != last_log_version:
+                last_log_version = _workbench_log_version
+                await websocket.send_text("console")
+
+            # Jobs: job count changed
+            agent_jobs = Jobs().get_agent_jobs(agent.name)
+            if len(agent_jobs) != last_jobs_count:
+                last_jobs_count = len(agent_jobs)
+                await websocket.send_text("jobs")
+
+            is_terminal = job.status.value in (
+                "completed",
+                "failed",
+                "stopped",
+                "cancelled",
             )
-
-        body = await request.json()
-        parameters = body.get("parameters", {})
-        fields = body.get("fields", {})
-
-        # Set parameters via os.environ (matching agent convention).
-        # Fall back to env values for empty fields (local mode pre-fill).
-        if agent.parameters_setup:
-            env_values = get_agent_parameters_from_env(agent)
-            for name in agent.parameters_setup.definitions:
-                value = parameters.get(name, "")
-                if not value:
-                    env_info = env_values.get(name, {})
-                    value = env_info.get("value", "")
-                if value:
-                    agent.parameters_setup.definitions[name].set_value(value)
-
-        # Create job context and job (Job.__init__ auto-registers in Jobs() singleton)
-        job_id = shortuuid.uuid()
-
-        context = JobContext(
-            workspace_id="workbench",
-            job_id=job_id,
-            started_by="workbench-admin",
-            started_at=datetime.now(),
-            mission_id="local",
-            mission_name="Workbench Test",
-        )
-
-        # Build agent_parameters as list of dicts (matching AbstractJob.agent_parameters type)
-        # Merge submitted values with env fallbacks
-        merged_params = {}
-        if agent.parameters_setup:
-            for name in agent.parameters_setup.definitions:
-                value = parameters.get(name, "")
-                if not value:
-                    env_info = env_values.get(name, {})
-                    value = env_info.get("value", "")
-                if value:
-                    merged_params[name] = value
-        # Also include any extra params not in definitions
-        for k, v in parameters.items():
-            if v and k not in merged_params:
-                merged_params[k] = v
-        agent_params_list = (
-            [{"name": k, "value": v} for k, v in merged_params.items()]
-            if merged_params
-            else None
-        )
-
-        job = Job(
-            id=job_id,
-            name="Workbench Test",
-            agent_name=agent.name,
-            status=EntityStatus.STOPPED,
-            job_context=context,
-            agent_parameters=agent_params_list,
-        )
-
-        # Execute job_start directly, bypassing agent.job_start() which sends Studio events
-        action_method = agent.methods.job_start.method
-        method_params = agent.methods.job_start.params or {}
-        params = method_params | {
-            "fields": fields,
-            "context": context,
-            "agent_parameters": agent_params_list or [],
-        }
-
-        # Run in background thread to not block the response
-        loop = asyncio.get_running_loop()
-
-        async def run_job() -> None:
-            try:
-                job.add_response(
-                    JobResponse(
-                        job_id=job.id,
-                        status=EntityStatus.IN_PROGRESS,
-                        message="Starting job execution",
-                        payload=None,
-                    )
-                )
-                result = await loop.run_in_executor(
-                    None, lambda: agent._execute(action_method, params)
-                )
-                job.add_response(result)
-            except Exception as e:
-                log.error(f"[Workbench] Job {job.id} failed: {e}")
-                job.add_response(
-                    JobResponse(
-                        job_id=job.id,
-                        status=EntityStatus.FAILED,
-                        message=f"Job failed: {e!s}",
-                        error=e,
-                    )
-                )
-
-        asyncio.create_task(run_job())
-
-        return JSONResponse({
-            "id": job.id,
-            "status": "STARTING",
-            "message": "Job started from workbench",
-        })
-
-    @router.get("/agents/{slug}/workbench/jobs/{job_id}", response_class=HTMLResponse)
-    async def workbench_job_monitor(
-        request: Request, slug: str, job_id: str
-    ) -> Response:
-        """HTMX partial — returns execution monitor HTML for polling."""
-        agent = get_agent_by_slug(request, slug)
-
-        job = Jobs().get_job(job_id, agent_name=agent.name)
-
-        if not job:
-            return HTMLResponse(
-                "<div class='text-gray-500 text-sm'>Job not found</div>"
-            )
-
-        cases = get_job_cases(job)
-
-        # For each case, check if it's awaiting and extract HITL form data
-        cases_data = []
-        for case in cases:
-            case_info = {
-                "case": case,
-                "hitl_form": None,
-                "hitl_dialog": None,
-            }
-            if case.status == EntityStatus.AWAITING:
-                # Find the HITL update in case.updates
-                for update in reversed(case.updates):
-                    if hasattr(update, "payload") and update.payload:
-                        payload = update.payload
-                        if isinstance(payload, dict):
-                            if "supervaizer_dialog" in payload:
-                                case_info["hitl_dialog"] = payload["supervaizer_dialog"]
-                                break
-                            elif "supervaizer_form" in payload:
-                                case_info["hitl_form"] = _normalize_hitl_form(
-                                    payload["supervaizer_form"]
-                                )
-                                break
-            cases_data.append(case_info)
-
-        return templates.TemplateResponse(
-            request,
-            "workbench_monitor.html",
-            {
-                "request": request,
-                "agent_slug": slug,
-                "job": job,
-                "cases_data": cases_data,
-                "has_human_answer": agent.methods
-                and getattr(agent.methods, "human_answer", None) is not None,
-            },
-        )
-
-    @router.post("/agents/{slug}/workbench/jobs/{job_id}/stop")
-    async def workbench_stop_job(request: Request, slug: str, job_id: str) -> Response:
-        """Stop a running job."""
-        agent = get_agent_by_slug(request, slug)
-
-        if not agent.methods or not agent.methods.job_stop:
-            raise HTTPException(status_code=400, detail="Agent has no job_stop method")
-
-        job_stop_method = agent.methods.job_stop.method
-
-        # Update job status in registry so the running loop can detect it
-        job = Jobs().get_job(job_id, agent_name=agent.name)
-        if job:
-            job.add_response(
-                JobResponse(
-                    job_id=job_id,
-                    status=EntityStatus.STOPPED,
-                    message="Stopped by user",
-                )
-            )
-
-        try:
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: agent._execute(job_stop_method, {"job_id": job_id}),
-            )
-            return JSONResponse({"status": "stopped", "message": str(result.message)})
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to stop job: {e}")
-
-    @router.get("/agents/{slug}/workbench/jobs/{job_id}/status")
-    async def workbench_job_status(
-        request: Request, slug: str, job_id: str
-    ) -> Response:
-        """Get job status via agent's job_status method."""
-        agent = get_agent_by_slug(request, slug)
-
-        if not agent.methods or not agent.methods.job_status:
-            # Fall back to reading job state directly
-            job = Jobs().get_job(job_id, agent_name=agent.name)
-            if not job:
-                raise HTTPException(status_code=404, detail="Job not found")
-            return JSONResponse({
-                "job_id": job.id,
-                "status": job.status.value,
-            })
-
-        job_status_method = agent.methods.job_status.method
-        try:
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: agent._execute(job_status_method, {"job_id": job_id}),
-            )
-            return JSONResponse({
-                "status": result.status.value,
-                "message": result.message,
-            })
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get status: {e}")
-
-    @router.post("/agents/{slug}/workbench/jobs/{job_id}/cases/{case_id}/answer")
-    async def workbench_answer_hitl(
-        request: Request, slug: str, job_id: str, case_id: str
-    ) -> Response:
-        """Submit HITL answer — two-step dispatch (receive + invoke human_answer)."""
-        agent = get_agent_by_slug(request, slug)
-
-        body = await request.json()
-        answer_data = body.get("answer", {})
-
-        # Find the case
-        case = Cases().get_case(case_id, job_id=job_id)
-
-        if not case:
-            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
-        if case.status != EntityStatus.AWAITING:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Case '{case_id}' is not awaiting input (current status: {case.status})",
-            )
-
-        # Derive a human-readable label from the HITL step that prompted this answer
-        hitl_label = "User response"
-        for prev_update in reversed(case.updates):
-            if hasattr(prev_update, "payload") and prev_update.payload:
-                p = prev_update.payload
-                if isinstance(p, dict) and (
-                    "supervaizer_form" in p or "supervaizer_dialog" in p
-                ):
-                    hitl_label = prev_update.name or hitl_label
-                    break
-
-        # Step 1: Transition case state AWAITING -> IN_PROGRESS
-        answer_with_label = (
-            dict(answer_data) if isinstance(answer_data, dict) else answer_data
-        )
-        if isinstance(answer_with_label, dict):
-            answer_with_label["_hitl_label"] = hitl_label
-        update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
-        await case.receive_human_input(update)
-
-        # Step 2: Invoke agent's human_answer method if defined
-        if agent.methods:
-            human_answer_def = getattr(agent.methods, "human_answer", None)
-            if human_answer_def is not None:
-                human_answer_method = human_answer_def.method
+            if is_terminal:
+                await websocket.send_text("console")
+                await websocket.send_text("jobs")
+                await websocket.send_text("terminal")
+                # Keep connection open but idle — prevents client reconnect loop
                 try:
-                    params = {
-                        "fields": answer_data,
-                        "context": {"job_id": job_id, "case_id": case_id},
-                        "payload": answer_data,
-                        "case_id": case_id,
-                        "job_id": job_id,
-                    }
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(
-                        None,
-                        lambda: agent._execute(human_answer_method, params),
-                    )
-                except Exception as e:
-                    log.error(
-                        f"[Workbench] human_answer failed for case {case_id}: {e}"
-                    )
-                    return JSONResponse(
-                        {"status": "error", "message": f"human_answer failed: {e}"},
-                        status_code=500,
-                    )
+                    while True:
+                        await asyncio.wait_for(websocket.receive_text(), timeout=60)
+                except (TimeoutError, WebSocketDisconnect):
+                    pass
+                break
 
-        return JSONResponse({
-            "status": "answered",
-            "case_id": case_id,
-            "message": "HITL answer submitted and dispatched",
-        })
-
-    @router.post(
-        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/execute"
-    )
-    async def workbench_execute_step(
-        request: Request, slug: str, job_id: str, case_id: str, step_index: int
-    ) -> Response:
-        """Execute a scheduled step immediately."""
-        agent = get_agent_by_slug(request, slug)
-
-        # Verify the job and case are both owned by this agent before using
-        # the agent's method allow-list.
-        job = Jobs().get_job(job_id, agent_name=agent.name)
-        if job is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Job '{job_id}' not found for agent '{slug}'",
-            )
-
-        case = Cases().get_case(case_id, job_id=job_id)
-        if not case:
-            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-        if case.id not in job.case_ids:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case '{case_id}' not found for agent '{slug}'",
-            )
-
-        if step_index < 0 or step_index >= len(case.updates):
-            raise HTTPException(status_code=404, detail="Step not found")
-
-        update = case.updates[step_index]
-        if getattr(update, "scheduled_at", None) is None:
-            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-        if getattr(update, "scheduled_status", None) != "pending":
-            raise HTTPException(
-                status_code=409,
-                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
-            )
-
-        object.__setattr__(update, "scheduled_status", "executing")
-        try:
-            if update.scheduled_method:
-                _execute_scheduled_method(
-                    update.scheduled_method,
-                    update.scheduled_params or {},
-                    allowed_methods=agent._declared_method_paths(),
+            try:
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=2.0,
                 )
-            object.__setattr__(update, "scheduled_status", "completed")
-            return JSONResponse({
-                "status": "completed",
-                "message": "Step executed successfully",
-            })
-        except Exception as e:
-            object.__setattr__(update, "scheduled_status", "failed")
-            log.error(f"[Workbench] Scheduled step execute failed: {e}")
-            return JSONResponse(
-                {"status": "failed", "message": f"Execution failed: {e}"},
-                status_code=500,
-            )
-
-    @router.post(
-        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/cancel"
-    )
-    async def workbench_cancel_step(
-        request: Request, slug: str, job_id: str, case_id: str, step_index: int
-    ) -> Response:
-        """Cancel a pending scheduled step."""
-        get_agent_by_slug(request, slug)
-
-        case = Cases().get_case(case_id, job_id=job_id)
-        if not case:
-            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
-        if step_index < 0 or step_index >= len(case.updates):
-            raise HTTPException(status_code=404, detail="Step not found")
-
-        update = case.updates[step_index]
-        if getattr(update, "scheduled_at", None) is None:
-            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-        if getattr(update, "scheduled_status", None) != "pending":
-            raise HTTPException(
-                status_code=409,
-                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
-            )
-
-        object.__setattr__(update, "scheduled_status", "cancelled")
-        return JSONResponse({"status": "cancelled", "message": "Step cancelled"})
-
-    @router.patch(
-        "/agents/{slug}/workbench/jobs/{job_id}/steps/{case_id}/{step_index}/schedule"
-    )
-    async def workbench_reschedule_step(
-        request: Request, slug: str, job_id: str, case_id: str, step_index: int
-    ) -> Response:
-        """Reschedule a pending scheduled step."""
-        get_agent_by_slug(request, slug)
-
-        case = Cases().get_case(case_id, job_id=job_id)
-        if not case:
-            raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
-        if step_index < 0 or step_index >= len(case.updates):
-            raise HTTPException(status_code=404, detail="Step not found")
-
-        update = case.updates[step_index]
-        if getattr(update, "scheduled_at", None) is None:
-            raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-        if getattr(update, "scheduled_status", None) != "pending":
-            raise HTTPException(
-                status_code=409,
-                detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
-            )
-
-        body = await request.json()
-        new_scheduled_at = body.get("scheduled_at")
-        if not new_scheduled_at:
-            raise HTTPException(status_code=400, detail="scheduled_at is required")
-
-        try:
-            new_dt = datetime.fromisoformat(new_scheduled_at.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="Invalid datetime format")
-
-        object.__setattr__(update, "scheduled_at", new_dt)
-        return JSONResponse({
-            "status": "rescheduled",
-            "message": f"Step rescheduled to {new_dt.isoformat()}",
-        })
-
-    @router.get("/agents/{slug}/workbench/console", response_class=HTMLResponse)
-    async def workbench_console(request: Request, slug: str) -> Response:
-        """HTMX partial — returns recent console log entries."""
-        try:
-            last_index = int(request.query_params.get("last_index", 0))
-        except (ValueError, TypeError):
-            last_index = 0
-
-        buf = list(_workbench_log_buffer)
-        entries_to_send = buf[last_index:]
-
-        return templates.TemplateResponse(
-            request,
-            "workbench_console.html",
-            {
-                "request": request,
-                "entries": entries_to_send,
-                "next_index": len(buf),
-                "agent_slug": slug,
-            },
-        )
-
-    @router.get("/agents/{slug}/workbench/jobs", response_class=HTMLResponse)
-    async def workbench_jobs_list(request: Request, slug: str) -> Response:
-        """HTMX partial — returns job history list."""
-        agent = get_agent_by_slug(request, slug)
-        agent_jobs = Jobs().get_agent_jobs(agent.name)
-
-        # Sort by created_at descending (most recent first)
-        jobs_list = sorted(
-            agent_jobs.values(),
-            key=lambda j: getattr(j, "created_at", None) or datetime.min,
-            reverse=True,
-        )
-
-        return templates.TemplateResponse(
-            request,
-            "workbench_jobs_list.html",
-            {
-                "request": request,
-                "agent_slug": slug,
-                "jobs": jobs_list,
-            },
-        )
-
-    return router
+                if data == "ping":
+                    await websocket.send_text("pong")
+            except TimeoutError:
+                pass
+    except WebSocketDisconnect:
+        pass
 
 
 def create_workbench_ws_routes() -> APIRouter:
     """Create WebSocket routes for workbench (no auth dependency — WS can't use APIKeyHeader)."""
     ws_router = APIRouter(tags=["workbench-ws"])
-
-    @ws_router.websocket("/agents/{slug}/workbench/jobs/{job_id}/ws")
-    async def workbench_job_ws(websocket: WebSocket, slug: str, job_id: str) -> None:
-        """WebSocket that pushes typed refresh signals when state changes.
-
-        Sends: "monitor" (job/case state changed), "console" (new log entries),
-               "jobs" (job list changed). Client fetches the relevant partial.
-        """
-        await websocket.accept()
-        last_monitor_hash = ""
-        last_log_version = _workbench_log_version
-        last_jobs_count = -1
-        # Cache agent outside the loop — it doesn't change during a WS session
-        try:
-            agent = get_agent_by_slug(websocket, slug)
-        except Exception:
-            await websocket.close()
-            return
-        try:
-            while True:
-                try:
-                    job = Jobs().get_job(job_id, agent_name=agent.name)
-                except Exception:
-                    job = None
-
-                if not job:
-                    await websocket.send_text("monitor")
-                    break
-
-                # Monitor: job/case state changes
-                current_hash = _compute_job_state_hash(job)
-                if current_hash != last_monitor_hash:
-                    last_monitor_hash = current_hash
-                    await websocket.send_text("monitor")
-
-                # Console: only meaningful log entries (filtered, no admin HTTP noise)
-                if _workbench_log_version != last_log_version:
-                    last_log_version = _workbench_log_version
-                    await websocket.send_text("console")
-
-                # Jobs: job count changed
-                agent_jobs = Jobs().get_agent_jobs(agent.name)
-                if len(agent_jobs) != last_jobs_count:
-                    last_jobs_count = len(agent_jobs)
-                    await websocket.send_text("jobs")
-
-                is_terminal = job.status.value in (
-                    "completed",
-                    "failed",
-                    "stopped",
-                    "cancelled",
-                )
-                if is_terminal:
-                    await websocket.send_text("console")
-                    await websocket.send_text("jobs")
-                    await websocket.send_text("terminal")
-                    # Keep connection open but idle — prevents client reconnect loop
-                    try:
-                        while True:
-                            await asyncio.wait_for(websocket.receive_text(), timeout=60)
-                    except (TimeoutError, WebSocketDisconnect):
-                        pass
-                    break
-
-                try:
-                    data = await asyncio.wait_for(
-                        websocket.receive_text(),
-                        timeout=2.0,
-                    )
-                    if data == "ping":
-                        await websocket.send_text("pong")
-                except TimeoutError:
-                    pass
-        except WebSocketDisconnect:
-            pass
-
+    ws_router.add_api_websocket_route(
+        "/agents/{slug}/workbench/jobs/{job_id}/ws", workbench_job_ws
+    )
     return ws_router
