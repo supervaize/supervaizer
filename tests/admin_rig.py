@@ -20,7 +20,9 @@ from supervaizer.storage import StorageManager
 class Page:
     """What one endpoint call produced: the HTTP response and the template input."""
 
-    def __init__(self, response: Any, template: str | None, context: dict[str, Any]):
+    def __init__(
+        self, response: Any, template: str | None, context: dict[str, Any]
+    ) -> None:
         self.response = response
         self.template = template
         self.context = context
