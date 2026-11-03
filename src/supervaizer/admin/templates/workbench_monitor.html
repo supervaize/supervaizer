@@ -169,7 +169,7 @@
                         </div>
                     </div>
                     {# Scheduled step controls #}
-                    {% set is_sched = step.scheduled_at is not none if step.scheduled_at is defined else false %}
+                    {% set is_sched = step.scheduled_at is defined and step.scheduled_at is not none %}
                     {% if is_sched %}
                     <div class="ml-8 mt-1 flex items-center gap-2 text-xs">
                         {% set sched_status = step.scheduled_status if step.scheduled_status is defined else "pending" %}
