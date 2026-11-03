@@ -152,47 +152,61 @@ def _compute_job_state_hash(job: "Job") -> str:
     return hashlib.md5(raw.encode()).hexdigest()
 
 
+def _parameter_rows(agent: Agent) -> list[dict[str, Any]]:
+    """The agent's parameters with the value to pre-fill and where it came from."""
+    if not agent.parameters_setup:
+        return []
+    env_values = get_agent_parameters_from_env(agent)
+    return [
+        {
+            "name": param.name,
+            "description": param.description,
+            "is_required": param.is_required,
+            "is_secret": param.is_secret,
+            "value": env_values.get(name, {}).get("value", ""),
+            "from_env": env_values.get(name, {}).get("from_env", False),
+        }
+        for name, param in agent.parameters_setup.definitions.items()
+    ]
+
+
+def _job_field_rows(agent: Agent) -> list[dict[str, Any]]:
+    """The input fields of the agent's job_start method, as the form needs them."""
+    if not (
+        agent.methods and agent.methods.job_start and agent.methods.job_start.fields
+    ):
+        return []
+    return [
+        {
+            "name": field.name,
+            "field_type": field.field_type.value
+            if hasattr(field.field_type, "value")
+            else str(field.field_type),
+            "description": field.description,
+            "choices": field.choices,
+            "default": field.default,
+            "required": field.required,
+            "widget": field.widget,
+        }
+        for field in agent.methods.job_start.fields
+    ]
+
+
+def _active_job(agent: Agent) -> Job | None:
+    """The first job of the agent that is still in progress."""
+    return next(
+        (
+            job
+            for job in Jobs().get_agent_jobs(agent.name).values()
+            if job.status == EntityStatus.IN_PROGRESS
+        ),
+        None,
+    )
+
+
 async def workbench_page(request: Request, slug: str) -> Response:
     """Render the main workbench page."""
     agent = get_agent_by_slug(request, slug)
-
-    # Gather agent info for the template
-    parameters = []
-    if agent.parameters_setup:
-        env_values = get_agent_parameters_from_env(agent)
-        for name, param in agent.parameters_setup.definitions.items():
-            env_info = env_values.get(name, {})
-            parameters.append({
-                "name": param.name,
-                "description": param.description,
-                "is_required": param.is_required,
-                "is_secret": param.is_secret,
-                "value": env_info.get("value", ""),
-                "from_env": env_info.get("from_env", False),
-            })
-
-    job_fields = []
-    if agent.methods and agent.methods.job_start and agent.methods.job_start.fields:
-        for field in agent.methods.job_start.fields:
-            job_fields.append({
-                "name": field.name,
-                "field_type": field.field_type.value
-                if hasattr(field.field_type, "value")
-                else str(field.field_type),
-                "description": field.description,
-                "choices": field.choices,
-                "default": field.default,
-                "required": field.required,
-                "widget": field.widget,
-            })
-
-    # Check for active job
-    active_job = None
-    agent_jobs = Jobs().get_agent_jobs(agent.name)
-    for job in agent_jobs.values():
-        if job.status == EntityStatus.IN_PROGRESS:
-            active_job = job
-            break
 
     return templates.TemplateResponse(
         request,
@@ -201,9 +215,9 @@ async def workbench_page(request: Request, slug: str) -> Response:
             "request": request,
             "agent": agent,
             "agent_slug": slug,
-            "parameters": parameters,
-            "job_fields": job_fields,
-            "active_job": active_job,
+            "parameters": _parameter_rows(agent),
+            "job_fields": _job_field_rows(agent),
+            "active_job": _active_job(agent),
             "api_version": API_VERSION,
             "local_mode": _is_workbench_local_mode(request),
             "has_human_answer": agent.methods
@@ -214,6 +228,61 @@ async def workbench_page(request: Request, slug: str) -> Response:
             ],
         },
     )
+
+
+async def _execute_in_thread(agent: Agent, method: str, params: dict[str, Any]) -> Any:
+    """Run an agent method in a worker thread so the event loop stays free."""
+    return await asyncio.get_running_loop().run_in_executor(
+        None, lambda: agent._execute(method, params)
+    )
+
+
+def _resolve_parameters(agent: Agent, submitted: dict[str, Any]) -> dict[str, Any]:
+    """Typed values win; empty ones fall back to the environment, then the default.
+
+    Typed values for names the agent does not declare are kept.
+    """
+    resolved: dict[str, Any] = {}
+    if agent.parameters_setup:
+        env_values = get_agent_parameters_from_env(agent)
+        for name in agent.parameters_setup.definitions:
+            value = submitted.get(name, "") or env_values.get(name, {}).get("value", "")
+            if value:
+                resolved[name] = value
+    resolved.update({k: v for k, v in submitted.items() if v and k not in resolved})
+    return resolved
+
+
+def _store_parameters(agent: Agent, resolved: dict[str, Any]) -> None:
+    """Set the resolved values on the agent's declared parameters."""
+    if agent.parameters_setup:
+        for name, definition in agent.parameters_setup.definitions.items():
+            if name in resolved:
+                definition.set_value(resolved[name])
+
+
+async def _run_job(job: Job, agent: Agent, method: str, params: dict[str, Any]) -> None:
+    """Execute the job's start method and record the outcome on the job."""
+    try:
+        job.add_response(
+            JobResponse(
+                job_id=job.id,
+                status=EntityStatus.IN_PROGRESS,
+                message="Starting job execution",
+                payload=None,
+            )
+        )
+        job.add_response(await _execute_in_thread(agent, method, params))
+    except Exception as e:
+        log.error(f"[Workbench] Job {job.id} failed: {e}")
+        job.add_response(
+            JobResponse(
+                job_id=job.id,
+                status=EntityStatus.FAILED,
+                message=f"Job failed: {e!s}",
+                error=e,
+            )
+        )
 
 
 async def workbench_start_job(request: Request, slug: str) -> Response:
@@ -227,24 +296,13 @@ async def workbench_start_job(request: Request, slug: str) -> Response:
         )
 
     body = await request.json()
-    parameters = body.get("parameters", {})
-    fields = body.get("fields", {})
-
+    resolved = _resolve_parameters(agent, body.get("parameters", {}))
     # Set parameters via os.environ (matching agent convention).
-    # Fall back to env values for empty fields (local mode pre-fill).
-    if agent.parameters_setup:
-        env_values = get_agent_parameters_from_env(agent)
-        for name in agent.parameters_setup.definitions:
-            value = parameters.get(name, "")
-            if not value:
-                env_info = env_values.get(name, {})
-                value = env_info.get("value", "")
-            if value:
-                agent.parameters_setup.definitions[name].set_value(value)
+    _store_parameters(agent, resolved)
+    agent_params_list = [{"name": k, "value": v} for k, v in resolved.items()] or None
 
-    # Create job context and job (Job.__init__ auto-registers in Jobs() singleton)
+    # Job.__init__ auto-registers the job in the Jobs() singleton
     job_id = shortuuid.uuid()
-
     context = JobContext(
         workspace_id="workbench",
         job_id=job_id,
@@ -253,28 +311,6 @@ async def workbench_start_job(request: Request, slug: str) -> Response:
         mission_id="local",
         mission_name="Workbench Test",
     )
-
-    # Build agent_parameters as list of dicts (matching AbstractJob.agent_parameters type)
-    # Merge submitted values with env fallbacks
-    merged_params = {}
-    if agent.parameters_setup:
-        for name in agent.parameters_setup.definitions:
-            value = parameters.get(name, "")
-            if not value:
-                env_info = env_values.get(name, {})
-                value = env_info.get("value", "")
-            if value:
-                merged_params[name] = value
-    # Also include any extra params not in definitions
-    for k, v in parameters.items():
-        if v and k not in merged_params:
-            merged_params[k] = v
-    agent_params_list = (
-        [{"name": k, "value": v} for k, v in merged_params.items()]
-        if merged_params
-        else None
-    )
-
     job = Job(
         id=job_id,
         name="Workbench Test",
@@ -285,43 +321,13 @@ async def workbench_start_job(request: Request, slug: str) -> Response:
     )
 
     # Execute job_start directly, bypassing agent.job_start() which sends Studio events
-    action_method = agent.methods.job_start.method
-    method_params = agent.methods.job_start.params or {}
-    params = method_params | {
-        "fields": fields,
+    job_start = agent.methods.job_start
+    params = (job_start.params or {}) | {
+        "fields": body.get("fields", {}),
         "context": context,
         "agent_parameters": agent_params_list or [],
     }
-
-    # Run in background thread to not block the response
-    loop = asyncio.get_running_loop()
-
-    async def run_job() -> None:
-        try:
-            job.add_response(
-                JobResponse(
-                    job_id=job.id,
-                    status=EntityStatus.IN_PROGRESS,
-                    message="Starting job execution",
-                    payload=None,
-                )
-            )
-            result = await loop.run_in_executor(
-                None, lambda: agent._execute(action_method, params)
-            )
-            job.add_response(result)
-        except Exception as e:
-            log.error(f"[Workbench] Job {job.id} failed: {e}")
-            job.add_response(
-                JobResponse(
-                    job_id=job.id,
-                    status=EntityStatus.FAILED,
-                    message=f"Job failed: {e!s}",
-                    error=e,
-                )
-            )
-
-    asyncio.create_task(run_job())
+    asyncio.create_task(_run_job(job, agent, job_start.method, params))
 
     return JSONResponse({
         "id": job.id,
@@ -384,8 +390,6 @@ async def workbench_stop_job(request: Request, slug: str, job_id: str) -> Respon
     if not agent.methods or not agent.methods.job_stop:
         raise HTTPException(status_code=400, detail="Agent has no job_stop method")
 
-    job_stop_method = agent.methods.job_stop.method
-
     # Update job status in registry so the running loop can detect it
     job = Jobs().get_job(job_id, agent_name=agent.name)
     if job:
@@ -398,10 +402,8 @@ async def workbench_stop_job(request: Request, slug: str, job_id: str) -> Respon
         )
 
     try:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: agent._execute(job_stop_method, {"job_id": job_id}),
+        result = await _execute_in_thread(
+            agent, agent.methods.job_stop.method, {"job_id": job_id}
         )
         return JSONResponse({"status": "stopped", "message": str(result.message)})
     except Exception as e:
@@ -422,12 +424,9 @@ async def workbench_job_status(request: Request, slug: str, job_id: str) -> Resp
             "status": job.status.value,
         })
 
-    job_status_method = agent.methods.job_status.method
     try:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: agent._execute(job_status_method, {"job_id": job_id}),
+        result = await _execute_in_thread(
+            agent, agent.methods.job_status.method, {"job_id": job_id}
         )
         return JSONResponse({
             "status": result.status.value,
@@ -437,71 +436,69 @@ async def workbench_job_status(request: Request, slug: str, job_id: str) -> Resp
         raise HTTPException(status_code=500, detail=f"Failed to get status: {e}")
 
 
+def _hitl_label(case: Case) -> str:
+    """The name of the newest step that asked a human for input."""
+    for update in reversed(case.updates):
+        payload = update.payload
+        if payload and (
+            "supervaizer_form" in payload or "supervaizer_dialog" in payload
+        ):
+            return update.name or "User response"
+    return "User response"
+
+
+async def _run_human_answer(
+    agent: Agent, method: str, answer: Any, job_id: str, case_id: str
+) -> JSONResponse | None:
+    """Hand the answer to the agent's human_answer method; a 500 response if it fails."""
+    params = {
+        "fields": answer,
+        "context": {"job_id": job_id, "case_id": case_id},
+        "payload": answer,
+        "case_id": case_id,
+        "job_id": job_id,
+    }
+    try:
+        await _execute_in_thread(agent, method, params)
+    except Exception as e:
+        log.error(f"[Workbench] human_answer failed for case {case_id}: {e}")
+        return JSONResponse(
+            {"status": "error", "message": f"human_answer failed: {e}"},
+            status_code=500,
+        )
+    return None
+
+
 async def workbench_answer_hitl(
     request: Request, slug: str, job_id: str, case_id: str
 ) -> Response:
     """Submit HITL answer — two-step dispatch (receive + invoke human_answer)."""
     agent = get_agent_by_slug(request, slug)
+    answer_data = (await request.json()).get("answer", {})
 
-    body = await request.json()
-    answer_data = body.get("answer", {})
-
-    # Find the case
-    case = Cases().get_case(case_id, job_id=job_id)
-
-    if not case:
-        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
+    case = _find_case(job_id, case_id)
     if case.status != EntityStatus.AWAITING:
         raise HTTPException(
             status_code=409,
             detail=f"Case '{case_id}' is not awaiting input (current status: {case.status})",
         )
 
-    # Derive a human-readable label from the HITL step that prompted this answer
-    hitl_label = "User response"
-    for prev_update in reversed(case.updates):
-        if hasattr(prev_update, "payload") and prev_update.payload:
-            p = prev_update.payload
-            if isinstance(p, dict) and (
-                "supervaizer_form" in p or "supervaizer_dialog" in p
-            ):
-                hitl_label = prev_update.name or hitl_label
-                break
-
     # Step 1: Transition case state AWAITING -> IN_PROGRESS
-    answer_with_label = (
-        dict(answer_data) if isinstance(answer_data, dict) else answer_data
+    payload = (
+        {**answer_data, "_hitl_label": _hitl_label(case)}
+        if isinstance(answer_data, dict)
+        else answer_data
     )
-    if isinstance(answer_with_label, dict):
-        answer_with_label["_hitl_label"] = hitl_label
-    update = CaseNodeUpdate(name="HITL Answer", payload=answer_with_label)
-    await case.receive_human_input(update)
+    await case.receive_human_input(CaseNodeUpdate(name="HITL Answer", payload=payload))
 
     # Step 2: Invoke agent's human_answer method if defined
-    if agent.methods:
-        human_answer_def = getattr(agent.methods, "human_answer", None)
-        if human_answer_def is not None:
-            human_answer_method = human_answer_def.method
-            try:
-                params = {
-                    "fields": answer_data,
-                    "context": {"job_id": job_id, "case_id": case_id},
-                    "payload": answer_data,
-                    "case_id": case_id,
-                    "job_id": job_id,
-                }
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None,
-                    lambda: agent._execute(human_answer_method, params),
-                )
-            except Exception as e:
-                log.error(f"[Workbench] human_answer failed for case {case_id}: {e}")
-                return JSONResponse(
-                    {"status": "error", "message": f"human_answer failed: {e}"},
-                    status_code=500,
-                )
+    human_answer = agent.methods.human_answer if agent.methods else None
+    if human_answer is not None:
+        failure = await _run_human_answer(
+            agent, human_answer.method, answer_data, job_id, case_id
+        )
+        if failure:
+            return failure
 
     return JSONResponse({
         "status": "answered",
