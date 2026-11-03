@@ -302,6 +302,19 @@ def _validate_claims_against_request(
     expected_server_id: str,
 ) -> None:
     now = int(time.time())
+    _validate_claim_times(claims, leeway_seconds, now)
+    _validate_claim_server_id(claims, expected_server_id)
+    agent = _get_agent_by_slug(server, agent_slug)
+    _validate_claim_agent(claims, agent_slug, agent)
+    _validate_claim_workspace(claims, request_workspace)
+    _validate_claim_scopes(claims, required_scopes)
+
+
+def _validate_claim_times(
+    claims: WorkspaceAuthorizationClaims,
+    leeway_seconds: int,
+    now: int,
+) -> None:
     if claims.exp + leeway_seconds < now:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_expired",
@@ -312,12 +325,24 @@ def _validate_claims_against_request(
             "workspace_authorization_not_yet_valid",
             "Workspace authorization token was issued in the future",
         )
+
+
+def _validate_claim_server_id(
+    claims: WorkspaceAuthorizationClaims,
+    expected_server_id: str,
+) -> None:
     if claims.server_id != expected_server_id:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_wrong_server",
             "Workspace authorization token server_id does not match this server",
         )
-    agent = _get_agent_by_slug(server, agent_slug)
+
+
+def _validate_claim_agent(
+    claims: WorkspaceAuthorizationClaims,
+    agent_slug: str,
+    agent: Any,
+) -> None:
     if claims.agent_slug != agent_slug:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_wrong_agent",
@@ -328,6 +353,12 @@ def _validate_claims_against_request(
             "workspace_authorization_wrong_agent",
             "Workspace authorization token agent_id does not match the request",
         )
+
+
+def _validate_claim_workspace(
+    claims: WorkspaceAuthorizationClaims,
+    request_workspace: V2WorkspaceContext,
+) -> None:
     if claims.workspace_id != request_workspace.id:
         raise WorkspaceAuthorizationError(
             "workspace_authorization_wrong_workspace",
@@ -342,6 +373,12 @@ def _validate_claims_against_request(
             "workspace_authorization_wrong_workspace",
             "Workspace authorization token workspace_slug does not match the request",
         )
+
+
+def _validate_claim_scopes(
+    claims: WorkspaceAuthorizationClaims,
+    required_scopes: list[str],
+) -> None:
     missing_scopes = [
         scope for scope in required_scopes if scope not in set(claims.scopes)
     ]

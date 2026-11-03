@@ -12,18 +12,24 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Production Python refactors** (PR #163): Agent lifecycle, CLI startup, contracts, authentication, REST routes, deployment, and example jobs use smaller functions. Shared helpers replace repeated decisions. Characterization tests preserve existing payloads, errors, logs, and execution order. All scored production Python functions have CRAP below 10. The documentation generator remains exempt.
 - **`just ship-reconcile` takes no arguments** (PR #156) — The recipe only forwarded its own defaults, so the script's repo argument and `--timeout-seconds`/`--poll-seconds` parser are gone. Override with environment variables: `TIMEOUT_SECONDS` (default 1800), `POLL_SECONDS` (default 15), e.g. `TIMEOUT_SECONDS=7200 just ship-reconcile`. The script refuses any argument (exit 2), so a stale command cannot run against a repo it did not name; the repo is fixed to `supervaize/supervaizer`. Tooling only, no package change.
+- **Admin and workbench route factories split** (PR #163) — `create_admin_routes` (CRAP 1046) and `create_workbench_routes` (CRAP 1104) held every handler as a nested closure. Handlers are now `AdminHandlers` methods and module-level workbench functions, registered from route tables; the OpenAPI schema is unchanged. Shared helpers replace copied filter/sort/paginate, status-update, step-validation and error-to-500 code. `set_server_start_time`, `SERVER_START_TIME` and the `EntityFilter` model were unused and are removed. Internal module only, no public API change.
+
+### Fixed
+
+- **Workbench job monitor returned 500** (PR #163) — `workbench_monitor.html` used `x is not none if x is defined else false`, which Jinja 3.1 parses as a test argument, so `GET /manage/agents/<slug>/workbench/jobs/<job_id>` raised `TemplateSyntaxError` for every existing job. The condition is now `x is defined and x is not none`; a test compiles every admin template.
 
 ### Tests
 
-`just test`
+`uv run just test-cov -p no:sugar -q`
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 999   |
+| ✅ Passed  | 1559  |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
-| ⏱️ in      | 43s   |
+| ⏱️ in      | 127s  |
 
 ## [1.9.0] - 2026-10-29
 

@@ -10,8 +10,10 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from __future__ import annotations
 
 import base64
+import builtins
 import json
 import os
 import sys
@@ -141,7 +143,7 @@ class SvBaseModel(BaseModel):
 
 
 class ApiResult:
-    def __init__(self, message: str, detail: dict[str, Any] | None, code: str):
+    def __init__(self, message: str, detail: dict[str, Any] | None, code: str) -> None:
         self.message = message
         self.code = str(code)
         self.detail = detail
@@ -176,7 +178,7 @@ class ApiSuccess(ApiResult):
 
     def __init__(
         self, message: str, detail: dict[str, Any] | str | None, code: int = 200
-    ):
+    ) -> None:
         log_message = "✅ "
         if isinstance(detail, str):
             result = demjson3.decode(detail, return_errors=True)
@@ -217,7 +219,7 @@ class ApiError(ApiResult):
         exception: Exception | None = None,
         url: str = "",
         payload: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         super().__init__(message, detail, code)
         self.exception = exception
         self.url = url
@@ -227,49 +229,71 @@ class ApiError(ApiResult):
     @property
     def dict(self) -> dict[str, Any]:
         if self.exception:
-            exception_dict: dict[str, Any] = {
-                "type": type(self.exception).__name__,
-                "message": str(self.exception),
-                "traceback": traceback.format_exc(),
-                "attributes": {},
-            }
-            if (
-                response := hasattr(self.exception, "response")
-                and self.exception.response
-            ):
-                self.code = str(response.status_code) or ""
+            exception_dict = self._exception_dict()
 
-                try:
-                    response_text = self.exception.response.text
-                    exception_dict["response"] = json.loads(response_text)
-                except json.JSONDecodeError:
-                    pass
-            for attr in dir(self.exception):
-                try:
-                    if (
-                        not attr.startswith("__")
-                        and not callable(attribute := getattr(self.exception, attr))
-                        and getattr(self.exception, attr)
-                    ):
-                        try:
-                            exception_dict["attributes"][attr] = json.loads(
-                                str(attribute)
-                            )
-                        except json.JSONDecodeError:
-                            pass
-                except Exception:
-                    pass
+        result = self._result_dict()
+        if self.exception:
+            result["exception"] = exception_dict
+        return result
 
-        result: dict[str, Any] = {
+    def _exception_dict(self) -> builtins.dict[str, Any]:
+        """Serialize exception details while preserving API error side effects."""
+        exception = self.exception
+        assert exception is not None
+        exception_dict: builtins.dict[str, Any] = {
+            "type": type(exception).__name__,
+            "message": str(exception),
+            "traceback": traceback.format_exc(),
+            "attributes": {},
+        }
+        self._add_exception_response(exception, exception_dict)
+        self._add_exception_attributes(exception, exception_dict)
+        return exception_dict
+
+    def _add_exception_response(
+        self,
+        exception: Exception,
+        exception_dict: builtins.dict[str, Any],
+    ) -> None:
+        """Add a JSON response body and preserve its status-code override."""
+        exception_data = cast(Any, exception)
+        if response := hasattr(exception, "response") and exception_data.response:
+            self.code = str(response.status_code) or ""
+            try:
+                response_text = exception_data.response.text
+                exception_dict["response"] = json.loads(response_text)
+            except json.JSONDecodeError:
+                pass
+
+    def _add_exception_attributes(
+        self,
+        exception: Exception,
+        exception_dict: builtins.dict[str, Any],
+    ) -> None:
+        """Add non-empty, JSON-decodable exception attributes."""
+        for attr in dir(exception):
+            try:
+                if (
+                    not attr.startswith("__")
+                    and not callable(attribute := getattr(exception, attr))
+                    and getattr(exception, attr)
+                ):
+                    try:
+                        exception_dict["attributes"][attr] = json.loads(str(attribute))
+                    except json.JSONDecodeError:
+                        pass
+            except Exception:
+                pass
+
+    def _result_dict(self) -> builtins.dict[str, Any]:
+        """Build the non-exception portion of an API error payload."""
+        return {
             "message": self.message,
             "code": self.code,
             "url": self.url,
             "payload": self.payload,
             "detail": self.detail,
         }
-        if self.exception:
-            result["exception"] = exception_dict
-        return result
 
 
 def log_access_denied_tailscale(ip: str, path: str, reason: str) -> None:  # <-- ADDED

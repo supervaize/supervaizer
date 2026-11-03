@@ -103,6 +103,17 @@ def apply_workspace_authorization_handshake(
 def apply_workspace_authorization_agent_bindings(
     server: Any, agent_bindings: list[Any]
 ) -> None:
+    bindings_by_slug = _agent_bindings_by_slug(agent_bindings)
+    missing_agents = _apply_agent_bindings(server, bindings_by_slug)
+    if missing_agents:
+        raise RuntimeError(
+            "Studio registration handshake failed: workspace authorization did not "
+            f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
+        )
+
+
+def _agent_bindings_by_slug(agent_bindings: list[Any]) -> dict[str, str]:
+    """Validate Studio binding entries and map them by agent slug."""
     bindings_by_slug: dict[str, str] = {}
     for binding in agent_bindings:
         if not isinstance(binding, dict):
@@ -123,7 +134,11 @@ def apply_workspace_authorization_agent_bindings(
                 "binding is missing slug."
             )
         bindings_by_slug[agent_slug] = agent_id
+    return bindings_by_slug
 
+
+def _apply_agent_bindings(server: Any, bindings_by_slug: dict[str, str]) -> list[str]:
+    """Apply bindings in server order and report missing agent slugs."""
     missing_agents = []
     for agent in server.agents:
         studio_agent_id = bindings_by_slug.get(agent.slug)
@@ -136,9 +151,4 @@ def apply_workspace_authorization_agent_bindings(
                 f"id mismatch for slug={agent.slug}."
             )
         agent.server_agent_id = studio_agent_id
-
-    if missing_agents:
-        raise RuntimeError(
-            "Studio registration handshake failed: workspace authorization did not "
-            f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
-        )
+    return missing_agents

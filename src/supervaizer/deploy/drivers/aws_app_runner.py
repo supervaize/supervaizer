@@ -68,7 +68,7 @@ else:
 class AWSAppRunnerDriver(BaseDriver):
     """Driver for deploying to AWS App Runner."""
 
-    def __init__(self, region: str, project_id: str | None = None):
+    def __init__(self, region: str, project_id: str | None = None) -> None:
         """Initialize AWS App Runner driver."""
         if not AWS_AVAILABLE:
             raise ImportError(
@@ -97,97 +97,12 @@ class AWSAppRunnerDriver(BaseDriver):
     ) -> DeploymentPlan:
         """Plan deployment changes without applying them."""
         full_service_name = self.get_service_key(service_name, environment)
-
-        actions = []
-        current_image = None
-        current_url = None
-        current_status = None
-
-        # Check if service exists
-        try:
-            response = self.apprunner_client.describe_service(
-                ServiceArn=f"arn:aws:apprunner:{self.region}:{self._get_account_id()}:service/{full_service_name}"
-            )
-            service = response["Service"]
-            current_image = service["ServiceUrl"]
-            current_url = service["ServiceUrl"]
-            current_status = service["Status"]
-
-            # Check if update is needed
-            # Note: App Runner doesn't easily expose the current image, so we'll assume update is needed
-            actions.append(
-                ResourceAction(
-                    resource_type=ResourceType.SERVICE,
-                    action_type=ActionType.UPDATE,
-                    resource_name=full_service_name,
-                    description=f"Update App Runner service with image {image_tag}",
-                )
-            )
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                # Service doesn't exist, need to create
-                actions.append(
-                    ResourceAction(
-                        resource_type=ResourceType.SERVICE,
-                        action_type=ActionType.CREATE,
-                        resource_name=full_service_name,
-                        description=f"Create new App Runner service with image {image_tag}",
-                    )
-                )
-            else:
-                raise
-
-        # Check ECR repository
-        repo_name = f"{service_name}-{environment}"
-        try:
-            self.ecr_client.describe_repositories(repositoryNames=[repo_name])
-            actions.append(
-                ResourceAction(
-                    resource_type=ResourceType.REGISTRY,
-                    action_type=ActionType.NOOP,
-                    resource_name=repo_name,
-                    description="ECR repository exists",
-                )
-            )
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "RepositoryNotFoundException":
-                actions.append(
-                    ResourceAction(
-                        resource_type=ResourceType.REGISTRY,
-                        action_type=ActionType.CREATE,
-                        resource_name=repo_name,
-                        description=f"Create ECR repository {repo_name}",
-                    )
-                )
-            else:
-                raise
-
-        # Check secrets
-        if secrets:
-            for env_var in secrets:
-                secret_name = self.get_secret_name(full_service_name, env_var)
-                try:
-                    self.secrets_client.describe_secret(SecretId=secret_name)
-                    actions.append(
-                        ResourceAction(
-                            resource_type=ResourceType.SECRET,
-                            action_type=ActionType.UPDATE,
-                            resource_name=secret_name,
-                            description=f"Update secret {secret_name}",
-                        )
-                    )
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                        actions.append(
-                            ResourceAction(
-                                resource_type=ResourceType.SECRET,
-                                action_type=ActionType.CREATE,
-                                resource_name=secret_name,
-                                description=f"Create secret {secret_name}",
-                            )
-                        )
-                    else:
-                        raise
+        current_image, current_url, current_status, service_action = self._plan_service(
+            full_service_name, image_tag
+        )
+        registry_action = self._plan_registry(service_name, environment)
+        secret_actions = self._plan_secrets(full_service_name, secrets or {})
+        actions = [service_action, registry_action, *secret_actions]
 
         return DeploymentPlan(
             platform="aws-app-runner",
@@ -204,6 +119,89 @@ class AWSAppRunnerDriver(BaseDriver):
             target_env_vars=env_vars or {},
             target_secrets=secrets or {},
         )
+
+    def _plan_service(
+        self, service_name: str, image_tag: str
+    ) -> tuple[str | None, str | None, str | None, ResourceAction]:
+        """Return current App Runner state and the required service action."""
+        try:
+            response = self.apprunner_client.describe_service(
+                ServiceArn=f"arn:aws:apprunner:{self.region}:{self._get_account_id()}:service/{service_name}"
+            )
+            service = response["Service"]
+            service_url = service["ServiceUrl"]
+            return (
+                service_url,
+                service_url,
+                service["Status"],
+                ResourceAction(
+                    resource_type=ResourceType.SERVICE,
+                    action_type=ActionType.UPDATE,
+                    resource_name=service_name,
+                    description=f"Update App Runner service with image {image_tag}",
+                ),
+            )
+        except ClientError as error:
+            if error.response["Error"]["Code"] != "ResourceNotFoundException":
+                raise
+            return (
+                None,
+                None,
+                None,
+                ResourceAction(
+                    resource_type=ResourceType.SERVICE,
+                    action_type=ActionType.CREATE,
+                    resource_name=service_name,
+                    description=f"Create new App Runner service with image {image_tag}",
+                ),
+            )
+
+    def _plan_registry(self, service_name: str, environment: str) -> ResourceAction:
+        """Return the required ECR repository action."""
+        repository_name = f"{service_name}-{environment}"
+        try:
+            self.ecr_client.describe_repositories(repositoryNames=[repository_name])
+            return ResourceAction(
+                resource_type=ResourceType.REGISTRY,
+                action_type=ActionType.NOOP,
+                resource_name=repository_name,
+                description="ECR repository exists",
+            )
+        except ClientError as error:
+            if error.response["Error"]["Code"] != "RepositoryNotFoundException":
+                raise
+            return ResourceAction(
+                resource_type=ResourceType.REGISTRY,
+                action_type=ActionType.CREATE,
+                resource_name=repository_name,
+                description=f"Create ECR repository {repository_name}",
+            )
+
+    def _plan_secrets(
+        self, service_name: str, secrets: dict[str, str]
+    ) -> list[ResourceAction]:
+        """Return the required secret actions for the service."""
+        actions: list[ResourceAction] = []
+        for env_var in secrets:
+            secret_name = self.get_secret_name(service_name, env_var)
+            try:
+                self.secrets_client.describe_secret(SecretId=secret_name)
+                action_type = ActionType.UPDATE
+                description = f"Update secret {secret_name}"
+            except ClientError as error:
+                if error.response["Error"]["Code"] != "ResourceNotFoundException":
+                    raise
+                action_type = ActionType.CREATE
+                description = f"Create secret {secret_name}"
+            actions.append(
+                ResourceAction(
+                    resource_type=ResourceType.SECRET,
+                    action_type=action_type,
+                    resource_name=secret_name,
+                    description=description,
+                )
+            )
+        return actions
 
     def deploy_service(
         self,
