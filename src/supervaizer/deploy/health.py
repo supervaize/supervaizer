@@ -77,7 +77,7 @@ class HealthCheckConfig:
 class HealthVerifier:
     """Enhanced health verification with retry logic and exponential backoff."""
 
-    def __init__(self, config: HealthCheckConfig | None = None):
+    def __init__(self, config: HealthCheckConfig | None = None) -> None:
         """Initialize the health verifier with configuration."""
         self.config = config or HealthCheckConfig()
 
@@ -98,75 +98,11 @@ class HealthVerifier:
         Returns:
             HealthCheckResult with detailed status information
         """
-        config = config or self.config
-        headers = {}
-        if api_key:
-            headers["X-API-Key"] = api_key
-
-        last_error = None
-        successful_checks = 0
-        total_attempts = 0
-
-        for attempt in range(config.max_retries):
-            total_attempts += 1
-            start_time = time.time()
-
-            try:
-                # Check all configured endpoints
-                if not config.endpoints:
-                    last_error = "No endpoints configured"
-                    continue
-                all_healthy = True
-                for endpoint in config.endpoints:
-                    endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
-
-                    with httpx.Client(timeout=config.timeout) as client:
-                        response = client.get(endpoint_url, headers=headers)
-
-                        if response.status_code != 200:
-                            all_healthy = False
-                            last_error = (
-                                f"Endpoint {endpoint} returned {response.status_code}"
-                            )
-                            break
-
-                if all_healthy:
-                    successful_checks += 1
-                    if successful_checks >= config.success_threshold:
-                        response_time = time.time() - start_time
-                        return HealthCheckResult(
-                            status=HealthStatus.HEALTHY,
-                            response_time=response_time,
-                            status_code=200,
-                            endpoint=config.endpoints[0] if config.endpoints else None,
-                        )
-                else:
-                    last_error = last_error or "One or more endpoints failed"
-
-            except httpx.TimeoutException:
-                last_error = f"Request timeout after {config.timeout}s"
-            except httpx.RequestError as e:
-                last_error = f"Request error: {e!s}"
-            except Exception as e:
-                last_error = f"Unexpected error: {e!s}"
-
-            # Calculate delay for next attempt
-            if attempt < config.max_retries - 1:
-                delay = min(
-                    config.base_delay * (config.backoff_multiplier**attempt),
-                    config.max_delay,
-                )
-                log.debug(
-                    f"Health check attempt {attempt + 1} failed, retrying in {delay:.1f}s"
-                )
-                time.sleep(delay)
-
-        # All attempts failed
-        return HealthCheckResult(
-            status=HealthStatus.UNHEALTHY,
-            response_time=0.0,
-            error_message=last_error,
-            endpoint=config.endpoints[0] if config.endpoints else None,
+        active_config = config or self.config
+        return self._verify_health_sync(
+            service_url,
+            self._get_headers(api_key),
+            active_config,
         )
 
     def verify_health_async(
@@ -195,70 +131,180 @@ class HealthVerifier:
         config: HealthCheckConfig | None = None,
     ) -> HealthCheckResult:
         """Internal async health verification implementation."""
-        config = config or self.config
-        headers = {}
-        if api_key:
-            headers["X-API-Key"] = api_key
+        active_config = config or self.config
+        headers = self._get_headers(api_key)
+        async with httpx.AsyncClient(timeout=active_config.timeout) as client:
+            return await self._verify_health_async_with_client(
+                service_url,
+                headers,
+                active_config,
+                client,
+            )
 
-        last_error = None
+    def _verify_health_sync(
+        self,
+        service_url: str,
+        headers: dict[str, str],
+        config: HealthCheckConfig,
+    ) -> HealthCheckResult:
+        """Run synchronous health-check attempts with a new client per endpoint."""
+        last_error: str | None = None
         successful_checks = 0
 
-        async with httpx.AsyncClient(timeout=config.timeout) as client:
-            for attempt in range(config.max_retries):
-                start_time = time.time()
+        for attempt in range(config.max_retries):
+            start_time = time.time()
+            try:
+                if not config.endpoints:
+                    last_error = "No endpoints configured"
+                    continue
 
-                try:
-                    # Check all configured endpoints
-                    if not config.endpoints:
-                        last_error = "No endpoints configured"
-                        continue
-                    all_healthy = True
-                    for endpoint in config.endpoints:
-                        endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
+                healthy, error = self._verify_health_sync_endpoints(
+                    service_url,
+                    headers,
+                    config.endpoints,
+                    config.timeout,
+                )
+                if healthy:
+                    successful_checks += 1
+                    if successful_checks >= config.success_threshold:
+                        return self._healthy_result(start_time, config)
+                else:
+                    last_error = error or "One or more endpoints failed"
+            except Exception as error:
+                last_error = self._request_error(error, config)
 
-                        response = await client.get(endpoint_url, headers=headers)
+            if attempt < config.max_retries - 1:
+                self._sleep_before_retry(attempt, config)
 
-                        if response.status_code != 200:
-                            all_healthy = False
-                            last_error = (
-                                f"Endpoint {endpoint} returned {response.status_code}"
-                            )
-                            break
+        return self._unhealthy_result(config, last_error)
 
-                    if all_healthy:
-                        successful_checks += 1
-                        if successful_checks >= config.success_threshold:
-                            response_time = time.time() - start_time
-                            return HealthCheckResult(
-                                status=HealthStatus.HEALTHY,
-                                response_time=response_time,
-                                status_code=200,
-                                endpoint=config.endpoints[0]
-                                if config.endpoints
-                                else None,
-                            )
-                    else:
-                        last_error = last_error or "One or more endpoints failed"
+    def _verify_health_sync_endpoints(
+        self,
+        service_url: str,
+        headers: dict[str, str],
+        endpoints: list[str],
+        timeout: int,
+    ) -> tuple[bool, str | None]:
+        """Check synchronous endpoints and keep their client lifetime unchanged."""
+        for endpoint in endpoints:
+            endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
+            with httpx.Client(timeout=timeout) as client:
+                response = client.get(endpoint_url, headers=headers)
+                if response.status_code != 200:
+                    return False, f"Endpoint {endpoint} returned {response.status_code}"
 
-                except httpx.TimeoutException:
-                    last_error = f"Request timeout after {config.timeout}s"
-                except httpx.RequestError as e:
-                    last_error = f"Request error: {e!s}"
-                except Exception as e:
-                    last_error = f"Unexpected error: {e!s}"
+        return True, None
 
-                # Calculate delay for next attempt
-                if attempt < config.max_retries - 1:
-                    delay = min(
-                        config.base_delay * (config.backoff_multiplier**attempt),
-                        config.max_delay,
-                    )
-                    log.debug(
-                        f"Health check attempt {attempt + 1} failed, retrying in {delay:.1f}s"
-                    )
-                    await asyncio.sleep(delay)
+    async def _verify_health_async_with_client(
+        self,
+        service_url: str,
+        headers: dict[str, str],
+        config: HealthCheckConfig,
+        client: httpx.AsyncClient,
+    ) -> HealthCheckResult:
+        """Run asynchronous health-check attempts with one shared client."""
+        last_error: str | None = None
+        successful_checks = 0
 
-        # All attempts failed
+        for attempt in range(config.max_retries):
+            start_time = time.time()
+            try:
+                if not config.endpoints:
+                    last_error = "No endpoints configured"
+                    continue
+
+                healthy, error = await self._verify_health_async_endpoints(
+                    service_url,
+                    headers,
+                    config.endpoints,
+                    client,
+                )
+                if healthy:
+                    successful_checks += 1
+                    if successful_checks >= config.success_threshold:
+                        return self._healthy_result(start_time, config)
+                else:
+                    last_error = error or "One or more endpoints failed"
+            except Exception as error:
+                last_error = self._request_error(error, config)
+
+            if attempt < config.max_retries - 1:
+                delay = self._retry_delay(attempt, config)
+                self._log_retry(attempt, delay)
+                await asyncio.sleep(delay)
+
+        return self._unhealthy_result(config, last_error)
+
+    async def _verify_health_async_endpoints(
+        self,
+        service_url: str,
+        headers: dict[str, str],
+        endpoints: list[str],
+        client: httpx.AsyncClient,
+    ) -> tuple[bool, str | None]:
+        """Check asynchronous endpoints with the supplied client."""
+        for endpoint in endpoints:
+            endpoint_url = f"{service_url.rstrip('/')}{endpoint}"
+            response = await client.get(endpoint_url, headers=headers)
+            if response.status_code != 200:
+                return False, f"Endpoint {endpoint} returned {response.status_code}"
+
+        return True, None
+
+    @staticmethod
+    def _get_headers(api_key: str | None) -> dict[str, str]:
+        """Build request headers for an optional API key."""
+        return {"X-API-Key": api_key} if api_key else {}
+
+    @staticmethod
+    def _request_error(error: Exception, config: HealthCheckConfig) -> str:
+        """Convert request failures to the established result text."""
+        if isinstance(error, httpx.TimeoutException):
+            return f"Request timeout after {config.timeout}s"
+        if isinstance(error, httpx.RequestError):
+            return f"Request error: {error!s}"
+        return f"Unexpected error: {error!s}"
+
+    @staticmethod
+    def _retry_delay(attempt: int, config: HealthCheckConfig) -> float:
+        """Calculate the capped retry delay for an attempt."""
+        return min(
+            config.base_delay * (config.backoff_multiplier**attempt),
+            config.max_delay,
+        )
+
+    def _sleep_before_retry(self, attempt: int, config: HealthCheckConfig) -> None:
+        """Log and sleep before the next synchronous attempt."""
+        delay = self._retry_delay(attempt, config)
+        self._log_retry(attempt, delay)
+        time.sleep(delay)
+
+    @staticmethod
+    def _log_retry(attempt: int, delay: float) -> None:
+        """Log the established retry message."""
+        log.debug(
+            f"Health check attempt {attempt + 1} failed, retrying in {delay:.1f}s"
+        )
+
+    @staticmethod
+    def _healthy_result(
+        start_time: float,
+        config: HealthCheckConfig,
+    ) -> HealthCheckResult:
+        """Build the established successful health-check result."""
+        return HealthCheckResult(
+            status=HealthStatus.HEALTHY,
+            response_time=time.time() - start_time,
+            status_code=200,
+            endpoint=config.endpoints[0] if config.endpoints else None,
+        )
+
+    @staticmethod
+    def _unhealthy_result(
+        config: HealthCheckConfig,
+        last_error: str | None,
+    ) -> HealthCheckResult:
+        """Build the established failed health-check result."""
         return HealthCheckResult(
             status=HealthStatus.UNHEALTHY,
             response_time=0.0,
