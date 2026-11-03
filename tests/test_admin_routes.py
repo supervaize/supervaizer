@@ -12,6 +12,7 @@
 
 """Tests for admin routes module to improve coverage."""
 
+import asyncio
 import time
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
@@ -20,6 +21,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from supervaizer.admin import routes as admin_routes
 from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console_token, validate_console_token, verify_admin_access
     AdminStats,
     ServerConfiguration,
@@ -31,6 +33,7 @@ from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console
     get_server_configuration,
     get_server_status,
     process_console_command,
+    register_log_listener,
     set_server_start_time,
 )
 from supervaizer.common import ApiError, ApiSuccess
@@ -63,19 +66,6 @@ class TestAdminUtilityFunctions:
         """Test format_uptime with zero seconds."""
         result = format_uptime(0)
         assert result == "0m"
-
-    def test_set_server_start_time(self) -> None:
-        """Test setting server start time."""
-        test_time = time.time()
-        set_server_start_time(test_time)
-        # We can't easily test this without accessing globals, but we can verify it doesn't crash
-        assert True
-
-    def test_add_log_to_queue(self) -> None:
-        """Test adding log message to queue."""
-        # This function uses a global queue, so we just test it doesn't crash
-        add_log_to_queue("2023-01-01 10:00:00", "INFO", "Test message")
-        assert True
 
     # <-- REMOVED: test_generate_console_token, test_validate_console_token_*
     # (console token system removed; Tailscale is the gate)
@@ -650,152 +640,6 @@ class TestAdminRoutesIntegration:
         data = response.json()
         assert data["message"] == "Test log added to queue"
 
-    def test_api_jobs_basic(self, client: TestClient, mocker: "MockerFixture") -> None:
-        """Test basic jobs API endpoint."""
-        mock_job_repo = Mock()
-        mock_job_repo.list_jobs.return_value = []
-        mock_job_repo.count_jobs.return_value = 0
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.get("/manage/api/jobs")
-        assert response.status_code in [200, 500]
-
-    def test_api_jobs_with_filters(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test jobs API with status filter."""
-        mock_job_repo = Mock()
-        mock_job_repo.list_jobs.return_value = []
-        mock_job_repo.count_jobs.return_value = 0
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.get("/manage/api/jobs?status=completed")
-        assert response.status_code in [200, 500]
-
-    def test_api_job_details_not_found(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test job details API with non-existent job."""
-        mock_job_repo = Mock()
-        mock_job_repo.get_job.return_value = None
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.get("/manage/api/jobs/nonexistent")
-        assert response.status_code in [404, 500]
-
-    def test_api_cases_basic(self, client: TestClient, mocker: "MockerFixture") -> None:
-        """Test basic cases API endpoint."""
-        mock_case_repo = Mock()
-        mock_case_repo.list_cases.return_value = []
-        mock_case_repo.count_cases.return_value = 0
-
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.get("/manage/api/cases")
-        assert response.status_code in [200, 500]
-
-    def test_api_case_details_not_found(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test case details API with non-existent case."""
-        mock_case_repo = Mock()
-        mock_case_repo.get_case.return_value = None
-
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.get("/manage/api/cases/nonexistent")
-        assert response.status_code in [404, 500]
-
-    def test_update_job_status(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test updating job status."""
-        mock_job_repo = Mock()
-        mock_job_repo.update_job_status.return_value = True
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.post(
-            "/manage/api/jobs/job1/status",
-            json={"status": "completed"},
-        )
-        assert response.status_code in [200, 400, 403, 500]
-
-    def test_update_case_status(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test updating case status."""
-        mock_case_repo = Mock()
-        mock_case_repo.update_case_status.return_value = True
-
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.post(
-            "/manage/api/cases/case1/status",
-            json={"status": "closed"},
-        )
-        assert response.status_code in [200, 400, 403, 500]
-
-    def test_delete_job(self, client: TestClient, mocker: "MockerFixture") -> None:
-        """Test deleting a job."""
-        mock_job_repo = Mock()
-        mock_job_repo.delete_job.return_value = True
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-
-        response = client.delete("/manage/api/jobs/job1")
-        assert response.status_code in [200, 403, 500]
-
-    def test_delete_case(self, client: TestClient, mocker: "MockerFixture") -> None:
-        """Test deleting a case."""
-        mock_case_repo = Mock()
-        mock_case_repo.delete_case.return_value = True
-
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.delete("/manage/api/cases/case1")
-        assert response.status_code in [200, 403, 500]
-
-    def test_api_recent_activity(
-        self, client: TestClient, mocker: "MockerFixture"
-    ) -> None:
-        """Test recent activity API endpoint."""
-        mock_job_repo = Mock()
-        mock_case_repo = Mock()
-        mock_job_repo.list_jobs.return_value = []
-        mock_case_repo.list_cases.return_value = []
-
-        mocker.patch(
-            "supervaizer.storage.create_job_repository", return_value=mock_job_repo
-        )
-        mocker.patch(
-            "supervaizer.storage.create_case_repository", return_value=mock_case_repo
-        )
-
-        response = client.get("/manage/api/recent-activity")
-        assert response.status_code in [200, 500]
-
     def test_console_execute(self, client: TestClient) -> None:
         """Test console command execution — no token required; Tailscale is the gate."""
         response = client.post(
@@ -818,3 +662,54 @@ class TestAdminRoutesIntegration:
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Loguru test messages sent"
+
+
+class TestLogQueue:
+    """add_log_to_queue feeds the log stream and notifies listeners."""
+
+    @pytest.fixture(autouse=True)
+    def _fresh_queue(self, mocker: "MockerFixture") -> None:
+        mocker.patch("supervaizer.admin.routes.log_queue", asyncio.Queue(maxsize=1))
+        mocker.patch("supervaizer.admin.routes._log_listeners", [])
+
+    def test_entry_is_queued_and_listeners_are_notified(self) -> None:
+        heard: list[tuple[str, str, str]] = []
+        register_log_listener(lambda *entry: heard.append(entry))
+
+        add_log_to_queue("2024-01-01", "INFO", "hello")
+
+        assert admin_routes.log_queue.get_nowait() == {
+            "timestamp": "2024-01-01",
+            "level": "INFO",
+            "message": "hello",
+        }
+        assert heard == [("2024-01-01", "INFO", "hello")]
+
+    def test_full_queue_drops_the_entry_but_still_notifies_listeners(self) -> None:
+        heard: list[tuple[str, str, str]] = []
+        register_log_listener(lambda *entry: heard.append(entry))
+        add_log_to_queue("t1", "INFO", "first")
+
+        add_log_to_queue("t2", "INFO", "second")
+
+        assert admin_routes.log_queue.qsize() == 1
+        assert [entry[2] for entry in heard] == ["first", "second"]
+
+    def test_a_listener_registers_only_once(self) -> None:
+        listener = Mock()
+        register_log_listener(listener)
+        register_log_listener(listener)
+
+        add_log_to_queue("t", "INFO", "m")
+
+        listener.assert_called_once_with("t", "INFO", "m")
+
+
+def test_set_server_start_time_changes_the_uptime_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(admin_routes, "SERVER_START_TIME", 0.0)
+
+    set_server_start_time(1234.5)
+
+    assert admin_routes.SERVER_START_TIME == 1234.5

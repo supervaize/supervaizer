@@ -12,13 +12,14 @@
 
 import os
 import tempfile
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from datetime import datetime
 from typing import Annotated, Any
 from uuid import uuid4
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from pytest_mock import MockerFixture
 
 import supervaizer.storage as storage_module
 from supervaizer import (
@@ -45,6 +46,7 @@ from supervaizer import (
     TelemetryType,
 )
 from supervaizer.storage import EntityRepository, StorageManager
+from tests.admin_rig import AdminRig
 
 
 @pytest.fixture(scope="session")
@@ -453,3 +455,11 @@ def reset_supervaizer_environment():
     for key in list(os.environ.keys()):
         if key.startswith("SUPERVAIZER_") and key not in original_env:
             del os.environ[key]
+
+
+@pytest.fixture
+def rig(mocker: MockerFixture) -> Iterator[AdminRig]:
+    """An admin router on empty in-memory storage (see tests/admin_rig.py)."""
+    admin_rig = AdminRig(mocker)
+    yield admin_rig
+    admin_rig.storage._db.drop_tables()

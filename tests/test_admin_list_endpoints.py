@@ -11,18 +11,13 @@ They read what the page template receives: the filtered, sorted and paginated
 rows. They pin current behavior so the handlers can be restructured safely.
 """
 
-from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from supervaizer.admin import routes
-from supervaizer.admin.routes import create_admin_routes
-from supervaizer.storage import StorageManager
+from tests.admin_rig import AdminRig
 
 JOBS: list[dict[str, Any]] = [
     {
@@ -94,60 +89,6 @@ AGENTS: list[dict[str, str]] = [
     },
     {"name": "Mid"},
 ]
-
-
-class Page:
-    """What one endpoint call produced: the HTTP response and the template input."""
-
-    def __init__(self, response: Any, template: str | None, context: dict[str, Any]):
-        self.response = response
-        self.template = template
-        self.context = context
-
-    @property
-    def status(self) -> int:
-        return int(self.response.status_code)
-
-    def ids(self, key: str) -> list[str]:
-        return [row["id"] for row in self.context[key]]
-
-    def names(self, key: str) -> list[str]:
-        return [row["name"] for row in self.context[key]]
-
-
-class AdminRig:
-    """An admin router bound to a real in-memory storage, with template calls recorded."""
-
-    def __init__(self, mocker: MockerFixture) -> None:
-        self.storage = StorageManager(":memory:")
-        # In-memory StorageManager instances share their data: start from empty.
-        self.storage._db.drop_tables()
-        mocker.patch(
-            "supervaizer.admin.routes.StorageManager", return_value=self.storage
-        )
-        self.spy = mocker.spy(routes.templates, "TemplateResponse")
-        app = FastAPI()
-        app.include_router(create_admin_routes(), prefix="/manage")
-        self.client = TestClient(app, raise_server_exceptions=False)
-
-    def seed(self, kind: str, rows: list[dict[str, Any]]) -> None:
-        for row in rows:
-            self.storage.save_object(kind, dict(row))
-
-    def get(self, url: str) -> Page:
-        self.spy.reset_mock()
-        response = self.client.get(url)
-        if not self.spy.called:
-            return Page(response, None, {})
-        args = self.spy.call_args.args
-        return Page(response, args[1], args[2])
-
-
-@pytest.fixture
-def rig(mocker: MockerFixture) -> Iterator[AdminRig]:
-    admin_rig = AdminRig(mocker)
-    yield admin_rig
-    admin_rig.storage._db.drop_tables()
 
 
 class TestJobsEndpoint:
