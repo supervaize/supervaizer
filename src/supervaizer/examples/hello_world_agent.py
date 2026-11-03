@@ -245,26 +245,27 @@ def human_answer(**kwargs: Any) -> JobResponse:
     )
 
 
-def job_stop(**kwargs: Any) -> JobResponse:
-    """Stop handler for local Hello World agent."""
-    job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
-    log.info(f"Job stopped: {job_id}")
+def _control_hook_response(
+    params: dict[str, Any], action: str, message: str
+) -> JobResponse:
+    """Build a local control-hook response with the resolved job identifier."""
+    job_id = params.get("job_id") or _job_id_from_params(params)
+    log.info(f"{action}: {job_id}")
     return JobResponse(
         job_id=job_id,
         status=EntityStatus.STOPPED,
-        message="Stopped",
+        message=message,
     )
+
+
+def job_stop(**kwargs: Any) -> JobResponse:
+    """Stop handler for local Hello World agent."""
+    return _control_hook_response(kwargs, "Job stopped", "Stopped")
 
 
 def job_status(**kwargs: Any) -> JobResponse:
     """Status handler for local Hello World agent."""
-    job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
-    log.info(f"Job status: {job_id}")
-    return JobResponse(
-        job_id=job_id,
-        status=EntityStatus.STOPPED,
-        message="idle",
-    )
+    return _control_hook_response(kwargs, "Job status", "idle")
 
 
 def handle_v2_surface(surface_request: Any) -> dict[str, Any]:
