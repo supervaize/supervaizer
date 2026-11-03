@@ -14,7 +14,7 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -32,9 +32,10 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from supervaizer.__version__ import VERSION
-from supervaizer.common import log
+from supervaizer.common import ApiError, ApiSuccess, log
 from supervaizer.contracts import API_VERSION
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.routes import get_server
 from supervaizer.storage import (
     StorageManager,
 )
@@ -376,6 +377,36 @@ async def _log_events() -> AsyncGenerator[str, None]:
         yield _sse_event(_system_entry("ERROR", f"Log stream error: {e!s}"))
 
 
+async def _resolve_server(request: Request) -> Any | None:
+    """The live server: `app.state.server` (set at launch), else the dependency override."""
+    server = getattr(request.app.state, "server", None)
+    if server is not None:
+        return server
+    get_current = request.app.dependency_overrides.get(get_server)
+    if get_current is None:
+        return None
+    try:
+        return await get_current()
+    except (NotImplementedError, TypeError):
+        return None
+
+
+def _registration_response(result: ApiSuccess | ApiError) -> JSONResponse:
+    """200 when Studio accepted the registration, 502 when it refused it."""
+    if isinstance(result, ApiSuccess):
+        status_code, success = 200, True
+    else:
+        status_code, success = 502, False
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": success,
+            "message": result.message,
+            "detail": getattr(result, "detail", None),
+        },
+    )
+
+
 class AdminHandlers:
     """Request handlers of the admin router, bound to one storage manager."""
 
@@ -529,18 +560,7 @@ class AdminHandlers:
     async def register_server_with_supervisor(self, request: Request) -> JSONResponse:
         """Trigger SERVER_REGISTER to the supervaizer supervisor (no frontend API key; backend sends to SUPERVAIZE_API_URL)."""
         try:
-            from supervaizer.common import ApiSuccess
-            from supervaizer.routes import get_server
-
-            # Prefer app.state.server (set at launch), else dependency override
-            server = getattr(request.app.state, "server", None)
-            if server is None:
-                get_current = request.app.dependency_overrides.get(get_server)
-                if get_current is not None:
-                    try:
-                        server = await get_current()
-                    except (NotImplementedError, TypeError):
-                        pass
+            server = await _resolve_server(request)
             if server is None:
                 raise HTTPException(
                     status_code=503,
@@ -552,24 +572,7 @@ class AdminHandlers:
                     detail="No supervisor account configured",
                 )
             result = await server.supervisor_account.register_server(server=server)
-            if isinstance(result, ApiSuccess):
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "success": True,
-                        "message": result.message,
-                        "detail": result.detail,
-                    },
-                )
-            # ApiError
-            return JSONResponse(
-                status_code=502,
-                content={
-                    "success": False,
-                    "message": result.message,
-                    "detail": getattr(result, "detail", None),
-                },
-            )
+            return _registration_response(result)
         except HTTPException:
             raise
         except Exception as e:
@@ -1093,68 +1096,68 @@ def get_dashboard_stats(storage: StorageManager) -> AdminStats:
         )
 
 
+def _info(message: str) -> dict[str, str]:
+    return {"level": "INFO", "message": message}
+
+
+def _server_info_command() -> dict[str, str]:
+    status = get_server_status()
+    return _info(
+        f"Server: {status.status} | Uptime: {status.uptime} | CPU: {status.cpu_percent:.1f}% | Memory: {status.memory_usage}"
+    )
+
+
+def _memory_command() -> dict[str, str]:
+    status = get_server_status()
+    return _info(f"Memory Usage: {status.memory_usage} ({status.memory_percent:.1f}%)")
+
+
+def _uptime_command() -> dict[str, str]:
+    status = get_server_status()
+    return _info(f"Server uptime: {status.uptime} ({status.uptime_seconds} seconds)")
+
+
+def _debug_command() -> dict[str, str]:
+    environment = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev")
+    return {
+        "level": "DEBUG",
+        "message": f"Environment: {environment} | API Version: {API_VERSION}",
+    }
+
+
+def _test_log_command() -> dict[str, str]:
+    add_log_to_queue(
+        timestamp=datetime.now().isoformat(),
+        level="INFO",
+        message="This is a test log message from console command",
+    )
+    return {"level": "SUCCESS", "message": "Test log message sent"}
+
+
+_CONSOLE_COMMANDS: dict[str, Callable[[], dict[str, str]]] = {
+    "help": lambda: _info(
+        "Available commands: status, help, clear, reconnect, debug, server-info, memory, uptime"
+    ),
+    "status": lambda: _info("Server is running and log stream is active"),
+    "server-info": _server_info_command,
+    "memory": _memory_command,
+    "uptime": _uptime_command,
+    "debug": _debug_command,
+    "clear": lambda: {"level": "SYSTEM", "message": "Console cleared"},
+    "test-log": _test_log_command,
+}
+
+
 async def process_console_command(command: str) -> dict[str, str]:
     """Process a console command and return the result."""
-    cmd = command.lower().strip()
-
+    handler = _CONSOLE_COMMANDS.get(command.lower().strip())
+    if handler is None:
+        return {
+            "level": "ERROR",
+            "message": f"Unknown command: {command}. Type 'help' for available commands.",
+        }
     try:
-        if cmd == "help":
-            return {
-                "level": "INFO",
-                "message": "Available commands: status, help, clear, reconnect, debug, server-info, memory, uptime",
-            }
-
-        elif cmd == "status":
-            return {
-                "level": "INFO",
-                "message": "Server is running and log stream is active",
-            }
-
-        elif cmd == "server-info":
-            server_status = get_server_status()
-            return {
-                "level": "INFO",
-                "message": f"Server: {server_status.status} | Uptime: {server_status.uptime} | CPU: {server_status.cpu_percent:.1f}% | Memory: {server_status.memory_usage}",
-            }
-
-        elif cmd == "memory":
-            server_status = get_server_status()
-            return {
-                "level": "INFO",
-                "message": f"Memory Usage: {server_status.memory_usage} ({server_status.memory_percent:.1f}%)",
-            }
-
-        elif cmd == "uptime":
-            server_status = get_server_status()
-            return {
-                "level": "INFO",
-                "message": f"Server uptime: {server_status.uptime} ({server_status.uptime_seconds} seconds)",
-            }
-
-        elif cmd == "debug":
-            return {
-                "level": "DEBUG",
-                "message": f"Environment: {os.getenv('SUPERVAIZER_ENVIRONMENT', 'dev')} | API Version: {API_VERSION}",
-            }
-
-        elif cmd == "clear":
-            return {"level": "SYSTEM", "message": "Console cleared"}
-
-        elif cmd == "test-log":
-            # Add a test log message
-            add_log_to_queue(
-                timestamp=datetime.now().isoformat(),
-                level="INFO",
-                message="This is a test log message from console command",
-            )
-            return {"level": "SUCCESS", "message": "Test log message sent"}
-
-        else:
-            return {
-                "level": "ERROR",
-                "message": f"Unknown command: {command}. Type 'help' for available commands.",
-            }
-
+        return handler()
     except Exception as e:
         return {"level": "ERROR", "message": f"Command processing error: {e!s}"}
 
