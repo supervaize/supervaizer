@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
 
 from supervaizer.agent import Agent
-from supervaizer.case import CaseNodeUpdate, Cases
+from supervaizer.case import Case, CaseNodeUpdate, Cases
 from supervaizer.common import log
 from supervaizer.contracts import API_VERSION
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
@@ -504,42 +504,31 @@ async def workbench_answer_hitl(
     })
 
 
-async def workbench_execute_step(
-    request: Request, slug: str, job_id: str, case_id: str, step_index: int
-) -> Response:
-    """Execute a scheduled step immediately."""
-    agent = get_agent_by_slug(request, slug)
-
-    # Verify the job and case are both owned by this agent before using
-    # the agent's method allow-list.
-    job = Jobs().get_job(job_id, agent_name=agent.name)
-    if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Job '{job_id}' not found for agent '{slug}'",
-        )
-
+def _find_case(job_id: str, case_id: str) -> Case:
+    """The case of a job, or a 404."""
     case = Cases().get_case(case_id, job_id=job_id)
     if not case:
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-    if case.id not in job.case_ids:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Case '{case_id}' not found for agent '{slug}'",
-        )
+    return case
 
+
+def _pending_step(case: Case, step_index: int) -> CaseNodeUpdate:
+    """The scheduled step at `step_index` that has not started, or the matching error."""
     if step_index < 0 or step_index >= len(case.updates):
         raise HTTPException(status_code=404, detail="Step not found")
-
     update = case.updates[step_index]
-    if getattr(update, "scheduled_at", None) is None:
+    if update.scheduled_at is None:
         raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-    if getattr(update, "scheduled_status", None) != "pending":
+    if update.scheduled_status != "pending":
         raise HTTPException(
             status_code=409,
-            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
+            detail=f"Step is not pending (current: {update.scheduled_status})",
         )
+    return update
 
+
+def _run_step(update: CaseNodeUpdate, agent: Agent) -> JSONResponse:
+    """Run the step's method now and record whether it completed or failed."""
     object.__setattr__(update, "scheduled_status", "executing")
     try:
         if update.scheduled_method:
@@ -562,28 +551,49 @@ async def workbench_execute_step(
         )
 
 
+def _parse_scheduled_at(body: dict[str, Any]) -> datetime:
+    """The `scheduled_at` field of a request body as a datetime, or a 400."""
+    raw = body.get("scheduled_at")
+    if not raw:
+        raise HTTPException(status_code=400, detail="scheduled_at is required")
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid datetime format")
+
+
+async def workbench_execute_step(
+    request: Request, slug: str, job_id: str, case_id: str, step_index: int
+) -> Response:
+    """Execute a scheduled step immediately."""
+    agent = get_agent_by_slug(request, slug)
+
+    # Verify the job and case are both owned by this agent before using
+    # the agent's method allow-list.
+    job = Jobs().get_job(job_id, agent_name=agent.name)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job '{job_id}' not found for agent '{slug}'",
+        )
+
+    case = _find_case(job_id, case_id)
+    if case.id not in job.case_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{case_id}' not found for agent '{slug}'",
+        )
+
+    return _run_step(_pending_step(case, step_index), agent)
+
+
 async def workbench_cancel_step(
     request: Request, slug: str, job_id: str, case_id: str, step_index: int
 ) -> Response:
     """Cancel a pending scheduled step."""
     get_agent_by_slug(request, slug)
 
-    case = Cases().get_case(case_id, job_id=job_id)
-    if not case:
-        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
-    if step_index < 0 or step_index >= len(case.updates):
-        raise HTTPException(status_code=404, detail="Step not found")
-
-    update = case.updates[step_index]
-    if getattr(update, "scheduled_at", None) is None:
-        raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-    if getattr(update, "scheduled_status", None) != "pending":
-        raise HTTPException(
-            status_code=409,
-            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
-        )
-
+    update = _pending_step(_find_case(job_id, case_id), step_index)
     object.__setattr__(update, "scheduled_status", "cancelled")
     return JSONResponse({"status": "cancelled", "message": "Step cancelled"})
 
@@ -594,32 +604,8 @@ async def workbench_reschedule_step(
     """Reschedule a pending scheduled step."""
     get_agent_by_slug(request, slug)
 
-    case = Cases().get_case(case_id, job_id=job_id)
-    if not case:
-        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
-
-    if step_index < 0 or step_index >= len(case.updates):
-        raise HTTPException(status_code=404, detail="Step not found")
-
-    update = case.updates[step_index]
-    if getattr(update, "scheduled_at", None) is None:
-        raise HTTPException(status_code=400, detail="Step is not a scheduled step")
-    if getattr(update, "scheduled_status", None) != "pending":
-        raise HTTPException(
-            status_code=409,
-            detail=f"Step is not pending (current: {getattr(update, 'scheduled_status', 'unknown')})",
-        )
-
-    body = await request.json()
-    new_scheduled_at = body.get("scheduled_at")
-    if not new_scheduled_at:
-        raise HTTPException(status_code=400, detail="scheduled_at is required")
-
-    try:
-        new_dt = datetime.fromisoformat(new_scheduled_at.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        raise HTTPException(status_code=400, detail="Invalid datetime format")
-
+    update = _pending_step(_find_case(job_id, case_id), step_index)
+    new_dt = _parse_scheduled_at(await request.json())
     object.__setattr__(update, "scheduled_at", new_dt)
     return JSONResponse({
         "status": "rescheduled",
