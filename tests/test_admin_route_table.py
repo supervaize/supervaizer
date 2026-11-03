@@ -12,6 +12,7 @@ and handler names the router exposes, in match order.
 """
 
 from fastapi import FastAPI
+from fastapi.routing import APIWebSocketRoute
 
 from supervaizer.admin.routes import create_admin_routes
 from supervaizer.admin.workbench_routes import create_workbench_ws_routes
@@ -91,5 +92,9 @@ def test_admin_router_exposes_expected_routes_in_order() -> None:
 
 
 def test_workbench_websocket_route_is_exposed() -> None:
-    routes = [(r.path, r.name) for r in create_workbench_ws_routes().routes]
+    routes = [
+        (r.path, r.name)
+        for r in create_workbench_ws_routes().routes
+        if isinstance(r, APIWebSocketRoute)
+    ]
     assert routes == [("/agents/{slug}/workbench/jobs/{job_id}/ws", "workbench_job_ws")]
