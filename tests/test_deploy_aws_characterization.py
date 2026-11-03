@@ -242,6 +242,57 @@ class TestAWSAppRunnerCharacterization:
             "Failed to get AWS account ID: denied",
         ]
 
+    def test_delete_secrets_uses_all_scoped_names_and_continues_after_errors(
+        self, driver: AWSAppRunnerDriver
+    ) -> None:
+        def delete_secret(**kwargs: str) -> None:
+            secret_id = kwargs["SecretId"]
+            if secret_id.endswith("api-key"):
+                raise _client_error("ResourceNotFoundException", "DeleteSecret")
+            if secret_id.endswith("rsa-key"):
+                raise _client_error("AccessDeniedException", "DeleteSecret")
+
+        driver.secrets_client.delete_secret.side_effect = delete_secret
+
+        driver._delete_secrets("agent-prod")
+
+        assert [
+            call.kwargs["SecretId"]
+            for call in driver.secrets_client.delete_secret.call_args_list
+        ] == [
+            "agent-prod-api-key",
+            "agent-prod-rsa-key",
+            "agent-prod-studio-api-key",
+        ]
+        assert all(
+            call.kwargs["ForceDeleteWithoutRecovery"] is True
+            for call in driver.secrets_client.delete_secret.call_args_list
+        )
+
+    @pytest.mark.parametrize("failure_at", ["service", "registry", "secret"])
+    def test_plan_reraises_unexpected_provider_errors(
+        self, driver: AWSAppRunnerDriver, failure_at: str
+    ) -> None:
+        unexpected_error = _client_error("AccessDeniedException", "ProviderCall")
+        if failure_at == "service":
+            driver.apprunner_client.describe_service.side_effect = unexpected_error
+        else:
+            driver.apprunner_client.describe_service.return_value = {
+                "Service": {"ServiceUrl": "https://app.aws", "Status": "RUNNING"}
+            }
+        if failure_at == "registry":
+            driver.ecr_client.describe_repositories.side_effect = unexpected_error
+        if failure_at == "secret":
+            driver.secrets_client.describe_secret.side_effect = unexpected_error
+
+        with pytest.raises(ClientError):
+            driver.plan_deployment(
+                "agent",
+                "prod",
+                "image:next",
+                secrets={"SUPERVAIZER_API_KEY": "secret"},
+            )
+
     @pytest.mark.parametrize(
         ("status", "expected_url"),
         [("RUNNING", "https://app.aws"), ("UPDATE_FAILED", None)],

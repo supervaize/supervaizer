@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from pytest_mock import MockerFixture
 
 from supervaizer.deploy.drivers import do_app_platform
@@ -128,6 +129,50 @@ class TestDOAppPlatformCharacterization:
             "invalid image",
             {"exception_type": "RuntimeError"},
         )
+
+    def test_set_public_url_replaces_existing_value_and_preserves_other_envs(
+        self,
+        driver: DOAppPlatformDriver,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        spec_path = tmp_path / "app.yaml"
+        spec_path.write_text(
+            """services:
+- envs:
+  - key: MODE
+    value: prod
+  - key: SUPERVAIZER_PUBLIC_URL
+    value: https://old.example
+  - key: SUPERVAIZER_API_KEY
+    value: secret
+    scope: RUN_TIME
+    type: SECRET
+"""
+        )
+        run = mocker.patch.object(do_app_platform.subprocess, "run")
+
+        driver._set_public_url("agent-prod", "https://new.example", spec_path)
+
+        envs = yaml.safe_load(spec_path.read_text())["services"][0]["envs"]
+        assert envs == [
+            {"key": "MODE", "value": "prod"},
+            {
+                "key": "SUPERVAIZER_API_KEY",
+                "value": "secret",
+                "scope": "RUN_TIME",
+                "type": "SECRET",
+            },
+            {"key": "SUPERVAIZER_PUBLIC_URL", "value": "https://new.example"},
+        ]
+        assert run.call_args.args[0] == [
+            "doctl",
+            "apps",
+            "update",
+            "agent-prod",
+            "--spec",
+            str(spec_path),
+        ]
 
     @pytest.mark.parametrize("failure", [False, True])
     def test_destroy_maps_doctl_result(
