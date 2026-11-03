@@ -162,6 +162,7 @@ def _prepare_local_mode(
         a2a_endpoints = True
         admin_interface = True
         if os.environ.get("SUPERVAIZER_DISABLE_HELLO_WORLD", "").lower() != "true":
+            # local_server imports Server through the package, so defer this cycle.
             from supervaizer.examples.local_server import get_default_local_agent
 
             hw_agent = get_default_local_agent()
@@ -572,6 +573,7 @@ class Server(ServerAbstract):
     ) -> None:
         """Register controller surfaces after Pydantic validates the server."""
         if local_hello_world_slug:
+            # local_server imports Server through the package, so defer this cycle.
             from supervaizer.examples.local_server import (
                 register_default_local_v2_handlers,
             )

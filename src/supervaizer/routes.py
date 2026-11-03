@@ -11,6 +11,7 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+import json
 import traceback
 from collections.abc import Awaitable, Callable
 from enum import Enum
@@ -36,6 +37,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from supervaizer import common, storage
 from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.agent import (
     Agent,
@@ -48,7 +50,7 @@ from supervaizer.common import SvBaseModel, log
 from supervaizer.contracts import controller_contract_info
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.job_service import service_job_custom, service_job_start
-from supervaizer.lifecycle import EntityStatus
+from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
 if TYPE_CHECKING:
@@ -301,10 +303,9 @@ async def _apply_case_answer(
     casestep_index = request.answer.get("casestep_index")
     if casestep_index is not None:
         await case.patch_step(int(casestep_index), update)
-        from supervaizer.lifecycle import EntityEvents
-        from supervaizer.storage import PersistentEntityLifecycle
-
-        PersistentEntityLifecycle.handle_event(case, EntityEvents.INPUT_RECEIVED)
+        storage.PersistentEntityLifecycle.handle_event(
+            case, EntityEvents.INPUT_RECEIVED
+        )
     else:
         await case.receive_human_input(update)
     return case.status.value
@@ -517,11 +518,7 @@ def _decrypt_agent_parameters(
 ) -> tuple[Any, Exception | None]:
     """Decrypt agent parameters while retaining the endpoint error boundary."""
     try:
-        import json
-
-        from supervaizer.common import decrypt_value
-
-        agent_parameters_str = decrypt_value(
+        agent_parameters_str = common.decrypt_value(
             encrypted_agent_parameters, server.private_key
         )
         return json.loads(agent_parameters_str) if agent_parameters_str else {}, None
