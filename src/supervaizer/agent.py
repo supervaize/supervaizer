@@ -19,6 +19,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Literal,
     TypeVar,
     cast,
 )
@@ -751,6 +752,188 @@ class AgentAbstract(SvBaseModel):
         return validate_billing_catalog(value)
 
 
+_TERMINAL_JOB_STATUSES = frozenset({
+    EntityStatus.COMPLETED,
+    EntityStatus.FAILED,
+    EntityStatus.CANCELLED,
+    EntityStatus.CANCELLING,
+})
+
+
+def _job_start_action(methods: AgentMethods, method_name: str) -> AgentMethod:
+    """Return the declared start action for a job request."""
+    if method_name == "job_start":
+        return methods.job_start
+    if not methods.custom:
+        raise ValueError(f"Custom method {method_name} not found")
+    return methods.custom[method_name]
+
+
+def _job_start_params(
+    action: AgentMethod,
+    job: Job,
+    job_fields: dict[str, Any],
+    context: JobContext,
+    agent_parameters: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Build the public parameters for an agent job-start method."""
+    return (
+        (action.params or {})
+        | {"fields": job_fields}
+        | {"context": context}
+        | {
+            "agent_parameters": job.agent_parameters
+            if agent_parameters is None
+            else agent_parameters
+        }
+    )
+
+
+def _apply_job_start_response(
+    job: Job, response: JobResponse, server: "Server"
+) -> None:
+    """Apply response side effects in the established job-start order."""
+    if response.payload:
+        job.metadata = response.payload
+    if server.supervisor_account is not None:
+        event = JobStartConfirmationEvent(job=job, account=server.supervisor_account)
+        server.supervisor_account.send_event_sync(sender=job, event=event)
+    else:
+        log.warning(
+            f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
+        )
+    if response.status in _TERMINAL_JOB_STATUSES:
+        job.add_response(response)
+        service_job_finished(job, server=server)
+    elif response.status == EntityStatus.AWAITING:
+        log.debug(
+            f"[Agent job_start] Job is awaiting input, adding response : Job {job.id} status {response} §SAS02"
+        )
+        job.add_response(response)
+    else:
+        log.warning(
+            f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {response} §SAS01"
+        )
+
+
+def _validate_agent_constructor_kwargs(kwargs: dict[str, Any]) -> None:
+    """Reject constructor options removed by the v2 contract."""
+    if "dynamic_choices_callback" in kwargs:
+        raise ValueError(
+            "dynamic_choices_callback was removed in Supervaizer v2. "
+            "Use v2 resource option_sources or typed A2A actions for dynamic options."
+        )
+
+
+def _agent_constructor_id(name: str, supplied_id: str | None) -> str:
+    """Return the deterministic identifier after validating an optional override."""
+    expected_id = shortuuid.uuid(name=name)
+    if supplied_id is not None and supplied_id != expected_id:
+        raise ValueError(
+            f"Agent id {supplied_id!r} does not match deterministic id for name {name!r} "
+            f"({expected_id!r}); omit id or use the expected value"
+        )
+    return supplied_id or expected_id
+
+
+def _agent_v2_constructor_values(
+    registration: SupervaizerV2AgentRegistrationContract | dict[str, Any] | None,
+    methods: V2AgentMethods | dict[str, Any] | None,
+    introduction: V2AgentIntroduction | dict[str, Any] | None,
+    full_description: V2AgentFullDescription | dict[str, Any] | None,
+    billing_catalog: list[BillingCatalogItem | dict[str, Any]] | None,
+) -> tuple[
+    SupervaizerV2AgentRegistrationContract | None,
+    V2AgentMethods | None,
+    V2AgentIntroduction | None,
+    V2AgentFullDescription | None,
+    list[BillingCatalogItem] | None,
+]:
+    """Normalize v2 constructor values before Pydantic receives them."""
+    normalized_registration = (
+        SupervaizerV2AgentRegistrationContract.model_validate(registration)
+        if isinstance(registration, dict)
+        else registration
+    )
+    normalized_methods = (
+        V2AgentMethods.model_validate(methods) if isinstance(methods, dict) else methods
+    )
+    normalized_introduction = (
+        V2AgentIntroduction.model_validate(introduction)
+        if isinstance(introduction, dict)
+        else introduction
+    )
+    normalized_full_description = (
+        V2AgentFullDescription.model_validate(full_description)
+        if isinstance(full_description, dict)
+        else full_description
+    )
+    normalized_catalog = (
+        None
+        if billing_catalog is None
+        else [BillingCatalogItem.model_validate(item) for item in billing_catalog]
+    )
+    return (
+        normalized_registration,
+        normalized_methods,
+        normalized_introduction,
+        normalized_full_description,
+        normalized_catalog,
+    )
+
+
+def _validate_unique_data_resource_names(
+    resources: list["DataResource"], agent_name: str
+) -> None:
+    """Require each resource name to be unique within its agent."""
+    seen_resource_names: set[str] = set()
+    for resource in resources:
+        if resource.name in seen_resource_names:
+            raise ValueError(
+                f"Duplicate DataResource name {resource.name!r} on agent {agent_name!r}; "
+                "each data resource must have a unique name per agent."
+            )
+        seen_resource_names.add(resource.name)
+
+
+def _get_agent_update_response(agent: "Agent", account: Any) -> Any:
+    """Look up an agent by its Studio id, or its stable slug."""
+    if agent.server_agent_id:
+        return account.get_agent_by(agent_id=agent.server_agent_id)
+    return account.get_agent_by(agent_slug=agent.slug)
+
+
+def _agent_detail_from_update_response(
+    response: Any, slug: str, server_agent_id: str | None
+) -> dict[str, Any]:
+    """Return a Studio agent detail or preserve the launch-stopping error."""
+    if isinstance(response, ApiSuccess):
+        return _agent_detail_from_server_response(response.detail)
+    error_response = getattr(response.exception, "response", None)
+    status = error_response.status_code if error_response is not None else "no response"
+    raise RuntimeError(
+        f"Agent update from Studio failed for slug={slug} "
+        f"server_agent_id={server_agent_id}: GET {response.url} "
+        f"returned {status} ({response.exception})"
+    )
+
+
+def _validated_server_agent_id(
+    current_id: str | None, agent_detail: dict[str, Any], slug: str
+) -> str | None:
+    """Return the Studio id after enforcing stable agent identity."""
+    returned_id = _agent_id_from_server_detail(agent_detail)
+    if current_id and returned_id and current_id != returned_id:
+        raise ValueError(f"Agent ID mismatch: {current_id} != {returned_id}")
+    if not current_id and not returned_id:
+        response_keys = sorted(str(key) for key in agent_detail)
+        raise ValueError(
+            "Agent update from Studio failed: response did not include agent id "
+            f"for slug={slug}. response_keys={response_keys}"
+        )
+    return returned_id or current_id
+
+
 class Agent(AgentAbstract):
     _server_encrypted_parameters: str | None = PrivateAttr(default=None)
 
@@ -819,38 +1002,20 @@ class Agent(AgentAbstract):
 
         Tested in tests/test_agent.py
         """
-        if "dynamic_choices_callback" in kwargs:
-            raise ValueError(
-                "dynamic_choices_callback was removed in Supervaizer v2. "
-                "Use v2 resource option_sources or typed A2A actions for dynamic options."
-            )
-
-        expected_id = shortuuid.uuid(name=name)
-        agent_id = id or expected_id
-        if id is not None and id != expected_id:
-            raise ValueError(
-                f"Agent id {id!r} does not match deterministic id for name {name!r} "
-                f"({expected_id!r}); omit id or use the expected value"
-            )
-
-        v2_registration = supervaizer_v2_registration
-        if isinstance(v2_registration, dict):
-            v2_registration = SupervaizerV2AgentRegistrationContract.model_validate(
-                v2_registration
-            )
-        v2_method_declarations = v2_methods
-        if isinstance(v2_method_declarations, dict):
-            v2_method_declarations = V2AgentMethods.model_validate(
-                v2_method_declarations
-            )
-        if isinstance(introduction, dict):
-            introduction = V2AgentIntroduction.model_validate(introduction)
-        if isinstance(full_description, dict):
-            full_description = V2AgentFullDescription.model_validate(full_description)
-        catalog = (
-            None
-            if billing_catalog is None
-            else [BillingCatalogItem.model_validate(item) for item in billing_catalog]
+        _validate_agent_constructor_kwargs(kwargs)
+        agent_id = _agent_constructor_id(name, id)
+        (
+            v2_registration,
+            v2_method_declarations,
+            v2_introduction,
+            v2_full_description,
+            catalog,
+        ) = _agent_v2_constructor_values(
+            supervaizer_v2_registration,
+            v2_methods,
+            introduction,
+            full_description,
+            billing_catalog,
         )
 
         # Initialize using Pydantic's mechanism
@@ -875,8 +1040,8 @@ class Agent(AgentAbstract):
             data_resources=data_resources or [],
             supervaizer_v2_registration=v2_registration,
             v2_methods=v2_method_declarations,
-            introduction=introduction,
-            full_description=full_description,
+            introduction=v2_introduction,
+            full_description=v2_full_description,
             billing_catalog=catalog,
             **kwargs,
         )
@@ -884,14 +1049,7 @@ class Agent(AgentAbstract):
         self._validate_supervaizer_v2_identity()
         self._apply_v2_method_capabilities()
 
-        seen_resource_names: set[str] = set()
-        for r in self.data_resources:
-            if r.name in seen_resource_names:
-                raise ValueError(
-                    f"Duplicate DataResource name {r.name!r} on agent {self.name!r}; "
-                    "each data resource must have a unique name per agent."
-                )
-            seen_resource_names.add(r.name)
+        _validate_unique_data_resource_names(self.data_resources, self.name)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
@@ -984,48 +1142,16 @@ class Agent(AgentAbstract):
         Returns None without a Studio account; raises if the Studio lookup fails.
         Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
-        if server.supervisor_account:
-            if self.server_agent_id:
-                # Get agent by ID from SaaS Server
-                from_server = server.supervisor_account.get_agent_by(
-                    agent_id=self.server_agent_id
-                )
-
-            else:
-                # Get agent by name from SaaS Server
-                from_server = server.supervisor_account.get_agent_by(
-                    agent_slug=self.slug
-                )
-        else:
+        supervisor_account = server.supervisor_account
+        if not supervisor_account:
             return None
-        if not isinstance(from_server, ApiSuccess):
-            # Stop the launch: continuing would run with unrefreshed status and
-            # parameters, and hide Studio errors such as an agent id mismatch.
-            response = getattr(from_server.exception, "response", None)
-            status = response.status_code if response is not None else "no response"
-            raise RuntimeError(
-                f"Agent update from Studio failed for slug={self.slug} "
-                f"server_agent_id={self.server_agent_id}: GET {from_server.url} "
-                f"returned {status} ({from_server.exception})"
-            )
-
-        agent_from_server = _agent_detail_from_server_response(from_server.detail)
-        server_agent_id = _agent_id_from_server_detail(agent_from_server)
-
-        if (
-            self.server_agent_id
-            and server_agent_id
-            and self.server_agent_id != server_agent_id
-        ):
-            message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
-            raise ValueError(message)
-        if not self.server_agent_id and not server_agent_id:
-            response_keys = sorted(str(key) for key in agent_from_server)
-            message = (
-                "Agent update from Studio failed: response did not include agent id "
-                f"for slug={self.slug}. response_keys={response_keys}"
-            )
-            raise ValueError(message)
+        from_server = _get_agent_update_response(self, supervisor_account)
+        agent_from_server = _agent_detail_from_update_response(
+            from_server, self.slug, self.server_agent_id
+        )
+        server_agent_id = _validated_server_agent_id(
+            self.server_agent_id, agent_from_server, self.slug
+        )
 
         # Update agent attributes
         self.server_agent_id = server_agent_id or self.server_agent_id
@@ -1156,12 +1282,7 @@ class Agent(AgentAbstract):
         if not self.methods:
             raise ValueError("Agent methods not defined")
 
-        if method_name == "job_start":
-            action = self.methods.job_start
-        else:
-            if not self.methods.custom:
-                raise ValueError(f"Custom method {method_name} not found")
-            action = self.methods.custom[method_name]
+        action = _job_start_action(self.methods, method_name)
 
         log.debug(f"[Agent job_start] Run <{action.method}> - Job <{job.id}>")
         # Mark job as in progress when execution starts
@@ -1176,17 +1297,7 @@ class Agent(AgentAbstract):
 
         # Execute the method
         action_method = action.method
-        method_params = action.params or {}
-        params = (
-            method_params
-            | {"fields": job_fields}
-            | {"context": context}
-            | {
-                "agent_parameters": job.agent_parameters
-                if agent_parameters is None
-                else agent_parameters
-            }
-        )
+        params = _job_start_params(action, job, job_fields, context, agent_parameters)
         # agent_parameters holds decrypted secrets: never log it.
         log.debug(
             f"[Agent job_start] action_method : {action_method} - params : "
@@ -1207,37 +1318,7 @@ class Agent(AgentAbstract):
                 )
             else:
                 job_response = self._execute(action_method, params)
-                # Populate job.metadata from payload so Studio receives it in the confirmation event
-                if job_response.payload:
-                    job.metadata = job_response.payload
-                # Send confirmation event now that metadata is populated
-                if server.supervisor_account is not None:
-                    event = JobStartConfirmationEvent(
-                        job=job,
-                        account=server.supervisor_account,
-                    )
-                    server.supervisor_account.send_event_sync(sender=job, event=event)
-                else:
-                    log.warning(
-                        f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
-                    )
-                if (
-                    job_response.status == EntityStatus.COMPLETED
-                    or job_response.status == EntityStatus.FAILED
-                    or job_response.status == EntityStatus.CANCELLED
-                    or job_response.status == EntityStatus.CANCELLING
-                ):
-                    job.add_response(job_response)
-                    service_job_finished(job, server=server)
-                elif job_response.status == EntityStatus.AWAITING:
-                    log.debug(
-                        f"[Agent job_start] Job is awaiting input, adding response : Job {job.id} status {job_response} §SAS02"
-                    )
-                    job.add_response(job_response)
-                else:
-                    log.warning(
-                        f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {job_response} §SAS01"
-                    )
+                _apply_job_start_response(job, job_response, server)
 
         except Exception as e:
             # Handle any execution errors
@@ -1256,17 +1337,24 @@ class Agent(AgentAbstract):
 
     def job_stop(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous stop hook; controller ``POST /stop`` runs it in a worker thread."""
-        if not self.methods or not self.methods.job_stop:
-            raise ValueError("Agent methods not defined")
-        method = self.methods.job_stop.method
-        return self._execute(method, params)
+        return self._execute_lifecycle_hook("job_stop", params)
 
     def job_status(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous status hook; controller ``POST /status`` runs it in a worker thread."""
-        if not self.methods or not self.methods.job_status:
+        return self._execute_lifecycle_hook("job_status", params)
+
+    def _execute_lifecycle_hook(
+        self,
+        hook_name: Literal["job_stop", "job_status"],
+        params: dict[str, Any],
+    ) -> Any:
+        """Run a configured stop or status hook with the supplied parameters."""
+        if not self.methods:
             raise ValueError("Agent methods not defined")
-        method = self.methods.job_status.method
-        return self._execute(method, params)
+        method = getattr(self.methods, hook_name)
+        if not method:
+            raise ValueError("Agent methods not defined")
+        return self._execute(method.method, params)
 
     def chat(self, context: str, message: str) -> Any:
         if not self.methods or not self.methods.chat:
