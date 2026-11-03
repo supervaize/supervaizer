@@ -15,6 +15,7 @@ import collections
 import hashlib
 import os
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -731,6 +732,61 @@ def create_workbench_routes() -> APIRouter:
     return router
 
 
+_TERMINAL_STATUSES = ("completed", "failed", "stopped", "cancelled")
+
+
+@dataclass
+class _SignalState:
+    """What one WebSocket client has already been told."""
+
+    monitor_hash: str = ""
+    log_version: int = field(default_factory=lambda: _workbench_log_version)
+    jobs_count: int = -1
+
+    def changes(self, job: Job, agent_name: str) -> list[str]:
+        """Refresh signals for what changed since the last call; updates the state."""
+        signals: list[str] = []
+        current_hash = _compute_job_state_hash(job)
+        if current_hash != self.monitor_hash:
+            self.monitor_hash = current_hash
+            signals.append("monitor")
+        # Only meaningful log entries bump the version (no admin HTTP noise).
+        if _workbench_log_version != self.log_version:
+            self.log_version = _workbench_log_version
+            signals.append("console")
+        jobs_count = len(Jobs().get_agent_jobs(agent_name))
+        if jobs_count != self.jobs_count:
+            self.jobs_count = jobs_count
+            signals.append("jobs")
+        return signals
+
+
+def _find_job(job_id: str, agent_name: str) -> Job | None:
+    try:
+        return Jobs().get_job(job_id, agent_name=agent_name)
+    except Exception:
+        return None
+
+
+async def _idle_until_disconnect(websocket: WebSocket) -> None:
+    """Keep the connection open but idle, so the client does not reconnect in a loop."""
+    try:
+        while True:
+            await asyncio.wait_for(websocket.receive_text(), timeout=60)
+    except (TimeoutError, WebSocketDisconnect):
+        pass
+
+
+async def _answer_ping(websocket: WebSocket) -> None:
+    """Wait up to two seconds for a client message; answer a ping with a pong."""
+    try:
+        data = await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
+    except TimeoutError:
+        return
+    if data == "ping":
+        await websocket.send_text("pong")
+
+
 async def workbench_job_ws(websocket: WebSocket, slug: str, job_id: str) -> None:
     """WebSocket that pushes typed refresh signals when state changes.
 
@@ -738,70 +794,29 @@ async def workbench_job_ws(websocket: WebSocket, slug: str, job_id: str) -> None
            "jobs" (job list changed). Client fetches the relevant partial.
     """
     await websocket.accept()
-    last_monitor_hash = ""
-    last_log_version = _workbench_log_version
-    last_jobs_count = -1
     # Cache agent outside the loop — it doesn't change during a WS session
     try:
         agent = get_agent_by_slug(websocket, slug)
     except Exception:
         await websocket.close()
         return
+    state = _SignalState()
     try:
         while True:
-            try:
-                job = Jobs().get_job(job_id, agent_name=agent.name)
-            except Exception:
-                job = None
-
+            job = _find_job(job_id, agent.name)
             if not job:
                 await websocket.send_text("monitor")
                 break
-
-            # Monitor: job/case state changes
-            current_hash = _compute_job_state_hash(job)
-            if current_hash != last_monitor_hash:
-                last_monitor_hash = current_hash
-                await websocket.send_text("monitor")
-
-            # Console: only meaningful log entries (filtered, no admin HTTP noise)
-            if _workbench_log_version != last_log_version:
-                last_log_version = _workbench_log_version
-                await websocket.send_text("console")
-
-            # Jobs: job count changed
-            agent_jobs = Jobs().get_agent_jobs(agent.name)
-            if len(agent_jobs) != last_jobs_count:
-                last_jobs_count = len(agent_jobs)
-                await websocket.send_text("jobs")
-
-            is_terminal = job.status.value in (
-                "completed",
-                "failed",
-                "stopped",
-                "cancelled",
-            )
-            if is_terminal:
-                await websocket.send_text("console")
-                await websocket.send_text("jobs")
-                await websocket.send_text("terminal")
-                # Keep connection open but idle — prevents client reconnect loop
-                try:
-                    while True:
-                        await asyncio.wait_for(websocket.receive_text(), timeout=60)
-                except (TimeoutError, WebSocketDisconnect):
-                    pass
+            signals = state.changes(job, agent.name)
+            finished = job.status.value in _TERMINAL_STATUSES
+            if finished:
+                signals += ["console", "jobs", "terminal"]
+            for signal in signals:
+                await websocket.send_text(signal)
+            if finished:
+                await _idle_until_disconnect(websocket)
                 break
-
-            try:
-                data = await asyncio.wait_for(
-                    websocket.receive_text(),
-                    timeout=2.0,
-                )
-                if data == "ping":
-                    await websocket.send_text("pong")
-            except TimeoutError:
-                pass
+            await _answer_ping(websocket)
     except WebSocketDisconnect:
         pass
 
