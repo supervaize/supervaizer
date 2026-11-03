@@ -92,6 +92,4 @@ def test_admin_router_exposes_expected_routes_in_order() -> None:
 
 def test_workbench_websocket_route_is_exposed() -> None:
     routes = [(r.path, r.name) for r in create_workbench_ws_routes().routes]
-    assert routes == [
-        ("/agents/{slug}/workbench/jobs/{job_id}/ws", "workbench_job_ws")
-    ]
+    assert routes == [("/agents/{slug}/workbench/jobs/{job_id}/ws", "workbench_job_ws")]
