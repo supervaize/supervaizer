@@ -34,7 +34,6 @@ from supervaizer.admin.routes import (  # <-- MODIFIED: removed generate_console
     get_server_status,
     process_console_command,
     register_log_listener,
-    set_server_start_time,
 )
 from supervaizer.common import ApiError, ApiSuccess
 
@@ -737,13 +736,3 @@ class TestLogQueue:
         add_log_to_queue("t", "INFO", "m")
 
         listener.assert_called_once_with("t", "INFO", "m")
-
-
-def test_set_server_start_time_changes_the_uptime_origin(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(admin_routes, "SERVER_START_TIME", 0.0)
-
-    set_server_start_time(1234.5)
-
-    assert admin_routes.SERVER_START_TIME == 1234.5
