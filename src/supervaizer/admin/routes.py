@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 import asyncio
 import json
 import os
@@ -26,7 +20,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
-)  # <-- MODIFIED: removed Depends, Security
+)
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -54,17 +48,6 @@ def register_log_listener(listener: Any) -> None:
         _log_listeners.append(listener)
 
 
-# Server start time for uptime calculation
-# This will be set when the server actually starts
-SERVER_START_TIME = time.time()
-
-
-def set_server_start_time(start_time: float) -> None:
-    """Set the server start time for uptime calculation."""
-    global SERVER_START_TIME
-    SERVER_START_TIME = start_time
-
-
 def add_log_to_queue(timestamp: str, level: str, message: str) -> None:
     """Add a log message to the streaming queue and notify listeners."""
     log_data = {"timestamp": timestamp, "level": level, "message": message}
@@ -78,7 +61,6 @@ def add_log_to_queue(timestamp: str, level: str, message: str) -> None:
 
 # Initialize templates
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-# <-- REMOVED: api_key_header / APIKeyHeader (Tailscale enforced at router level)
 
 
 class AdminStats(BaseModel):
@@ -120,26 +102,12 @@ class ServerConfiguration(BaseModel):
     agents: list[dict[str, str]]
 
 
-class EntityFilter(BaseModel):
-    """Filter parameters for entity queries."""
-
-    status: str | None = None
-    agent_name: str | None = None
-    search: str | None = None
-    sort: str = "-created_at"
-    limit: int = 50
-    skip: int = 0
-
-
 def _is_local_mode(request: Request) -> bool:
     """True when server has no Studio registration (supervisor_account is None)."""
     live = getattr(request.app.state, "server", None)
     if live is None:
         return False
     return getattr(live, "supervisor_account", None) is None
-
-
-# <-- REMOVED: verify_admin_access (Tailscale enforced at router level in private_router)
 
 
 def format_uptime(seconds: int) -> str:
@@ -558,7 +526,6 @@ class AdminHandlers:
 
     async def admin_console_page(self, request: Request) -> Response:
         """Interactive console page — access enforced by Tailscale at router level."""
-        # <-- MODIFIED: removed console token generation; Tailscale is the gate
         return templates.TemplateResponse(
             request,
             "console.html",
@@ -893,7 +860,6 @@ class AdminHandlers:
         command_data: dict[str, str],
     ) -> dict[str, str]:
         """Execute a console command — access enforced by Tailscale at router level."""
-        # <-- MODIFIED: removed token parameter; Tailscale is the gate
 
         command = command_data.get("command", "").strip()
         if not command:
@@ -967,7 +933,7 @@ def create_admin_routes() -> APIRouter:
     # Include workbench sub-router
     from supervaizer.admin.workbench_routes import create_workbench_routes
 
-    # <-- MODIFIED: removed verify_admin_access dep; Tailscale covers both HTTP and WS
+    # Tailscale covers both HTTP and WS, so no extra dependency here.
     router.include_router(create_workbench_routes())
     # WebSocket routes are included in private_router (routers/private.py)
 
@@ -1093,7 +1059,3 @@ async def process_console_command(command: str) -> dict[str, str]:
         return handler()
     except Exception as e:
         return {"level": "ERROR", "message": f"Command processing error: {e!s}"}
-
-
-# <-- REMOVED: generate_console_token, validate_console_token, cleanup_expired_tokens
-# (console token system removed; Tailscale is the sole gate for /manage routes)
