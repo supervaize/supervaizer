@@ -7,13 +7,14 @@
 """Characterize Cloud Run deployment behavior without provider access."""
 
 import subprocess
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
 from pytest_mock import MockerFixture
 
 from supervaizer.deploy.drivers import cloud_run
+from supervaizer.deploy.drivers.base import ActionType, ResourceType
 from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
 
 
@@ -45,6 +46,18 @@ class TestCloudRunDriverCharacterization:
         mocker.patch.object(cloud_run, "secretmanager")
         mocker.patch.object(cloud_run, "artifactregistry_v1")
         return CloudRunDriver("us-central1", "project-1")
+
+    @pytest.fixture
+    def run_client(self, driver: CloudRunDriver) -> Mock:
+        return cast(Mock, driver.run_client)
+
+    @pytest.fixture
+    def secret_client(self, driver: CloudRunDriver) -> Mock:
+        return cast(Mock, driver.secret_client)
+
+    @pytest.fixture
+    def registry_client(self, driver: CloudRunDriver) -> Mock:
+        return cast(Mock, driver.registry_client)
 
     def test_deploy_returns_running_result_after_ready_service(
         self, driver: CloudRunDriver, mocker: MockerFixture
@@ -101,7 +114,7 @@ class TestCloudRunDriverCharacterization:
         }
 
     def test_destroy_deletes_service_and_known_secrets(
-        self, driver: CloudRunDriver, mocker: MockerFixture
+        self, driver: CloudRunDriver, run_client: Mock, mocker: MockerFixture
     ) -> None:
         delete_secrets = mocker.patch.object(driver, "_delete_secrets")
 
@@ -109,15 +122,15 @@ class TestCloudRunDriverCharacterization:
 
         assert result.success is True
         assert result.status == "deleted"
-        driver.run_client.delete_service.assert_called_once_with(
+        run_client.delete_service.assert_called_once_with(
             name="projects/project-1/locations/us-central1/services/agent-dev"
         )
         delete_secrets.assert_called_once_with("agent-dev")
 
     def test_destroy_reports_missing_service_without_deleting_secrets(
-        self, driver: CloudRunDriver, mocker: MockerFixture
+        self, driver: CloudRunDriver, run_client: Mock, mocker: MockerFixture
     ) -> None:
-        driver.run_client.delete_service.side_effect = cloud_run.NotFound("missing")
+        run_client.delete_service.side_effect = cloud_run.NotFound("missing")
         delete_secrets = mocker.patch.object(driver, "_delete_secrets")
 
         result = driver.destroy_service("agent", "dev")
@@ -127,9 +140,9 @@ class TestCloudRunDriverCharacterization:
         delete_secrets.assert_not_called()
 
     def test_status_reports_health_for_service_url(
-        self, driver: CloudRunDriver, mocker: MockerFixture
+        self, driver: CloudRunDriver, run_client: Mock, mocker: MockerFixture
     ) -> None:
-        driver.run_client.get_service.return_value = _service()
+        run_client.get_service.return_value = _service()
         mocker.patch.object(driver, "verify_health", return_value=False)
 
         result = driver.get_service_status("agent", "dev")
@@ -143,8 +156,10 @@ class TestCloudRunDriverCharacterization:
             "health_status": "unhealthy",
         }
 
-    def test_status_uses_exact_not_found_error(self, driver: CloudRunDriver) -> None:
-        driver.run_client.get_service.side_effect = cloud_run.NotFound("missing")
+    def test_status_uses_exact_not_found_error(
+        self, driver: CloudRunDriver, run_client: Mock
+    ) -> None:
+        run_client.get_service.side_effect = cloud_run.NotFound("missing")
 
         result = driver.get_service_status("agent", "dev")
 
@@ -155,44 +170,104 @@ class TestCloudRunDriverCharacterization:
             "error_message": "Service not found",
         }
 
-    def test_existing_secret_adds_a_new_version(self, driver: CloudRunDriver) -> None:
-        driver.secret_client.get_secret.return_value = Mock()
+    def test_plan_marks_matching_service_and_existing_secret_for_update(
+        self, driver: CloudRunDriver, run_client: Mock, secret_client: Mock
+    ) -> None:
+        service = _service()
+        service.template.containers[0].image = "image:tag"
+        run_client.get_service.return_value = service
+        secret_client.get_secret.return_value = Mock()
+
+        plan = driver.plan_deployment(
+            "agent",
+            "dev",
+            "image:tag",
+            port=8080,
+            env_vars={"PORT": "8080"},
+            secrets={"SUPERVAIZER_API_KEY": "secret"},
+        )
+
+        assert [
+            (action.resource_type, action.action_type, action.resource_name)
+            for action in plan.actions
+        ] == [
+            (ResourceType.SERVICE, ActionType.NOOP, "agent-dev"),
+            (ResourceType.SECRET, ActionType.UPDATE, "agent-dev-api-key"),
+        ]
+        assert plan.current_image == "image:tag"
+        assert plan.current_url == "https://agent.example.com"
+        assert plan.current_status == "running"
+        assert plan.target_port == 8080
+        assert plan.target_env_vars == {"PORT": "8080"}
+        assert plan.target_secrets == {"SUPERVAIZER_API_KEY": "secret"}
+
+    def test_plan_marks_missing_service_and_secret_for_creation(
+        self, driver: CloudRunDriver, run_client: Mock, secret_client: Mock
+    ) -> None:
+        run_client.get_service.side_effect = cloud_run.NotFound("missing")
+        secret_client.get_secret.side_effect = cloud_run.NotFound("missing")
+
+        plan = driver.plan_deployment(
+            "agent", "dev", "image:tag", secrets={"SUPERVAIZER_API_KEY": "secret"}
+        )
+
+        assert [
+            (action.resource_type, action.action_type, action.resource_name)
+            for action in plan.actions
+        ] == [
+            (ResourceType.SERVICE, ActionType.CREATE, "agent-dev"),
+            (ResourceType.SECRET, ActionType.CREATE, "agent-dev-api-key"),
+        ]
+        assert plan.current_image is None
+        assert plan.current_url is None
+        assert plan.current_status is None
+        run_client.get_service.assert_called_once_with(
+            name="projects/project-1/locations/us-central1/services/agent-dev"
+        )
+        secret_client.get_secret.assert_called_once_with(
+            name="projects/project-1/secrets/agent-dev-api-key"
+        )
+
+    def test_existing_secret_adds_a_new_version(
+        self, driver: CloudRunDriver, secret_client: Mock
+    ) -> None:
+        secret_client.get_secret.return_value = Mock()
 
         driver._create_or_update_secrets("agent-dev", {"SUPERVAIZER_API_KEY": "key"})
 
-        driver.secret_client.create_secret.assert_not_called()
-        assert driver.secret_client.add_secret_version.call_args.kwargs["request"] == {
+        secret_client.create_secret.assert_not_called()
+        assert secret_client.add_secret_version.call_args.kwargs["request"] == {
             "parent": "projects/project-1/secrets/agent-dev-api-key",
             "payload": {"data": b"key"},
         }
 
     def test_missing_secret_is_created_before_its_version(
-        self, driver: CloudRunDriver
+        self, driver: CloudRunDriver, secret_client: Mock
     ) -> None:
-        driver.secret_client.get_secret.side_effect = cloud_run.NotFound("missing")
-        driver.secret_client.create_secret.return_value.name = "created-secret"
+        secret_client.get_secret.side_effect = cloud_run.NotFound("missing")
+        secret_client.create_secret.return_value.name = "created-secret"
 
         driver._create_or_update_secrets("agent-dev", {"SUPERVAIZER_API_KEY": "key"})
 
-        assert driver.secret_client.create_secret.call_args.kwargs["request"] == {
+        assert secret_client.create_secret.call_args.kwargs["request"] == {
             "parent": "projects/project-1",
             "secret_id": "agent-dev-api-key",
             "secret": {"replication": {"automatic": {}}},
         }
-        assert driver.secret_client.add_secret_version.call_args.kwargs["request"] == {
+        assert secret_client.add_secret_version.call_args.kwargs["request"] == {
             "parent": "created-secret",
             "payload": {"data": b"key"},
         }
 
     def test_prepare_registry_preserves_an_existing_repository(
-        self, driver: CloudRunDriver
+        self, driver: CloudRunDriver, registry_client: Mock
     ) -> None:
-        driver.registry_client.get_repository.return_value = Mock()
+        registry_client.get_repository.return_value = Mock()
 
         image = driver.prepare_registry("agent")
 
         assert image == "us-central1-docker.pkg.dev/project-1/agent/agent:latest"
-        driver.registry_client.create_repository.assert_not_called()
+        registry_client.create_repository.assert_not_called()
 
     def test_registry_auth_returns_trimmed_access_token(
         self, driver: CloudRunDriver, mocker: MockerFixture
@@ -212,9 +287,9 @@ class TestCloudRunDriverCharacterization:
         )
 
     def test_ready_poll_retries_after_provider_error(
-        self, driver: CloudRunDriver, mocker: MockerFixture
+        self, driver: CloudRunDriver, run_client: Mock, mocker: MockerFixture
     ) -> None:
-        driver.run_client.get_service.side_effect = [
+        run_client.get_service.side_effect = [
             RuntimeError("pending"),
             _service(),
         ]
@@ -227,9 +302,9 @@ class TestCloudRunDriverCharacterization:
         sleep.assert_called_once_with(5)
 
     def test_ready_poll_raises_exact_timeout_error(
-        self, driver: CloudRunDriver, mocker: MockerFixture
+        self, driver: CloudRunDriver, run_client: Mock, mocker: MockerFixture
     ) -> None:
-        driver.run_client.get_service.return_value = _service(uri=None)
+        run_client.get_service.return_value = _service(uri=None)
         mocker.patch.object(cloud_run.time, "time", side_effect=[0, 0, 5])
         mocker.patch.object(cloud_run.time, "sleep")
 
@@ -239,14 +314,14 @@ class TestCloudRunDriverCharacterization:
             driver._wait_for_service_ready("service-path", timeout=5)
 
     def test_public_url_replaces_only_its_previous_environment_entry(
-        self, driver: CloudRunDriver
+        self, driver: CloudRunDriver, run_client: Mock
     ) -> None:
         retained = Mock(name="kept")
         retained.name = "KEEP"
         previous = Mock(name="previous")
         previous.name = "SUPERVAIZER_PUBLIC_URL"
         service = _service(environment=[retained, previous])
-        driver.run_client.get_service.return_value = service
+        run_client.get_service.return_value = service
 
         driver._set_public_url("service-path", "https://new.example.com")
 
@@ -254,14 +329,12 @@ class TestCloudRunDriverCharacterization:
             retained,
             {"name": "SUPERVAIZER_PUBLIC_URL", "value": "https://new.example.com"},
         ]
-        driver.run_client.update_service.assert_called_once_with(
-            request={"service": service}
-        )
+        run_client.update_service.assert_called_once_with(request={"service": service})
 
     def test_delete_secrets_continues_after_provider_errors(
-        self, driver: CloudRunDriver
+        self, driver: CloudRunDriver, secret_client: Mock
     ) -> None:
-        driver.secret_client.delete_secret.side_effect = [
+        secret_client.delete_secret.side_effect = [
             cloud_run.NotFound("missing"),
             RuntimeError("denied"),
             None,
@@ -269,7 +342,7 @@ class TestCloudRunDriverCharacterization:
 
         driver._delete_secrets("agent-dev")
 
-        assert driver.secret_client.delete_secret.call_count == 3
+        assert secret_client.delete_secret.call_count == 3
 
     def test_prerequisites_returns_all_failed_check_errors(
         self, driver: CloudRunDriver, mocker: MockerFixture
