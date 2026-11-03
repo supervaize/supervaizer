@@ -18,7 +18,9 @@ This module handles Docker-related operations for deployment.
 
 import json
 import os
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 
@@ -181,9 +183,10 @@ class DockerManager:
         context_path: Path | None = None,
         dockerfile_path: Path | None = None,
         verbose: bool = False,
-        build_args: dict | None = None,
+        build_args: dict[str, Any] | None = None,
     ) -> str:
         """Build Docker image and return the image ID."""
+        # The Docker SDK is optional, so its exceptions load only for a build.
         from docker.errors import APIError, BuildError, DockerException
 
         if self.client is None:
@@ -198,45 +201,12 @@ class DockerManager:
 
         try:
             log.info(f"Building Docker image with tag: {tag}")
-
-            # Use low-level API to get logs even when build fails
-            # Access the low-level API through the existing client
-            build_kwargs = {
-                "path": str(context_path),
-                "dockerfile": str(dockerfile_path),
-                "tag": tag,
-                "rm": True,
-                "forcerm": True,
-                "buildargs": build_args or {},
-                "decode": True,
-            }
-
-            response = [line for line in self.client.api.build(**build_kwargs)]
-
-            if not response:
-                raise RuntimeError("Failed to get a response from docker client")
-
-            # Process and display logs (always show output, especially errors)
-            image_id = None
-            last_error = None
-            for result in response:
-                if isinstance(result, dict):
-                    # Check for errors first
-                    if "error" in result or "errorDetail" in result:
-                        error_msg = result.get("error") or result.get(
-                            "errorDetail", {}
-                        ).get("message", "Unknown error")
-                        last_error = error_msg
-
-                    for key, value in result.items():
-                        if isinstance(value, str):
-                            # Always print string values (logs, errors, etc.)
-                            print(value, end="", flush=True)
-                        elif key == "aux" and isinstance(value, dict):
-                            # Extract image ID from aux data
-                            image_id = value.get("ID")
-
-            # If we found an error, raise it
+            build_kwargs = _build_options(
+                tag, context_path, dockerfile_path, build_args
+            )
+            image_id, last_error = _process_build_response(
+                self.client.api.build(**build_kwargs)
+            )
             if last_error:
                 raise RuntimeError(f"Docker build failed: {last_error}")
 
@@ -321,6 +291,55 @@ class DockerManager:
         except DockerException as e:
             log.error(f"Failed to get image digest: {e}")
             return None
+
+
+def _build_options(
+    tag: str,
+    context_path: Path,
+    dockerfile_path: Path,
+    build_args: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "path": str(context_path),
+        "dockerfile": str(dockerfile_path),
+        "tag": tag,
+        "rm": True,
+        "forcerm": True,
+        "buildargs": build_args or {},
+        "decode": True,
+    }
+
+
+def _process_build_response(response: Iterable[Any]) -> tuple[Any, Any]:
+    # Finish reading before printing, so iterator failures show no partial output.
+    records = [line for line in response]
+    if not records:
+        raise RuntimeError("Failed to get a response from docker client")
+
+    image_id: Any = None
+    last_error: Any = None
+    for record in records:
+        if isinstance(record, dict):
+            last_error = _build_record_error(record, last_error)
+            image_id = _display_build_record(record, image_id)
+    return image_id, last_error
+
+
+def _build_record_error(record: dict[str, Any], last_error: Any) -> Any:
+    if "error" in record or "errorDetail" in record:
+        return record.get("error") or record.get("errorDetail", {}).get(
+            "message", "Unknown error"
+        )
+    return last_error
+
+
+def _display_build_record(record: dict[str, Any], image_id: Any) -> Any:
+    for key, value in record.items():
+        if isinstance(value, str):
+            print(value, end="", flush=True)
+        elif key == "aux" and isinstance(value, dict):
+            image_id = value.get("ID")
+    return image_id
 
 
 def ensure_docker_running() -> bool:
