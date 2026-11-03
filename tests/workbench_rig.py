@@ -22,10 +22,13 @@ from supervaizer import (
     EntityStatus,
     Job,
     JobContext,
+    Parameter,
+    ParametersSetup,
 )
 from supervaizer.admin import workbench_routes
 from supervaizer.admin.routes import create_admin_routes
 from supervaizer.admin.workbench_routes import create_workbench_ws_routes
+from supervaizer.agent import AgentMethodField
 from supervaizer.case import Cases
 from supervaizer.job import Jobs
 from tests.admin_rig import Page
@@ -45,11 +48,15 @@ class WorkbenchRig:
         *,
         stoppable: bool = True,
         reports_status: bool = True,
+        parameters: list[Parameter] | None = None,
+        start_fields: list[AgentMethodField] | None = None,
     ) -> None:
         Cases().reset()
         Jobs().reset()
         methods = AgentMethods(
-            job_start=AgentMethod(name="job_start", method="test_module.start"),
+            job_start=AgentMethod(
+                name="job_start", method="test_module.start", fields=start_fields
+            ),
             job_stop=AgentMethod(name="job_stop", method="test_module.stop")
             if stoppable
             else None,
@@ -62,6 +69,9 @@ class WorkbenchRig:
             version="1.0.0",
             description="Agent for workbench tests",
             methods=methods,
+            parameters_setup=ParametersSetup.from_list(parameters)
+            if parameters
+            else None,
         )
         context = JobContext(
             workspace_id="ws",

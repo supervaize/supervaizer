@@ -411,6 +411,40 @@ class TestConsoleCommands:
         # Empty command falls through to unknown command case
         assert result["level"] == "ERROR"
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command", ["server-info", "memory", "uptime"])
+    async def test_process_console_command_reports_a_failing_status_lookup(
+        self, mocker: "MockerFixture", command: str
+    ) -> None:
+        mocker.patch(
+            "supervaizer.admin.routes.get_server_status",
+            side_effect=RuntimeError("no server"),
+        )
+
+        result = await process_console_command(command)
+
+        assert result == {
+            "level": "ERROR",
+            "message": "Command processing error: no server",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command", ["HELP", "  Status  "])
+    async def test_process_console_command_ignores_case_and_outer_spaces(
+        self, command: str
+    ) -> None:
+        result = await process_console_command(command)
+
+        assert result["level"] == "INFO"
+
+    @pytest.mark.asyncio
+    async def test_process_console_command_names_the_unknown_command_as_typed(
+        self,
+    ) -> None:
+        result = await process_console_command("Frobnicate")
+
+        assert result["message"].startswith("Unknown command: Frobnicate.")
+
 
 class TestAdminRoutesIntegration:
     """Integration tests for admin routes using TestClient."""
