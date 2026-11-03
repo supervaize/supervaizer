@@ -336,6 +336,46 @@ def _case_row(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sse_event(entry: dict[str, str]) -> str:
+    return f"data: {json.dumps(entry, ensure_ascii=False)}\n\n"
+
+
+def _system_entry(level: str, message: str) -> dict[str, str]:
+    return {"timestamp": datetime.now().isoformat(), "level": level, "message": message}
+
+
+def _log_entry(item: Any) -> dict[str, str]:
+    """A queued item as a log entry; anything that is not a dict becomes an INFO message."""
+    return item if isinstance(item, dict) else _system_entry("INFO", str(item))
+
+
+async def _log_events() -> AsyncGenerator[str, None]:
+    """Server-Sent Events: a hello, the queued backlog, then live entries and keep-alives."""
+    try:
+        yield _sse_event(_system_entry("INFO", "Log stream connected"))
+
+        # Send any existing messages in the queue
+        while not log_queue.empty():
+            try:
+                event = _sse_event(_log_entry(log_queue.get_nowait()))
+            except Exception:  # QueueEmpty or an entry that cannot be serialized
+                break
+            yield event
+
+        # Keep alive and wait for new messages
+        while True:
+            try:
+                item = await asyncio.wait_for(log_queue.get(), timeout=30.0)
+                yield _sse_event(_log_entry(item))
+            except TimeoutError:
+                yield _sse_event(_system_entry("SYSTEM", "keepalive"))
+
+    except asyncio.CancelledError:
+        pass  # Client disconnected
+    except Exception as e:
+        yield _sse_event(_system_entry("ERROR", f"Log stream error: {e!s}"))
+
+
 class AdminHandlers:
     """Request handlers of the admin router, bound to one storage manager."""
 
@@ -871,93 +911,9 @@ class AdminHandlers:
             log.error(f"Get recent activity error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def log_stream(
-        self,
-    ) -> (
-        EventSourceResponse
-    ):  # <-- MODIFIED: removed token/key params; Tailscale is the gate
+    async def log_stream(self) -> EventSourceResponse:
         """Stream log messages via Server-Sent Events."""
-
-        async def generate_log_events() -> AsyncGenerator[str, None]:
-            try:
-                # Send connection message immediately
-                test_message = {
-                    "timestamp": datetime.now().isoformat(),
-                    "level": "INFO",
-                    "message": "Log stream connected",
-                }
-                yield f"data: {json.dumps(test_message, ensure_ascii=False)}\n\n"
-
-                # Send any existing messages in the queue
-                while not log_queue.empty():
-                    try:
-                        log_message = log_queue.get_nowait()
-                        if isinstance(log_message, dict):
-                            event_data = json.dumps(log_message, ensure_ascii=False)
-                            yield f"data: {event_data}\n\n"
-                        else:
-                            fallback_message = {
-                                "timestamp": datetime.now().isoformat(),
-                                "level": "INFO",
-                                "message": str(log_message),
-                            }
-                            event_data = json.dumps(
-                                fallback_message, ensure_ascii=False
-                            )
-                            yield f"data: {event_data}\n\n"
-                    except Exception:  # QueueEmpty or any other exception
-                        break
-
-                # Keep alive and wait for new messages
-                while True:
-                    try:
-                        # Wait for a log message with timeout to send keep-alive
-                        log_message = await asyncio.wait_for(
-                            log_queue.get(), timeout=30.0
-                        )
-
-                        if isinstance(log_message, dict):
-                            event_data = json.dumps(log_message, ensure_ascii=False)
-                            yield f"data: {event_data}\n\n"
-                        else:
-                            fallback_message = {
-                                "timestamp": datetime.now().isoformat(),
-                                "level": "INFO",
-                                "message": str(log_message),
-                            }
-                            event_data = json.dumps(
-                                fallback_message, ensure_ascii=False
-                            )
-                            yield f"data: {event_data}\n\n"
-                    except TimeoutError:
-                        # Send keep-alive message
-                        keepalive_message = {
-                            "timestamp": datetime.now().isoformat(),
-                            "level": "SYSTEM",
-                            "message": "keepalive",
-                        }
-                        yield f"data: {json.dumps(keepalive_message, ensure_ascii=False)}\n\n"
-
-            except asyncio.CancelledError:
-                # Client disconnected
-                pass
-            except Exception as e:
-                # Send error and close
-                try:
-                    error_data = json.dumps(
-                        {
-                            "timestamp": datetime.now().isoformat(),
-                            "level": "ERROR",
-                            "message": f"Log stream error: {e!s}",
-                        },
-                        ensure_ascii=False,
-                    )
-                    yield f"data: {error_data}\n\n"
-                except Exception:
-                    # If even error formatting fails, just close
-                    pass
-
-        return EventSourceResponse(generate_log_events())
+        return EventSourceResponse(_log_events())
 
     async def test_log(self) -> dict[str, str]:
         """Test endpoint to generate a log message."""
