@@ -235,7 +235,9 @@ class TestAdminDataFunctions:
         assert config.agents[0]["name"] == "agent1"
         assert config.agents[1]["version"] == "2.0.0"
 
-    def test_get_dashboard_stats(self, storage_manager: "StorageManager") -> None:
+    def test_get_dashboard_stats(
+        self, storage_manager: "StorageManager", monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test getting dashboard statistics."""
         # Mock storage data
         mock_jobs = [
@@ -250,20 +252,26 @@ class TestAdminDataFunctions:
             {"status": "failed"},
         ]
 
-        storage_manager.get_objects = Mock(
-            side_effect=lambda obj_type: (
-                mock_jobs
-                if obj_type == "Job"
-                else mock_cases
-                if obj_type == "Case"
-                else []
-            )
+        # monkeypatch restores both attributes: StorageManager is a singleton, so a
+        # leftover mock would reach every later test that builds a StorageManager.
+        monkeypatch.setattr(
+            storage_manager,
+            "get_objects",
+            Mock(
+                side_effect=lambda obj_type: (
+                    mock_jobs
+                    if obj_type == "Job"
+                    else mock_cases
+                    if obj_type == "Case"
+                    else []
+                )
+            ),
         )
 
         # Mock TinyDB tables
         mock_db = Mock()
         mock_db.tables.return_value = ["Job", "Case"]
-        storage_manager._db = mock_db
+        monkeypatch.setattr(storage_manager, "_db", mock_db)
 
         stats = get_dashboard_stats(storage_manager)
 
