@@ -104,31 +104,38 @@ _FIELD_TYPE_MAP = {
 }
 
 
+def _answer_fields(form_data: dict) -> list | None:
+    """The field list of a `supervaizer_form` payload, or None when it has none."""
+    answer = form_data.get("answer")
+    fields = answer.get("fields") if isinstance(answer, dict) else None
+    return fields if isinstance(fields, list) else None
+
+
+def _field_definition(field: dict) -> dict[str, Any]:
+    """One form field as the template wants it: input type, label, required, options."""
+    field_type = field.get("field_type", "CharField")
+    definition: dict[str, Any] = {
+        "type": _FIELD_TYPE_MAP.get(field_type, "text"),
+        "label": field.get("description") or field["name"],
+        "required": field.get("required", False),
+    }
+    if field_type == "ChoiceField" and "choices" in field:
+        definition["options"] = field["choices"]
+    return definition
+
+
 def _normalize_hitl_form(form_data: dict) -> dict:
     """Convert supervaizer_form payload to {field_name: {type, label, required, ...}} for the template."""
     if not isinstance(form_data, dict):
         return {}
-    # Already in flat {name: def} format
-    answer = form_data.get("answer")
-    if not isinstance(answer, dict):
-        return form_data
-    fields = answer.get("fields")
-    if not isinstance(fields, list):
-        return form_data
-    result = {}
-    for field in fields:
-        if not isinstance(field, dict) or "name" not in field:
-            continue
-        name = field["name"]
-        field_type = field.get("field_type", "CharField")
-        result[name] = {
-            "type": _FIELD_TYPE_MAP.get(field_type, "text"),
-            "label": field.get("description") or name,
-            "required": field.get("required", False),
-        }
-        if field_type == "ChoiceField" and "choices" in field:
-            result[name]["options"] = field["choices"]
-    return result
+    fields = _answer_fields(form_data)
+    if fields is None:
+        return form_data  # already in flat {name: def} format
+    return {
+        field["name"]: _field_definition(field)
+        for field in fields
+        if isinstance(field, dict) and "name" in field
+    }
 
 
 def _compute_job_state_hash(job: "Job") -> str:
@@ -322,40 +329,38 @@ async def workbench_start_job(request: Request, slug: str) -> Response:
     })
 
 
+_NO_HITL: dict[str, Any] = {"hitl_form": None, "hitl_dialog": None}
+
+
+def _latest_hitl(case: Case) -> dict[str, Any]:
+    """The newest dialog or form an awaiting case asks the human for."""
+    for update in reversed(case.updates):
+        payload = update.payload
+        if payload and "supervaizer_dialog" in payload:
+            return {"hitl_form": None, "hitl_dialog": payload["supervaizer_dialog"]}
+        if payload and "supervaizer_form" in payload:
+            form = _normalize_hitl_form(payload["supervaizer_form"])
+            return {"hitl_form": form, "hitl_dialog": None}
+    return _NO_HITL
+
+
 async def workbench_job_monitor(request: Request, slug: str, job_id: str) -> Response:
     """HTMX partial — returns execution monitor HTML for polling."""
     agent = get_agent_by_slug(request, slug)
 
     job = Jobs().get_job(job_id, agent_name=agent.name)
-
     if not job:
         return HTMLResponse("<div class='text-gray-500 text-sm'>Job not found</div>")
 
-    cases = get_job_cases(job)
-
-    # For each case, check if it's awaiting and extract HITL form data
-    cases_data = []
-    for case in cases:
-        case_info = {
+    cases_data = [
+        {
             "case": case,
-            "hitl_form": None,
-            "hitl_dialog": None,
+            **(
+                _latest_hitl(case) if case.status == EntityStatus.AWAITING else _NO_HITL
+            ),
         }
-        if case.status == EntityStatus.AWAITING:
-            # Find the HITL update in case.updates
-            for update in reversed(case.updates):
-                if hasattr(update, "payload") and update.payload:
-                    payload = update.payload
-                    if isinstance(payload, dict):
-                        if "supervaizer_dialog" in payload:
-                            case_info["hitl_dialog"] = payload["supervaizer_dialog"]
-                            break
-                        elif "supervaizer_form" in payload:
-                            case_info["hitl_form"] = _normalize_hitl_form(
-                                payload["supervaizer_form"]
-                            )
-                            break
-        cases_data.append(case_info)
+        for case in get_job_cases(job)
+    ]
 
     return templates.TemplateResponse(
         request,
