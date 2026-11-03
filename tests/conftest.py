@@ -47,6 +47,7 @@ from supervaizer import (
 )
 from supervaizer.storage import EntityRepository, StorageManager
 from tests.admin_rig import AdminRig
+from tests.workbench_rig import WorkbenchRig
 
 
 @pytest.fixture(scope="session")
@@ -463,3 +464,13 @@ def rig(mocker: MockerFixture) -> Iterator[AdminRig]:
     admin_rig = AdminRig(mocker)
     yield admin_rig
     admin_rig.storage._db.drop_tables()
+
+
+@pytest.fixture
+def workbench(
+    mocker: MockerFixture, account_fixture: Account
+) -> Iterator[WorkbenchRig]:
+    """A workbench app with one agent, job and case (see tests/workbench_rig.py)."""
+    wb = WorkbenchRig(account_fixture, mocker)
+    yield wb
+    wb.close()
