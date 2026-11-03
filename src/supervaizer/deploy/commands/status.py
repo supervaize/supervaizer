@@ -25,6 +25,10 @@ from supervaizer.common import log
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 from supervaizer.deploy.drivers.base import DeploymentResult
 from supervaizer.deploy.state import DeploymentState, StateManager
+from supervaizer.deploy.utils import (
+    get_default_region as _get_default_region,
+    prerequisites_met,
+)
 
 console = Console()
 
@@ -50,32 +54,18 @@ def deploy_status(
     if not region:
         region = _get_default_region(platform)
 
-    console.print(f"[bold blue]Deployment Status for {name}-{env}[/bold blue]")
-    console.print(f"Platform: {platform}")
-    console.print(f"Region: {region}")
-    if project_id:
-        console.print(f"Project ID: {project_id}")
+    _display_status_target(platform, name, env, region, project_id)
 
     try:
         # Check local state first
         deployment_dir = (source_dir or Path.cwd()) / ".deployment"
-        if deployment_dir.exists():
-            state_manager = StateManager(deployment_dir)
-            state = state_manager.load_state()
-
-            if state:
-                console.print("\n[bold]Local State:[/bold]")
-                _display_state(state)
+        _display_local_state(deployment_dir)
 
         # Get live status from platform
         driver = create_driver(platform, region, project_id)
 
         # Check prerequisites
-        prerequisites = driver.check_prerequisites()
-        if prerequisites:
-            console.print("[bold red]Prerequisites not met:[/]")
-            for prereq in prerequisites:
-                console.print(f"  • {prereq}")
+        if not prerequisites_met(driver, console):
             return
 
         # Get service status
@@ -94,14 +84,23 @@ def deploy_status(
         console.print(f"[bold red]Status check failed:[/] {e}")
 
 
-def _get_default_region(platform: str) -> str:
-    """Get default region for platform."""
-    defaults = {
-        "cloud-run": "us-central1",
-        "aws-app-runner": "us-east-1",
-        "do-app-platform": "nyc3",
-    }
-    return defaults.get(platform, "us-central1")
+def _display_status_target(
+    platform: str, name: str, env: str, region: str, project_id: str | None
+) -> None:
+    console.print(f"[bold blue]Deployment Status for {name}-{env}[/bold blue]")
+    console.print(f"Platform: {platform}")
+    console.print(f"Region: {region}")
+    if project_id:
+        console.print(f"Project ID: {project_id}")
+
+
+def _display_local_state(deployment_dir: Path) -> None:
+    if deployment_dir.exists():
+        state_manager = StateManager(deployment_dir)
+        state = state_manager.load_state()
+        if state:
+            console.print("\n[bold]Local State:[/bold]")
+            _display_state(state)
 
 
 def _display_state(state: DeploymentState) -> None:
