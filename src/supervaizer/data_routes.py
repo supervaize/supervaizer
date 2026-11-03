@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 """FastAPI route generation for DataResource CRUD endpoints.
 
 For each DataResource declared on an Agent, generates routes under
@@ -88,6 +82,19 @@ def _add_resource_routes(
 ) -> None:
     """Register all declared operation routes for one DataResource."""
     prefix = f"/data/{resource.name}"
+    _add_read_resource_routes(router, resource, agent_slug, server, prefix)
+    _add_write_resource_routes(router, resource, agent_slug, server, prefix)
+    _add_import_resource_route(router, resource, agent_slug, server, prefix)
+
+
+def _add_read_resource_routes(
+    router: APIRouter,
+    resource: DataResource,
+    agent_slug: str,
+    server: Server,
+    prefix: str,
+) -> None:
+    """Register list and get routes for a resource."""
 
     if resource.on_list is not None:
         op_id = _data_resource_operation_id(agent_slug, resource.name, "list")
@@ -113,6 +120,15 @@ def _add_resource_routes(
             name=op_id,
         )
 
+
+def _add_write_resource_routes(
+    router: APIRouter,
+    resource: DataResource,
+    agent_slug: str,
+    server: Server,
+    prefix: str,
+) -> None:
+    """Register writable CRUD routes for a resource."""
     if resource.on_create is not None and not resource.read_only:
         op_id = _data_resource_operation_id(agent_slug, resource.name, "create")
         router.add_api_route(
@@ -155,6 +171,15 @@ def _add_resource_routes(
             name=op_id,
         )
 
+
+def _add_import_resource_route(
+    router: APIRouter,
+    resource: DataResource,
+    agent_slug: str,
+    server: Server,
+    prefix: str,
+) -> None:
+    """Register the optional bulk import route for a resource."""
     if resource.importable and resource.on_import is not None:
         op_id = _data_resource_operation_id(agent_slug, resource.name, "import")
         router.add_api_route(
