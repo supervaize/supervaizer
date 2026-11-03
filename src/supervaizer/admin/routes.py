@@ -37,8 +37,6 @@ from supervaizer.contracts import API_VERSION
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import (
     StorageManager,
-    create_case_repository,
-    create_job_repository,
 )
 
 # Global log queue for streaming
@@ -241,23 +239,18 @@ def get_server_configuration(
     )
 
 
-def create_admin_routes() -> APIRouter:
-    """Create and configure admin routes."""
-    router = APIRouter(tags=["admin"])
+class AdminHandlers:
+    """Request handlers of the admin router, bound to one storage manager."""
 
-    _static_dir = Path(__file__).parent / "static"
+    def __init__(self, storage: StorageManager) -> None:
+        self.storage = storage
+        self.static_dir = Path(__file__).parent / "static"
 
-    # Initialize storage manager
-    storage = StorageManager()
-    _job_repo = create_job_repository()
-    _case_repo = create_case_repository()
-
-    @router.get("/", response_class=HTMLResponse)
-    async def admin_dashboard(request: Request) -> Response:
+    async def admin_dashboard(self, request: Request) -> Response:
         """Admin dashboard page."""
         try:
             # Get stats
-            stats = get_dashboard_stats(storage)
+            stats = get_dashboard_stats(self.storage)
 
             return templates.TemplateResponse(
                 request,
@@ -268,7 +261,7 @@ def create_admin_routes() -> APIRouter:
                     "stats": stats,
                     "system_status": "Online",
                     "db_name": "TinyDB",
-                    "data_storage_path": str(storage.db_path.absolute()),
+                    "data_storage_path": str(self.storage.db_path.absolute()),
                     "local_mode": _is_local_mode(request),
                     "server_id": os.getenv("SUPERVAIZER_SERVER_ID"),
                 },
@@ -277,8 +270,7 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Admin dashboard error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/jobs", response_class=HTMLResponse)
-    async def admin_jobs_page(request: Request) -> Response:
+    async def admin_jobs_page(self, request: Request) -> Response:
         """Jobs management page."""
         return templates.TemplateResponse(
             request,
@@ -290,8 +282,7 @@ def create_admin_routes() -> APIRouter:
             },
         )
 
-    @router.get("/cases", response_class=HTMLResponse)
-    async def admin_cases_page(request: Request) -> Response:
+    async def admin_cases_page(self, request: Request) -> Response:
         """Cases management page."""
         return templates.TemplateResponse(
             request,
@@ -303,13 +294,12 @@ def create_admin_routes() -> APIRouter:
             },
         )
 
-    @router.get("/server", response_class=HTMLResponse)
-    async def admin_server_page(request: Request) -> Response:
+    async def admin_server_page(self, request: Request) -> Response:
         """Server status and configuration page."""
         try:
             # Get initial server data (from storage or live when no persistence)
             server_status = get_server_status(request)
-            server_config = get_server_configuration(storage, request)
+            server_config = get_server_configuration(self.storage, request)
 
             return templates.TemplateResponse(
                 request,
@@ -326,8 +316,7 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Admin server page error: {e}")
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-    @router.get("/agents", response_class=HTMLResponse)
-    async def admin_agents_page(request: Request) -> Response:
+    async def admin_agents_page(self, request: Request) -> Response:
         """Agents management page."""
         try:
             server_info = _get_server_info(request)
@@ -352,12 +341,11 @@ def create_admin_routes() -> APIRouter:
                 status_code=503, detail="Server information unavailable"
             ) from e
 
-    @router.get("/static/{file_path:path}")
-    async def serve_static(file_path: str) -> Response:
+    async def serve_static(self, file_path: str) -> Response:
         """Serve static files from the admin static directory."""
-        full_path = _static_dir / file_path
+        full_path = self.static_dir / file_path
         if not full_path.is_file() or not full_path.resolve().is_relative_to(
-            _static_dir.resolve()
+            self.static_dir.resolve()
         ):
             raise HTTPException(status_code=404, detail="File not found")
         suffix = full_path.suffix.lower()
@@ -371,8 +359,7 @@ def create_admin_routes() -> APIRouter:
             media_type=media_types.get(suffix, "application/octet-stream"),
         )
 
-    @router.get("/console", response_class=HTMLResponse)
-    async def admin_console_page(request: Request) -> Response:
+    async def admin_console_page(self, request: Request) -> Response:
         """Interactive console page — access enforced by Tailscale at router level."""
         # <-- MODIFIED: removed console token generation; Tailscale is the gate
         return templates.TemplateResponse(
@@ -381,14 +368,11 @@ def create_admin_routes() -> APIRouter:
             {"request": request},
         )
 
-    # API Routes
-    @router.get("/api/stats")
-    async def get_stats() -> AdminStats:
+    async def get_stats(self) -> AdminStats:
         """Get system statistics."""
-        return get_dashboard_stats(storage)
+        return get_dashboard_stats(self.storage)
 
-    @router.get("/api/server/status")
-    async def get_server_status_api(request: Request) -> Response:
+    async def get_server_status_api(self, request: Request) -> Response:
         """Get current server status for HTMX refresh."""
         try:
             server_status = get_server_status(request)
@@ -405,8 +389,7 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get server status API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.post("/api/server/register")
-    async def register_server_with_supervisor(request: Request) -> JSONResponse:
+    async def register_server_with_supervisor(self, request: Request) -> JSONResponse:
         """Trigger SERVER_REGISTER to the supervaizer supervisor (no frontend API key; backend sends to SUPERVAIZE_API_URL)."""
         try:
             from supervaizer.common import ApiSuccess
@@ -456,8 +439,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Server register API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/agents")
     async def get_agents_api(
+        self,
         request: Request,
         status: str | None = Query(None),
         agent_type: str | None = Query(None),
@@ -527,8 +510,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get agents API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/agents/{agent_slug}")
     async def get_agent_details(
+        self,
         request: Request,
         agent_slug: str,
     ) -> Response:
@@ -565,8 +548,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get agent details error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/jobs")
     async def get_jobs_api(
+        self,
         request: Request,
         status: str | None = Query(None),
         agent_name: str | None = Query(None),
@@ -578,7 +561,7 @@ def create_admin_routes() -> APIRouter:
         """Get jobs with filtering and pagination."""
         try:
             # Get all jobs
-            jobs_data = storage.get_objects("Job")
+            jobs_data = self.storage.get_objects("Job")
 
             # Apply filters
             filtered_jobs = []
@@ -652,16 +635,15 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get jobs API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/jobs/{job_id}")
-    async def get_job_details(request: Request, job_id: str) -> Response:
+    async def get_job_details(self, request: Request, job_id: str) -> Response:
         """Get detailed job information."""
         try:
-            job_data = storage.get_object_by_id("Job", job_id)
+            job_data = self.storage.get_object_by_id("Job", job_id)
             if not job_data:
                 raise HTTPException(status_code=404, detail="Job not found")
 
             # Get related cases
-            cases_data = storage.get_cases_for_job(job_id)
+            cases_data = self.storage.get_cases_for_job(job_id)
 
             return templates.TemplateResponse(
                 request,
@@ -679,8 +661,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get job details error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/cases")
     async def get_cases_api(
+        self,
         request: Request,
         status: str | None = Query(None),
         job_id: str | None = Query(None),
@@ -692,7 +674,7 @@ def create_admin_routes() -> APIRouter:
         """Get cases with filtering and pagination."""
         try:
             # Get all cases
-            cases_data = storage.get_objects("Case")
+            cases_data = self.storage.get_objects("Case")
 
             # Apply filters
             filtered_cases = []
@@ -772,18 +754,17 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get cases API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/cases/{case_id}")
-    async def get_case_details(request: Request, case_id: str) -> Response:
+    async def get_case_details(self, request: Request, case_id: str) -> Response:
         """Get detailed case information."""
         try:
-            case_data = storage.get_object_by_id("Case", case_id)
+            case_data = self.storage.get_object_by_id("Case", case_id)
             if not case_data:
                 raise HTTPException(status_code=404, detail="Case not found")
 
             # Get parent job if exists
             job_data = None
             if case_data.get("job_id"):
-                job_data = storage.get_object_by_id("Job", case_data["job_id"])
+                job_data = self.storage.get_object_by_id("Job", case_data["job_id"])
 
             return templates.TemplateResponse(
                 request,
@@ -801,8 +782,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get case details error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.post("/api/jobs/{job_id}/status")
     async def update_job_status(
+        self,
         job_id: str,
         status_data: dict[str, str],
     ) -> dict[str, str]:
@@ -812,7 +793,7 @@ def create_admin_routes() -> APIRouter:
             if not new_status or new_status not in [s.value for s in EntityStatus]:
                 raise HTTPException(status_code=400, detail="Invalid status")
 
-            job_data = storage.get_object_by_id("Job", job_id)
+            job_data = self.storage.get_object_by_id("Job", job_id)
             if not job_data:
                 raise HTTPException(status_code=404, detail="Job not found")
 
@@ -821,7 +802,7 @@ def create_admin_routes() -> APIRouter:
             if new_status in ["completed", "failed", "cancelled"]:
                 job_data["finished_at"] = datetime.now().isoformat()
 
-            storage.save_object("Job", job_data)
+            self.storage.save_object("Job", job_data)
 
             return {"message": "Job status updated successfully"}
 
@@ -831,8 +812,8 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Update job status error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.post("/api/cases/{case_id}/status")
     async def update_case_status(
+        self,
         case_id: str,
         status_data: dict[str, str],
     ) -> dict[str, str]:
@@ -842,7 +823,7 @@ def create_admin_routes() -> APIRouter:
             if not new_status or new_status not in [s.value for s in EntityStatus]:
                 raise HTTPException(status_code=400, detail="Invalid status")
 
-            case_data = storage.get_object_by_id("Case", case_id)
+            case_data = self.storage.get_object_by_id("Case", case_id)
             if not case_data:
                 raise HTTPException(status_code=404, detail="Case not found")
 
@@ -851,7 +832,7 @@ def create_admin_routes() -> APIRouter:
             if new_status in ["completed", "failed", "cancelled"]:
                 case_data["finished_at"] = datetime.now().isoformat()
 
-            storage.save_object("Case", case_data)
+            self.storage.save_object("Case", case_data)
 
             return {"message": "Case status updated successfully"}
 
@@ -861,17 +842,16 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Update case status error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.delete("/api/jobs/{job_id}")
-    async def delete_job(job_id: str) -> dict[str, str]:
+    async def delete_job(self, job_id: str) -> dict[str, str]:
         """Delete a job and its related cases."""
         try:
             # Delete related cases first
-            cases_data = storage.get_cases_for_job(job_id)
+            cases_data = self.storage.get_cases_for_job(job_id)
             for case_data in cases_data:
-                storage.delete_object("Case", case_data["id"])
+                self.storage.delete_object("Case", case_data["id"])
 
             # Delete the job
-            deleted = storage.delete_object("Job", job_id)
+            deleted = self.storage.delete_object("Job", job_id)
             if not deleted:
                 raise HTTPException(status_code=404, detail="Job not found")
 
@@ -883,11 +863,10 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Delete job error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.delete("/api/cases/{case_id}")
-    async def delete_case(case_id: str) -> dict[str, str]:
+    async def delete_case(self, case_id: str) -> dict[str, str]:
         """Delete a case."""
         try:
-            deleted = storage.delete_object("Case", case_id)
+            deleted = self.storage.delete_object("Case", case_id)
             if not deleted:
                 raise HTTPException(status_code=404, detail="Case not found")
 
@@ -899,13 +878,12 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Delete case error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/recent-activity")
-    async def get_recent_activity(request: Request) -> Response:
+    async def get_recent_activity(self, request: Request) -> Response:
         """Get recent entity activity."""
         try:
             # Get recent jobs and cases
-            recent_jobs = storage.get_objects("Job")[-5:]  # Last 5 jobs
-            recent_cases = storage.get_objects("Case")[-5:]  # Last 5 cases
+            recent_jobs = self.storage.get_objects("Job")[-5:]  # Last 5 jobs
+            recent_cases = self.storage.get_objects("Case")[-5:]  # Last 5 cases
 
             # Combine and sort by created_at
             activities = []
@@ -946,8 +924,9 @@ def create_admin_routes() -> APIRouter:
             log.error(f"Get recent activity error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/log-stream")
-    async def log_stream() -> (
+    async def log_stream(
+        self,
+    ) -> (
         EventSourceResponse
     ):  # <-- MODIFIED: removed token/key params; Tailscale is the gate
         """Stream log messages via Server-Sent Events."""
@@ -1033,8 +1012,7 @@ def create_admin_routes() -> APIRouter:
 
         return EventSourceResponse(generate_log_events())
 
-    @router.get("/test-log")
-    async def test_log() -> dict[str, str]:
+    async def test_log(self) -> dict[str, str]:
         """Test endpoint to generate a log message."""
         test_message = f"Test log message generated at {datetime.now().isoformat()}"
         add_log_to_queue(
@@ -1046,18 +1024,14 @@ def create_admin_routes() -> APIRouter:
 
         return {"message": "Test log added to queue"}
 
-    # <-- REMOVED: debug-tokens endpoint (console tokens removed)
-
-    @router.get("/test-loguru")
-    async def test_loguru() -> dict[str, str]:
+    async def test_loguru(self) -> dict[str, str]:
         """Test endpoint to generate loguru messages."""
         log.info("Testing loguru INFO message")
         log.warning("Testing loguru WARNING message")
         log.error("Testing loguru ERROR message")
         return {"message": "Loguru test messages sent"}
 
-    @router.get("/debug-queue")
-    async def debug_queue() -> dict[str, Any]:
+    async def debug_queue(self) -> dict[str, Any]:
         """Debug endpoint to check log queue status."""
         queue_size = log_queue.qsize()
 
@@ -1074,8 +1048,8 @@ def create_admin_routes() -> APIRouter:
             "message": "Test message added to queue",
         }
 
-    @router.post("/api/console/execute")
     async def execute_console_command(
+        self,
         request: Request,
         command_data: dict[str, str],
     ) -> dict[str, str]:
@@ -1108,6 +1082,48 @@ def create_admin_routes() -> APIRouter:
                 message=f"Command execution failed: {e!s}",
             )
             return {"status": "error", "message": str(e)}
+
+
+# (HTTP method, path, AdminHandlers method name, extra add_api_route options).
+# Order matters: FastAPI matches the first route that fits.
+_ADMIN_ROUTES: list[tuple[str, str, str, dict[str, Any]]] = [
+    ("GET", "/", "admin_dashboard", {"response_class": HTMLResponse}),
+    ("GET", "/jobs", "admin_jobs_page", {"response_class": HTMLResponse}),
+    ("GET", "/cases", "admin_cases_page", {"response_class": HTMLResponse}),
+    ("GET", "/server", "admin_server_page", {"response_class": HTMLResponse}),
+    ("GET", "/agents", "admin_agents_page", {"response_class": HTMLResponse}),
+    ("GET", "/static/{file_path:path}", "serve_static", {}),
+    ("GET", "/console", "admin_console_page", {"response_class": HTMLResponse}),
+    ("GET", "/api/stats", "get_stats", {}),
+    ("GET", "/api/server/status", "get_server_status_api", {}),
+    ("POST", "/api/server/register", "register_server_with_supervisor", {}),
+    ("GET", "/api/agents", "get_agents_api", {}),
+    ("GET", "/api/agents/{agent_slug}", "get_agent_details", {}),
+    ("GET", "/api/jobs", "get_jobs_api", {}),
+    ("GET", "/api/jobs/{job_id}", "get_job_details", {}),
+    ("GET", "/api/cases", "get_cases_api", {}),
+    ("GET", "/api/cases/{case_id}", "get_case_details", {}),
+    ("POST", "/api/jobs/{job_id}/status", "update_job_status", {}),
+    ("POST", "/api/cases/{case_id}/status", "update_case_status", {}),
+    ("DELETE", "/api/jobs/{job_id}", "delete_job", {}),
+    ("DELETE", "/api/cases/{case_id}", "delete_case", {}),
+    ("GET", "/api/recent-activity", "get_recent_activity", {}),
+    ("GET", "/log-stream", "log_stream", {}),
+    ("GET", "/test-log", "test_log", {}),
+    ("GET", "/test-loguru", "test_loguru", {}),
+    ("GET", "/debug-queue", "debug_queue", {}),
+    ("POST", "/api/console/execute", "execute_console_command", {}),
+]
+
+
+def create_admin_routes() -> APIRouter:
+    """Create and configure admin routes."""
+    router = APIRouter(tags=["admin"])
+    handlers = AdminHandlers(StorageManager())
+    for method, route_path, name, options in _ADMIN_ROUTES:
+        router.add_api_route(
+            route_path, getattr(handlers, name), methods=[method], **options
+        )
 
     # Include workbench sub-router
     from supervaizer.admin.workbench_routes import create_workbench_routes
