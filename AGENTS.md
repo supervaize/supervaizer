@@ -24,6 +24,7 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 | User-facing overview and quick start | `README.md` |
 | Supervaizer v2 contract (Jobs, Cases, Steps, Resources, Surfaces, Actions) | `docs/2026_05_SUPERVAIZER_v2.md` |
 | Protocol layering (A2A, A2UI, AG-UI) | `docs/2026_05_PROTOCOLS.md` |
+| Integration skill for coding agents (process only; it points to the docs and examples, so update those, not the skill, when a contract changes) | `skills/supervaizer-integration/` |
 | Workspace authorization (grants, signed tokens) | `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` |
 | CLI, deployment, local Docker testing | `docs/2025_08_CLI.md`, `docs/rfc/2025_10_001-cloud-deployment-cli.md`, `docs/2025_10_LOCAL_TESTING.md` |
 | API surfaces and auth, admin UI, persistence, v1 parameter validation | `docs/2025_08_REST_API.md`, `docs/2025_08_ADMIN_README.md`, `docs/2025_08_PERSISTENCE.md`, `docs/2025_08_PARAMETER_VALIDATION.md` |
