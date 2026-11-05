@@ -11,7 +11,6 @@ from __future__ import annotations
 import ast
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -55,20 +54,6 @@ def _mask_secret(value: str | None) -> str | None:
 
 def _normalize_controller_url(url: str) -> str:
     return url.rstrip("/")
-
-
-def _slug(value: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
-    return slug or "value"
-
-
-def _v2_slug(value: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
-    return slug or "agent"
-
-
-def _module_from_filename(filename: str) -> str:
-    return Path(filename).stem
 
 
 def _read_json_file(path: str | Path) -> Any:
@@ -167,441 +152,143 @@ def _handle(output_pretty: bool, fn: Any, *args: Any, **kwargs: Any) -> None:
         raise typer.Exit(code=1)
 
 
-def _questions_payload() -> dict[str, Any]:
-    return {
-        "ok": True,
-        "operation": "questions",
-        "goal": "Design the Supervaizer v2 Job, Case, Step, Resource, Surface, and Action contract before writing controller code.",
-        "questions": [
-            {
-                "id": "agent_entrypoint",
-                "category": "Target Function",
-                "question": "What Python function should the v2 `job.start` action call (module path + function)?",
-                "why": "This becomes the target call inside the generated `agent_impl.py` action handler.",
-            },
-            {
-                "id": "job_definition",
-                "category": "Job Mapping",
-                "question": "What does one invocation represent in business terms (the Job)?",
-                "why": "The Job should match a committed user-visible unit of work in Studio.",
-            },
-            {
-                "id": "case_definition",
-                "category": "Case Mapping",
-                "question": "Does one job process multiple items? If yes, what is the per-item unit (email, phone number, document, lead, etc.)?",
-                "why": "Each repeated item is usually one Case.",
-            },
-            {
-                "id": "case_source_field",
-                "category": "Case Mapping",
-                "question": "Which input field contains the case items (e.g., `emails`, `phone_numbers`) and how is it encoded (CSV/list/single)?",
-                "why": "Used to build the case loop in `agent_impl.py`.",
-            },
-            {
-                "id": "lane_list",
-                "category": "Case Mapping",
-                "question": "Which lanes should Studio render for these Cases? Use `work` by default; add `setup` or `deliverable` only when useful.",
-                "why": "Case.lane is a rendering hint, not an ontology.",
-            },
-            {
-                "id": "step_list",
-                "category": "Flow Mapping",
-                "question": "What are the ordered steps inside each case (fetch, parse, classify, generate, send, review, etc.)?",
-                "why": "These become v2 Step snapshots with activity/status/awaiting/outputs.",
-            },
-            {
-                "id": "human_in_the_loop",
-                "category": "Flow Mapping",
-                "question": "Where do humans approve/review/answer? Which steps are HITL?",
-                "why": "HITL is represented as a Step with `status=awaiting` and an `awaiting` form submitted through `step.awaiting.submit`.",
-            },
-            {
-                "id": "start_fields",
-                "category": "A2UI Surface",
-                "question": "Which user-provided inputs should appear in the `job.start` A2UI form?",
-                "why": "These become the document returned by `supervaizer/surface.load` for `job.start`.",
-            },
-            {
-                "id": "agent_parameters",
-                "category": "Secrets / Env",
-                "question": "Which environment variables/secrets should be requested as agent parameters (API keys, credentials, endpoints)?",
-                "why": "These become explicit controller requirements or optional Agent parameters; missing required values should fail clearly.",
-            },
-            {
-                "id": "resources",
-                "category": "Resources",
-                "question": "What agent-owned resources should Studio manage, and which operations are allowed?",
-                "why": "Resources become v2 declarations plus `resource.<id>.<operation>` typed actions.",
-            },
-            {
-                "id": "datasets_artifacts",
-                "category": "Outputs",
-                "question": "Which datasets, Vega-Lite dashboards, and artifacts should Studio render?",
-                "why": "Agent-owned vocabulary belongs in dataset and artifact declarations, not protocol enums.",
-            },
-            {
-                "id": "sync_source",
-                "category": "Sync",
-                "question": "How should `job.sync` converge Studio state with the agent when status has drifted or a job was created for an existing external run?",
-                "why": "`job.sync` is the v2 status convergence mechanism.",
-            },
-        ],
-    }
-
-
 def _spec_template() -> dict[str, Any]:
+    """A blank design record. Each section holds the decisions of one interview topic."""
     return {
         "project": {
             "name": "my_agent_project",
             "output_dir": ".",
             "controller_filename": "supervaizer_control.py",
-            "workflow_filename": "agent_impl.py",
         },
-        "integration": {
-            "agent_slug": "my-agent",
-            "agent_display_name": "My Agent",
-            "agent_description": "Describe the agent's purpose for Supervaize users.",
-            "agent_version": "0.1.0",
-            "a2ui_catalog_version": "my-agent-ui.1",
-            "workflow_wrapper_function": "process_my_agent_workflow",
-            "job_start_title": "Start My Agent",
+        "agent": {
+            "slug": "my-agent",
+            "display_name": "My Agent",
+            "description": "What the agent does, for Studio users.",
+            "version": "0.1.0",
         },
-        "target_agent": {
-            "module": "my_agent.main",
-            "function": "run_workflow",
-            "kwargs_from_fields": ["input_text"],
-            "case_item_param": None,
+        "mission": "The business goal that several jobs serve together.",
+        "job": {
+            "definition": "What one click starts, and what is finished when it is finished.",
+            "started_by": ["person"],
+            "continues_after_start": False,
+            "needs_setup": False,
+            "entrypoint": "my_agent.main.run_workflow",
         },
-        "job_mapping": {
-            "job_definition": "One execution processes a user request end-to-end.",
-            "case_strategy": "single_case",
-            "case_collection_field": None,
-            "case_items_format": "single",
-            "case_item_label": "item",
-            "case_name_prefix": "Case",
-            "case_description_template": "Process one case item",
+        "case": {
+            "definition": "The item an operator counts: a contact, a document, a ticket.",
+            "known_at_start": True,
+            "independent": True,
+            "title": "What names a case on one line.",
         },
-        "lanes": [{"id": "work", "label": "Work", "default": True}],
         "steps": [
             {
-                "id": "prepare",
-                "name": "Prepare Inputs",
-                "description": "Validate and normalize inputs.",
-                "activity": "operation",
-                "status": "completed",
-            },
-            {
                 "id": "execute",
-                "name": "Run Agent Logic",
-                "description": "Call the existing Python agent function.",
-                "activity": "operation",
-                "status": "completed",
-            },
-            {
-                "id": "finalize",
-                "name": "Finalize Result",
-                "description": "Prepare final payload and close the case.",
-                "activity": "operation",
-                "status": "completed",
-                "outputs": [{"id": "result", "type": "result", "title": "Result"}],
-            },
+                "title": "The step name, in the operator's words",
+                "can_fail": True,
+                "costs_money": False,
+                "output": None,
+                "outside_effect": False,
+                "needs_person": False,
+            }
         ],
         "start_fields": [
-            {
-                "id": "input_text",
-                "label": "Input text",
-                "type": "string",
-                "required": True,
-                "description": "Primary user input",
-            }
+            {"id": "goal", "label": "Goal", "type": "text", "required": True}
         ],
-        "resources": [
-            {
-                "id": "items",
-                "label": "Items",
-                "auto_surface": True,
-                "scope": "workspace",
-                "requires_context": ["workspace.slug"],
-                "operations": ["list"],
-                "fields": [
-                    {"id": "id", "label": "ID", "type": "string", "required": True},
-                    {"id": "name", "label": "Name", "type": "string", "required": True},
-                ],
-            }
-        ],
-        "datasets": [],
-        "artifact_types": [{"type": "result", "label": "Result"}],
-        "agent_parameters": [
-            {
-                "name": "EXAMPLE_API_KEY",
-                "description": "API key used by the agent",
-                "is_environment": True,
-                "is_secret": True,
-            }
-        ],
-        "supervaize_env": {
-            "workspace_id_env": "SUPERVAIZE_WORKSPACE_ID",
-            "api_key_env": "SUPERVAIZE_API_KEY",
-            "api_url_env": "SUPERVAIZE_API_URL",
-        },
-        "notes": {
-            "job_case_step_mapping": "Replace with your concrete v2 mapping before scaffolding.",
-            "hitl_steps": [],
-        },
+        "parameters": [],
+        "cost": {"counted": [], "estimate_before_start": False},
+        "human_in_the_loop": [],
+        "guardrail_checkpoints": [],
+        "resources": [],
+        "configure": {"sections": [], "primary_action": None},
+        "analytics": {"job": [], "mission": []},
+        "artifact_types": [],
+        "scheduled_start": False,
+        "notes": {},
     }
-
-
-def _parse_csv_list(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def _wizard_impl(output_file: str, pretty: bool) -> None:
-    typer.echo(
-        "Supervaizer v2 Integration Wizard (existing Python agent -> A2A/A2UI controller)"
-    )
-    project_name = typer.prompt("Project name", default="my_agent_project")
-    agent_slug = _v2_slug(
-        typer.prompt("Agent slug (Studio/A2A slug)", default="my-agent")
-    )
-    agent_display_name = typer.prompt(
-        "Agent display name", default=agent_slug.replace("_", " ").title()
-    )
-    agent_description = typer.prompt(
-        "Agent description", default="Existing Python agent integrated with Supervaizer"
-    )
-    agent_version = typer.prompt("Agent version", default="0.1.0")
-    a2ui_catalog_version = typer.prompt(
-        "A2UI catalog version", default=f"{agent_slug}-ui.1"
-    )
-
-    target_module = typer.prompt(
-        "Target agent module (dotted path)", default=f"{agent_slug}.main"
-    )
-    target_function = typer.prompt("Target agent function name", default="run_workflow")
-    kwargs_from_fields_csv = typer.prompt(
-        "Target function kwargs sourced from job fields (comma-separated)",
-        default="input_text",
-    )
-
-    job_definition = typer.prompt(
-        "What is one Job (business meaning)?",
-        default="One end-to-end agent execution",
-    )
-    case_strategy = typer.prompt(
-        "Case strategy (single_case/per_item)",
-        default="single_case",
-    ).strip()
-    case_collection_field = None
-    case_items_format = "single"
-    case_item_label = "item"
-    case_item_param = None
-    if case_strategy == "per_item":
-        case_collection_field = typer.prompt(
-            "Field containing case items", default="items"
-        )
-        case_items_format = typer.prompt(
-            "Case items format (csv/list/single)", default="csv"
-        )
-        case_item_label = typer.prompt("Per-case item label", default="item")
-        case_item_param = (
-            typer.prompt(
-                "Target function kwarg name for the current case item (blank to skip)",
-                default=case_item_label,
-            ).strip()
-            or None
-        )
-
-    steps_csv = typer.prompt(
-        "Ordered per-case steps (comma-separated)",
-        default="prepare,execute,finalize",
-    )
-    start_fields_csv = typer.prompt(
-        "Job start form fields (comma-separated, default all string required)",
-        default=kwargs_from_fields_csv,
-    )
-    agent_params_csv = typer.prompt(
-        "Agent parameter env vars/secrets (comma-separated, blank if none)",
-        default="",
-        show_default=False,
-    )
-
-    steps: list[dict[str, Any]] = []
-    step_names = _parse_csv_list(steps_csv)
-    for idx, step in enumerate(step_names):
-        step_id = _slug(step)
-        steps.append({
-            "id": step_id,
-            "name": step.replace("_", " ").title(),
-            "description": f"{step.replace('_', ' ').title()} step",
-            "activity": "operation",
-            "status": "completed",
-            "outputs": [
-                {"id": f"{step_id}_output", "type": "result", "title": "Result"}
-            ]
-            if idx == len(step_names) - 1
-            else [],
-        })
-
-    start_fields = [
-        {
-            "id": field,
-            "label": field.replace("_", " ").title(),
-            "type": "string",
-            "required": True,
-            "description": f"Input field: {field}",
-        }
-        for field in _parse_csv_list(start_fields_csv)
-    ]
-
-    agent_parameters = [
-        {
-            "name": name,
-            "description": f"{name} environment variable",
-            "is_environment": True,
-            "is_secret": bool(name.endswith("KEY") or "PASSWORD" in name),
-        }
-        for name in _parse_csv_list(agent_params_csv)
-    ]
-
-    spec = _spec_template()
-    spec["project"]["name"] = project_name
-    spec["integration"].update({
-        "agent_slug": agent_slug,
-        "agent_display_name": agent_display_name,
-        "agent_description": agent_description,
-        "agent_version": agent_version,
-        "a2ui_catalog_version": a2ui_catalog_version,
-        "workflow_wrapper_function": f"process_{_slug(agent_slug)}_workflow",
-        "job_start_title": f"Start {agent_display_name}",
-    })
-    spec["target_agent"].update({
-        "module": target_module,
-        "function": target_function,
-        "kwargs_from_fields": _parse_csv_list(kwargs_from_fields_csv),
-        "case_item_param": case_item_param,
-    })
-    spec["job_mapping"].update({
-        "job_definition": job_definition,
-        "case_strategy": case_strategy,
-        "case_collection_field": case_collection_field,
-        "case_items_format": case_items_format,
-        "case_item_label": case_item_label,
-        "case_name_prefix": case_item_label.replace("_", " ").title(),
-        "case_description_template": f"Process one {case_item_label}",
-    })
-    spec["steps"] = steps
-    spec["start_fields"] = start_fields
-    spec["agent_parameters"] = agent_parameters
-    spec["notes"]["job_case_step_mapping"] = (
-        "Review this mapping carefully. Confirm the Job, each Case boundary, and the exact ordered Steps before scaffolding."
-    )
-
-    out_path = Path(output_file)
-    _write_text(out_path, json.dumps(spec, indent=2) + "\n", force=True)
-    _print_json(
-        {
-            "ok": True,
-            "operation": "wizard",
-            "spec_file": str(out_path),
-            "next_steps": [
-                "Review and edit the generated spec (especially job_mapping, steps, start_fields, and agent_parameters).",
-                "Run analyze-agent on the target project if you need help choosing the target function.",
-                "Run scaffold-integration with this spec to generate a v2 supervaizer_control.py and agent_impl.py.",
-            ],
-            "spec": spec if pretty else None,
-        },
-        pretty=pretty,
-    )
 
 
 def _load_and_validate_spec(spec_file: str | Path) -> dict[str, Any]:
     spec = _read_json_file(spec_file)
     if not isinstance(spec, dict):
         raise ValueError("Spec file must be a JSON object")
-    for key in ["project", "integration", "target_agent", "job_mapping"]:
+    for key in ["project", "agent", "job", "case", "steps"]:
         if key not in spec:
             raise ValueError(f"Spec file missing required top-level key: {key}")
     return spec
 
 
-V2_GUIDE = (
-    "https://github.com/supervaize/supervaizer/blob/main/docs/2026_05_SUPERVAIZER_v2.md"
-)
 HELLO_WORLD = "https://github.com/runwaize/supervaize_hello_world/blob/main"
 DOCS = "https://docs.runwaize.com/docs/supervaizer-controller"
 
 
 def _spec_checklist(spec: dict[str, Any]) -> list[dict[str, str]]:
-    """What to build for this spec, and the reference to copy each part from.
+    """What to build for this spec, in build order, with the guide and the pattern of each part.
 
-    This helper holds no code templates: the SDK scaffold, the SDK docs and the
+    This helper holds no code templates: the guides, the SDK scaffold and the
     Hello World example are the only sources of implementation patterns.
     """
-    integration = spec["integration"]
-    target = spec["target_agent"]
-    items = [
-        {
-            "task": f"Set the registration: slug {integration.get('agent_slug')!r}, display name, catalog version, lanes.",
-            "reference": f"{V2_GUIDE}#registration",
-        },
-        {
-            "task": f"Wire job.start to {target.get('module')}.{target.get('function')} and return the job state "
-            f"for this mapping: {spec['job_mapping'].get('job_definition', '')}",
-            "reference": f"{HELLO_WORLD}/agent_v2.py",
-        },
-        {
-            "task": "Implement job.sync and job.stop; make job.start safe to retry.",
-            "reference": f"{V2_GUIDE}#idempotency",
-        },
-        {
-            "task": "Declare action metadata (read-only actions, scopes).",
-            "reference": f"{V2_GUIDE}#action-metadata",
-        },
-    ]
-    optional = [
+    steps = spec.get("steps") or []
+    configure = spec.get("configure") or {}
+    analytics = spec.get("analytics") or {}
+    topics = [
         (
-            spec.get("notes", {}).get("hitl_steps")
-            or any(s.get("status") == "awaiting" for s in spec.get("steps", [])),
-            "Add the awaiting steps, their surface and the submit action.",
-            f"{HELLO_WORLD}/tests/test_hitl.py",
+            True,
+            (
+                f"Register {spec['agent'].get('slug')!r}, describe the start form, wire job.start to "
+                f"{spec['job'].get('entrypoint')}, and return the job state for: {spec['job'].get('definition', '')}"
+            ),
+            "controller-setup",
+            "agent_v2.py",
+        ),
+        (
+            spec.get("parameters"),
+            "Declare the parameters and secrets.",
+            "parameters",
+            "supervaizer_control.py",
+        ),
+        (
+            True,
+            "Report the cost of each step and the job total.",
+            "cost-reporting",
+            "agent_v2.py",
+        ),
+        (
+            spec.get("human_in_the_loop") or any(s.get("needs_person") for s in steps),
+            "Add the waiting steps, their form and the submit action.",
+            "human-in-the-loop",
+            "tests/test_hitl.py",
+        ),
+        (
+            spec.get("guardrail_checkpoints")
+            or any(s.get("outside_effect") for s in steps),
+            "Add a rule checkpoint to each step with an outside effect.",
+            "rule-checkpoints",
+            "agent_rules.py",
         ),
         (
             spec.get("resources"),
-            "Declare the resources and implement their operations.",
-            f"{HELLO_WORLD}/agent_data_resource.py",
+            "Declare the shared resources and their operations.",
+            "resources",
+            "agent_data_resource.py",
         ),
         (
-            spec.get("datasets"),
-            "Declare the datasets and build the dashboards.",
-            f"{DOCS}/job-analytics",
-        ),
-        (
-            spec.get("artifact_types"),
-            "Declare the artifact types and the step outputs.",
-            f"{HELLO_WORLD}/agent_deliverable.py",
-        ),
-        (
-            integration.get("scheduled_start"),
-            "Opt in to scheduled start.",
-            f"{V2_GUIDE}#scheduled-start",
-        ),
-        (
-            integration.get("job_configurator"),
+            configure.get("sections") or spec["job"].get("needs_setup"),
             "Build the Configure screen.",
-            f"{DOCS}/job-configurator",
+            "job-configurator",
+            "agent_configurator.py",
         ),
         (
-            spec.get("agent_parameters"),
-            "Declare the agent parameters and secrets.",
-            "https://github.com/supervaize/supervaizer/blob/main/README.md",
+            analytics.get("job") or analytics.get("mission"),
+            "Build the analytics dashboards.",
+            "job-analytics",
+            "agent_dashboard.py",
         ),
     ]
-    items.extend(
-        {"task": task, "reference": reference}
-        for wanted, task, reference in optional
+    return [
+        {"task": task, "guide": f"{DOCS}/{page}", "pattern": f"{HELLO_WORLD}/{pattern}"}
+        for wanted, task, page, pattern in topics
         if wanted
-    )
-    return items
+    ]
 
 
 def _scaffold_integration_impl(
@@ -1021,14 +708,6 @@ def _load_surface_impl(
     )
 
 
-@app.command("questions")
-def questions(
-    pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output."),
-) -> None:
-    """Print the integration discovery questions (Job/Case/Step mapping first)."""
-    _print_json(_questions_payload(), pretty=pretty)
-
-
 @app.command("spec-template")
 def spec_template(
     output_file: str | None = typer.Option(
@@ -1051,19 +730,6 @@ def spec_template(
         },
         pretty=pretty,
     )
-
-
-@app.command("wizard")
-def wizard(
-    output_file: str = typer.Option(
-        "integration_spec.json",
-        "--output-file",
-        help="Where to write the generated integration spec JSON.",
-    ),
-    pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output."),
-) -> None:
-    """Interactive wizard to collect Job/Case/Step mapping and create an integration spec."""
-    _handle(pretty, _wizard_impl, output_file=output_file, pretty=pretty)
 
 
 @app.command("analyze-agent")
