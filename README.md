@@ -25,6 +25,8 @@ Supervaizer does not contain agent business logic. Agents declare their resource
 - [Admin interface and workbench](docs/2025_08_ADMIN_README.md)
 - [Hello World example repository](https://github.com/supervaize/supervaize_hello_world)
 - [Built-in local Hello World agent](src/supervaizer/examples/hello_world_agent.py)
+- [Supervaizer integration skill](https://github.com/runwaize/runwaize_skills/tree/main/supervaizer_integration) — lets a coding agent (Claude Code, Cursor, Codex) integrate an existing Python agent step by step
+- Studio guides: [Job Configurator (Configure screen)](https://docs.runwaize.com/docs/supervaizer-controller/job-configurator), [Job and mission analytics](https://docs.runwaize.com/docs/supervaizer-controller/job-analytics)
 
 ## Quick Start
 
