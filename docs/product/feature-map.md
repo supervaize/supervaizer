@@ -25,6 +25,24 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Verification: `tests/test_local_mode_a2a.py`, `tests/test_cli.py`
 - Known caveats: The bypass covers `/a2a` actions and surfaces only. Data-resource routes never bypass. Do not expose the port: the key is well known, and a non-loopback `--host` publishes it. The public [supervaize_hello_world](https://github.com/supervaize/supervaize_hello_world) repo is still the v1 `AgentMethod` style; model new agents on the built-in agent.
 
+## Log in to Studio from the terminal
+
+- Purpose: Get the Studio credentials of a workspace with no key to copy, for a new or an existing Studio account.
+- Entry points:
+  - `supervaizer login`
+  - `supervaizer start --env-file <file>`
+- Access: A Studio account with Developer access. The approval is in the browser, with the Studio sign-in (Google included).
+- Preconditions: A Studio that has the device login endpoints (`/api/v1/cli/device/`).
+- Main flow:
+  1. Run `supervaizer login`. Open the printed page, check the code, choose the workspace, approve.
+  2. Run `supervaizer start --env-file .env` with a public URL.
+  3. Open the agent page that the start log shows, and accept the workspace authorization there.
+- Expected result: The environment file holds the three `SUPERVAIZE_*` variables and the three `SUPERVAIZER_WORKSPACE_AUTH_*` variables. The registration succeeds and the log shows the Studio page of each agent.
+- Important states: A denied or expired code writes nothing. The code is valid for one login. An older Studio answers 404 and the command says to create the key on the Developer page.
+- Source: `src/supervaizer/studio_login.py`, `src/supervaizer/cli.py`, `src/supervaizer/studio_handshake.py`
+- Verification: `tests/test_studio_login.py`
+- Known caveats: The command never prints a value; it prints variable names. The environment file must stay out of git. `start` loads an environment file only with `--env-file` or `--local`.
+
 ## Scaffold a v2 control file
 
 - Purpose: Generate a minimal controller you can edit.

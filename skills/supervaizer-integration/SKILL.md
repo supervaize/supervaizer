@@ -1,6 +1,6 @@
 ---
 name: supervaizer-integration
-description: Use when a developer wants to connect a Python agent to Supervaize Studio with the Supervaizer SDK, or wants to add a capability to a connected agent - parameters and secrets, form fields, shared resources, cost reporting, human in the loop, guardrail controls (rule checkpoints), a Configure screen, or analytics dashboards.
+description: Use when a developer wants to connect a Python agent to Supervaize Studio with the Supervaizer SDK, or wants to add a capability to a connected agent - parameters and secrets, form fields, shared resources, cost reporting, human in the loop, guardrail controls (rule checkpoints), a Configure screen, artifacts, a scheduled start, or analytics dashboards. Use also when a developer needs a Studio account, a developer API key, a first registration, a deployment, or help with a registration that Studio refuses.
 ---
 
 # Supervaizer Integration
@@ -30,6 +30,12 @@ Guides are at `https://docs.runwaize.com/docs/supervaizer-controller/<page>`. He
 | Configure screen | `job-configurator` | `agent_configurator.py`, `tests/test_configurator.py` |
 | Analytics dashboards | `job-analytics` | `agent_dashboard.py` |
 | First run and Studio credentials | `quickstart` | `README.md` |
+| Cloud deployment | `deploy` | - |
+| Public address for a local controller | `tunneling-setup` | - |
+| Network rules between Studio and the controller | `network-security` | - |
+| Errors at start or at registration | `troubleshooting` | - |
+
+The Studio account guide is at `https://docs.runwaize.com/docs/supervaize-fleet/developer-account`.
 
 Other references:
 
@@ -39,7 +45,9 @@ Other references:
 - Scheduled start, guided setup, billing, labels: the v2 guide sections of those names.
 - What each release added: [SDK changelog](https://github.com/supervaize/supervaizer/blob/main/docs/CHANGELOG.md). Check it against the installed version.
 
-This skill lives in the SDK repository, in `skills/supervaizer-integration/`. Inside a checkout of the SDK, the docs are in `../../docs/` and the examples in `../../src/supervaizer/examples/`. If the project has a local checkout of the SDK or of Hello World, read that copy. Helper commands below use paths relative to this skill's folder.
+This skill lives in the SDK repository, in `skills/supervaizer-integration/`. Inside a checkout of the SDK, the docs are in `../../docs/` and the examples in `../../src/supervaizer/examples/`. If the project has a local checkout of the SDK or of Hello World, read that copy.
+
+The helper script is in this skill's folder, not in the developer's project. Claude Code replaces `${CLAUDE_SKILL_DIR}` in the commands below with that folder. In another coding agent, replace it yourself with the absolute path of the folder that holds this `SKILL.md`.
 
 ## The Interview
 
@@ -105,6 +113,11 @@ Ask the questions of every topic that the first three rounds opened. Ask them to
 | **Shared resources** | Several jobs use the same data, or operators must see or correct it | Which data? Who shares it: the workspace, a mission, a job? What may Studio do: list, create, update, delete, import? Which form must offer it as a choice? |
 | **Configure screen** | Round 1 said that the job needs setup, or settings change while the job runs | Which sections? What is editable before launch, while it runs, after it ends? What must be true before launch? What is the main button? |
 | **Analytics** | The agent has numbers that an operator follows. Offer a job dashboard by default | Which three numbers tell the operator that the job goes well? Which chart? Per job, per mission, or both? Which filter? |
+| **Artifacts** | A step produces something to open or export | Which outputs? Who must open each one? Read the "Artifact" section of the v2 guide for the types, then ask which type each output has. |
+| **Scheduled start** | Round 1 said that a schedule starts the job | Which values does a scheduled run use for the start form? What happens when the previous run is not finished? |
+| **Billing catalog** | Other workspaces will pay to use the agent | What is the unit of sale? Which price does the owner set? Read the "Billing catalog" section of the v2 guide before you ask. |
+| **Hosting** | Always | Where does the controller run: the developer's computer with a tunnel, or a cloud service? Who has the cloud account? Which address does Studio call? |
+| **Studio account** | Always | Does the developer have a Studio account with Developer access? Which workspace receives the agent? Who is the admin that accepts the agent's workspace authorization? |
 
 Introduce human in the loop and guardrail controls yourself when the answers of round 3 call for them. Do not wait for the developer to ask.
 
@@ -114,7 +127,15 @@ Summarize the whole design in one message: mission, job, cases, steps, and each 
 
 ## Workflow
 
-### 1. Read the project
+### 1. Install the SDK
+
+Install the SDK in the project's environment as the `quickstart` guide says. Do this first: the helper script and the `supervaizer` command need it. Then check the installed version against the SDK changelog.
+
+```bash
+supervaizer --version
+```
+
+### 2. Read the project
 
 Before the first question, read:
 
@@ -125,35 +146,33 @@ Before the first question, read:
 - an existing `supervaizer_control.py` (then extend it; do not overwrite it)
 
 ```bash
-python scripts/supervaize_cli_helper.py analyze-agent --project-root /path/to/agent --pretty
+python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" analyze-agent --project-root /path/to/agent --pretty
 ```
 
-### 2. Run the interview
+### 3. Run the interview
 
 Follow "The Interview" above.
 
-### 3. Record the decisions
+### 4. Record the decisions
 
 Write the confirmed design to a spec file, so the developer can review it and so the next session can read it:
 
 ```bash
-python scripts/supervaize_cli_helper.py spec-template --output-file integration_spec.json --pretty
+python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" spec-template --output-file integration_spec.json --pretty
 ```
 
-Fill every section of the spec from the interview. Put a decision that has no slot under `notes`.
+Fill every section of the spec from the interview. Put a decision that has no slot under `notes`. The command refuses to replace an existing spec file. Use `--force` only when the developer wants a blank one.
 
-### 4. Install and scaffold
-
-Install the SDK as the `quickstart` guide says. Then:
+### 5. Scaffold
 
 ```bash
-python scripts/supervaize_cli_helper.py scaffold-integration \
+python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" scaffold-integration \
   --spec-file integration_spec.json --output-dir /path/to/agent --pretty
 ```
 
 The helper runs the SDK's `supervaizer scaffold` and prints a checklist built from the spec. Each item names its guide and its Hello World pattern.
 
-### 5. Build one topic at a time
+### 6. Build one topic at a time
 
 Build in this order. For each topic: read its guide, copy the Hello World pattern, adapt it, write a test, run it.
 
@@ -168,20 +187,96 @@ Build in this order. For each topic: read its guide, copy the Hello World patter
 
 Skip a topic only when the developer decided against it in the interview. Say which topics you skipped and why.
 
-### 6. Test
+### 7. Test without Studio
 
-Run the controller without Studio and call it, as `controller-setup` shows:
+Run the controller in local mode and call it, as `controller-setup` shows. Local mode needs no Studio account.
 
 ```bash
-python scripts/supervaize_cli_helper.py load-surface --help
-python scripts/supervaize_cli_helper.py invoke-action --help
+supervaizer start --local
+python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" load-surface --help
+python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" invoke-action --help
 ```
+
+Both commands fail when the controller answers with a JSON-RPC error. Give `--job-id`, `--case-id` or `--step-id` only for a surface or an action of that scope. For a mission-scoped action, give none.
 
 Write tests that post the same requests to the server app. Copy the helpers from the Hello World `tests/` folder.
 
-### 7. Connect to Studio
+### 8. Connect to Studio
 
-Follow the `quickstart` guide and the Workspace agent grants doc. Tell the developer that a workspace admin must accept the agent grant again each time the registration gains a surface or an action.
+Do this part with the developer. The account and the key are theirs.
+
+**The short way: `supervaizer login`**
+
+Use this way first. It works for a developer with no Studio account and for a developer who has one. The CLI guide of the SDK (`docs/2025_08_CLI.md`, section `login`) is the reference.
+
+1. Run the command in the project folder:
+
+   ```bash
+   supervaizer login
+   ```
+
+2. The command prints an approval page and a short code. Give both to the developer. The developer opens the page, signs in or signs up (Google works), checks that the page shows the same code, chooses the workspace and approves. You do not open the page, and you do not approve.
+3. Wait. The command ends when the developer approves. It writes the Studio credentials and the workspace authorization settings to `.env`. It prints the names of the variables, never a value.
+4. Check that git ignores `.env`. Add the file to `.gitignore` if it is not there.
+5. Start the controller with that file, at the public address from the Hosting question:
+
+   ```bash
+   supervaizer start --env-file .env --public-url https://<public address>
+   ```
+
+6. Read the start log. It shows the Studio page of each registered agent. Give these links to the developer. This is the first time that the developer needs Studio.
+7. On that page, the developer (an admin of the workspace) sets the agent's workspace reference and accepts the workspace authorization. This is the only step in Studio. The Workspace agent grants doc says what Studio and the controller refuse until then.
+8. Ask the developer to start one job from Studio. Read the controller log with them.
+
+If the command says that this Studio does not support the login, use the manual way.
+
+**The manual way: what only the developer does**
+
+These steps need a person in a browser. Give the developer the list, then wait. The screens are in the Studio account guide.
+
+1. Create a Studio account, or sign in. A new account gets its own workspace, and its creator is the admin of that workspace.
+2. Get Developer access for the workspace, as the Studio account guide says. Without it, Studio refuses the registration.
+3. Open the Developer page of the profile menu. Create an API key. Studio shows the key one time only.
+4. On the same page, copy the environment variables that Studio generated for the workspace. There are two groups: the Studio credentials, and the workspace authorization settings. The `quickstart` guide names each variable.
+5. Put the variables in the project's environment file (`.env` or `.envrc`). Make sure that git ignores this file.
+
+**What you never do, in both ways**
+
+- Do not ask the developer to paste the API key in the chat.
+- Do not read the environment file, and do not print a variable.
+- Do not create the account or the key for the developer.
+
+**The manual way: what you do**
+
+1. Check that the variables are present. This command prints names only, never values:
+
+   ```bash
+   python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" env-status --pretty
+   ```
+
+2. Check that the control script reads these variables and gives them to the account object, as the scaffold does. The SDK server does not read them by itself.
+3. Give the controller a public address. Studio must be able to call it. Use the answer of the Hosting question: a tunnel for a local controller (`tunneling-setup`), or a cloud service (`deploy`).
+4. Start the controller with `supervaizer start`. Read the log: the registration event must succeed, and the agent must be updated from Studio.
+5. Tell the developer to open the agent in the Agents list of their workspace. On the agent page, a workspace admin must accept the agent's workspace authorization. The Workspace agent grants doc says what Studio and the controller refuse until then.
+6. Ask the developer to start one job from Studio. Read the controller log with them.
+
+Tell the developer that a workspace admin must accept the workspace authorization again each time the registration gains a surface or an action.
+
+**When Studio refuses the registration**
+
+Read the `troubleshooting` guide first. The usual causes of a refusal with status 403 are:
+
+- the workspace variable is not the exact workspace slug that the Developer page shows
+- the owner of the API key is not a member of that workspace, or lost Developer access
+- the workspace has no Developer access or no active plan
+
+Report the status code and the request id of the log. Never report a header or a key.
+
+### 9. Deploy
+
+When the developer chose a cloud service, follow the `deploy` guide. Run `supervaizer deploy plan` before `supervaizer deploy up`, and show the plan to the developer. The deployed controller registers itself with Studio at its start, with the same variables.
+
+After a deployment, do the checks of step 8 again: the registration in the log, the workspace authorization, one job from Studio.
 
 ## Review Before You Finish
 
@@ -194,6 +289,8 @@ Check each point against its guide:
 - No secret reaches a result, a title, case metadata or a log.
 - Every step with an outside effect has a guardrail checkpoint, or the developer declined it.
 - Every Configure document passes the refusal rules of its guide.
+- Git ignores the environment file, and no key is in the code, the spec file or the chat.
+- The registration succeeded in the controller log, and a workspace admin accepted the workspace authorization.
 - The checklists at the end of each guide hold.
 
 ## Report
@@ -207,6 +304,8 @@ When you finish, report:
 - resources, Configure sections and dashboards
 - registered surfaces and actions
 - the installed SDK version
+- where the controller runs, and its public address
+- the Studio state: the workspace, the result of the registration, and if the workspace authorization is accepted
 - tests run and their result
 - open decisions and business logic still to write
 - any difference found between this skill and a reference
