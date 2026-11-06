@@ -44,14 +44,6 @@ def _print_json(data: dict[str, Any] | list[Any], pretty: bool = False) -> None:
     print(json.dumps(data, separators=(",", ":"), sort_keys=True))
 
 
-def _mask_secret(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if len(value) <= 8:
-        return "*" * len(value)
-    return f"{value[:4]}...{value[-4:]}"
-
-
 def _normalize_controller_url(url: str) -> str:
     return url.rstrip("/")
 
@@ -120,6 +112,27 @@ def _http_json(
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(json.dumps({"url": url, "error": str(exc.reason)})) from exc
+
+
+def _print_rpc_result(
+    operation: str,
+    endpoint: str,
+    status: int,
+    payload: dict[str, Any],
+    response: Any,
+    pretty: bool,
+) -> None:
+    """Print the call. A JSON-RPC error fails the command: the controller sends it with HTTP 200."""
+    report = {
+        "operation": operation,
+        "endpoint": endpoint,
+        "status_code": status,
+        "json_rpc": payload,
+        "response": response,
+    }
+    if isinstance(response, dict) and response.get("error") is not None:
+        raise RuntimeError(json.dumps(report))
+    _print_json({"ok": True, **report}, pretty=pretty)
 
 
 def _handle(output_pretty: bool, fn: Any, *args: Any, **kwargs: Any) -> None:
@@ -228,6 +241,7 @@ def _spec_checklist(spec: dict[str, Any]) -> list[dict[str, str]]:
     Hello World example are the only sources of implementation patterns.
     """
     steps = spec.get("steps") or []
+    cost = spec.get("cost") or {}
     configure = spec.get("configure") or {}
     analytics = spec.get("analytics") or {}
     topics = [
@@ -247,7 +261,9 @@ def _spec_checklist(spec: dict[str, Any]) -> list[dict[str, str]]:
             "supervaizer_control.py",
         ),
         (
-            True,
+            cost.get("counted")
+            or cost.get("estimate_before_start")
+            or any(s.get("costs_money") for s in steps),
             "Report the cost of each step and the job total.",
             "cost-reporting",
             "agent_v2.py",
@@ -547,18 +563,15 @@ def _env_status_impl(shell_template: bool, pretty: bool) -> None:
         )
         return
 
-    values = {name: os.getenv(name) for name in SUPERVAIZE_ENV_VARS}
-    missing = [name for name, value in values.items() if not value]
+    # Names only: no value of an environment variable is ever printed, in full or in part.
+    missing = [name for name in SUPERVAIZE_ENV_VARS if not os.getenv(name)]
     _print_json(
         {
             "ok": len(missing) == 0,
             "operation": "env-status",
             "required_env_vars": list(SUPERVAIZE_ENV_VARS),
-            "present": [name for name, value in values.items() if value],
+            "present": [name for name in SUPERVAIZE_ENV_VARS if name not in missing],
             "missing": missing,
-            "values_masked": {
-                k: (_mask_secret(v) if "KEY" in k else v) for k, v in values.items()
-            },
             "controller_auth_key_present": bool(
                 os.getenv("CONTROLLER_AUTH_KEY")
                 or os.getenv("SUPERVAIZE_CONTROLLER_AUTH_KEY")
@@ -578,7 +591,7 @@ def _invoke_action_impl(
     workspace_slug: str,
     mission_id: str,
     actor_id: str,
-    job_id: str | None,
+    correlation: dict[str, str | None],
     params_json: str | None,
     params_file: str | None,
     timeout_seconds: int,
@@ -608,8 +621,10 @@ def _invoke_action_impl(
             "surface": surface,
             "action": action,
             "input": params,
-            "job_id": job_id or f"local-{request_id}",
             "idempotency_key": request_id,
+            # An id that the caller did not give stays absent: a made-up job id
+            # would test a mission-scoped action in the wrong context.
+            **{key: value for key, value in correlation.items() if value},
         },
     }
 
@@ -638,17 +653,7 @@ def _invoke_action_impl(
         headers=_controller_headers(api_key),
         timeout=timeout_seconds,
     )
-    _print_json(
-        {
-            "ok": True,
-            "operation": "invoke-action",
-            "endpoint": endpoint,
-            "status_code": status,
-            "json_rpc": payload,
-            "response": response,
-        },
-        pretty=pretty,
-    )
+    _print_rpc_result("invoke-action", endpoint, status, payload, response, pretty)
 
 
 def _load_surface_impl(
@@ -659,6 +664,7 @@ def _load_surface_impl(
     workspace_slug: str,
     mission_id: str,
     actor_id: str,
+    correlation: dict[str, str | None],
     input_json: str | None,
     input_file: str | None,
     timeout_seconds: int,
@@ -686,6 +692,7 @@ def _load_surface_impl(
             "agent_slug": agent_slug,
             "surface": surface,
             "input": action_input,
+            **{key: value for key, value in correlation.items() if value},
         },
     }
     status, response = _http_json(
@@ -695,17 +702,7 @@ def _load_surface_impl(
         headers=_controller_headers(api_key),
         timeout=timeout_seconds,
     )
-    _print_json(
-        {
-            "ok": True,
-            "operation": "load-surface",
-            "endpoint": endpoint,
-            "status_code": status,
-            "json_rpc": payload,
-            "response": response,
-        },
-        pretty=pretty,
-    )
+    _print_rpc_result("load-surface", endpoint, status, payload, response, pretty)
 
 
 @app.command("spec-template")
@@ -713,23 +710,30 @@ def spec_template(
     output_file: str | None = typer.Option(
         None, "--output-file", help="Write the template JSON to a file."
     ),
+    force: bool = typer.Option(
+        False, "--force", help="Replace an existing file. A filled spec is lost."
+    ),
     pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output."),
 ) -> None:
     """Print or write an integration spec template used for scaffolding."""
-    template = _spec_template()
-    if output_file:
-        _write_text(
-            Path(output_file), json.dumps(template, indent=2) + "\n", force=True
+
+    def run() -> None:
+        template = _spec_template()
+        if output_file:
+            _write_text(
+                Path(output_file), json.dumps(template, indent=2) + "\n", force=force
+            )
+        _print_json(
+            {
+                "ok": True,
+                "operation": "spec-template",
+                "template": template,
+                "output_file": output_file,
+            },
+            pretty=pretty,
         )
-    _print_json(
-        {
-            "ok": True,
-            "operation": "spec-template",
-            "template": template,
-            "output_file": output_file,
-        },
-        pretty=pretty,
-    )
+
+    _handle(pretty, run)
 
 
 @app.command("analyze-agent")
@@ -842,6 +846,14 @@ def load_surface(
     actor_id: str = typer.Option(
         "local-user", "--actor-id", help="Actor id for the surface context."
     ),
+    job_id: str | None = typer.Option(
+        None, "--job-id", help="Job id, for a job-scoped surface such as job.analytics."
+    ),
+    case_id: str | None = typer.Option(None, "--case-id", help="Optional case id."),
+    step_id: str | None = typer.Option(None, "--step-id", help="Optional step id."),
+    draft_session_id: str | None = typer.Option(
+        None, "--draft-session-id", help="Optional draft session id."
+    ),
     input_json: str | None = typer.Option(
         None, "--input-json", help="JSON object string for surface input."
     ),
@@ -864,6 +876,12 @@ def load_surface(
         workspace_slug,
         mission_id,
         actor_id,
+        {
+            "job_id": job_id,
+            "case_id": case_id,
+            "step_id": step_id,
+            "draft_session_id": draft_session_id,
+        },
         input_json,
         input_file,
         timeout_seconds,
@@ -898,6 +916,11 @@ def invoke_action(
         "local-user", "--actor-id", help="Actor id for the action context."
     ),
     job_id: str | None = typer.Option(None, "--job-id", help="Optional job id."),
+    case_id: str | None = typer.Option(None, "--case-id", help="Optional case id."),
+    step_id: str | None = typer.Option(None, "--step-id", help="Optional step id."),
+    draft_session_id: str | None = typer.Option(
+        None, "--draft-session-id", help="Optional draft session id."
+    ),
     params_json: str | None = typer.Option(
         None, "--params-json", help="JSON object string for action input."
     ),
@@ -924,7 +947,12 @@ def invoke_action(
         workspace_slug,
         mission_id,
         actor_id,
-        job_id,
+        {
+            "job_id": job_id,
+            "case_id": case_id,
+            "step_id": step_id,
+            "draft_session_id": draft_session_id,
+        },
         params_json,
         params_file,
         timeout_seconds,
