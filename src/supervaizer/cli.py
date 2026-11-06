@@ -17,15 +17,25 @@ import importlib.util
 import os
 import shutil
 import sys
+import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import httpx
 import typer
 from rich.console import Console
 from rich.prompt import Confirm
 
 from supervaizer.__version__ import VERSION
 from supervaizer.deploy.cli import deploy_app
+from supervaizer.studio_login import (
+    DEFAULT_API_URL,
+    StudioLoginError,
+    env_values,
+    request_device_code,
+    wait_for_credentials,
+    write_env_file,
+)
 from supervaizer.utils.version_check import check_is_latest_version
 
 if TYPE_CHECKING:
@@ -155,6 +165,12 @@ def start(
         "--local",
         help="Local test mode: run without Studio credentials, with built-in Hello World agent",
     ),
+    env_file: str | None = typer.Option(
+        None,
+        "--env-file",
+        help="Load variables from this file before the start, for example the file "
+        "that `supervaizer login` wrote. Variables that are already set keep their value.",
+    ),
     script_path: str | None = typer.Argument(
         None,
         help="Path to the supervaizer_control.py script",
@@ -165,8 +181,13 @@ def start(
     _configure_start_environment(
         host, port, environment, persist, log_level, debug, reload, public_url
     )
+    if env_file is not None:
+        if not os.path.isfile(env_file):
+            console.print(f"[bold red]Error:[/] environment file {env_file} not found")
+            sys.exit(1)
+        _load_environment_file(env_file)
     if local:
-        _load_local_environment()
+        _load_environment_file(os.path.join(os.getcwd(), ".env"))
         host, public_url = _prepare_local_start(
             host, port, public_url, explicit_public_url
         )
@@ -216,8 +237,8 @@ def _configure_start_environment(
         os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
 
-def _load_local_environment() -> None:
-    env_file = os.path.join(os.getcwd(), ".env")
+def _load_environment_file(env_file: str) -> None:
+    """Set the variables of the file that are not set yet. A missing file is skipped."""
     if os.path.isfile(env_file):
         with open(env_file) as file:
             for line in file:
@@ -225,7 +246,7 @@ def _load_local_environment() -> None:
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, _, value = line.partition("=")
-                key = key.strip()
+                key = key.strip().removeprefix("export ").strip()
                 value = value.strip()
                 if key and key not in os.environ:
                     os.environ[key] = value
@@ -336,6 +357,55 @@ def _launch_control_script(
     if public_url is not None:
         server_instance.public_url = public_url
     server_instance.launch(log_level=log_level)
+
+
+@app.command()
+def login(
+    api_url: str = typer.Option(
+        os.environ.get("SUPERVAIZE_API_URL") or DEFAULT_API_URL,
+        "--api-url",
+        help="Address of the Studio API",
+    ),
+    env_file: str = typer.Option(
+        ".env",
+        "--env-file",
+        help="File that receives the Studio credentials. Keep it out of git.",
+    ),
+    browser: bool = typer.Option(
+        True, "--browser/--no-browser", help="Open the approval page in the browser"
+    ),
+) -> None:
+    """Log in to Supervaize Studio in the browser and save the credentials of the workspace."""
+    try:
+        with httpx.Client(base_url=api_url.rstrip("/"), timeout=30) as client:
+            device = request_device_code(client)
+            approval_url = str(device["verification_uri_complete"])
+            # Text from Studio is printed without markup.
+            console.print("Open this page, sign in or sign up, and approve the login:")
+            console.print(f"  {approval_url}", markup=False)
+            console.print(
+                f"The page must show this code: {device['user_code']}", markup=False
+            )
+            if browser:
+                webbrowser.open(approval_url)
+            console.print("Waiting for the approval in Studio...")
+            credentials = wait_for_credentials(client, device)
+        values = env_values(credentials)
+        write_env_file(Path(env_file), values)
+    except (StudioLoginError, httpx.HTTPError) as exc:
+        console.print(f"Error: {exc}", style="bold red", markup=False)
+        raise typer.Exit(code=1) from exc
+
+    # Names only: the value of a credential is never printed.
+    console.print("[bold green]Logged in.[/]")
+    console.print(f"Workspace: {credentials.get('workspace_name', '')}", markup=False)
+    console.print(f"Wrote to {env_file}: {', '.join(values)}", markup=False)
+    console.print(f"Make sure that git ignores {env_file}.", markup=False)
+    console.print(
+        f"Next: supervaizer start --env-file {env_file}  "
+        "(the log then shows the page of each agent in Studio)",
+        markup=False,
+    )
 
 
 def _create_instructions_file(
