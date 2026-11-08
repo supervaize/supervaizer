@@ -1,0 +1,33 @@
+{
+  "name": "supervaizer",
+  "owner": {
+    "name": "Runwaize",
+    "email": "support@runwaize.com"
+  },
+  "metadata": {
+    "description": "Agent skills released with the Supervaizer SDK"
+  },
+  "plugins": [
+    {
+      "name": "supervaizer-integration",
+      "source": "./skills/supervaizer-integration",
+      "description": "Integrate an existing Python agent with Supervaizer v2, A2A JSON-RPC, A2UI surfaces, and Supervaize Studio",
+      "version": "3.0.0",
+      "author": {
+        "name": "Runwaize"
+      },
+      "homepage": "https://github.com/supervaize/supervaizer/tree/main/skills/supervaizer-integration",
+      "repository": "https://github.com/supervaize/supervaizer",
+      "license": "MPL-2.0",
+      "keywords": [
+        "supervaize",
+        "supervaizer",
+        "agent",
+        "integration",
+        "runwaize",
+        "a2a"
+      ],
+      "category": "integrations"
+    }
+  ]
+}
