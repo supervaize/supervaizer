@@ -33,6 +33,13 @@ All notable changes to this project will be documented in this file.
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 127s  |
 
+| Metric                   | Before (`5ad84c6`)                     | After (`97ea54f`)                      |
+| ------------------------ | -------------------------------------- | -------------------------------------- |
+| Tests                    | 1,003                                  | 1,559                                  |
+| `src` + `tools` coverage | 74.4% (9,415 statements, 2,413 missed) | 85.4% (9,475 statements, 1,380 missed) |
+| `src` only coverage      | 82.0% (1,541 missed)                   | 94.1% (508 missed)                     |
+| `tools` only coverage    | 0% (872 statements)                    | 0% (872 statements)                    |
+
 ## [1.9.0] - 2026-10-29
 
 ### Added
