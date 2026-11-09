@@ -193,7 +193,9 @@ def test_login_command_fails_before_studio_when_env_file_path_is_invalid(
 
     def never_called(**_: object) -> httpx.Client:
         calls.append("client")
-        raise AssertionError("Studio client must not start when the env file is invalid")
+        raise AssertionError(
+            "Studio client must not start when the env file is invalid"
+        )
 
     monkeypatch.setattr(cli.httpx, "Client", never_called)
     monkeypatch.setattr(cli, "_check_version", lambda: (True, None))
@@ -204,7 +206,8 @@ def test_login_command_fails_before_studio_when_env_file_path_is_invalid(
     )
 
     assert result.exit_code == 1
-    assert "does not exist" in result.output
+    # Rich wraps long paths at the terminal width, so compare without line breaks.
+    assert "does not exist" in " ".join(result.output.split())
     assert calls == []
 
 
@@ -234,7 +237,7 @@ def test_start_refuses_an_env_file_that_does_not_exist(
     )
 
     assert result.exit_code == 1
-    assert "not found" in result.output
+    assert "not found" in " ".join(result.output.split())
 
 
 def test_start_uses_runtime_keys_from_env_file_when_flags_use_defaults(
