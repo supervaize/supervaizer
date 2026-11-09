@@ -401,7 +401,7 @@ An awaiting step can ask the operator for a file. The agent declares a field wit
 
 With `storage: "inline"`, the whole action JSON, content included, must stay under Studio's request body limit. Choose `studio` for files that can approach that limit.
 
-File fields are supported in `case.step.awaiting` steps only for now. The contract models already accept these keys as extra keys, so agents need no SDK change.
+File fields are supported in `case.step.awaiting` steps and in the `Form` components of a `job.configurator` document. The contract models already accept these keys as extra keys, so agents need no SDK change.
 
 ### Artifact
 
