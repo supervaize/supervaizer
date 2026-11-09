@@ -19,6 +19,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import typer
 
@@ -27,6 +28,17 @@ SUPERVAIZE_ENV_VARS = (
     "SUPERVAIZE_API_KEY",
     "SUPERVAIZE_WORKSPACE_ID",
     "SUPERVAIZE_API_URL",
+)
+WORKSPACE_AUTH_ENV_VARS = (
+    "SUPERVAIZER_WORKSPACE_AUTH_REQUIRED",
+    "SUPERVAIZER_WORKSPACE_AUTH_ISSUER",
+    "SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL",
+    "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY",
+)
+URL_ENV_HOSTNAMES = (
+    "SUPERVAIZE_API_URL",
+    "SUPERVAIZER_WORKSPACE_AUTH_ISSUER",
+    "SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL",
 )
 
 app = typer.Typer(
@@ -46,6 +58,88 @@ def _print_json(data: dict[str, Any] | list[Any], pretty: bool = False) -> None:
 
 def _normalize_controller_url(url: str) -> str:
     return url.rstrip("/")
+
+
+def _env_url_hostname(var_name: str) -> str | None:
+    """Hostname from a URL env var, or None when unset. Never returns the full URL."""
+    raw = os.getenv(var_name)
+    if not raw or not str(raw).strip():
+        return None
+    parsed = urlparse(str(raw).strip())
+    return parsed.hostname or "<unparsed>"
+
+
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_URL_FIELD_NAMES = frozenset({"url", "request_url", "uri", "href"})
+
+
+def _redact_url_string(value: str) -> str:
+    host = urlparse(value).hostname
+    return host or "<redacted>"
+
+
+def _redact_urls_in_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            if key in _URL_FIELD_NAMES and isinstance(item, str):
+                redacted[key] = _redact_url_string(item)
+            elif key == "raw_text":
+                redacted[key] = "<omitted>"
+            else:
+                redacted[key] = _redact_urls_in_value(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_urls_in_value(item) for item in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(("http://", "https://")):
+            return _redact_url_string(stripped)
+        if "://" in value:
+            return "<omitted>"
+    return value
+
+
+def _redact_url_in_error_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Sanitize HTTP error payloads so probe output never echoes secrets from URLs."""
+    sanitized = _redact_urls_in_value(payload)
+    if not isinstance(sanitized, dict):
+        return {"error": "<redacted>"}
+    return sanitized
+
+
+def _resolve_supervaizer_argv(project_dir: Path) -> list[str]:
+    """Command prefix to run the SDK CLI from the agent project directory."""
+    cli = shutil.which("supervaizer")
+    if cli is not None:
+        return [cli]
+    for name in (".venv", ".venv-sv", "venv"):
+        for base in (project_dir, Path.cwd()):
+            candidate = base / name / "bin" / "supervaizer"
+            if candidate.is_file():
+                return [str(candidate)]
+    uv = shutil.which("uv")
+    if uv is not None:
+        probe = subprocess.run(
+            [uv, "run", "supervaizer", "--version"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            return [uv, "run", "supervaizer"]
+    raise RuntimeError(
+        "The `supervaizer` command was not found. Install the SDK in the project "
+        "environment (activate the venv, set UV_PROJECT_ENVIRONMENT, or use `uv run "
+        "supervaizer` from the project root), then retry scaffold-integration."
+    )
 
 
 def _read_json_file(path: str | Path) -> Any:
@@ -323,35 +417,34 @@ def _scaffold_integration_impl(
     out_dir = (
         Path(output_dir or str(project.get("output_dir") or ".")).expanduser().resolve()
     )
-    cli = shutil.which("supervaizer")
-    if cli is None:
-        raise RuntimeError(
-            "The `supervaizer` command was not found. Install the SDK in this environment first."
-        )
     out_dir.mkdir(parents=True, exist_ok=True)
-    # The SDK owns the controller template, so the scaffold always matches the installed version.
-    command = [
-        cli,
-        "scaffold",
-        "--output-path",
-        controller_file,
-        *(["--force"] if force else []),
-    ]
-    run = subprocess.run(
-        command, cwd=out_dir, capture_output=True, text=True, check=False
-    )
-    if run.returncode != 0:
-        raise RuntimeError(
-            f"`supervaizer scaffold` failed: {(run.stdout + run.stderr).strip()}"
+    controller_path = out_dir / controller_file
+    scaffolded_by = "supervaizer scaffold"
+    if controller_path.exists() and not force:
+        scaffolded_by = "skipped (controller already exists; extend in place)"
+    else:
+        command = [
+            *_resolve_supervaizer_argv(out_dir),
+            "scaffold",
+            "--output-path",
+            controller_file,
+            *(["--force"] if force else []),
+        ]
+        run = subprocess.run(
+            command, cwd=out_dir, capture_output=True, text=True, check=False
         )
+        if run.returncode != 0:
+            raise RuntimeError(
+                f"`supervaizer scaffold` failed: {(run.stdout + run.stderr).strip()}"
+            )
     _print_json(
         {
             "ok": True,
             "operation": "scaffold-integration",
             "spec_file": str(Path(spec_file).resolve()),
             "output_dir": str(out_dir),
-            "files": {"controller": str(out_dir / controller_file)},
-            "scaffolded_by": "supervaizer scaffold",
+            "files": {"controller": str(controller_path)},
+            "scaffolded_by": scaffolded_by,
             "checklist": _spec_checklist(spec),
         },
         pretty=pretty,
@@ -555,31 +648,93 @@ def _discover_controller_impl(
     )
 
 
-def _env_status_impl(shell_template: bool, pretty: bool) -> None:
+def _probe_jwks_url(timeout: int) -> dict[str, Any]:
+    jwks_url = os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL")
+    if not jwks_url or not str(jwks_url).strip():
+        return {"probed": False, "reason": "SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL unset"}
+    url = str(jwks_url).strip()
+    try:
+        status, _ = _http_json("GET", url, timeout=timeout)
+        return {
+            "probed": True,
+            "status_code": status,
+            "ok": status == 200,
+            "jwks_hostname": _env_url_hostname("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL"),
+        }
+    except RuntimeError as exc:
+        try:
+            payload = _redact_url_in_error_payload(json.loads(str(exc)))
+        except json.JSONDecodeError:
+            payload = {"error": "JWKS request failed"}
+        return {
+            "probed": True,
+            "ok": False,
+            "jwks_hostname": _env_url_hostname("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL"),
+            **payload,
+        }
+
+
+def _env_status_impl(
+    shell_template: bool, pretty: bool, probe_jwks: bool, jwks_timeout: int
+) -> None:
     if shell_template:
         sys.stdout.write(
-            'export SUPERVAIZE_API_KEY="..."\nexport SUPERVAIZE_WORKSPACE_ID="team_1"\nexport SUPERVAIZE_API_URL="https://app.supervaize.com"\n\n# Optional local controller protection\nexport CONTROLLER_AUTH_KEY="..."'
-            + "\n"
+            'export SUPERVAIZE_API_KEY="..."\nexport SUPERVAIZE_WORKSPACE_ID="team_1"\nexport SUPERVAIZE_API_URL="https://app.supervaize.com"\n'
+            'export SUPERVAIZER_WORKSPACE_AUTH_REQUIRED="true"\n'
+            'export SUPERVAIZER_WORKSPACE_AUTH_ISSUER="https://studio.supervaize.com"\n'
+            'export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL="https://app.supervaize.com/w/team_1/api/v1/workspace-agent-grants/jwks/"\n\n'
+            "# Optional local controller protection\n"
+            'export CONTROLLER_AUTH_KEY="..."' + "\n"
         )
         return
 
     # Names only: no value of an environment variable is ever printed, in full or in part.
     missing = [name for name in SUPERVAIZE_ENV_VARS if not os.getenv(name)]
-    _print_json(
-        {
-            "ok": len(missing) == 0,
-            "operation": "env-status",
-            "required_env_vars": list(SUPERVAIZE_ENV_VARS),
-            "present": [name for name in SUPERVAIZE_ENV_VARS if name not in missing],
-            "missing": missing,
-            "controller_auth_key_present": bool(
-                os.getenv("CONTROLLER_AUTH_KEY")
-                or os.getenv("SUPERVAIZE_CONTROLLER_AUTH_KEY")
-                or os.getenv("SUPERVAIZER_CONTROLLER_AUTH_KEY")
-            ),
-        },
-        pretty=pretty,
+    auth_missing = [name for name in WORKSPACE_AUTH_ENV_VARS if not os.getenv(name)]
+    has_public_key = bool(os.getenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY"))
+    workspace_auth_required = _env_bool("SUPERVAIZER_WORKSPACE_AUTH_REQUIRED")
+    workspace_auth_ok = (
+        workspace_auth_required
+        and bool(os.getenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER"))
+        and (has_public_key or bool(os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL")))
     )
+    report: dict[str, Any] = {
+        "ok": len(missing) == 0 and workspace_auth_ok,
+        "operation": "env-status",
+        "required_env_vars": list(SUPERVAIZE_ENV_VARS),
+        "present": [name for name in SUPERVAIZE_ENV_VARS if name not in missing],
+        "missing": missing,
+        "workspace_auth_env_vars": list(WORKSPACE_AUTH_ENV_VARS),
+        "workspace_auth_present": [
+            name for name in WORKSPACE_AUTH_ENV_VARS if name not in auth_missing
+        ],
+        "workspace_auth_missing": auth_missing,
+        "workspace_auth_required_enabled": workspace_auth_required,
+        "workspace_auth_configured": workspace_auth_ok,
+        "url_hostnames": {
+            name: _env_url_hostname(name)
+            for name in URL_ENV_HOSTNAMES
+            if _env_url_hostname(name)
+        },
+        "controller_auth_key_present": bool(
+            os.getenv("CONTROLLER_AUTH_KEY")
+            or os.getenv("SUPERVAIZE_CONTROLLER_AUTH_KEY")
+            or os.getenv("SUPERVAIZER_CONTROLLER_AUTH_KEY")
+        ),
+    }
+    if probe_jwks:
+        if has_public_key and not os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL"):
+            report["jwks_probe"] = {
+                "probed": False,
+                "ok": True,
+                "reason": "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY configured",
+            }
+        else:
+            jwks = _probe_jwks_url(jwks_timeout)
+            report["jwks_probe"] = jwks
+            if jwks.get("probed") and not jwks.get("ok", False):
+                report["ok"] = False
+    _print_json(report, pretty=pretty)
 
 
 def _invoke_action_impl(
@@ -795,10 +950,25 @@ def env_status(
         "--shell-template",
         help="Print shell export statements for required env vars.",
     ),
+    probe_jwks: bool = typer.Option(
+        False,
+        "--probe-jwks",
+        help="GET the JWKS URL from the environment (hostnames only in output; no secrets).",
+    ),
+    jwks_timeout: int = typer.Option(
+        10, "--jwks-timeout", help="Seconds to wait for the JWKS probe."
+    ),
     pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output."),
 ) -> None:
-    """Check required SUPERVAIZE_* env vars or print export template."""
-    _handle(pretty, _env_status_impl, shell_template=shell_template, pretty=pretty)
+    """Check SUPERVAIZE_* and workspace-auth env vars; optional JWKS reachability."""
+    _handle(
+        pretty,
+        _env_status_impl,
+        shell_template=shell_template,
+        pretty=pretty,
+        probe_jwks=probe_jwks,
+        jwks_timeout=jwks_timeout,
+    )
 
 
 @app.command("discover-controller")
@@ -904,7 +1074,9 @@ def invoke_action(
         ..., "--action", help="V2 action id, e.g. job.start or resource.contacts.list."
     ),
     surface: str = typer.Option(
-        "job.start", "--surface", help="Surface context for the action."
+        "job.start",
+        "--surface",
+        help="Surface that owns the action (required in JSON-RPC params for action.invoke).",
     ),
     workspace_slug: str = typer.Option(
         ..., "--workspace-slug", help="Studio workspace slug."

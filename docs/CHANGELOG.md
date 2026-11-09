@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Integration skill workflow and helper** (PR #177) — The skill adds **greenfield**, **upgrade**, and **recs-accepted** modes so existing agents skip redundant interview rounds when the mapping is already clear. Connect to Studio targets production Supervaize Studio only. `scaffold-integration` resolves `supervaizer` from the project venv or `uv run supervaizer`. `env-status` reports workspace-authorization variable presence and URL hostnames (never secret values), with optional `--probe-jwks`. The smoke path documents the required `surface` field on `supervaizer/action.invoke` and grant re-accept after registration changes. Skill and helper tests extended. Skill and tooling only; not part of the wheel.
+
 ## [1.11.0] - 2026-11-09
 
 ### Added
@@ -32,7 +36,7 @@ All notable changes to this project will be documented in this file.
 
 | Status     | Count |
 | ---------- | ----- |
-| ✅ Passed  | 1600  |
+| ✅ Passed  | 1601  |
 | 🤔 Skipped | 0     |
 | 🔴 Failed  | 0     |
 | ⏱️ in      | 65s   |
