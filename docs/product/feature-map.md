@@ -41,7 +41,7 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Important states: A denied or expired code writes nothing. The code is valid for one login. An older Studio answers 404 and the command says to create the key on the Developer page.
 - Source: `src/supervaizer/studio_login.py`, `src/supervaizer/cli.py`, `src/supervaizer/studio_handshake.py`
 - Verification: `tests/test_studio_login.py`
-- Known caveats: The command never prints a value; it prints variable names. The environment file must stay out of git. `start` loads an environment file only with `--env-file` or `--local`.
+- Known caveats: The command never prints a value; it prints variable names. The environment file must stay out of git. `start` loads an environment file only with `--env-file` or `--local`. With `--env-file`, values already in the shell stay; explicit flags override the file; other file values override command defaults.
 
 ## Scaffold a v2 control file
 
