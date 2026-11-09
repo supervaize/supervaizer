@@ -1,6 +1,6 @@
 # Product feature map
 
-> **Updated:** 2026-10-30
+> **Updated:** 2026-11-09
 
 Compact index of what a person is trying to do with Supervaizer. Each entry names the workflow, where it starts, who can use it, what should happen, and where the code and pytest evidence live.
 
@@ -42,6 +42,25 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Source: `src/supervaizer/studio_login.py`, `src/supervaizer/cli.py`, `src/supervaizer/studio_handshake.py`
 - Verification: `tests/test_studio_login.py`
 - Known caveats: The command never prints a value; it prints variable names. The environment file must stay out of git. `start` loads an environment file only with `--env-file` or `--local`. With `--env-file`, values already in the shell stay; explicit flags override the file; other file values override command defaults.
+
+## Integrate an agent with the coding-agent skill
+
+- Purpose: Wire an existing Python agent to Supervaizer v2 and production Studio using the bundled integration skill and CLI helper (for humans and coding agents).
+- Entry points:
+  - Skill: `skills/supervaizer-integration/SKILL.md` (plugin id `supervaizer-integration@supervaizer`)
+  - Helper: `python skills/supervaizer-integration/scripts/supervaize_cli_helper.py` (`analyze-agent`, `spec-template`, `scaffold-integration`, `env-status`, `discover-controller`, `load-surface`, `invoke-action`)
+- Access: Local project and controller; Studio credentials via `supervaizer login` (Developer access).
+- Preconditions: SDK installed in the agent project (`supervaizer` on PATH, project venv, or `uv run supervaizer`). Contract shapes come from docs and Hello World, not from the skill text.
+- Main flow:
+  1. Pick integration mode: **greenfield** (full interview), **upgrade** (existing control script; one design pass), or **recs-accepted** (same as upgrade after delegating mapping).
+  2. `analyze-agent` → interview or consolidated design → `integration_spec.json` → `scaffold-integration`.
+  3. Build topics from the spec checklist; smoke with `load-surface` / `invoke-action` (`--surface` required on invoke).
+  4. `env-status` (optional `--probe-jwks`); `supervaizer login` → start with `--env-file` → registration → workspace grant acceptance in Studio.
+- Expected result: Controller registers; workspace authorization is accepted; jobs start from Studio.
+- Important states: `scaffold-integration` resolves the CLI from PATH, `.venv` / `.venv-sv` / `venv`, or `uv run`. `env-status` prints names and URL hostnames only; `workspace_auth_configured` requires `SUPERVAIZER_WORKSPACE_AUTH_REQUIRED=true` plus issuer and JWKS or public key. Re-accept the workspace grant after surfaces or actions change.
+- Source: `skills/supervaizer-integration/`
+- Verification: `tests/test_integration_skill_helper.py`
+- Known caveats: The skill is not shipped in the wheel. Skill process only; field names and payloads remain in the controller docs and Hello World.
 
 ## Scaffold a v2 control file
 
