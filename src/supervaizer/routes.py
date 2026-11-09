@@ -11,8 +11,10 @@
 # https://mozilla.org/MPL/2.0/.
 
 import asyncio
+import json
 import traceback
 from collections.abc import Awaitable, Callable
+from enum import Enum
 from functools import wraps
 from pathlib import Path
 from typing import (
@@ -35,10 +37,12 @@ from fastapi import (
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from supervaizer import common, storage
 from supervaizer.access import require_scope  # <-- ADDED
 from supervaizer.agent import (
     Agent,
     AgentMethodParams,
+    AgentMethods,
     AgentResponse,
 )
 from supervaizer.case import CaseNodeUpdate, Cases
@@ -46,12 +50,10 @@ from supervaizer.common import SvBaseModel, log
 from supervaizer.contracts import controller_contract_info
 from supervaizer.job import Job, JobContext, JobResponse, Jobs
 from supervaizer.job_service import service_job_custom, service_job_start
-from supervaizer.lifecycle import EntityStatus
+from supervaizer.lifecycle import EntityEvents, EntityStatus
 from supervaizer.server_utils import ErrorResponse, ErrorType, create_error_response
 
 if TYPE_CHECKING:
-    from enum import Enum
-
     from supervaizer.server import Server
 
 T = TypeVar("T")
@@ -160,15 +162,14 @@ async def _send_registration_refresh(
     )
 
 
-def create_default_routes(server: "Server") -> APIRouter:
-    """Create default routes for the server."""
-    router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
-
+def _add_get_controller_contract_route(router: APIRouter) -> None:
     @router.get("/contract", response_model=dict[str, Any])
     async def get_controller_contract() -> dict[str, Any]:
         """Return the controller contract Studio should use for route resolution."""
         return controller_contract_info()
 
+
+def _add_refresh_controller_registration_route(router: APIRouter) -> None:
     @router.post(
         "/registration/refresh",
         status_code=http_status.HTTP_202_ACCEPTED,
@@ -190,6 +191,8 @@ def create_default_routes(server: "Server") -> APIRouter:
         background_tasks.add_task(_send_registration_refresh, server, request_data)
         return {"status": "accepted", "reason": request_data.reason}
 
+
+def _add_default_get_job_status_route(router: APIRouter) -> None:
     @router.get(
         "/jobs/{job_id}",
         response_model=JobResponse,
@@ -211,6 +214,8 @@ def create_default_routes(server: "Server") -> APIRouter:
             payload=job.payload,
         )
 
+
+def _add_get_all_jobs_route(router: APIRouter) -> None:
     @router.get(
         "/jobs",
         response_model=dict[str, list[JobResponse]],
@@ -263,6 +268,103 @@ def create_default_routes(server: "Server") -> APIRouter:
 
         return all_jobs
 
+
+def _get_case_update_job(job_id: str) -> Job:
+    """Load a job from memory or persistent storage for a case update."""
+    job = Jobs().get_job(job_id, include_persisted=False)
+    if job is None:
+        job = Jobs().get_job(job_id, include_persisted=True)
+    if job is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Job with ID {job_id} not found §SRCCWU01",
+        )
+    return job
+
+
+async def _apply_case_answer(
+    case: Any, case_id: str, request: CaseUpdateRequest
+) -> str:
+    """Apply an answer to an awaiting case and return its new status."""
+    if case.status != EntityStatus.AWAITING:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
+        )
+    update = CaseNodeUpdate(
+        name="Human Input Response",
+        payload={
+            "answer": request.answer,
+            "message": request.message,
+            "response_type": "human_input",
+        },
+        is_final=False,
+    )
+    casestep_index = request.answer.get("casestep_index")
+    if casestep_index is not None:
+        await case.patch_step(int(casestep_index), update)
+        storage.PersistentEntityLifecycle.handle_event(
+            case, EntityEvents.INPUT_RECEIVED
+        )
+    else:
+        await case.receive_human_input(update)
+    return case.status.value
+
+
+async def _notify_human_answer(
+    server: "Server", job: Job, case_id: str, request: CaseUpdateRequest
+) -> None:
+    """Notify an agent human-answer hook without changing update success."""
+    owning_agent = server.get_agent_by_name(job.agent_name)
+    if not owning_agent or not owning_agent.methods:
+        return
+    human_answer_def = getattr(owning_agent.methods, "human_answer", None)
+    if human_answer_def is None:
+        return
+    answer_payload = request.answer
+    fields = {k: v for k, v in answer_payload.items() if k != "casestep_index"}
+    params: dict[str, Any] = {
+        "fields": fields,
+        "context": {"job_id": job.id, "case_id": case_id},
+        "payload": answer_payload,
+        "case_id": case_id,
+        "job_id": job.id,
+    }
+    if request.message is not None:
+        params["message"] = request.message
+    try:
+        await asyncio.to_thread(owning_agent._execute, human_answer_def.method, params)
+    except Exception as hook_exc:
+        log.error(f"[human_answer hook] {owning_agent.name}: {hook_exc}")
+
+
+async def _update_case_answer(
+    server: "Server", job_id: str, case_id: str, request: CaseUpdateRequest
+) -> dict[str, str]:
+    """Update an awaiting case and notify its optional human-answer hook."""
+    job = _get_case_update_job(job_id)
+    case = Cases().get_case(case_id, job_id)
+    if case is None:
+        log.warning(
+            f"[Case update] Case {case_id} not in registry for job {job_id} — "
+            "stateless replica, wrong replica, or unknown id; rejecting update"
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Case '{case_id}' not found §SRCCWU02",
+        )
+    case_status = await _apply_case_answer(case, case_id, request)
+    await _notify_human_answer(server, job, case_id, request)
+    return {
+        "status": "success",
+        "message": f"Answer received and processed for case {case_id} in job {job_id}",
+        "job_id": job_id,
+        "case_id": case_id,
+        "case_status": case_status,
+    }
+
+
+def _add_update_case_with_answer_route(router: APIRouter, server: "Server") -> None:
     @router.post(
         "/jobs/{job_id}/cases/{case_id}/update",
         summary="Update case with answer to question",
@@ -289,97 +391,14 @@ def create_default_routes(server: "Server") -> APIRouter:
             f"📥 POST /jobs/{job_id}/cases/{case_id}/update [Update case with answer]"
         )
 
-        jobs_registry = Jobs()
-        job = jobs_registry.get_job(job_id, include_persisted=False)
-        if job is None:
-            job = jobs_registry.get_job(job_id, include_persisted=True)
-        if job is None:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Job with ID {job_id} not found §SRCCWU01",
-            )
-
-        # In-memory registry only (populated on job_start / startup reload). No case in
-        # registry ⇒ cannot apply the update or validate lifecycle — do not succeed or
-        # dispatch human_answer (matches workbench 404 on missing case).
-        case = Cases().get_case(case_id, job_id)
-        if case is None:
-            log.warning(
-                f"[Case update] Case {case_id} not in registry for job {job_id} — "
-                "stateless replica, wrong replica, or unknown id; rejecting update"
-            )
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"Case '{case_id}' not found §SRCCWU02",
-            )
-
-        if case.status != EntityStatus.AWAITING:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Case {case_id} is not awaiting input. Current status: {case.status.value} §SRC01",
-            )
-        update = CaseNodeUpdate(
-            name="Human Input Response",
-            payload={
-                "answer": request.answer,
-                "message": request.message,
-                "response_type": "human_input",
-            },
-            is_final=False,
-        )
-        casestep_index = request.answer.get("casestep_index")
-        if casestep_index is not None:
-            await case.patch_step(int(casestep_index), update)
-            from supervaizer.lifecycle import EntityEvents
-            from supervaizer.storage import PersistentEntityLifecycle
-
-            PersistentEntityLifecycle.handle_event(case, EntityEvents.INPUT_RECEIVED)
-        else:
-            await case.receive_human_input(update)
-        case_status = case.status.value
-
-        owning_agent = server.get_agent_by_name(job.agent_name)
-        if owning_agent and owning_agent.methods:
-            human_answer_def = getattr(owning_agent.methods, "human_answer", None)
-            if human_answer_def is not None:
-                human_answer_method = human_answer_def.method
-                answer_payload = request.answer
-                if isinstance(answer_payload, dict):
-                    fields = {
-                        k: v for k, v in answer_payload.items() if k != "casestep_index"
-                    }
-                else:
-                    fields = answer_payload
-                params: dict[str, Any] = {
-                    "fields": fields,
-                    "context": {"job_id": job_id, "case_id": case_id},
-                    "payload": answer_payload,
-                    "case_id": case_id,
-                    "job_id": job_id,
-                }
-                if request.message is not None:
-                    params["message"] = request.message
-                try:
-                    await asyncio.to_thread(
-                        owning_agent._execute,
-                        human_answer_method,
-                        params,
-                    )
-                except Exception as hook_exc:
-                    log.error(f"[human_answer hook] {owning_agent.name}: {hook_exc}")
-
+        result = await _update_case_answer(server, job_id, case_id, request)
         log.info(
             f"[Case update] Job {job_id}, Case {case_id} - Answer processed successfully"
         )
+        return result
 
-        return {
-            "status": "success",
-            "message": f"Answer received and processed for case {case_id} in job {job_id}",
-            "job_id": job_id,
-            "case_id": case_id,
-            "case_status": case_status,
-        }
 
+def _add_get_all_agents_route(router: APIRouter, server: "Server") -> None:
     @router.get("/agents", response_model=list[AgentResponse])
     @handle_route_errors()
     async def get_all_agents(
@@ -396,6 +415,8 @@ def create_default_routes(server: "Server") -> APIRouter:
             for a in server.agents[skip : skip + limit]
         ]
 
+
+def _add_get_agent_details_route(router: APIRouter, server: "Server") -> None:
     @router.get("/agent/{agent_id}", response_model=AgentResponse)
     @handle_route_errors()
     async def get_agent_details(
@@ -413,69 +434,13 @@ def create_default_routes(server: "Server") -> APIRouter:
             detail=f"Agent with ID '{agent_id}' not found",
         )
 
-    return router
 
-
-def create_utils_routes(server: "Server") -> APIRouter:
-    """Create utility routes."""
-    router = APIRouter(prefix="/supervaizer/utils", tags=["Supervision"])
-
-    @router.get(
-        "/public_key",
-        summary="Get server's public key",
-        description="Returns the server's public key in PEM format",
-        response_model=str,
-    )
-    @handle_route_errors()
-    async def get_public_key() -> str:
-        pem = server.public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        return pem.decode("utf-8")
-
-    @router.post(
-        "/encrypt",
-        summary="Encrypt a string",
-        description="Encrypts a string using the server's public key. Example: {'key':'value'}",
-        response_model=str,
-        response_description="The encrypted string",
-    )
-    @handle_route_errors()
-    async def encrypt_string(text: str = Body(...)) -> str:
-        return server.encrypt(text)
-
-    return router
-
-
-def create_agents_routes(server: "Server") -> APIRouter:
-    """Create agent-specific routes."""
-    routers = APIRouter(prefix="/supervaizer", tags=["Supervision"])
-    for agent in server.agents:
-        routers.include_router(create_agent_route(server, agent))
-        # Add custom method routes for each agent
-        if agent.methods and agent.methods.custom:
-            routers.include_router(create_agent_custom_routes(server, agent))
-    return routers
-
-
-def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
-    """Create agent-specific routes."""
-    if not agent.methods and agent.supervaizer_v2_registration is None:
-        raise ValueError(
-            f"Agent {agent.name} has no methods defined and no "
-            "supervaizer_v2_registration"
-        )
-    # tags: list[str | Enum] = [f"Agent {agent.name} v{agent.version}"]
-    tags: list[str | Enum] = ["Supervision"]
-    router = APIRouter(
-        prefix=agent.path,
-        tags=tags,
-    )
-
-    async def get_agent() -> Agent:
-        return agent
-
+def _add_agent_info_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.get(
         "/",
         summary=f"Get information about the agent {agent.name}",
@@ -492,6 +457,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **agent.registration_info,
         )
 
+
+def _add_supervaize_instructions_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.get(
         f"/{agent.instructions_path}",
         summary=f"Get supervaize instructions page for agent {agent.name}",
@@ -540,6 +512,118 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
                     media_type="text/html",
                 )
 
+
+def _decrypt_agent_parameters(
+    server: "Server", encrypted_agent_parameters: Any
+) -> tuple[Any, Exception | None]:
+    """Decrypt agent parameters while retaining the endpoint error boundary."""
+    try:
+        agent_parameters_str = common.decrypt_value(
+            encrypted_agent_parameters, server.private_key
+        )
+        return json.loads(agent_parameters_str) if agent_parameters_str else {}, None
+    except Exception as error:
+        return {}, error
+
+
+def _normalise_agent_parameters(
+    agent_parameters: Any,
+) -> tuple[Any, str | None]:
+    """Accept the legacy dictionary and Studio parameter-list shapes."""
+    if not isinstance(agent_parameters, list):
+        return agent_parameters, None
+    if not all(
+        isinstance(param, dict)
+        and isinstance(param.get("name"), str)
+        and "value" in param
+        for param in agent_parameters
+    ):
+        return (
+            agent_parameters,
+            "Each agent parameter must be an object with a string 'name' and a 'value'",
+        )
+    return {param["name"]: param["value"] for param in agent_parameters}, None
+
+
+def _parameter_decryption_failure(agent: Agent, error: Exception) -> dict[str, Any]:
+    """Create the established decryption failure response without logging values."""
+    message = f"Decryption failed: {error!s}"
+    log.error(f"❌ Decryption failed: {type(error).__name__}: {error!s}")
+    log.info(f"📤 Agent {agent.name}: Decryption failed")
+    return {
+        "valid": False,
+        "message": f"Failed to decrypt agent parameters: {error!s}",
+        "errors": [message],
+        "invalid_parameters": {"encrypted_agent_parameters": message},
+    }
+
+
+def _validate_agent_parameter_request(
+    server: "Server", agent: Agent, body_params: Any
+) -> dict[str, Any]:
+    """Validate encrypted or plain agent parameters for one agent."""
+    log.info(
+        f"📥 POST /validate-agent-parameters [Validate agent parameters] {agent.name}"
+    )
+    if not agent.parameters_setup:
+        result = {
+            "valid": True,
+            "message": "Agent has no parameter setup defined",
+            "errors": [],
+            "invalid_parameters": {},
+        }
+        log.info(f"📤 Agent {agent.name}: No parameter setup defined → {result}")
+        return result
+    request_params = {} if body_params is None else body_params
+    encrypted_agent_parameters = request_params.get("encrypted_agent_parameters")
+    agent_parameters: Any = {}
+    if encrypted_agent_parameters:
+        log.info(
+            f"📥 Received encrypted_agent_parameters, length: {len(encrypted_agent_parameters)}"
+        )
+        agent_parameters, error = _decrypt_agent_parameters(
+            server, encrypted_agent_parameters
+        )
+        if error is not None:
+            return _parameter_decryption_failure(agent, error)
+    agent_parameters, validation_error = _normalise_agent_parameters(agent_parameters)
+    if validation_error is not None:
+        log.info(f"📤 Agent {agent.name}: Malformed agent parameter list")
+        return {
+            "valid": False,
+            "message": "Agent parameter validation failed",
+            "errors": [validation_error],
+            "invalid_parameters": {"encrypted_agent_parameters": validation_error},
+        }
+    param_count = len(agent_parameters) if isinstance(agent_parameters, dict) else 0
+    log.info(
+        f"🔍 Agent {agent.name}: Incoming request - "
+        f"encrypted_params: {bool(encrypted_agent_parameters)}, param_count: {param_count}"
+    )
+    validation_result = agent.parameters_setup.validate_parameters(agent_parameters)
+    result = {
+        "valid": validation_result["valid"],
+        "message": "Agent parameters validated successfully"
+        if validation_result["valid"]
+        else "Agent parameter validation failed",
+        "errors": validation_result["errors"],
+        "invalid_parameters": validation_result["invalid_parameters"],
+    }
+    log.info(
+        f"📤 Agent {agent.name}: Validation "
+        f"{'passed' if validation_result['valid'] else 'failed'} "
+        f"({len(validation_result['errors'])} error(s))"
+    )
+    return result
+
+
+def _add_validate_agent_parameters_route(
+    router: APIRouter,
+    server: "Server",
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/validate-agent-parameters",
         summary=f"Validate agent parameters for agent: {agent.name}",
@@ -559,115 +643,16 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         body_params: Any = Body(...),
         agent: Agent = Depends(get_agent),
     ) -> dict[str, Any]:
-        """Validate agent parameters for this agent"""
-        log.info(
-            f"📥 POST /validate-agent-parameters [Validate agent parameters] {agent.name}"
-        )
+        """Validate agent parameters for this agent."""
+        return _validate_agent_parameter_request(server, agent, body_params)
 
-        if not agent.parameters_setup:
-            result = {
-                "valid": True,
-                "message": "Agent has no parameter setup defined",
-                "errors": [],
-                "invalid_parameters": {},
-            }
-            log.info(f"📤 Agent {agent.name}: No parameter setup defined → {result}")
-            return result
 
-        if body_params is None:
-            body_params = {}
-
-        encrypted_agent_parameters = body_params.get("encrypted_agent_parameters")
-
-        agent_parameters: Any = {}
-        if encrypted_agent_parameters:
-            # Basic debug trace
-            log.info(
-                f"📥 Received encrypted_agent_parameters, length: {len(encrypted_agent_parameters)}"
-            )
-
-            try:
-                import json
-
-                from supervaizer.common import decrypt_value
-
-                agent_parameters_str = decrypt_value(
-                    encrypted_agent_parameters, server.private_key
-                )
-                agent_parameters = (
-                    json.loads(agent_parameters_str) if agent_parameters_str else {}
-                )
-
-            except Exception as e:
-                log.error(f"❌ Decryption failed: {type(e).__name__}: {e!s}")
-                result = {
-                    "valid": False,
-                    "message": f"Failed to decrypt agent parameters: {e!s}",
-                    "errors": [f"Decryption failed: {e!s}"],
-                    "invalid_parameters": {
-                        "encrypted_agent_parameters": f"Decryption failed: {e!s}"
-                    },
-                }
-                # Do not log the result payload: it can echo parameter data.
-                log.info(f"📤 Agent {agent.name}: Decryption failed")
-                return result
-
-        # Canonical shape: the list of {"name": ..., "value": ...} objects that
-        # Studio sends and job start consumes. The {NAME: value} dict form stays
-        # accepted for existing callers. Any other type fails in validate_parameters.
-        if isinstance(agent_parameters, list):
-            if not all(
-                isinstance(param, dict)
-                and isinstance(param.get("name"), str)
-                and "value" in param
-                for param in agent_parameters
-            ):
-                error_msg = (
-                    "Each agent parameter must be an object with a string "
-                    "'name' and a 'value'"
-                )
-                log.info(f"📤 Agent {agent.name}: Malformed agent parameter list")
-                return {
-                    "valid": False,
-                    "message": "Agent parameter validation failed",
-                    "errors": [error_msg],
-                    "invalid_parameters": {"encrypted_agent_parameters": error_msg},
-                }
-            agent_parameters = {
-                param["name"]: param["value"] for param in agent_parameters
-            }
-
-        # Log the incoming request details.
-        # Never log decrypted parameter values (secrets); log only presence/count.
-        _param_count = (
-            len(agent_parameters) if isinstance(agent_parameters, dict) else 0
-        )
-        log.info(
-            f"🔍 Agent {agent.name}: Incoming request - "
-            f"encrypted_params: {bool(encrypted_agent_parameters)}, "
-            f"param_count: {_param_count}"
-        )
-
-        # Validate agent parameters
-        validation_result = agent.parameters_setup.validate_parameters(agent_parameters)
-
-        result = {
-            "valid": validation_result["valid"],
-            "message": "Agent parameters validated successfully"
-            if validation_result["valid"]
-            else "Agent parameter validation failed",
-            "errors": validation_result["errors"],
-            "invalid_parameters": validation_result["invalid_parameters"],
-        }
-
-        # Log only the outcome, not the result payload (may contain values).
-        log.info(
-            f"📤 Agent {agent.name}: Validation "
-            f"{'passed' if validation_result['valid'] else 'failed'} "
-            f"({len(validation_result['errors'])} error(s))"
-        )
-        return result
-
+def _add_validate_method_fields_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/validate-method-fields",
         summary=f"Validate method fields for agent: {agent.name}",
@@ -745,6 +730,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         )
         return result
 
+
+def _add_server_update_agent_route(
+    router: APIRouter,
+    server: "Server",
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/parameters",
         summary=f"Server updates agent: {agent.name}",
@@ -775,22 +768,19 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
         # importlib.reload(Agent)
         return AgentResponse(**agent.registration_info)
 
-    # v2-only agent: Studio runs jobs through /a2a, so skip the v1 job routes.
-    if not agent.methods:
-        return router
 
-    agent_job_model_name = f"{agent.slug}_Start_Job_Model"
-    # Create the dynamic model with the custom name for FastAPI documentation
-    _AgentStartAbstractJob = type(
-        agent_job_model_name,
-        (agent.methods.job_start.job_model,),
-        {},
-    )
-
+def _add_start_job_route(
+    router: APIRouter,
+    server: "Server",
+    agent: Agent,
+    methods: AgentMethods,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/jobs",
         summary=f"Start a job with agent: {agent.name}",
-        description=f"{agent.methods.job_start.description}",
+        description=f"{methods.job_start.description}",
         responses={
             http_status.HTTP_202_ACCEPTED: {"model": Job},
             http_status.HTTP_400_BAD_REQUEST: {"model": dict[str, Any]},
@@ -837,6 +827,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
 
         return new_job
 
+
+def _add_get_agent_jobs_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.get(
         "/jobs",
         summary=f"Get all jobs for agent: {agent.name}",
@@ -881,6 +878,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             for job in jobs
         ]
 
+
+def _add_agent_get_job_status_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.get(
         "/jobs/{job_id}",
         summary=f"Get job status for agent: {agent.name}",
@@ -912,6 +916,14 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             payload=job.payload,
         )
 
+
+def _add_stop_agent_route(
+    router: APIRouter,
+    server: "Server",
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/stop",
         summary=f"Stop the agent: {agent.name}",
@@ -943,6 +955,13 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             **res_info,
         )
 
+
+def _add_status_agent_route(
+    router: APIRouter,
+    agent: Agent,
+    get_agent: Callable[[], Awaitable[Agent]],
+    tags: list[str | Enum],
+) -> None:
     @router.post(
         "/status",
         summary=f"Get the status of the agent: {agent.name}",
@@ -972,6 +991,96 @@ def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
             )
         return result
 
+
+def create_default_routes(server: "Server") -> APIRouter:
+    """Create default routes for the server."""
+    router = APIRouter(prefix="/supervaizer", tags=["Supervision"])
+    _add_get_controller_contract_route(router)
+    _add_refresh_controller_registration_route(router)
+    _add_default_get_job_status_route(router)
+    _add_get_all_jobs_route(router)
+    _add_update_case_with_answer_route(router, server)
+    _add_get_all_agents_route(router, server)
+    _add_get_agent_details_route(router, server)
+    return router
+
+
+def create_utils_routes(server: "Server") -> APIRouter:
+    """Create utility routes."""
+    router = APIRouter(prefix="/supervaizer/utils", tags=["Supervision"])
+
+    @router.get(
+        "/public_key",
+        summary="Get server's public key",
+        description="Returns the server's public key in PEM format",
+        response_model=str,
+    )
+    @handle_route_errors()
+    async def get_public_key() -> str:
+        pem = server.public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        return pem.decode("utf-8")
+
+    @router.post(
+        "/encrypt",
+        summary="Encrypt a string",
+        description="Encrypts a string using the server's public key. Example: {'key':'value'}",
+        response_model=str,
+        response_description="The encrypted string",
+    )
+    @handle_route_errors()
+    async def encrypt_string(text: str = Body(...)) -> str:
+        return server.encrypt(text)
+
+    return router
+
+
+def create_agents_routes(server: "Server") -> APIRouter:
+    """Create agent-specific routes."""
+    routers = APIRouter(prefix="/supervaizer", tags=["Supervision"])
+    for agent in server.agents:
+        routers.include_router(create_agent_route(server, agent))
+        # Add custom method routes for each agent
+        if agent.methods and agent.methods.custom:
+            routers.include_router(create_agent_custom_routes(server, agent))
+    return routers
+
+
+def _create_agent_dependency(agent: Agent) -> Callable[[], Awaitable[Agent]]:
+    async def get_agent() -> Agent:
+        return agent
+
+    return get_agent
+
+
+def create_agent_route(server: "Server", agent: Agent) -> APIRouter:
+    """Create agent-specific routes."""
+    if not agent.methods and agent.supervaizer_v2_registration is None:
+        raise ValueError(
+            f"Agent {agent.name} has no methods defined and no "
+            "supervaizer_v2_registration"
+        )
+    tags: list[str | Enum] = ["Supervision"]
+    router = APIRouter(prefix=agent.path, tags=tags)
+    get_agent = _create_agent_dependency(agent)
+    _add_agent_info_route(router, agent, get_agent, tags)
+    _add_supervaize_instructions_route(router, agent, get_agent, tags)
+    _add_validate_agent_parameters_route(router, server, agent, get_agent, tags)
+    _add_validate_method_fields_route(router, agent, get_agent, tags)
+    _add_server_update_agent_route(router, server, agent, get_agent, tags)
+    if not agent.methods:
+        return router
+    agent_job_model_name = f"{agent.slug}_Start_Job_Model"
+    _AgentStartAbstractJob = type(
+        agent_job_model_name, (agent.methods.job_start.job_model,), {}
+    )
+    _add_start_job_route(router, server, agent, agent.methods, get_agent, tags)
+    _add_get_agent_jobs_route(router, agent, get_agent, tags)
+    _add_agent_get_job_status_route(router, agent, get_agent, tags)
+    _add_stop_agent_route(router, server, agent, get_agent, tags)
+    _add_status_agent_route(router, agent, get_agent, tags)
     return router
 
 

@@ -12,13 +12,14 @@
 
 import os
 import tempfile
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from datetime import datetime
 from typing import Annotated, Any
 from uuid import uuid4
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from pytest_mock import MockerFixture
 
 import supervaizer.storage as storage_module
 from supervaizer import (
@@ -45,6 +46,8 @@ from supervaizer import (
     TelemetryType,
 )
 from supervaizer.storage import EntityRepository, StorageManager
+from tests.admin_rig import AdminRig
+from tests.workbench_rig import WorkbenchRig
 
 
 @pytest.fixture(scope="session")
@@ -453,3 +456,19 @@ def reset_supervaizer_environment():
     for key in list(os.environ.keys()):
         if key.startswith("SUPERVAIZER_") and key not in original_env:
             del os.environ[key]
+
+
+@pytest.fixture
+def rig(mocker: MockerFixture, storage_manager: StorageManager) -> AdminRig:
+    """An admin router on a clean StorageManager (see tests/admin_rig.py)."""
+    return AdminRig(mocker, storage_manager)
+
+
+@pytest.fixture
+def workbench(
+    mocker: MockerFixture, account_fixture: Account
+) -> Iterator[WorkbenchRig]:
+    """A workbench app with one agent, job and case (see tests/workbench_rig.py)."""
+    wb = WorkbenchRig(account_fixture, mocker)
+    yield wb
+    wb.close()

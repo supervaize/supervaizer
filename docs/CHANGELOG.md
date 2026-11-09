@@ -6,6 +6,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`supervaizer login`** (PR #166) — Logs a developer in to Studio from the terminal with a device authorization: the command prints an approval page and a code, the developer signs in or signs up in the browser (Google included) and approves, and the command writes the three `SUPERVAIZE_*` variables and the three `SUPERVAIZER_WORKSPACE_AUTH_*` variables to an environment file (`.env` by default). It prints variable names only, never a value. `supervaizer start --env-file <file>` loads such a file before the control script. After a registration, the start log shows the Studio page of each agent when Studio sends `studio_url` in the handshake agent entries. Needs a Studio with the `/api/v1/cli/device/` endpoints; an older Studio gets a clear error. Requires a minor release.
+- **Integration skill in the SDK** (PR #165) — The Supervaizer integration skill for coding agents moves from `runwaize/runwaize_skills` to `skills/supervaizer-integration/` and ships with the repository. It interviews the developer about the mission, job, case and step mapping, then builds the integration topic by topic (parameters, fields, shared resources, cost, human in the loop, guardrail controls, Configure screen, analytics). It holds the process only and points to the guides at docs.runwaize.com, `supervaizer scaffold`, `docs/` and the Hello World example for the contract. `.claude-plugin/marketplace.json` lets Claude Code install it with `/plugin marketplace add supervaize/supervaizer`. The skill is not part of the wheel. `docs/2026_05_SUPERVAIZER_v2.md` documents the `job.configurator` and `job.analytics` surfaces, the `Dashboard` document and the job snapshot keys Studio reads. The skill also covers the Studio side (account, Developer access, API key, registration, workspace authorization, refused registrations), hosting and deployment, artifacts, scheduled start and the billing catalog.
+
+### Changed
+
+- **Integration skill helper and review fixes** (PR #166) — `env-status` prints variable names only. `invoke-action` and `load-surface` fail on a JSON-RPC error. Both commands forward the job, case, step and draft-session ids; `invoke-action` sends no made-up job id. `spec-template` keeps an existing spec file unless `--force`. The cost task is listed only when the spec has a cost. The helper path uses `${CLAUDE_SKILL_DIR}`; the SDK install step is first and the install id is `supervaizer-integration@supervaizer`.
+- **Production Python refactors** (PR #163) — Agent lifecycle, CLI startup, contracts, authentication, REST routes, deployment, and example jobs use smaller functions. Shared helpers replace repeated decisions. Characterization tests preserve existing payloads, errors, logs, and execution order. All scored production Python functions have CRAP below 10. The documentation generator remains exempt.
+- **Admin and workbench route factories split** (PR #163) — `create_admin_routes` (CRAP 1046) and `create_workbench_routes` (CRAP 1104) held every handler as a nested closure. Handlers are now `AdminHandlers` methods and module-level workbench functions, registered from route tables; the OpenAPI schema is unchanged. Shared helpers replace copied filter/sort/paginate, status-update, step-validation and error-to-500 code. `set_server_start_time`, `SERVER_START_TIME` and the `EntityFilter` model were unused and are removed. Internal module only, no public API change.
+- **`just gitnexus-refresh`** (PR #169) — Refreshes the local GitNexus index with `analyze --index-only` so AGENTS.md, CLAUDE.md and the skills are not rewritten. Skips quietly when GitNexus is not installed. Tooling only, no package change.
+- **Dependencies** — `uv.lock`: `pyasn1` 0.6.5 (PR #164). GitHub Actions: `actions/setup-python` 7.1.0 (PR #162), `astral-sh/setup-uv` 10.3.2 (PR #161), `trufflesecurity/trufflehog` 3.99.7 (PR #160), `pypa/gh-action-pypi-publish` 1.14.3 (PR #159). No runtime change.
+
+### Fixed
+
+- **Workbench job monitor returned 500** (PR #163) — `workbench_monitor.html` used `x is not none if x is defined else false`, which Jinja 3.1 parses as a test argument, so `GET /manage/agents/<slug>/workbench/jobs/<job_id>` raised `TemplateSyntaxError` for every existing job. The condition is now `x is defined and x is not none`; a test compiles every admin template.
+- **Docs copied to docs.runwaize.com broke the site build** (PR #168) — `just generate-docs` copies `docs/` and the model reference into supervaize-doc; the site uses `onBrokenLinks: "throw"`. `tools/gen_model_docs.py` now rewrites in-repo links to sibling paths or `https://github.com/supervaize/supervaizer/blob/main/...` (tree for folders), and escapes `{`/`}` outside inline code in model field descriptions so MDX does not treat them as expressions. `tests/test_gen_model_docs.py` covers the transformations. `docs/2026_05_SUPERVAIZER_v2.md` documents `type: "file"` fields on case awaiting steps and in `job.configurator` `Form` components (Studio `useConfiguratorFileFields`). Tooling and docs only until the next `just generate-docs` at release.
+
+### Tests
+
+`uv run just test-cov -p no:sugar -q`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 1600  |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 65s   |
+
+| Metric                   | Before (`5ad84c6`)                     | After (`97ea54f`)                      |
+| ------------------------ | -------------------------------------- | -------------------------------------- |
+| Tests                    | 1,003                                  | 1,559                                  |
+| `src` + `tools` coverage | 74.4% (9,415 statements, 2,413 missed) | 85.4% (9,475 statements, 1,380 missed) |
+| `src` only coverage      | 82.0% (1,541 missed)                   | 94.1% (508 missed)                     |
+| `tools` only coverage    | 0% (872 statements)                    | 0% (872 statements)                    |
+
+Coverage table (PR #169) compares the tree before and after the CRAP refactor (#163).
+
 ## [1.10.0] - 2026-10-30
 
 ### Added

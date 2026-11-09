@@ -17,6 +17,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
+from functools import partial
 from typing import Any, ClassVar, TypeVar, cast
 from urllib.parse import urlunparse
 
@@ -102,6 +103,160 @@ insp = inspect
 
 T = TypeVar("T")
 SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
+
+def _resolve_server_runtime_settings(
+    environment: str | None,
+    host: str | None,
+    port: int | None,
+    public_url: str | None,
+    api_key: str | None,
+) -> tuple[str, str, int, str | None, str, bool, bool]:
+    """Resolve constructor settings after the caller has supplied overrides."""
+    if environment is None:
+        environment = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev")
+    if host is None:
+        host = os.getenv("SUPERVAIZER_HOST", "0.0.0.0")
+    if port is None:
+        port = int(os.getenv("SUPERVAIZER_PORT", "8000"))
+    if public_url is None:
+        public_url = os.getenv("SUPERVAIZER_PUBLIC_URL") or None
+    local_mode = is_local_mode()
+    api_key_was_generated = False
+    if api_key is None:
+        api_key = os.getenv("SUPERVAIZER_API_KEY")
+        if not api_key:
+            if local_mode:
+                api_key = "local-dev"
+            else:
+                api_key = secrets.token_urlsafe(32)
+                os.environ["SUPERVAIZER_API_KEY"] = api_key
+                api_key_was_generated = True
+    return (
+        environment,
+        host,
+        port,
+        public_url,
+        api_key,
+        local_mode,
+        api_key_was_generated,
+    )
+
+
+def _prepare_local_mode(
+    agents: list[Agent],
+    supervisor_account: Account | None,
+    a2a_endpoints: bool,
+    admin_interface: bool,
+    local_mode: bool,
+) -> tuple[list[Agent], Account | None, bool, bool, str | None]:
+    """Apply local-mode controller settings and optional Hello World injection."""
+    local_hello_world_slug: str | None = None
+    if local_mode:
+        if supervisor_account is not None:
+            log.warning(
+                "[Server] Local mode active — ignoring supervisor_account"
+                " (no Studio registration)"
+            )
+        supervisor_account = None
+        a2a_endpoints = True
+        admin_interface = True
+        if os.environ.get("SUPERVAIZER_DISABLE_HELLO_WORLD", "").lower() != "true":
+            # local_server imports Server through the package, so defer this cycle.
+            from supervaizer.examples.local_server import get_default_local_agent
+
+            hw_agent = get_default_local_agent()
+            existing_slugs = {agent.slug for agent in agents}
+            if hw_agent.slug not in existing_slugs:
+                agents = [hw_agent, *agents]
+                local_hello_world_slug = hw_agent.slug
+        elif not agents:
+            log.warning(
+                "[Server] Local mode with Hello World disabled and no"
+                " agents — server will be empty"
+            )
+    return (
+        agents,
+        supervisor_account,
+        a2a_endpoints,
+        admin_interface,
+        local_hello_world_slug,
+    )
+
+
+@asynccontextmanager
+async def _server_lifespan(server: "Server", _app: FastAPI) -> AsyncIterator[None]:
+    """Run and stop the controller scheduler with the FastAPI lifespan."""
+    scheduled_step_task = asyncio.create_task(
+        _run_scheduled_step_loop(server),
+        name="supervaizer-scheduled-step-loop",
+    )
+    try:
+        yield
+    finally:
+        scheduled_step_task.cancel()
+        done, pending = await asyncio.wait(
+            {scheduled_step_task}, timeout=SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS
+        )
+        if pending:
+            log.warning(
+                "[Scheduled step] Shutdown timed out while waiting for "
+                "the scheduler task to stop"
+            )
+        if done:
+            with suppress(asyncio.CancelledError):
+                await scheduled_step_task
+
+
+def _create_server_app(server: "Server", debug: bool) -> FastAPI:
+    """Build the FastAPI app before controller routes are mounted."""
+    docs_url = "/docs"
+    redoc_url = "/redoc"
+    openapi_url = "/openapi.json"
+    app = FastAPI(
+        lifespan=partial(_server_lifespan, server),
+        debug=debug,
+        title="Supervaizer API",
+        description=(
+            f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
+            "API for controlling and managing Supervaize agents. \n\nMore information at "
+            "[https://doc.supervaize.com](https://doc.supervaize.com)\n\n"
+            "## Authentication\n\n"
+            "Some endpoints require API key authentication. Protected endpoints expect "
+            "the API key in the X-API-Key header.\n\n"
+            f"[Swagger]({docs_url})\n"
+            f"[Redoc]({redoc_url})\n"
+            f"[OpenAPI]({openapi_url})\n"
+        ),
+        version=API_VERSION,
+        terms_of_service="https://supervaize.com/terms/",
+        contact={
+            "name": "Support Team",
+            "url": "https://supervaize.com/dev_contact/",
+            "email": "integration_support@supervaize.com",
+        },
+        license_info={
+            "name": "Mozilla Public License 2.0",
+            "url": "https://mozilla.org/MPL/2.0/",
+        },
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
+    )
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        log.error(f"[422 Error] {exc.errors()}")
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.errors(), "body": exc.body},
+        )
+
+    return app
+
 
 # Baseline security response headers applied to every HTTP response.
 _SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
@@ -332,57 +487,30 @@ class Server(ServerAbstract):
             api_key: API key for securing endpoints
 
         """
-        # Resolve defaults from env vars at call time (not class definition time).
-        # This ensures CLI-set env vars are picked up even when the module was
-        # imported before the CLI ran.
-        if environment is None:
-            environment = os.getenv("SUPERVAIZER_ENVIRONMENT", "dev")
-        if host is None:
-            host = os.getenv("SUPERVAIZER_HOST", "0.0.0.0")
-        if port is None:
-            port = int(os.getenv("SUPERVAIZER_PORT", "8000"))
-        if public_url is None:
-            public_url = os.getenv("SUPERVAIZER_PUBLIC_URL") or None
-        local_mode = is_local_mode()
-        api_key_was_generated = False
-        if api_key is None:
-            api_key = os.getenv("SUPERVAIZER_API_KEY")
-            if not api_key:
-                if local_mode:
-                    api_key = "local-dev"
-                else:
-                    api_key = secrets.token_urlsafe(32)
-                    os.environ["SUPERVAIZER_API_KEY"] = api_key
-                    api_key_was_generated = True
-
-        # Local mode: skip Studio, inject Hello World, default api_key
-        local_hello_world_slug: str | None = None
-        if local_mode:
-            if supervisor_account is not None:
-                log.warning(
-                    "[Server] Local mode active — ignoring supervisor_account"
-                    " (no Studio registration)"
-                )
-            supervisor_account = None
-            a2a_endpoints = True
-            admin_interface = True
-
-            # Inject Hello World agent unless disabled or duplicate
-            if os.environ.get("SUPERVAIZER_DISABLE_HELLO_WORLD", "").lower() != "true":
-                from supervaizer.examples.local_server import (
-                    get_default_local_agent,
-                )
-
-                hw_agent = get_default_local_agent()
-                existing_slugs = {a.slug for a in agents}
-                if hw_agent.slug not in existing_slugs:
-                    agents = [hw_agent] + list(agents)
-                    local_hello_world_slug = hw_agent.slug
-            elif not agents:
-                log.warning(
-                    "[Server] Local mode with Hello World disabled and no"
-                    " agents — server will be empty"
-                )
+        (
+            environment,
+            host,
+            port,
+            public_url,
+            api_key,
+            local_mode,
+            api_key_was_generated,
+        ) = _resolve_server_runtime_settings(
+            environment, host, port, public_url, api_key
+        )
+        (
+            agents,
+            supervisor_account,
+            a2a_endpoints,
+            admin_interface,
+            local_hello_world_slug,
+        ) = _prepare_local_mode(
+            agents,
+            supervisor_account,
+            a2a_endpoints,
+            admin_interface,
+            local_mode,
+        )
 
         if not mac_addr:
             node_id = uuid.getnode()
@@ -407,83 +535,7 @@ class Server(ServerAbstract):
                 ).decode('utf-8')!s
             },"
         )
-        # Create root app to handle version prefix
-        docs_url = "/docs"  # Swagger UI
-        redoc_url = "/redoc"  # ReDoc
-        openapi_url = "/openapi.json"
-
-        @asynccontextmanager
-        async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
-            # Keep a task handle so shutdown can stop the scheduler cleanly.
-            scheduled_step_task = asyncio.create_task(
-                _run_scheduled_step_loop(self),
-                name="supervaizer-scheduled-step-loop",
-            )
-            try:
-                yield
-            finally:
-                # Give the scheduler a bounded chance to observe cancellation.
-                scheduled_step_task.cancel()
-                done, pending = await asyncio.wait(
-                    {scheduled_step_task},
-                    timeout=SCHEDULED_STEP_SHUTDOWN_TIMEOUT_SECONDS,
-                )
-                if pending:
-                    log.warning(
-                        "[Scheduled step] Shutdown timed out while waiting for "
-                        "the scheduler task to stop"
-                    )
-                if done:
-                    with suppress(asyncio.CancelledError):
-                        await scheduled_step_task
-
-        app = FastAPI(
-            lifespan=_lifespan,
-            debug=debug,
-            title="Supervaizer API",
-            description=(
-                f"API version: {API_VERSION}  Controller version: {VERSION}\n\n"
-                "API for controlling and managing Supervaize agents. \n\nMore information at "
-                "[https://doc.supervaize.com](https://doc.supervaize.com)\n\n"
-                "## Authentication\n\n"
-                "Some endpoints require API key authentication. Protected endpoints expect "
-                "the API key in the X-API-Key header.\n\n"
-                f"[Swagger]({docs_url})\n"
-                f"[Redoc]({redoc_url})\n"
-                f"[OpenAPI]({openapi_url})\n"
-            ),
-            version=API_VERSION,
-            terms_of_service="https://supervaize.com/terms/",
-            contact={
-                "name": "Support Team",
-                "url": "https://supervaize.com/dev_contact/",
-                "email": "integration_support@supervaize.com",
-            },
-            license_info={
-                "name": "Mozilla Public License 2.0",
-                "url": "https://mozilla.org/MPL/2.0/",
-            },
-            docs_url=docs_url,
-            redoc_url=redoc_url,
-            openapi_url=openapi_url,
-        )
-
-        # Baseline security response headers (clickjacking, MIME sniffing,
-        # referrer leakage, TLS downgrade). Implemented as a lightweight ASGI
-        # middleware that only touches response-start headers, so it does not
-        # buffer streaming/SSE responses.
-        app.add_middleware(SecurityHeadersMiddleware)
-
-        # Add exception handler for 422 validation errors
-        @app.exception_handler(RequestValidationError)
-        async def validation_exception_handler(
-            request: Request, exc: RequestValidationError
-        ) -> JSONResponse:
-            log.error(f"[422 Error] {exc.errors()}")
-            return JSONResponse(
-                status_code=422,
-                content={"detail": exc.errors(), "body": exc.body},
-            )
+        app = _create_server_app(self, debug)
 
         super().__init__(
             scheme=scheme,
@@ -505,7 +557,23 @@ class Server(ServerAbstract):
             **kwargs,
         )
 
+        self._configure_startup(
+            admin_interface,
+            local_mode,
+            local_hello_world_slug,
+            api_key_was_generated,
+        )
+
+    def _configure_startup(
+        self,
+        admin_interface: bool,
+        local_mode: bool,
+        local_hello_world_slug: str | None,
+        api_key_was_generated: bool,
+    ) -> None:
+        """Register controller surfaces after Pydantic validates the server."""
         if local_hello_world_slug:
+            # local_server imports Server through the package, so defer this cycle.
             from supervaizer.examples.local_server import (
                 register_default_local_v2_handlers,
             )
@@ -523,65 +591,59 @@ class Server(ServerAbstract):
                 "'local-mode' workspace context. Do not expose this server."
             )
 
-        # Store server instance on app state before building routers
-        self.app.state.server = self  # <-- MOVED earlier (was after route mount)
+        self._configure_controller_routes(admin_interface, local_mode)
+        self._configure_runtime_state(api_key_was_generated)
+
+    def _configure_controller_routes(
+        self, admin_interface: bool, local_mode: bool
+    ) -> None:
+        """Mount controller routes and restore running entities in startup order."""
+
+        self.app.state.server = self
         self._register_agent_v2_method_handlers()
 
-        # Activate API + A2A routes when supervisor account or local mode is set
         if self.supervisor_account or local_mode:
             log.info(
                 "[Server launch] 🚀 Deploy API routes (/api)"
                 + (" (local mode)" if local_mode else "")
             )
             self.a2a_endpoints = True
-            self.app.include_router(create_api_router(self))  # <-- ADDED: /api surface
+            self.app.include_router(create_api_router(self))
 
-        # Public surface: home page + A2A discovery  # <-- ADDED
         self.app.include_router(
             create_public_router(self, admin_interface=admin_interface)
         )
         log.info("[Server launch] 🌐 Deploy public routes (/)")
 
-        # Private surface: admin UI + workbench (Tailscale-only)  # <-- ADDED
         if self.api_key and admin_interface:
             log.info(
                 f"[Server launch] 💼 Deploy admin interface @ {self.public_url}/manage"
             )
-            self.app.include_router(
-                create_private_router()
-            )  # <-- ADDED: /manage surface
-            # <-- REMOVED: AdminIPAllowlistMiddleware (replaced by require_tailscale)
-            # <-- REMOVED: create_admin_routes() prefix="/admin" (now inside private_router)
-
-            # Save server info to storage for admin interface
+            self.app.include_router(create_private_router())
             save_server_info_to_storage(self)
-        # <-- REMOVED: inline home_page handler (moved to routers/public.py)
 
-        # Load running entities from storage into memory
         try:
             load_running_entities_on_startup()
         except Exception as e:
             log.error(f"[Server launch] Failed to load running entities: {e}")
             raise
 
-        # Override the get_server dependency to return this instance
+    def _configure_runtime_state(self, api_key_was_generated: bool) -> None:
+        """Expose the live controller and report its API key state."""
+
         async def get_current_server() -> "Server":
             return self
 
-        # Update the dependency
         self.app.dependency_overrides[get_server] = get_current_server
-
-        # Expose live server for admin when storage has no ServerInfo (e.g. no persistence)
         self._start_time = time.time()
         self.app.state.server = self
 
-        if api_key:
+        if self.api_key:
             log.info("[Server launch] API Key authentication enabled")
-            # Print the API key if it was generated
             if api_key_was_generated:
                 log.warning(
                     "[Server launch] Using auto-generated API key "
-                    f"fingerprint={_controller_key_fingerprint(api_key)}"
+                    f"fingerprint={_controller_key_fingerprint(self.api_key)}"
                 )
         else:
             log.info("[Server launch] API Key authentication disabled")

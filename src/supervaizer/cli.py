@@ -10,19 +10,38 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from __future__ import annotations
+
 import asyncio
+import importlib.util
 import os
 import shutil
 import sys
+import webbrowser
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+import httpx
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.prompt import Confirm
 
 from supervaizer.__version__ import VERSION
 from supervaizer.deploy.cli import deploy_app
+from supervaizer.studio_login import (
+    DEFAULT_API_URL,
+    StudioLoginError,
+    ensure_env_file_writable,
+    env_values,
+    request_device_code,
+    wait_for_credentials,
+    write_env_file,
+)
 from supervaizer.utils.version_check import check_is_latest_version
+
+if TYPE_CHECKING:
+    from supervaizer.server import Server
 
 console = Console()
 
@@ -107,8 +126,71 @@ scaffold_app = typer.Typer(help="Scaffold commands for creating project files")
 app.add_typer(scaffold_app, name="scaffold", invoke_without_command=True)
 
 
+def _env_flag_is_true(name: str) -> bool:
+    return os.environ.get(name, "").lower() in ("true", "1", "yes")
+
+
+def _cli_set_parameter(ctx: typer.Context, param: str) -> bool:
+    """True when the user passed `param` on the command line (not a Typer/Click default)."""
+    source = ctx.get_parameter_source(param)
+    if source is None:
+        return False
+    # Typer may resolve ParameterSource from a different Click install than ours.
+    return getattr(source, "name", None) == ParameterSource.COMMANDLINE.name
+
+
+def _apply_start_environment(
+    ctx: typer.Context,
+    *,
+    host: str,
+    port: int,
+    environment: str,
+    persist: bool,
+    log_level: str,
+    debug: bool,
+    reload: bool,
+    public_url: str | None,
+) -> None:
+    """Apply start settings: explicit CLI beats env file and shell; file beats Typer defaults."""
+
+    def set_env(param: str, env_key: str, value: str) -> None:
+        if _cli_set_parameter(ctx, param) or env_key not in os.environ:
+            os.environ[env_key] = value
+
+    set_env("host", "SUPERVAIZER_HOST", host)
+    set_env("port", "SUPERVAIZER_PORT", str(port))
+    set_env("environment", "SUPERVAIZER_ENVIRONMENT", environment)
+    set_env("persist", "SUPERVAIZER_PERSISTENCE", str(persist).lower())
+    set_env("log_level", "SUPERVAIZER_LOG_LEVEL", log_level)
+    set_env("debug", "SUPERVAIZER_DEBUG", str(debug))
+    set_env("reload", "SUPERVAIZER_RELOAD", str(reload))
+    if public_url is not None:
+        set_env("public_url", "SUPERVAIZER_PUBLIC_URL", public_url)
+    if debug:
+        console.print(
+            "[bold yellow]Warning:[/] --debug is deprecated and will be removed. "
+            "Set debug=True on the Server in your control script."
+        )
+    if reload:
+        console.print(
+            "[bold yellow]Warning:[/] --reload is deprecated and will be removed. "
+            "The Server does not support auto-reload."
+        )
+
+
+def _sync_start_runtime_from_environ() -> tuple[str, int, str, bool, str, bool]:
+    host = os.environ["SUPERVAIZER_HOST"]
+    port = int(os.environ["SUPERVAIZER_PORT"])
+    environment = os.environ["SUPERVAIZER_ENVIRONMENT"]
+    persist = _env_flag_is_true("SUPERVAIZER_PERSISTENCE")
+    log_level = os.environ["SUPERVAIZER_LOG_LEVEL"]
+    debug = _env_flag_is_true("SUPERVAIZER_DEBUG")
+    return host, port, environment, persist, log_level, debug
+
+
 @app.command()
 def start(
+    ctx: typer.Context,
     public_url: str | None = typer.Option(
         None,
         help="Public URL to use for inbound connections (reads SUPERVAIZER_PUBLIC_URL env var if not set)",
@@ -148,179 +230,240 @@ def start(
         "--local",
         help="Local test mode: run without Studio credentials, with built-in Hello World agent",
     ),
+    env_file: str | None = typer.Option(
+        None,
+        "--env-file",
+        help="Load variables from this file before the start, for example the file "
+        "that `supervaizer login` wrote. Values already exported in the shell keep "
+        "their value. Explicit start flags override the file. Other file values override "
+        "command defaults.",
+    ),
     script_path: str | None = typer.Argument(
         None,
         help="Path to the supervaizer_control.py script",
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
-    # Track whether the user explicitly passed --public-url on the CLI.
-    # Since the default is None, a non-None value means it was explicit.
-    user_provided_public_url = public_url is not None
-
-    # Set CLI-provided env vars BEFORE .env loading so they take precedence.
-    # The .env loader skips keys already present in os.environ.
-    os.environ["SUPERVAIZER_HOST"] = host
-    os.environ["SUPERVAIZER_PORT"] = str(port)
-    os.environ["SUPERVAIZER_ENVIRONMENT"] = environment
-    os.environ["SUPERVAIZER_PERSISTENCE"] = str(persist).lower()
-    os.environ["SUPERVAIZER_LOG_LEVEL"] = log_level
-    os.environ["SUPERVAIZER_DEBUG"] = str(debug)
-    os.environ["SUPERVAIZER_RELOAD"] = str(reload)
-    if debug:
-        console.print(
-            "[bold yellow]Warning:[/] --debug is deprecated and will be removed. "
-            "Set debug=True on the Server in your control script."
-        )
-    if reload:
-        console.print(
-            "[bold yellow]Warning:[/] --reload is deprecated and will be removed. "
-            "The Server does not support auto-reload."
-        )
-    if user_provided_public_url:
-        assert public_url is not None
-        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
-
-    # In local mode, load .env file so agent parameters are available.
-    # CLI-provided values above won't be overridden (loader skips existing keys).
+    if env_file is not None:
+        if not os.path.isfile(env_file):
+            console.print(f"[bold red]Error:[/] environment file {env_file} not found")
+            sys.exit(1)
+        _load_environment_file(env_file)
+    _apply_start_environment(
+        ctx,
+        host=host,
+        port=port,
+        environment=environment,
+        persist=persist,
+        log_level=log_level,
+        debug=debug,
+        reload=reload,
+        public_url=public_url,
+    )
+    host, port, environment, persist, log_level, debug = (
+        _sync_start_runtime_from_environ()
+    )
+    explicit_public_url = _cli_set_parameter(ctx, "public_url")
+    public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
     if local:
-        env_file = os.path.join(os.getcwd(), ".env")
-        if os.path.isfile(env_file):
-            with open(env_file) as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    key, _, value = line.partition("=")
-                    key = key.strip()
-                    value = value.strip()
-                    # Don't override already-set env vars
-                    if key and key not in os.environ:
-                        os.environ[key] = value
-
-    if local:
-        os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
-        # Security: local test mode uses a well-known default API key
-        # ("local-dev"). Never expose that on all network interfaces — bind
-        # loopback unless the user chose a specific non-wildcard host.
-        if host in ("0.0.0.0", "::", ""):
-            host = "127.0.0.1"
-            os.environ["SUPERVAIZER_HOST"] = host
-        # In local mode, force public_url to localhost unless the user
-        # explicitly passed --public-url on the CLI.
-        if not user_provided_public_url:
-            public_url = f"http://{host}:{port}"
-            os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
-        console.print(
-            f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)"
+        _load_environment_file(os.path.join(os.getcwd(), ".env"))
+        host, public_url = _prepare_local_start(
+            host, port, public_url, explicit_public_url
         )
-        console.print("[dim]No Studio registration — agents run locally[/]")
-        api_key_display = os.environ.get("SUPERVAIZER_API_KEY") or "local-dev"
-        base = public_url
-        console.print(
-            f"[bold]API:[/] {base}/docs  [bold]Admin/Workbench:[/] {base}/manage/"
-        )
-        console.print(f"[dim]API key for /manage: {api_key_display}[/]")
     else:
-        # Non-local mode: resolve public_url from env var if not explicitly provided
-        if not user_provided_public_url:
-            public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
-            if public_url is not None:
-                os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
+        public_url = _resolve_start_public_url(public_url, explicit_public_url)
 
+    script_path, use_fallback = _resolve_start_script(script_path, local)
+    if not local:
+        console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
+    if use_fallback:
+        _launch_local_fallback(host, port, debug, environment, log_level)
+        return
+    _launch_control_script(script_path, host, port, public_url, log_level)
+
+
+def _load_environment_file(env_file: str) -> None:
+    """Set the variables of the file that are not set yet. A missing file is skipped."""
+    if os.path.isfile(env_file):
+        with open(env_file) as file:
+            for line in file:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip().removeprefix("export ").strip()
+                value = value.strip()
+                if key and key not in os.environ:
+                    os.environ[key] = value
+
+
+def _prepare_local_start(
+    host: str, port: int, public_url: str | None, explicit_public_url: bool
+) -> tuple[str, str | None]:
+    os.environ["SUPERVAIZER_LOCAL_MODE"] = "true"
+    # The local development API key requires a loopback default.
+    if host in ("0.0.0.0", "::", ""):
+        host = "127.0.0.1"
+        os.environ["SUPERVAIZER_HOST"] = host
+    if not explicit_public_url:
+        public_url = f"http://{host}:{port}"
+        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
+    console.print(
+        f"[bold green]Starting Supervaizer Controller v{VERSION}[/] (local test mode)"
+    )
+    console.print("[dim]No Studio registration — agents run locally[/]")
+    api_key_display = os.environ.get("SUPERVAIZER_API_KEY") or "local-dev"
+    console.print(
+        f"[bold]API:[/] {public_url}/docs  [bold]Admin/Workbench:[/] {public_url}/manage/"
+    )
+    console.print(f"[dim]API key for /manage: {api_key_display}[/]")
+    return host, public_url
+
+
+def _resolve_start_public_url(
+    public_url: str | None, explicit_public_url: bool
+) -> str | None:
+    if not explicit_public_url:
+        public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
+        if public_url is not None:
+            os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
+    return public_url
+
+
+def _resolve_start_script(script_path: str | None, local: bool) -> tuple[str, bool]:
     if script_path is None:
         script_path = (
             os.environ.get("SUPERVAIZER_SCRIPT_PATH") or "supervaizer_control.py"
         )
-
-    use_fallback_server = False
     if not os.path.exists(script_path):
         if local:
-            # Use fallback: launch a Server with Hello World agent directly
-            use_fallback_server = True
-        else:
-            console.print(f"[bold red]Error:[/] {script_path} not found")
-            console.print(
-                "Run [bold]supervaizer scaffold[/] to create a default script"
-            )
-            sys.exit(1)
+            return script_path, True
+        console.print(f"[bold red]Error:[/] {script_path} not found")
+        console.print("Run [bold]supervaizer scaffold[/] to create a default script")
+        sys.exit(1)
+    return script_path, False
 
-    if not local:
-        console.print(f"[bold green]Starting Supervaizer Controller v{VERSION}[/]")
 
-    if use_fallback_server:
-        # No control script found — create a minimal Server with Hello World agent
-        console.print(
-            "[dim]No control script found — using built-in Hello World agent[/]"
-        )
-        from supervaizer.server import Server as _Server
+def _controller_type() -> type[Server]:
+    # Keep the controller runtime out of version and scaffold command startup.
+    from supervaizer.server import Server
 
-        _local_server = _Server(
-            agents=[],
-            supervisor_account=None,
-            a2a_endpoints=True,
-            admin_interface=True,
-            host=host,
-            port=port,
-            public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
-            debug=debug,
-            environment=environment,
-            api_key=None,
-        )
-        _local_server.launch(log_level=log_level)
-        return
+    return Server
 
+
+def _launch_local_fallback(
+    host: str, port: int, debug: bool, environment: str, log_level: str
+) -> None:
+    console.print("[dim]No control script found — using built-in Hello World agent[/]")
+    server = _controller_type()(
+        agents=[],
+        supervisor_account=None,
+        a2a_endpoints=True,
+        admin_interface=True,
+        host=host,
+        port=port,
+        public_url=os.environ.get("SUPERVAIZER_PUBLIC_URL"),
+        debug=debug,
+        environment=environment,
+        api_key=None,
+    )
+    server.launch(log_level=log_level)
+
+
+def _launch_control_script(
+    script_path: str, host: str, port: int, public_url: str | None, log_level: str
+) -> None:
     console.print(f"Loading configuration from [bold]{script_path}[/]")
-
-    # Import the control script as a module and auto-launch the Server if needed.
-    # This allows scripts that only *define* a Server (without an `if __name__`
-    # guard calling launch()) to still work via `supervaizer start`.
-    import importlib.util
-
     spec = importlib.util.spec_from_file_location("supervaizer_control", script_path)
     if spec is None or spec.loader is None:
         console.print(f"[bold red]Error:[/] Could not load {script_path} as a module")
         sys.exit(1)
-
     module = importlib.util.module_from_spec(spec)
-
-    # Add the script's directory to sys.path so relative imports work
     script_dir = os.path.dirname(os.path.abspath(script_path))
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
-
     spec.loader.exec_module(module)
 
-    # Look for a Server instance that hasn't been launched yet.
-    # If the script already called launch() (via __main__ guard), uvicorn would
-    # be running and we'd never reach this point. So if we're here, we need to
-    # find the Server and call launch().
-    from supervaizer.server import Server as _Server
-
-    server_instance: _Server | None = None
+    server_type = _controller_type()
+    server_instance: Server | None = None
     for attr_name in dir(module):
         obj = getattr(module, attr_name, None)
-        if isinstance(obj, _Server):
+        if isinstance(obj, server_type):
             server_instance = obj
             break
-
     if server_instance is None:
         console.print(
             "[bold red]Error:[/] No Server instance found in the control script. "
             "Define a variable of type supervaizer.Server in your script."
         )
         sys.exit(1)
-
-    # Override Server attributes with CLI values.
-    # Python default arguments (os.getenv in Server.__init__) are evaluated at
-    # class definition time, so if the module was already imported before the CLI
-    # set env vars, the Server instance has stale defaults.
     server_instance.host = host
     server_instance.port = port
     if public_url is not None:
         server_instance.public_url = public_url
-
     server_instance.launch(log_level=log_level)
+
+
+@app.command()
+def login(
+    api_url: str = typer.Option(
+        os.environ.get("SUPERVAIZE_API_URL") or DEFAULT_API_URL,
+        "--api-url",
+        help="Address of the Studio API",
+    ),
+    env_file: str = typer.Option(
+        ".env",
+        "--env-file",
+        help="File that receives the Studio credentials. Keep it out of git.",
+    ),
+    browser: bool = typer.Option(
+        True, "--browser/--no-browser", help="Open the approval page in the browser"
+    ),
+) -> None:
+    """Log in to Supervaize Studio in the browser and save the credentials of the workspace."""
+    env_path = Path(env_file)
+    try:
+        ensure_env_file_writable(env_path)
+    except StudioLoginError as exc:
+        console.print(f"Error: {exc}", style="bold red", markup=False)
+        raise typer.Exit(code=1) from exc
+
+    try:
+        with httpx.Client(base_url=api_url.rstrip("/"), timeout=30) as client:
+            device = request_device_code(client)
+            approval_url = str(device["verification_uri_complete"])
+            # Text from Studio is printed without markup.
+            console.print("Open this page, sign in or sign up, and approve the login:")
+            console.print(f"  {approval_url}", markup=False)
+            console.print(
+                f"The page must show this code: {device['user_code']}", markup=False
+            )
+            if browser:
+                webbrowser.open(approval_url)
+            console.print("Waiting for the approval in Studio...")
+            credentials = wait_for_credentials(client, device)
+        values = env_values(credentials)
+        try:
+            write_env_file(env_path, values)
+        except (OSError, UnicodeError) as exc:
+            raise StudioLoginError(
+                "Studio issued credentials but the file could not be written. "
+                "Create a new API key on the Developer page of Studio, then try again."
+            ) from exc
+    except (StudioLoginError, httpx.HTTPError) as exc:
+        console.print(f"Error: {exc}", style="bold red", markup=False)
+        raise typer.Exit(code=1) from exc
+
+    # Names only: the value of a credential is never printed.
+    console.print("[bold green]Logged in.[/]")
+    console.print(f"Workspace: {credentials.get('workspace_name', '')}", markup=False)
+    console.print(f"Wrote to {env_file}: {', '.join(values)}", markup=False)
+    console.print(f"Make sure that git ignores {env_file}.", markup=False)
+    console.print(
+        f"Next: supervaizer start --env-file {env_file}  "
+        "(the log then shows the page of each agent in Studio)",
+        markup=False,
+    )
 
 
 def _create_instructions_file(

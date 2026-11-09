@@ -750,41 +750,60 @@ class V2AgentCapabilities(ContractModel):
 
     @model_validator(mode="after")
     def validate_surface_definitions(self) -> V2AgentCapabilities:
-        declared = set(self.surfaces)
-        described: set[str] = set()
-        with_text: list[V2SurfaceDefinition] = []
-        for definition in self.surface_definitions:
-            if definition.id not in declared:
-                raise ValueError(
-                    f"surface_definitions describes undeclared surface {definition.id!r}"
-                )
-            if definition.id in described:
-                raise ValueError(
-                    f"surface_definitions describes surface {definition.id!r} twice"
-                )
-            described.add(definition.id)
-            if definition.label is not None or definition.description is not None:
-                with_text.append(definition)
-        # A definition with no text says nothing, and keeping it would serialize a
-        # non-empty `surface_definitions` for an agent that declares no display text.
-        self.surface_definitions = with_text
-        if self.rule_checkpoints is not None and not any(
-            action.id == RULE_CHECKPOINT_RESUME_ACTION for action in self.actions
-        ):
-            self.actions.append(
-                V2ActionDefinition(
-                    id=RULE_CHECKPOINT_RESUME_ACTION,
-                    mutating=True,
-                    scope="job",
-                )
-            )
-        if self.scheduled_start and not any(
-            action.id == "job.start" for action in self.actions
-        ):
-            raise ValueError(
-                "capabilities.scheduled_start requires a declared job.start action"
-            )
+        self.surface_definitions = _described_surface_definitions(
+            self.surfaces,
+            self.surface_definitions,
+        )
+        _add_rule_checkpoint_resume_action(self)
+        _validate_scheduled_start_action(self)
         return self
+
+
+def _described_surface_definitions(
+    surfaces: list[str],
+    definitions: list[V2SurfaceDefinition],
+) -> list[V2SurfaceDefinition]:
+    """Validate and retain definitions that contain display text."""
+    declared = set(surfaces)
+    described: set[str] = set()
+    with_text: list[V2SurfaceDefinition] = []
+    for definition in definitions:
+        if definition.id not in declared:
+            raise ValueError(
+                f"surface_definitions describes undeclared surface {definition.id!r}"
+            )
+        if definition.id in described:
+            raise ValueError(
+                f"surface_definitions describes surface {definition.id!r} twice"
+            )
+        described.add(definition.id)
+        if definition.label is not None or definition.description is not None:
+            with_text.append(definition)
+    return with_text
+
+
+def _add_rule_checkpoint_resume_action(capabilities: V2AgentCapabilities) -> None:
+    """Add the required checkpoint resume action when it is not declared."""
+    if capabilities.rule_checkpoints is not None and not any(
+        action.id == RULE_CHECKPOINT_RESUME_ACTION for action in capabilities.actions
+    ):
+        capabilities.actions.append(
+            V2ActionDefinition(
+                id=RULE_CHECKPOINT_RESUME_ACTION,
+                mutating=True,
+                scope="job",
+            )
+        )
+
+
+def _validate_scheduled_start_action(capabilities: V2AgentCapabilities) -> None:
+    """Require the start action when scheduled starts are enabled."""
+    if capabilities.scheduled_start and not any(
+        action.id == "job.start" for action in capabilities.actions
+    ):
+        raise ValueError(
+            "capabilities.scheduled_start requires a declared job.start action"
+        )
 
 
 class V2RuleCheckpointCapability(ContractModel):
@@ -1035,6 +1054,12 @@ _FieldOptions = Annotated[
 
 def _validate_field_rules(field: Any) -> None:
     """Shared checks for setup, awaiting and resource field definitions."""
+    _validate_field_layout(field)
+    _validate_field_validation(field)
+
+
+def _validate_field_layout(field: Any) -> None:
+    """Validate multiline and list-field shape requirements."""
     if field.min_rows is not None and not field.multiline:
         raise ValueError(f"field {field.id!r} sets min_rows without multiline")
     if field.type == "list":
@@ -1049,6 +1074,10 @@ def _validate_field_rules(field: Any) -> None:
         raise ValueError(
             f"field {field.id!r} declares item_fields but is not of type 'list'"
         )
+
+
+def _validate_field_validation(field: Any) -> None:
+    """Validate rule compatibility with the rendered field type."""
     if field.validation is None:
         return
     # Unknown types render as string, so they take the string rules.
@@ -1524,21 +1553,13 @@ def _job_policy(value: V2JobPolicy | dict[str, Any] | None) -> V2JobPolicy:
 def _workspace_binding(
     value: V2WorkspaceBindingDefinition | dict[str, Any] | None,
 ) -> V2WorkspaceBindingDefinition | None:
-    if value is None:
-        return None
-    if isinstance(value, V2WorkspaceBindingDefinition):
-        return value
-    return V2WorkspaceBindingDefinition.model_validate(value)
+    return _contract_or_none(value, V2WorkspaceBindingDefinition)
 
 
 def _agent_methods(
     value: V2AgentMethods | dict[str, Any] | None,
 ) -> V2AgentMethods | None:
-    if value is None:
-        return None
-    if isinstance(value, V2AgentMethods):
-        return value
-    return V2AgentMethods.model_validate(value)
+    return _contract_or_none(value, V2AgentMethods)
 
 
 def _unique_strings(values: Iterable[str]) -> list[str]:
@@ -1682,6 +1703,15 @@ def _merge_actions(
     explicit metadata wherever the two appear, and the earlier mention still
     fixes the order.
     """
+    resolved, bare_ids = _resolve_declared_actions(declared)
+    _merge_derived_actions(resolved, bare_ids, derived)
+    return list(resolved.values())
+
+
+def _resolve_declared_actions(
+    declared: Iterable[str | V2ActionDefinition | dict[str, Any]],
+) -> tuple[dict[str, V2ActionDefinition], set[str]]:
+    """Resolve declared actions while retaining bare-id precedence."""
     resolved: dict[str, V2ActionDefinition] = {}
     bare_ids: set[str] = set()
     for entry in declared:
@@ -1694,13 +1724,21 @@ def _merge_actions(
         elif not is_bare and action.id in bare_ids:
             resolved[action.id] = action
             bare_ids.discard(action.id)
+    return resolved, bare_ids
+
+
+def _merge_derived_actions(
+    resolved: dict[str, V2ActionDefinition],
+    bare_ids: set[str],
+    derived: Iterable[V2ActionDefinition],
+) -> None:
+    """Apply derived metadata only where explicit metadata is absent."""
     for action in derived:
         if action.id not in resolved:
             resolved[action.id] = action
         elif action.id in bare_ids:
             resolved[action.id] = action
             bare_ids.discard(action.id)
-    return list(resolved.values())
 
 
 def _workspace_binding_surface_ids(

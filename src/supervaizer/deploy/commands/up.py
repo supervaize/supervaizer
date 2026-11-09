@@ -30,9 +30,20 @@ from supervaizer.deploy.docker import (
     get_container_env,
 )
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
-from supervaizer.deploy.drivers.base import SECRET_ENV_VARS, DeploymentResult
+from supervaizer.deploy.drivers.base import (
+    SECRET_ENV_VARS,
+    BaseDriver,
+    DeploymentResult,
+)
 from supervaizer.deploy.state import StateManager
-from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
+from supervaizer.deploy.utils import (
+    create_deployment_directory,
+    display_service_target,
+    format_image_tag,
+    get_default_region as _get_default_region,
+    get_git_sha,
+    prerequisites_met,
+)
 
 console = Console()
 
@@ -51,34 +62,14 @@ def deploy_up(
     source_dir: Path | None = None,
 ) -> None:
     """Deploy or update the service."""
-    # Validate platform
-    if platform not in get_supported_platforms():
-        console.print(f"[bold red]Error:[/] Unsupported platform: {platform}")
-        console.print(f"Supported platforms: {', '.join(get_supported_platforms())}")
-        return
-    if image and "/" in image:
-        console.print(
-            "[bold red]Error:[/] --image takes name[:tag]; "
-            "the platform registry is added automatically"
-        )
+    if not _valid_deployment_inputs(platform, image):
         return
 
     # Set defaults
     project_dir = source_dir or Path.cwd()
-    if not name:
-        name = project_dir.name
-    if not region:
-        region = _get_default_region(platform)
+    name, region = _deployment_defaults(platform, project_dir, name, region)
 
-    console.print(f"[bold green]Deploying to {platform}[/bold green]")
-    console.print(f"Service name: {name}")
-    console.print(f"Environment: {env}")
-    console.print(f"Region: {region}")
-    console.print(f"Port: {port}")
-    if project_id:
-        console.print(f"Project ID: {project_id}")
-    if image:
-        console.print(f"Image: {image}")
+    _display_deployment_target(platform, name, env, region, port, project_id, image)
 
     try:
         # Check Docker
@@ -94,11 +85,7 @@ def deploy_up(
         driver = create_driver(platform, region, project_id)
 
         # Check prerequisites
-        prerequisites = driver.check_prerequisites()
-        if prerequisites:
-            console.print("[bold red]Prerequisites not met:[/]")
-            for prereq in prerequisites:
-                console.print(f"  • {prereq}")
+        if not prerequisites_met(driver, console):
             return
 
         # Generate image tag
@@ -109,27 +96,9 @@ def deploy_up(
             env, port, _generate_secrets(generate_api_key, generate_rsa)
         )
 
-        # Build and push Docker image
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Building Docker image...", total=None)
-
-            docker_manager = DockerManager()
-            dockerfile_path = deployment_dir / "Dockerfile"
-            docker_manager.generate_dockerfile(
-                output_path=dockerfile_path,
-                app_port=port,
-            )
-            docker_manager.generate_dockerignore(deployment_dir / ".dockerignore")
-            docker_manager.build_image(image, project_dir, dockerfile_path)
-
-            progress.update(task, description="Pushing Docker image...")
-            remote_image = driver.prepare_registry(image)
-            docker_manager.tag_image(image, remote_image)
-            docker_manager.push_image(remote_image, auth_config=driver.registry_auth())
+        remote_image = _build_and_push_image(
+            driver, image, project_dir, deployment_dir, port
+        )
 
         # Deploy service
         with Progress(
@@ -137,7 +106,7 @@ def deploy_up(
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task = progress.add_task("Deploying service...", total=None)
+            progress.add_task("Deploying service...", total=None)
 
             result = driver.deploy_service(
                 service_name=name,
@@ -191,20 +160,74 @@ def build_service_env(
     return env_vars, {**secrets, **host_secrets}
 
 
-def _get_default_region(platform: str) -> str:
-    """Get default region for platform."""
-    defaults = {
-        "cloud-run": "us-central1",
-        "aws-app-runner": "us-east-1",
-        "do-app-platform": "nyc3",
-    }
-    return defaults.get(platform, "us-central1")
+def _valid_deployment_inputs(platform: str, image: str | None) -> bool:
+    if platform not in get_supported_platforms():
+        console.print(f"[bold red]Error:[/] Unsupported platform: {platform}")
+        console.print(f"Supported platforms: {', '.join(get_supported_platforms())}")
+        return False
+    if image and "/" in image:
+        console.print(
+            "[bold red]Error:[/] --image takes name[:tag]; "
+            "the platform registry is added automatically"
+        )
+        return False
+    return True
+
+
+def _deployment_defaults(
+    platform: str, project_dir: Path, name: str | None, region: str | None
+) -> tuple[str, str]:
+    if not name:
+        name = project_dir.name
+    if not region:
+        region = _get_default_region(platform)
+    return name, region
+
+
+def _display_deployment_target(
+    platform: str,
+    name: str,
+    env: str,
+    region: str,
+    port: int,
+    project_id: str | None,
+    image: str | None,
+) -> None:
+    console.print(f"[bold green]Deploying to {platform}[/bold green]")
+    display_service_target(console, name, env, region, project_id, port=port)
+    if image:
+        console.print(f"Image: {image}")
+
+
+def _build_and_push_image(
+    driver: BaseDriver,
+    image: str,
+    project_dir: Path,
+    deployment_dir: Path,
+    port: int,
+) -> str:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Building Docker image...", total=None)
+        docker_manager = DockerManager()
+        dockerfile_path = deployment_dir / "Dockerfile"
+        docker_manager.generate_dockerfile(output_path=dockerfile_path, app_port=port)
+        docker_manager.generate_dockerignore(deployment_dir / ".dockerignore")
+        docker_manager.build_image(image, project_dir, dockerfile_path)
+
+        progress.update(task, description="Pushing Docker image...")
+        remote_image = driver.prepare_registry(image)
+        docker_manager.tag_image(image, remote_image)
+        docker_manager.push_image(remote_image, auth_config=driver.registry_auth())
+    return remote_image
 
 
 def _generate_image_tag(service_name: str, environment: str) -> str:
     """Generate image tag for deployment."""
-    git_sha = get_git_sha()
-    return f"{service_name}-{environment}:{git_sha}"
+    return format_image_tag(service_name, environment, get_git_sha())
 
 
 def _generate_secrets(generate_api_key: bool, generate_rsa: bool) -> dict[str, str]:

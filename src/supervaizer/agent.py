@@ -19,6 +19,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Literal,
     TypeVar,
     cast,
 )
@@ -301,6 +302,101 @@ class AgentMethodAbstract(BaseModel):
         return value
 
 
+_FIELD_TYPE_RULES: tuple[
+    tuple[type[Any], type[Any] | tuple[type[Any], ...], str], ...
+] = (
+    (str, str, "a string"),
+    (int, int, "an integer"),
+    (bool, bool, "a boolean"),
+    (list, list, "a list"),
+    (dict, dict, "a dictionary"),
+    (float, (int, float), "a number"),
+)
+
+_DYNAMIC_FIELD_TYPES: tuple[tuple[type[Any], type[Any]], ...] = (
+    (str, str),
+    (int, int),
+    (bool, bool),
+    (list, list),
+    (dict, dict),
+    (float, float),
+)
+
+
+def _field_annotation(field: AgentMethodField) -> Any:
+    """Return the dynamic Pydantic annotation for an agent method field."""
+    annotation_type = _normalize_field_annotation_type(field.type)
+    return annotation_type if field.required else annotation_type | None
+
+
+def _normalize_field_annotation_type(field_type: Any) -> type[Any]:
+    """Map supported field types to the annotations used in dynamic models."""
+    for supported_type, annotation_type in _DYNAMIC_FIELD_TYPES:
+        if field_type is supported_type:
+            return annotation_type
+
+    origin = getattr(field_type, "__origin__", None)
+    if origin is list:
+        return list
+    if origin is dict:
+        return dict
+    return Any
+
+
+def _field_type_validation_error(
+    field_name: str, field_value: Any, expected_type: Any
+) -> str | None:
+    """Return the public type-validation error for one supplied field value."""
+    for supported_type, value_type, type_name in _FIELD_TYPE_RULES:
+        if expected_type is supported_type and not isinstance(field_value, value_type):
+            return (
+                f"Field '{field_name}' must be {type_name}, "
+                f"got {type(field_value).__name__}"
+            )
+    return None
+
+
+def _missing_required_field_errors(
+    fields: list[AgentMethodField], job_fields: dict[str, Any]
+) -> tuple[list[str], dict[str, str]]:
+    """Collect missing required-field errors in declared field order."""
+    errors: list[str] = []
+    invalid_fields: dict[str, str] = {}
+    for field in fields:
+        if field.required and field.name not in job_fields:
+            error_msg = f"Required field '{field.name}' is missing"
+            errors.append(error_msg)
+            invalid_fields[field.name] = error_msg
+    return errors, invalid_fields
+
+
+def _provided_field_validation_errors(
+    fields: list[AgentMethodField], job_fields: dict[str, Any]
+) -> tuple[list[str], dict[str, str]]:
+    """Collect unknown and type errors in supplied field order."""
+    errors: list[str] = []
+    invalid_fields: dict[str, str] = {}
+    for field_name, field_value in job_fields.items():
+        error_msg: str | None
+        field_def = next((field for field in fields if field.name == field_name), None)
+        if not field_def:
+            error_msg = f"Unknown field '{field_name}'"
+        elif field_value is None:
+            continue
+        else:
+            try:
+                error_msg = _field_type_validation_error(
+                    field_name, field_value, field_def.type
+                )
+            except Exception as e:
+                error_msg = f"Field '{field_name}' validation failed: {e!s}"
+
+        if error_msg:
+            errors.append(error_msg)
+            invalid_fields[field_name] = error_msg
+    return errors, invalid_fields
+
+
 class AgentMethod(AgentMethodAbstract):
     @property
     def fields_definitions(self) -> list[dict[str, Any]]:
@@ -332,38 +428,9 @@ class AgentMethod(AgentMethodAbstract):
         if not self.fields:
             return type("EmptyFieldsModel", (BaseModel,), {"to_dict": lambda self: {}})
 
-        field_annotations = {}
-        for field in self.fields:
-            field_name = field.name
-            field_type = field.type
-
-            # Convert Python types to proper typing annotations
-            if field_type is str:
-                annotation_type: type = str
-            elif field_type is int:
-                annotation_type = int
-            elif field_type is bool:
-                annotation_type = bool
-            elif field_type is list:
-                annotation_type = list
-            elif field_type is dict:
-                annotation_type = dict
-            elif field_type is float:
-                annotation_type = float
-            elif hasattr(field_type, "__origin__") and field_type.__origin__ is list:
-                # Handle generic list types like list[str]
-                annotation_type = list
-            elif hasattr(field_type, "__origin__") and field_type.__origin__ is dict:
-                # Handle generic dict types like dict[str, Any]
-                annotation_type = dict
-            else:
-                # Default to Any for unknown types
-                annotation_type = Any
-
-            # Make field optional if not required
-            field_annotations[field_name] = (
-                annotation_type if field.required else annotation_type | None
-            )
+        field_annotations = {
+            field.name: _field_annotation(field) for field in self.fields
+        }
 
         # Create the dynamic model with proper module information
         model_dict = {
@@ -404,69 +471,12 @@ class AgentMethod(AgentMethodAbstract):
                 "invalid_fields": {},
             }
 
-        errors = []
-        invalid_fields = {}
-
-        # First check for missing required fields
-        for field in self.fields:
-            if field.required and field.name not in job_fields:
-                error_msg = f"Required field '{field.name}' is missing"
-                errors.append(error_msg)
-                invalid_fields[field.name] = error_msg
-
-        # Then validate the provided fields
-        for field_name, field_value in job_fields.items():
-            # Find the field definition
-            field_def = next((f for f in self.fields if f.name == field_name), None)
-            if not field_def:
-                error_msg = f"Unknown field '{field_name}'"
-                errors.append(error_msg)
-                invalid_fields[field_name] = error_msg
-                continue
-
-            # Skip validation for None values (optional fields)
-            if field_value is None:
-                continue
-
-            # Type validation
-            expected_type = field_def.type
-            if expected_type:
-                try:
-                    # Handle special cases for type validation
-                    if expected_type is str:
-                        if not isinstance(field_value, str):
-                            error_msg = f"Field '{field_name}' must be a string, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is int:
-                        if not isinstance(field_value, int):
-                            error_msg = f"Field '{field_name}' must be an integer, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is bool:
-                        if not isinstance(field_value, bool):
-                            error_msg = f"Field '{field_name}' must be a boolean, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is list:
-                        if not isinstance(field_value, list):
-                            error_msg = f"Field '{field_name}' must be a list, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is dict:
-                        if not isinstance(field_value, dict):
-                            error_msg = f"Field '{field_name}' must be a dictionary, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                    elif expected_type is float:
-                        if not isinstance(field_value, (int, float)):
-                            error_msg = f"Field '{field_name}' must be a number, got {type(field_value).__name__}"
-                            errors.append(error_msg)
-                            invalid_fields[field_name] = error_msg
-                except Exception as e:
-                    error_msg = f"Field '{field_name}' validation failed: {e!s}"
-                    errors.append(error_msg)
-                    invalid_fields[field_name] = error_msg
+        errors, invalid_fields = _missing_required_field_errors(self.fields, job_fields)
+        provided_errors, provided_invalid_fields = _provided_field_validation_errors(
+            self.fields, job_fields
+        )
+        errors.extend(provided_errors)
+        invalid_fields.update(provided_invalid_fields)
 
         return {
             "valid": len(errors) == 0,
@@ -742,6 +752,188 @@ class AgentAbstract(SvBaseModel):
         return validate_billing_catalog(value)
 
 
+_TERMINAL_JOB_STATUSES = frozenset({
+    EntityStatus.COMPLETED,
+    EntityStatus.FAILED,
+    EntityStatus.CANCELLED,
+    EntityStatus.CANCELLING,
+})
+
+
+def _job_start_action(methods: AgentMethods, method_name: str) -> AgentMethod:
+    """Return the declared start action for a job request."""
+    if method_name == "job_start":
+        return methods.job_start
+    if not methods.custom:
+        raise ValueError(f"Custom method {method_name} not found")
+    return methods.custom[method_name]
+
+
+def _job_start_params(
+    action: AgentMethod,
+    job: Job,
+    job_fields: dict[str, Any],
+    context: JobContext,
+    agent_parameters: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Build the public parameters for an agent job-start method."""
+    return (
+        (action.params or {})
+        | {"fields": job_fields}
+        | {"context": context}
+        | {
+            "agent_parameters": job.agent_parameters
+            if agent_parameters is None
+            else agent_parameters
+        }
+    )
+
+
+def _apply_job_start_response(
+    job: Job, response: JobResponse, server: "Server"
+) -> None:
+    """Apply response side effects in the established job-start order."""
+    if response.payload:
+        job.metadata = response.payload
+    if server.supervisor_account is not None:
+        event = JobStartConfirmationEvent(job=job, account=server.supervisor_account)
+        server.supervisor_account.send_event_sync(sender=job, event=event)
+    else:
+        log.warning(
+            f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
+        )
+    if response.status in _TERMINAL_JOB_STATUSES:
+        job.add_response(response)
+        service_job_finished(job, server=server)
+    elif response.status == EntityStatus.AWAITING:
+        log.debug(
+            f"[Agent job_start] Job is awaiting input, adding response : Job {job.id} status {response} §SAS02"
+        )
+        job.add_response(response)
+    else:
+        log.warning(
+            f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {response} §SAS01"
+        )
+
+
+def _validate_agent_constructor_kwargs(kwargs: dict[str, Any]) -> None:
+    """Reject constructor options removed by the v2 contract."""
+    if "dynamic_choices_callback" in kwargs:
+        raise ValueError(
+            "dynamic_choices_callback was removed in Supervaizer v2. "
+            "Use v2 resource option_sources or typed A2A actions for dynamic options."
+        )
+
+
+def _agent_constructor_id(name: str, supplied_id: str | None) -> str:
+    """Return the deterministic identifier after validating an optional override."""
+    expected_id = shortuuid.uuid(name=name)
+    if supplied_id is not None and supplied_id != expected_id:
+        raise ValueError(
+            f"Agent id {supplied_id!r} does not match deterministic id for name {name!r} "
+            f"({expected_id!r}); omit id or use the expected value"
+        )
+    return supplied_id or expected_id
+
+
+def _agent_v2_constructor_values(
+    registration: SupervaizerV2AgentRegistrationContract | dict[str, Any] | None,
+    methods: V2AgentMethods | dict[str, Any] | None,
+    introduction: V2AgentIntroduction | dict[str, Any] | None,
+    full_description: V2AgentFullDescription | dict[str, Any] | None,
+    billing_catalog: list[BillingCatalogItem | dict[str, Any]] | None,
+) -> tuple[
+    SupervaizerV2AgentRegistrationContract | None,
+    V2AgentMethods | None,
+    V2AgentIntroduction | None,
+    V2AgentFullDescription | None,
+    list[BillingCatalogItem] | None,
+]:
+    """Normalize v2 constructor values before Pydantic receives them."""
+    normalized_registration = (
+        SupervaizerV2AgentRegistrationContract.model_validate(registration)
+        if isinstance(registration, dict)
+        else registration
+    )
+    normalized_methods = (
+        V2AgentMethods.model_validate(methods) if isinstance(methods, dict) else methods
+    )
+    normalized_introduction = (
+        V2AgentIntroduction.model_validate(introduction)
+        if isinstance(introduction, dict)
+        else introduction
+    )
+    normalized_full_description = (
+        V2AgentFullDescription.model_validate(full_description)
+        if isinstance(full_description, dict)
+        else full_description
+    )
+    normalized_catalog = (
+        None
+        if billing_catalog is None
+        else [BillingCatalogItem.model_validate(item) for item in billing_catalog]
+    )
+    return (
+        normalized_registration,
+        normalized_methods,
+        normalized_introduction,
+        normalized_full_description,
+        normalized_catalog,
+    )
+
+
+def _validate_unique_data_resource_names(
+    resources: list["DataResource"], agent_name: str
+) -> None:
+    """Require each resource name to be unique within its agent."""
+    seen_resource_names: set[str] = set()
+    for resource in resources:
+        if resource.name in seen_resource_names:
+            raise ValueError(
+                f"Duplicate DataResource name {resource.name!r} on agent {agent_name!r}; "
+                "each data resource must have a unique name per agent."
+            )
+        seen_resource_names.add(resource.name)
+
+
+def _get_agent_update_response(agent: "Agent", account: Any) -> Any:
+    """Look up an agent by its Studio id, or its stable slug."""
+    if agent.server_agent_id:
+        return account.get_agent_by(agent_id=agent.server_agent_id)
+    return account.get_agent_by(agent_slug=agent.slug)
+
+
+def _agent_detail_from_update_response(
+    response: Any, slug: str, server_agent_id: str | None
+) -> dict[str, Any]:
+    """Return a Studio agent detail or preserve the launch-stopping error."""
+    if isinstance(response, ApiSuccess):
+        return _agent_detail_from_server_response(response.detail)
+    error_response = getattr(response.exception, "response", None)
+    status = error_response.status_code if error_response is not None else "no response"
+    raise RuntimeError(
+        f"Agent update from Studio failed for slug={slug} "
+        f"server_agent_id={server_agent_id}: GET {response.url} "
+        f"returned {status} ({response.exception})"
+    )
+
+
+def _validated_server_agent_id(
+    current_id: str | None, agent_detail: dict[str, Any], slug: str
+) -> str | None:
+    """Return the Studio id after enforcing stable agent identity."""
+    returned_id = _agent_id_from_server_detail(agent_detail)
+    if current_id and returned_id and current_id != returned_id:
+        raise ValueError(f"Agent ID mismatch: {current_id} != {returned_id}")
+    if not current_id and not returned_id:
+        response_keys = sorted(str(key) for key in agent_detail)
+        raise ValueError(
+            "Agent update from Studio failed: response did not include agent id "
+            f"for slug={slug}. response_keys={response_keys}"
+        )
+    return returned_id or current_id
+
+
 class Agent(AgentAbstract):
     _server_encrypted_parameters: str | None = PrivateAttr(default=None)
 
@@ -810,38 +1002,20 @@ class Agent(AgentAbstract):
 
         Tested in tests/test_agent.py
         """
-        if "dynamic_choices_callback" in kwargs:
-            raise ValueError(
-                "dynamic_choices_callback was removed in Supervaizer v2. "
-                "Use v2 resource option_sources or typed A2A actions for dynamic options."
-            )
-
-        expected_id = shortuuid.uuid(name=name)
-        agent_id = id or expected_id
-        if id is not None and id != expected_id:
-            raise ValueError(
-                f"Agent id {id!r} does not match deterministic id for name {name!r} "
-                f"({expected_id!r}); omit id or use the expected value"
-            )
-
-        v2_registration = supervaizer_v2_registration
-        if isinstance(v2_registration, dict):
-            v2_registration = SupervaizerV2AgentRegistrationContract.model_validate(
-                v2_registration
-            )
-        v2_method_declarations = v2_methods
-        if isinstance(v2_method_declarations, dict):
-            v2_method_declarations = V2AgentMethods.model_validate(
-                v2_method_declarations
-            )
-        if isinstance(introduction, dict):
-            introduction = V2AgentIntroduction.model_validate(introduction)
-        if isinstance(full_description, dict):
-            full_description = V2AgentFullDescription.model_validate(full_description)
-        catalog = (
-            None
-            if billing_catalog is None
-            else [BillingCatalogItem.model_validate(item) for item in billing_catalog]
+        _validate_agent_constructor_kwargs(kwargs)
+        agent_id = _agent_constructor_id(name, id)
+        (
+            v2_registration,
+            v2_method_declarations,
+            v2_introduction,
+            v2_full_description,
+            catalog,
+        ) = _agent_v2_constructor_values(
+            supervaizer_v2_registration,
+            v2_methods,
+            introduction,
+            full_description,
+            billing_catalog,
         )
 
         # Initialize using Pydantic's mechanism
@@ -866,8 +1040,8 @@ class Agent(AgentAbstract):
             data_resources=data_resources or [],
             supervaizer_v2_registration=v2_registration,
             v2_methods=v2_method_declarations,
-            introduction=introduction,
-            full_description=full_description,
+            introduction=v2_introduction,
+            full_description=v2_full_description,
             billing_catalog=catalog,
             **kwargs,
         )
@@ -875,14 +1049,7 @@ class Agent(AgentAbstract):
         self._validate_supervaizer_v2_identity()
         self._apply_v2_method_capabilities()
 
-        seen_resource_names: set[str] = set()
-        for r in self.data_resources:
-            if r.name in seen_resource_names:
-                raise ValueError(
-                    f"Duplicate DataResource name {r.name!r} on agent {self.name!r}; "
-                    "each data resource must have a unique name per agent."
-                )
-            seen_resource_names.add(r.name)
+        _validate_unique_data_resource_names(self.data_resources, self.name)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
@@ -975,48 +1142,16 @@ class Agent(AgentAbstract):
         Returns None without a Studio account; raises if the Studio lookup fails.
         Tested in tests/test_agent.py/test_agent_update_agent_from_server
         """
-        if server.supervisor_account:
-            if self.server_agent_id:
-                # Get agent by ID from SaaS Server
-                from_server = server.supervisor_account.get_agent_by(
-                    agent_id=self.server_agent_id
-                )
-
-            else:
-                # Get agent by name from SaaS Server
-                from_server = server.supervisor_account.get_agent_by(
-                    agent_slug=self.slug
-                )
-        else:
+        supervisor_account = server.supervisor_account
+        if not supervisor_account:
             return None
-        if not isinstance(from_server, ApiSuccess):
-            # Stop the launch: continuing would run with unrefreshed status and
-            # parameters, and hide Studio errors such as an agent id mismatch.
-            response = getattr(from_server.exception, "response", None)
-            status = response.status_code if response is not None else "no response"
-            raise RuntimeError(
-                f"Agent update from Studio failed for slug={self.slug} "
-                f"server_agent_id={self.server_agent_id}: GET {from_server.url} "
-                f"returned {status} ({from_server.exception})"
-            )
-
-        agent_from_server = _agent_detail_from_server_response(from_server.detail)
-        server_agent_id = _agent_id_from_server_detail(agent_from_server)
-
-        if (
-            self.server_agent_id
-            and server_agent_id
-            and self.server_agent_id != server_agent_id
-        ):
-            message = f"Agent ID mismatch: {self.server_agent_id} != {server_agent_id}"
-            raise ValueError(message)
-        if not self.server_agent_id and not server_agent_id:
-            response_keys = sorted(str(key) for key in agent_from_server)
-            message = (
-                "Agent update from Studio failed: response did not include agent id "
-                f"for slug={self.slug}. response_keys={response_keys}"
-            )
-            raise ValueError(message)
+        from_server = _get_agent_update_response(self, supervisor_account)
+        agent_from_server = _agent_detail_from_update_response(
+            from_server, self.slug, self.server_agent_id
+        )
+        server_agent_id = _validated_server_agent_id(
+            self.server_agent_id, agent_from_server, self.slug
+        )
 
         # Update agent attributes
         self.server_agent_id = server_agent_id or self.server_agent_id
@@ -1147,12 +1282,7 @@ class Agent(AgentAbstract):
         if not self.methods:
             raise ValueError("Agent methods not defined")
 
-        if method_name == "job_start":
-            action = self.methods.job_start
-        else:
-            if not self.methods.custom:
-                raise ValueError(f"Custom method {method_name} not found")
-            action = self.methods.custom[method_name]
+        action = _job_start_action(self.methods, method_name)
 
         log.debug(f"[Agent job_start] Run <{action.method}> - Job <{job.id}>")
         # Mark job as in progress when execution starts
@@ -1167,17 +1297,7 @@ class Agent(AgentAbstract):
 
         # Execute the method
         action_method = action.method
-        method_params = action.params or {}
-        params = (
-            method_params
-            | {"fields": job_fields}
-            | {"context": context}
-            | {
-                "agent_parameters": job.agent_parameters
-                if agent_parameters is None
-                else agent_parameters
-            }
-        )
+        params = _job_start_params(action, job, job_fields, context, agent_parameters)
         # agent_parameters holds decrypted secrets: never log it.
         log.debug(
             f"[Agent job_start] action_method : {action_method} - params : "
@@ -1198,37 +1318,7 @@ class Agent(AgentAbstract):
                 )
             else:
                 job_response = self._execute(action_method, params)
-                # Populate job.metadata from payload so Studio receives it in the confirmation event
-                if job_response.payload:
-                    job.metadata = job_response.payload
-                # Send confirmation event now that metadata is populated
-                if server.supervisor_account is not None:
-                    event = JobStartConfirmationEvent(
-                        job=job,
-                        account=server.supervisor_account,
-                    )
-                    server.supervisor_account.send_event_sync(sender=job, event=event)
-                else:
-                    log.warning(
-                        f"[Agent job_start] No supervisor account defined for server, skipping event send for job {job.id}"
-                    )
-                if (
-                    job_response.status == EntityStatus.COMPLETED
-                    or job_response.status == EntityStatus.FAILED
-                    or job_response.status == EntityStatus.CANCELLED
-                    or job_response.status == EntityStatus.CANCELLING
-                ):
-                    job.add_response(job_response)
-                    service_job_finished(job, server=server)
-                elif job_response.status == EntityStatus.AWAITING:
-                    log.debug(
-                        f"[Agent job_start] Job is awaiting input, adding response : Job {job.id} status {job_response} §SAS02"
-                    )
-                    job.add_response(job_response)
-                else:
-                    log.warning(
-                        f"[Agent job_start] Job is not a terminal status, skipping job finish : Job {job.id} status {job_response} §SAS01"
-                    )
+                _apply_job_start_response(job, job_response, server)
 
         except Exception as e:
             # Handle any execution errors
@@ -1247,17 +1337,24 @@ class Agent(AgentAbstract):
 
     def job_stop(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous stop hook; controller ``POST /stop`` runs it in a worker thread."""
-        if not self.methods or not self.methods.job_stop:
-            raise ValueError("Agent methods not defined")
-        method = self.methods.job_stop.method
-        return self._execute(method, params)
+        return self._execute_lifecycle_hook("job_stop", params)
 
     def job_status(self, params: dict[str, Any] = {}) -> Any:
         """Synchronous status hook; controller ``POST /status`` runs it in a worker thread."""
-        if not self.methods or not self.methods.job_status:
+        return self._execute_lifecycle_hook("job_status", params)
+
+    def _execute_lifecycle_hook(
+        self,
+        hook_name: Literal["job_stop", "job_status"],
+        params: dict[str, Any],
+    ) -> Any:
+        """Run a configured stop or status hook with the supplied parameters."""
+        if not self.methods:
             raise ValueError("Agent methods not defined")
-        method = self.methods.job_status.method
-        return self._execute(method, params)
+        method = getattr(self.methods, hook_name)
+        if not method:
+            raise ValueError("Agent methods not defined")
+        return self._execute(method.method, params)
 
     def chat(self, context: str, message: str) -> Any:
         if not self.methods or not self.methods.chat:
