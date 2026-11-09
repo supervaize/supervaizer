@@ -13,6 +13,7 @@ API key and the settings of the workspace. No credential is typed in the termina
 
 from __future__ import annotations
 
+import os
 import platform
 import time
 from collections.abc import Callable
@@ -126,6 +127,26 @@ def env_values(credentials: dict[str, Any]) -> dict[str, str]:
         if not isinstance(value, str) or "\n" in value or "\r" in value:
             raise StudioLoginError(f"Studio sent a value for {name} that is not valid.")
     return values
+
+
+def ensure_env_file_writable(path: Path) -> None:
+    """Fail before authorization if credentials cannot be saved to `path`."""
+    parent = path.parent
+    if not parent.exists():
+        raise StudioLoginError(
+            f"Directory {parent} does not exist. Create it or choose another --env-file."
+        )
+    if path.exists():
+        if not os.access(path, os.W_OK):
+            raise StudioLoginError(f"Cannot write to {path}.")
+        try:
+            path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise StudioLoginError(
+                f"{path} is not valid UTF-8. Fix the file or choose another --env-file."
+            ) from exc
+    elif not os.access(parent, os.W_OK):
+        raise StudioLoginError(f"Cannot create {path}.")
 
 
 def write_env_file(path: Path, values: dict[str, str]) -> None:

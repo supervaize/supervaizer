@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.prompt import Confirm
 
@@ -31,6 +32,7 @@ from supervaizer.deploy.cli import deploy_app
 from supervaizer.studio_login import (
     DEFAULT_API_URL,
     StudioLoginError,
+    ensure_env_file_writable,
     env_values,
     request_device_code,
     wait_for_credentials,
@@ -124,8 +126,73 @@ scaffold_app = typer.Typer(help="Scaffold commands for creating project files")
 app.add_typer(scaffold_app, name="scaffold", invoke_without_command=True)
 
 
+def _env_flag_is_true(name: str) -> bool:
+    return os.environ.get(name, "").lower() in ("true", "1", "yes")
+
+
+def _cli_set_parameter(ctx: typer.Context, param: str) -> bool:
+    """True when the user passed `param` on the command line (not a Typer/Click default)."""
+    source = ctx.get_parameter_source(param)
+    if source is None:
+        return False
+    # Typer may resolve ParameterSource from a different Click install than ours.
+    return getattr(source, "name", None) == ParameterSource.COMMANDLINE.name
+
+
+def _apply_start_environment(
+    ctx: typer.Context,
+    *,
+    host: str,
+    port: int,
+    environment: str,
+    persist: bool,
+    log_level: str,
+    debug: bool,
+    reload: bool,
+    public_url: str | None,
+) -> None:
+    """Apply start settings: explicit CLI beats env file and shell; file beats Typer defaults."""
+
+    def set_env(param: str, env_key: str, value: str) -> None:
+        if _cli_set_parameter(ctx, param):
+            os.environ[env_key] = value
+        elif env_key not in os.environ:
+            os.environ[env_key] = value
+
+    set_env("host", "SUPERVAIZER_HOST", host)
+    set_env("port", "SUPERVAIZER_PORT", str(port))
+    set_env("environment", "SUPERVAIZER_ENVIRONMENT", environment)
+    set_env("persist", "SUPERVAIZER_PERSISTENCE", str(persist).lower())
+    set_env("log_level", "SUPERVAIZER_LOG_LEVEL", log_level)
+    set_env("debug", "SUPERVAIZER_DEBUG", str(debug))
+    set_env("reload", "SUPERVAIZER_RELOAD", str(reload))
+    if public_url is not None:
+        set_env("public_url", "SUPERVAIZER_PUBLIC_URL", public_url)
+    if debug:
+        console.print(
+            "[bold yellow]Warning:[/] --debug is deprecated and will be removed. "
+            "Set debug=True on the Server in your control script."
+        )
+    if reload:
+        console.print(
+            "[bold yellow]Warning:[/] --reload is deprecated and will be removed. "
+            "The Server does not support auto-reload."
+        )
+
+
+def _sync_start_runtime_from_environ() -> tuple[str, int, str, bool, str, bool]:
+    host = os.environ["SUPERVAIZER_HOST"]
+    port = int(os.environ["SUPERVAIZER_PORT"])
+    environment = os.environ["SUPERVAIZER_ENVIRONMENT"]
+    persist = _env_flag_is_true("SUPERVAIZER_PERSISTENCE")
+    log_level = os.environ["SUPERVAIZER_LOG_LEVEL"]
+    debug = _env_flag_is_true("SUPERVAIZER_DEBUG")
+    return host, port, environment, persist, log_level, debug
+
+
 @app.command()
 def start(
+    ctx: typer.Context,
     public_url: str | None = typer.Option(
         None,
         help="Public URL to use for inbound connections (reads SUPERVAIZER_PUBLIC_URL env var if not set)",
@@ -169,7 +236,9 @@ def start(
         None,
         "--env-file",
         help="Load variables from this file before the start, for example the file "
-        "that `supervaizer login` wrote. Variables that are already set keep their value.",
+        "that `supervaizer login` wrote. Values already exported in the shell keep "
+        "their value. Explicit start flags override the file. Other file values override "
+        "command defaults.",
     ),
     script_path: str | None = typer.Argument(
         None,
@@ -177,15 +246,25 @@ def start(
     ),
 ) -> None:
     """Start the Supervaizer Controller server."""
-    explicit_public_url = public_url is not None
-    _configure_start_environment(
-        host, port, environment, persist, log_level, debug, reload, public_url
-    )
     if env_file is not None:
         if not os.path.isfile(env_file):
             console.print(f"[bold red]Error:[/] environment file {env_file} not found")
             sys.exit(1)
         _load_environment_file(env_file)
+    _apply_start_environment(
+        ctx,
+        host=host,
+        port=port,
+        environment=environment,
+        persist=persist,
+        log_level=log_level,
+        debug=debug,
+        reload=reload,
+        public_url=public_url,
+    )
+    host, port, environment, persist, log_level, debug = _sync_start_runtime_from_environ()
+    explicit_public_url = _cli_set_parameter(ctx, "public_url")
+    public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
     if local:
         _load_environment_file(os.path.join(os.getcwd(), ".env"))
         host, public_url = _prepare_local_start(
@@ -201,40 +280,6 @@ def start(
         _launch_local_fallback(host, port, debug, environment, log_level)
         return
     _launch_control_script(script_path, host, port, public_url, log_level)
-
-
-def _configure_start_environment(
-    host: str,
-    port: int,
-    environment: str,
-    persist: bool,
-    log_level: str,
-    debug: bool,
-    reload: bool,
-    public_url: str | None,
-) -> None:
-    # Apply CLI values before the local file loader, which keeps existing keys.
-    os.environ.update({
-        "SUPERVAIZER_HOST": host,
-        "SUPERVAIZER_PORT": str(port),
-        "SUPERVAIZER_ENVIRONMENT": environment,
-        "SUPERVAIZER_PERSISTENCE": str(persist).lower(),
-        "SUPERVAIZER_LOG_LEVEL": log_level,
-        "SUPERVAIZER_DEBUG": str(debug),
-        "SUPERVAIZER_RELOAD": str(reload),
-    })
-    if debug:
-        console.print(
-            "[bold yellow]Warning:[/] --debug is deprecated and will be removed. "
-            "Set debug=True on the Server in your control script."
-        )
-    if reload:
-        console.print(
-            "[bold yellow]Warning:[/] --reload is deprecated and will be removed. "
-            "The Server does not support auto-reload."
-        )
-    if public_url is not None:
-        os.environ["SUPERVAIZER_PUBLIC_URL"] = public_url
 
 
 def _load_environment_file(env_file: str) -> None:
@@ -376,6 +421,13 @@ def login(
     ),
 ) -> None:
     """Log in to Supervaize Studio in the browser and save the credentials of the workspace."""
+    env_path = Path(env_file)
+    try:
+        ensure_env_file_writable(env_path)
+    except StudioLoginError as exc:
+        console.print(f"Error: {exc}", style="bold red", markup=False)
+        raise typer.Exit(code=1) from exc
+
     try:
         with httpx.Client(base_url=api_url.rstrip("/"), timeout=30) as client:
             device = request_device_code(client)
@@ -391,7 +443,13 @@ def login(
             console.print("Waiting for the approval in Studio...")
             credentials = wait_for_credentials(client, device)
         values = env_values(credentials)
-        write_env_file(Path(env_file), values)
+        try:
+            write_env_file(env_path, values)
+        except (OSError, UnicodeError) as exc:
+            raise StudioLoginError(
+                "Studio issued credentials but the file could not be written. "
+                "Create a new API key on the Developer page of Studio, then try again."
+            ) from exc
     except (StudioLoginError, httpx.HTTPError) as exc:
         console.print(f"Error: {exc}", style="bold red", markup=False)
         raise typer.Exit(code=1) from exc
