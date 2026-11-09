@@ -136,6 +136,7 @@ def test_env_status_reports_workspace_auth_and_hostnames_only(
     assert "sk-secret" not in result.output
     report = json.loads(result.output)
     assert report["workspace_auth_configured"] is True
+    assert report["ok"] is True
     assert report["url_hostnames"]["SUPERVAIZE_API_URL"] == "app.supervaize.com"
     assert report["url_hostnames"]["SUPERVAIZER_WORKSPACE_AUTH_ISSUER"] == (
         "studio.supervaize.com"
@@ -162,6 +163,7 @@ def test_env_status_workspace_auth_not_configured_when_required_false(
     report = json.loads(result.output)
     assert report["workspace_auth_required_enabled"] is False
     assert report["workspace_auth_configured"] is False
+    assert report["ok"] is False
 
 
 def test_probe_jwks_redacts_url_on_http_error(
@@ -175,7 +177,12 @@ def test_probe_jwks_redacts_url_on_http_error(
             json.dumps({
                 "status": 403,
                 "url": url,
-                "error": {"message": "denied", "url": url, "raw_text": url},
+                "error": {
+                    "message": url,
+                    "detail": f"fetch failed for {url}",
+                    "url": url,
+                    "raw_text": url,
+                },
             })
         )
 
@@ -186,6 +193,8 @@ def test_probe_jwks_redacts_url_on_http_error(
     assert report["jwks_probe"]["url"] == "evil.test"
     assert report["jwks_probe"]["error"]["url"] == "evil.test"
     assert report["jwks_probe"]["error"]["raw_text"] == "<omitted>"
+    assert report["jwks_probe"]["error"]["message"] == "evil.test"
+    assert report["jwks_probe"]["error"]["detail"] == "<omitted>"
 
 
 def test_probe_jwks_skipped_when_public_key_configured(
@@ -194,6 +203,10 @@ def test_probe_jwks_skipped_when_public_key_configured(
     monkeypatch.setenv("SUPERVAIZE_API_KEY", "x")
     monkeypatch.setenv("SUPERVAIZE_WORKSPACE_ID", "acme")
     monkeypatch.setenv("SUPERVAIZE_API_URL", "https://app.supervaize.com")
+    monkeypatch.setenv("SUPERVAIZER_WORKSPACE_AUTH_REQUIRED", "true")
+    monkeypatch.setenv(
+        "SUPERVAIZER_WORKSPACE_AUTH_ISSUER", "https://studio.supervaize.com"
+    )
     monkeypatch.setenv(
         "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY", "-----BEGIN PUBLIC KEY-----"
     )

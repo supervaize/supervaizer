@@ -97,6 +97,12 @@ def _redact_urls_in_value(value: Any) -> Any:
         return redacted
     if isinstance(value, list):
         return [_redact_urls_in_value(item) for item in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(("http://", "https://")):
+            return _redact_url_string(stripped)
+        if "://" in value:
+            return "<omitted>"
     return value
 
 
@@ -693,7 +699,7 @@ def _env_status_impl(
         and (has_public_key or bool(os.getenv("SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL")))
     )
     report: dict[str, Any] = {
-        "ok": len(missing) == 0,
+        "ok": len(missing) == 0 and workspace_auth_ok,
         "operation": "env-status",
         "required_env_vars": list(SUPERVAIZE_ENV_VARS),
         "present": [name for name in SUPERVAIZE_ENV_VARS if name not in missing],
