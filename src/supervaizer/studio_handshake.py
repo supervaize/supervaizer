@@ -33,6 +33,7 @@ def validate_registration_handshake(server: Any, result: ApiSuccess) -> None:
         )
     if handshake.get("controller_api_key_match") is True:
         apply_workspace_authorization_handshake(server, handshake)
+        _log_agent_pages(handshake)
         log.info(
             "[Server launch] Studio registration handshake verified "
             f"server_id={handshake.get('server_id')} "
@@ -46,6 +47,20 @@ def validate_registration_handshake(server: Any, result: ApiSuccess) -> None:
         f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
         f"reason={handshake.get('reason')}"
     )
+
+
+def _log_agent_pages(handshake: dict[str, Any]) -> None:
+    """Log the Studio page of each registered agent. A Studio that sends none logs nothing."""
+    workspace_authorization = handshake.get("workspace_authorization")
+    if not isinstance(workspace_authorization, dict):
+        return
+    agents = workspace_authorization.get("agents")
+    for binding in agents if isinstance(agents, list) else []:
+        if isinstance(binding, dict) and isinstance(binding.get("studio_url"), str):
+            log.success(
+                f"[Server launch] Agent {binding.get('slug')} in Studio: "
+                f"{binding['studio_url']}"
+            )
 
 
 def validate_studio_a2a_workspace_authorization(server: Any) -> None:

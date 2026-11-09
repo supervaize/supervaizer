@@ -10,8 +10,10 @@ In Claude Code:
 
 ```
 /plugin marketplace add supervaize/supervaizer
-/plugin install supervaizer-integration
+/plugin install supervaizer-integration@supervaizer
 ```
+
+The install id is the plugin name, an `@`, and the marketplace name. Claude Code 2.1.275 or later can do both steps in one line: `/plugin install supervaizer-integration --marketplace supervaize/supervaizer`.
 
 Or point your coding agent to [`SKILL.md`](./SKILL.md) in a checkout of this repository.
 
