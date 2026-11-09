@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 """Minimal Hello World agent implementation for local test mode.
 
 Used when running `supervaizer start --local` without Studio credentials.
@@ -71,10 +65,10 @@ def _job_id_from_params(params: dict) -> str:
     return "local-job"
 
 
-def job_start(**kwargs: Any) -> JobResponse:
-    """Run a multi-case greeting job with simulated step durations."""
-    job_id = _job_id_from_params(kwargs)
-    fields = kwargs.get("fields") or {}
+def _job_options(params: dict[str, Any]) -> tuple[str, int, bool, list[str]]:
+    """Read the local job options from handler parameters."""
+    job_id = _job_id_from_params(params)
+    fields = params.get("fields") or {}
     n = int(fields.get("How many times to say hello", 1))
     n = max(0, min(n, 100))
     enable_hitl = str(fields.get("Enable human review", False)).lower() in (
@@ -84,6 +78,114 @@ def job_start(**kwargs: Any) -> JobResponse:
         "yes",
     )
     steps = STEPS_WITH_HITL if enable_hitl else STEPS_WITHOUT_HITL
+    return job_id, n, enable_hitl, steps
+
+
+def _is_job_stopped(job_id: str) -> bool:
+    """Return whether the job has stopped or been cancelled externally."""
+    job = Jobs().get_job(job_id)
+    return job is not None and job.status in (
+        EntityStatus.STOPPED,
+        EntityStatus.CANCELLED,
+    )
+
+
+def _create_case(job_id: str, case_idx: int, total_cases: int) -> Case:
+    """Create a local case and link it to its job when present."""
+    case = Case(
+        id=shortuuid.uuid(),
+        job_id=job_id,
+        name=f"Hello case {case_idx}",
+        account=_local_account,
+        description=f"Greeting case {case_idx} of {total_cases}",
+        status=EntityStatus.IN_PROGRESS,
+    )
+    job = Jobs().get_job(job_id)
+    if job:
+        job.add_case_id(case.id)
+    return case
+
+
+def _human_review_update(case_idx: int) -> CaseNodeUpdate:
+    """Build the local human-review request for a case."""
+    return CaseNodeUpdate(
+        name="Human Review",
+        payload={
+            "supervaizer_form": {
+                "question": f"Review case {case_idx}: should we continue?",
+                "answer": {
+                    "fields": [
+                        {
+                            "name": "approved",
+                            "description": "Approve this case to continue",
+                            "type": "bool",
+                            "field_type": "BooleanField",
+                            "required": True,
+                        },
+                        {
+                            "name": "comment",
+                            "description": "Optional reviewer comment",
+                            "type": "str",
+                            "field_type": "CharField",
+                            "required": False,
+                        },
+                    ]
+                },
+            },
+            "message": f"Waiting for human review on case {case_idx}",
+        },
+    )
+
+
+def _wait_for_human_review(case: Case, case_idx: int, job_id: str) -> bool:
+    """Wait for input and return whether the job stopped while waiting."""
+    log.info(f"Case {case_idx}: requesting human input")
+    case.request_human_input_sync(
+        _human_review_update(case_idx), message=f"Review case {case_idx}"
+    )
+    while case.status == EntityStatus.AWAITING:
+        if _is_job_stopped(job_id):
+            log.info(f"Job stopped while awaiting HITL on case {case_idx}")
+            return True
+        time.sleep(HITL_POLL_INTERVAL)
+    log.info(f"Case {case_idx}: human input received, continuing")
+    return False
+
+
+def _run_standard_step(
+    case: Case, case_idx: int, step_idx: int, step_name: str
+) -> None:
+    """Run one simulated local step and record its duration."""
+    duration = round(random.uniform(0.5, 3.0), 2)
+    log.info(f"Case {case_idx}: starting step {step_idx} ({step_name})")
+    time.sleep(duration)
+    msg = f"The step {step_idx} ({step_name}) in case {case_idx} lasted {duration} s"
+    log.info(msg)
+    case.update_sync(
+        CaseNodeUpdate(
+            name=step_name,
+            payload={"message": msg, "duration": duration},
+        )
+    )
+
+
+def _run_case_steps(case: Case, job_id: str, case_idx: int, steps: list[str]) -> bool:
+    """Run case steps and return whether the case was interrupted."""
+    for step_idx, step_name in enumerate(steps, start=1):
+        if _is_job_stopped(job_id):
+            log.info(f"Job stopped during case {case_idx} at step {step_name}")
+            return True
+        if step_name == "Human Review":
+            if _wait_for_human_review(case, case_idx, job_id):
+                return True
+        else:
+            _run_standard_step(case, case_idx, step_idx, step_name)
+    return False
+
+
+def job_start(**kwargs: Any) -> JobResponse:
+    """Run a multi-case greeting job with simulated step durations."""
+    job_id, n, enable_hitl, steps = _job_options(kwargs)
 
     log.info(f"Starting job with {n} cases (HITL: {enable_hitl})")
 
@@ -91,105 +193,19 @@ def job_start(**kwargs: Any) -> JobResponse:
     cases_done = 0
     stopped = False
 
-    def _is_job_stopped() -> bool:
-        """Check if the job was stopped externally."""
-        job = Jobs().get_job(job_id)
-        return job is not None and job.status in (
-            EntityStatus.STOPPED,
-            EntityStatus.CANCELLED,
-        )
-
     for case_idx in range(1, n + 1):
         # Check job instructions before each case
         can_continue, explanation = job_instructions.check(cases=cases_done, cost=0)
-        if not can_continue or _is_job_stopped():
+        if not can_continue or _is_job_stopped(job_id):
             log.info(
                 f"Job stopped before case {case_idx}: {explanation or 'stopped by user'}"
             )
             stopped = True
             break
 
-        case_name = f"Hello case {case_idx}"
         log.info(f"--- Case {case_idx}/{n} ---")
-
-        case = Case(
-            id=shortuuid.uuid(),
-            job_id=job_id,
-            name=case_name,
-            account=_local_account,
-            description=f"Greeting case {case_idx} of {n}",
-            status=EntityStatus.IN_PROGRESS,
-        )
-
-        # Link case to job
-        job = Jobs().get_job(job_id)
-        if job:
-            job.add_case_id(case.id)
-
-        case_interrupted = False
-        for step_idx, step_name in enumerate(steps, start=1):
-            # Check job status before each step
-            if _is_job_stopped():
-                log.info(f"Job stopped during case {case_idx} at step {step_name}")
-                case_interrupted = True
-                break
-
-            if step_name == "Human Review":
-                log.info(f"Case {case_idx}: requesting human input")
-                hitl_update = CaseNodeUpdate(
-                    name="Human Review",
-                    payload={
-                        "supervaizer_form": {
-                            "question": f"Review case {case_idx}: should we continue?",
-                            "answer": {
-                                "fields": [
-                                    {
-                                        "name": "approved",
-                                        "description": "Approve this case to continue",
-                                        "type": "bool",
-                                        "field_type": "BooleanField",
-                                        "required": True,
-                                    },
-                                    {
-                                        "name": "comment",
-                                        "description": "Optional reviewer comment",
-                                        "type": "str",
-                                        "field_type": "CharField",
-                                        "required": False,
-                                    },
-                                ]
-                            },
-                        },
-                        "message": f"Waiting for human review on case {case_idx}",
-                    },
-                )
-                case.request_human_input_sync(
-                    hitl_update, message=f"Review case {case_idx}"
-                )
-
-                # Poll until human answers or job is stopped
-                while case.status == EntityStatus.AWAITING:
-                    if _is_job_stopped():
-                        log.info(f"Job stopped while awaiting HITL on case {case_idx}")
-                        case_interrupted = True
-                        break
-                    time.sleep(HITL_POLL_INTERVAL)
-
-                if case_interrupted:
-                    break
-                log.info(f"Case {case_idx}: human input received, continuing")
-            else:
-                duration = round(random.uniform(0.5, 3.0), 2)
-                log.info(f"Case {case_idx}: starting step {step_idx} ({step_name})")
-                time.sleep(duration)
-                msg = f"The step {step_idx} ({step_name}) in case {case_idx} lasted {duration} s"
-                log.info(msg)
-                case.update_sync(
-                    CaseNodeUpdate(
-                        name=step_name,
-                        payload={"message": msg, "duration": duration},
-                    )
-                )
+        case = _create_case(job_id, case_idx, n)
+        case_interrupted = _run_case_steps(case, job_id, case_idx, steps)
 
         if case_interrupted:
             log.info(f"Case {case_idx} interrupted")
@@ -229,26 +245,27 @@ def human_answer(**kwargs: Any) -> JobResponse:
     )
 
 
-def job_stop(**kwargs: Any) -> JobResponse:
-    """Stop handler for local Hello World agent."""
-    job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
-    log.info(f"Job stopped: {job_id}")
+def _control_hook_response(
+    params: dict[str, Any], action: str, message: str
+) -> JobResponse:
+    """Build a local control-hook response with the resolved job identifier."""
+    job_id = params.get("job_id") or _job_id_from_params(params)
+    log.info(f"{action}: {job_id}")
     return JobResponse(
         job_id=job_id,
         status=EntityStatus.STOPPED,
-        message="Stopped",
+        message=message,
     )
+
+
+def job_stop(**kwargs: Any) -> JobResponse:
+    """Stop handler for local Hello World agent."""
+    return _control_hook_response(kwargs, "Job stopped", "Stopped")
 
 
 def job_status(**kwargs: Any) -> JobResponse:
     """Status handler for local Hello World agent."""
-    job_id = kwargs.get("job_id") or _job_id_from_params(kwargs)
-    log.info(f"Job status: {job_id}")
-    return JobResponse(
-        job_id=job_id,
-        status=EntityStatus.STOPPED,
-        message="idle",
-    )
+    return _control_hook_response(kwargs, "Job status", "idle")
 
 
 def handle_v2_surface(surface_request: Any) -> dict[str, Any]:

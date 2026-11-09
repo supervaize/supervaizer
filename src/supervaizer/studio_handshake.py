@@ -33,6 +33,7 @@ def validate_registration_handshake(server: Any, result: ApiSuccess) -> None:
         )
     if handshake.get("controller_api_key_match") is True:
         apply_workspace_authorization_handshake(server, handshake)
+        _log_agent_pages(handshake)
         log.info(
             "[Server launch] Studio registration handshake verified "
             f"server_id={handshake.get('server_id')} "
@@ -46,6 +47,20 @@ def validate_registration_handshake(server: Any, result: ApiSuccess) -> None:
         f"studio_fingerprint={handshake.get('stored_controller_api_key_fingerprint')} "
         f"reason={handshake.get('reason')}"
     )
+
+
+def _log_agent_pages(handshake: dict[str, Any]) -> None:
+    """Log the Studio page of each registered agent. A Studio that sends none logs nothing."""
+    workspace_authorization = handshake.get("workspace_authorization")
+    if not isinstance(workspace_authorization, dict):
+        return
+    agents = workspace_authorization.get("agents")
+    for binding in agents if isinstance(agents, list) else []:
+        if isinstance(binding, dict) and isinstance(binding.get("studio_url"), str):
+            log.success(
+                f"[Server launch] Agent {binding.get('slug')} in Studio: "
+                f"{binding['studio_url']}"
+            )
 
 
 def validate_studio_a2a_workspace_authorization(server: Any) -> None:
@@ -103,6 +118,17 @@ def apply_workspace_authorization_handshake(
 def apply_workspace_authorization_agent_bindings(
     server: Any, agent_bindings: list[Any]
 ) -> None:
+    bindings_by_slug = _agent_bindings_by_slug(agent_bindings)
+    missing_agents = _apply_agent_bindings(server, bindings_by_slug)
+    if missing_agents:
+        raise RuntimeError(
+            "Studio registration handshake failed: workspace authorization did not "
+            f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
+        )
+
+
+def _agent_bindings_by_slug(agent_bindings: list[Any]) -> dict[str, str]:
+    """Validate Studio binding entries and map them by agent slug."""
     bindings_by_slug: dict[str, str] = {}
     for binding in agent_bindings:
         if not isinstance(binding, dict):
@@ -123,7 +149,11 @@ def apply_workspace_authorization_agent_bindings(
                 "binding is missing slug."
             )
         bindings_by_slug[agent_slug] = agent_id
+    return bindings_by_slug
 
+
+def _apply_agent_bindings(server: Any, bindings_by_slug: dict[str, str]) -> list[str]:
+    """Apply bindings in server order and report missing agent slugs."""
     missing_agents = []
     for agent in server.agents:
         studio_agent_id = bindings_by_slug.get(agent.slug)
@@ -136,9 +166,4 @@ def apply_workspace_authorization_agent_bindings(
                 f"id mismatch for slug={agent.slug}."
             )
         agent.server_agent_id = studio_agent_id
-
-    if missing_agents:
-        raise RuntimeError(
-            "Studio registration handshake failed: workspace authorization did not "
-            f"return Studio agent id(s) for slug(s): {', '.join(missing_agents)}"
-        )
+    return missing_agents

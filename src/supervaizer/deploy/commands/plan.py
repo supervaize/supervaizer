@@ -25,7 +25,11 @@ from supervaizer.common import log
 from supervaizer.deploy.commands.up import build_service_env
 from supervaizer.deploy.driver_factory import create_driver, get_supported_platforms
 from supervaizer.deploy.drivers.base import DeploymentPlan
-from supervaizer.deploy.utils import get_git_sha
+from supervaizer.deploy.utils import (
+    format_image_tag,
+    get_default_region as _get_default_region,
+    get_git_sha,
+)
 
 console = Console()
 
@@ -99,20 +103,9 @@ def plan_deployment(
         console.print(f"[bold red]Planning failed:[/] {e}")
 
 
-def _get_default_region(platform: str) -> str:
-    """Get default region for platform."""
-    defaults = {
-        "cloud-run": "us-central1",
-        "aws-app-runner": "us-east-1",
-        "do-app-platform": "nyc3",
-    }
-    return defaults.get(platform, "us-central1")
-
-
 def _generate_image_tag(service_name: str, environment: str) -> str:
     """Generate image tag for deployment."""
-    git_sha = get_git_sha()
-    return f"{service_name}-{environment}:{git_sha}"
+    return format_image_tag(service_name, environment, get_git_sha())
 
 
 def _display_plan(plan: DeploymentPlan) -> None:

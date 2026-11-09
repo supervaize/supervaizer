@@ -199,6 +199,13 @@ def iter_modules(package: str) -> Iterator[ModuleType]:
             pass
 
 
+def escape_mdx_braces(text: str) -> str:
+    """Escape { and } outside inline code: MDX reads a bare {name} as an expression."""
+    parts = text.split("`")
+    parts[::2] = [p.replace("{", "\\{").replace("}", "\\}") for p in parts[::2]]
+    return "`".join(parts)
+
+
 def sanitize_default_for_mdx(default_repr: str) -> str:
     """Sanitize default value representation to avoid MDX parsing issues."""
     # Replace enum representations that contain colons with a safer format
@@ -353,7 +360,7 @@ def get_model_fields(model: type[BaseModel]) -> list[tuple[str, str, str, str]]:
             required = bool(getattr(field, "required", False))
 
         # Description
-        desc = getattr(field, "description", "") or ""
+        desc = escape_mdx_braces(getattr(field, "description", "") or "")
 
         # Default handling
         default_repr: str
@@ -508,7 +515,7 @@ def get_dataclass_fields(model: Any) -> list[tuple[str, str, str, str]]:
             if field.default is not dataclasses.MISSING
             else "factory"
         )
-        desc = field.metadata.get("description", "")
+        desc = escape_mdx_braces(field.metadata.get("description", ""))
         result.append((name, type_str, default, desc))
     return result
 
@@ -821,6 +828,43 @@ def generate_model_docs() -> None:
         print(f"⚠️  Failed to copy to external directory: {e}")
 
 
+GITHUB_REPO_URL = "https://github.com/supervaize/supervaizer"
+_MD_LINK = re.compile(r"\]\(([^)\s]+)\)")
+
+
+def rewrite_links(content: str, source: Path, copied: set[Path]) -> str:
+    """Make the relative links of a copied file valid on the documentation site.
+
+    The copies sit flat in one folder. A link to another copied file becomes a
+    sibling link. A link to any other repository path becomes a GitHub link,
+    because the documentation build fails on a link it cannot resolve.
+    """
+    repo_root = Path.cwd().resolve()
+
+    def fix(match: re.Match[str]) -> str:
+        target, _, anchor = match.group(1).partition("#")
+        # Leave anchors, absolute paths and URLs (http:, mailto:) as they are.
+        if (
+            not target
+            or target.startswith("/")
+            or re.match(r"[a-z][a-z0-9+.-]*:", target)
+        ):
+            return match.group(0)
+        resolved = (source.parent / target).resolve()
+        suffix = f"#{anchor}" if anchor else ""
+        if resolved in copied:
+            return f"]({resolved.name}{suffix})"
+        if not resolved.is_relative_to(repo_root):
+            return match.group(0)
+        kind = "tree" if resolved.is_dir() else "blob"
+        path = resolved.relative_to(repo_root).as_posix()
+        return f"]({GITHUB_REPO_URL}/{kind}/main/{path}{suffix})"
+
+    # ponytail: a regex, so a link example inside a code block is rewritten too.
+    # Use a markdown parser if that ever matters.
+    return _MD_LINK.sub(fix, content)
+
+
 def copy_to_docs_dir() -> None:
     """Copy all docs/*.md and some root files to the OUTPUT/ref folder."""
     try:
@@ -843,14 +887,12 @@ def copy_to_docs_dir() -> None:
 
     # Combine all markdown files
     md_files = docs_md_files + [f for f in root_md_files if f.exists()]
+    copied = {f.resolve() for f in md_files}
 
     for md_file in md_files:
         try:
             # Read the content of the markdown file
-            content = md_file.read_text()
-
-            # Replace "docs/" links with empty strings
-            content = content.replace("(docs/", "(")
+            content = rewrite_links(md_file.read_text(), md_file, copied)
 
             # Add footer to the content
             footer_lines = add_footer()

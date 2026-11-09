@@ -25,6 +25,8 @@ Supervaizer does not contain agent business logic. Agents declare their resource
 - [Admin interface and workbench](docs/2025_08_ADMIN_README.md)
 - [Hello World example repository](https://github.com/supervaize/supervaize_hello_world)
 - [Built-in local Hello World agent](src/supervaizer/examples/hello_world_agent.py)
+- [Supervaizer integration skill](skills/supervaizer-integration/) — lets a coding agent (Claude Code, Cursor, Codex) integrate an existing Python agent step by step
+- Studio guides: [Job Configurator (Configure screen)](https://docs.runwaize.com/docs/supervaizer-controller/job-configurator), [Job and mission analytics](https://docs.runwaize.com/docs/supervaizer-controller/job-analytics)
 
 ## Quick Start
 
@@ -229,7 +231,9 @@ export SUPERVAIZER_WORKSPACE_AUTH_ISSUER=https://studio.supervaize.com
 export SUPERVAIZER_WORKSPACE_AUTH_JWKS_URL=https://app.supervaize.com/w/your-workspace-slug/api/v1/workspace-agent-grants/jwks/  # or SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY=<PEM>
 ```
 
-Copy the generated workspace values from Studio's **Developer → Environment variables** section. `SUPERVAIZE_WORKSPACE_ID` must be the workspace slug shown there; the API key's user must belong to that workspace and retain Developer access. A mismatch can make `SERVER_REGISTER` return HTTP 403. The issuer must match Studio's token issuer. The JWKS URL is public and supplies the signing key. Workspace authorization is separate from `SUPERVAIZE_API_KEY` and `SUPERVAIZER_API_KEY`.
+The short way: `supervaizer login` opens an approval page in your browser, where you sign in or sign up, and then writes the Studio variables to `.env`. Start with `supervaizer start --env-file .env`. The start log shows the Studio page of each agent. See [docs/2025_08_CLI.md](docs/2025_08_CLI.md#login).
+
+The manual way: copy the generated workspace values from Studio's **Developer → Environment variables** section. `SUPERVAIZE_WORKSPACE_ID` must be the workspace slug shown there; the API key's user must belong to that workspace and retain Developer access. A mismatch can make `SERVER_REGISTER` return HTTP 403. The issuer must match Studio's token issuer. The JWKS URL is public and supplies the signing key. Workspace authorization is separate from `SUPERVAIZE_API_KEY` and `SUPERVAIZER_API_KEY`.
 
 In your own control file, build the account explicitly; `Server` does not read the `SUPERVAIZE_*` variables itself:
 

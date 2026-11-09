@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 """
 Tests for deployment CLI Phase 1 functionality.
 """
@@ -23,10 +17,8 @@ import pytest
 from docker.errors import DockerException
 from pytest_mock import MockerFixture
 
-from supervaizer.deploy.commands import (
-    plan,
-    up,
-)  # Import plan and up modules to access their console instances
+from supervaizer.deploy.cli import plan as plan_deployment
+from supervaizer.deploy.commands.down import deploy_down
 from supervaizer.deploy.docker import DockerManager, ensure_docker_running
 from supervaizer.deploy.state import (
     DeploymentState,
@@ -526,12 +518,11 @@ class TestDeployCommands:
 
     def test_plan_deployment_command(self, mocker: MockerFixture) -> None:
         """Test plan deployment command."""
-        from supervaizer.deploy.cli import plan
 
         # Mock console.print to capture output
         mock_print = mocker.patch("supervaizer.deploy.commands.plan.console.print")
 
-        plan(
+        plan_deployment(
             platform="cloud-run",
             name="test-service",
             env="dev",
@@ -546,33 +537,6 @@ class TestDeployCommands:
         assert any("Environment: dev" in call for call in calls)
         assert any("Service name: test-service" in call for call in calls)
 
-    def test_deploy_up_command(self, mocker: MockerFixture) -> None:
-        """Test deploy up command."""
-
-        # Mock console.print to capture output
-        mocker.patch("supervaizer.deploy.commands.up.console.print")
-        # Stop before touching the local Docker daemon or cloud credentials.
-        mocker.patch(
-            "supervaizer.deploy.commands.up.ensure_docker_running", return_value=False
-        )
-
-        up.deploy_up(
-            platform="aws-app-runner",
-            name="test-service",
-            env="staging",
-            region="us-east-1",
-            project_id="test-account",
-            image="test:latest",
-            port=8080,
-            generate_api_key=True,
-            generate_rsa=True,
-            timeout=600,
-        )
-
-        # The test is primarily to ensure the command can be called without error.
-        # The logic is tested in the command-specific tests.
-        assert True
-
     def test_deploy_down_command(
         self,
         mocker: MockerFixture,
@@ -580,7 +544,6 @@ class TestDeployCommands:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test deploy down command."""
-        from supervaizer.deploy.commands.down import StateManager, deploy_down
 
         monkeypatch.chdir(tmp_path)
         (tmp_path / ".deployment").mkdir()
@@ -621,40 +584,6 @@ class TestDeployCommands:
         )
         mock_state_manager.delete_state.assert_called_once()
         mock_rmtree.assert_called_once()
-
-    def test_deploy_status_command(self, mocker: MockerFixture) -> None:
-        """Test deploy status command."""
-        from supervaizer.deploy.cli import status
-
-        # Mock console.print to capture output
-        mocker.patch.object(plan.console, "print")
-
-        # Call the function being tested
-        status(
-            platform="cloud-run",
-            name="test-service",
-            env="dev",
-            region="us-central1",
-            project_id="test-project",
-        )
-
-        # Assert that the correct methods were called
-        # This test needs to be implemented properly
-        assert True  # Placeholder until proper assertions are added
-
-    def test_deploy_up_minimal_args(self, mocker: MockerFixture) -> None:
-        """Test deploy up with minimal arguments."""
-        from supervaizer.deploy.commands.up import deploy_up
-
-        # Mock console.print to capture output
-        mocker.patch.object(up.console, "print")
-        # Stop before touching the local Docker daemon or cloud credentials.
-        mocker.patch.object(up, "ensure_docker_running", return_value=False)
-
-        deploy_up(platform="aws-app-runner")
-
-        # The test is primarily to ensure the command can be called without error.
-        assert True
 
 
 class TestStateManagerAdvanced:

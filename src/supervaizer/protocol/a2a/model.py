@@ -4,12 +4,6 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
-# Copyright (c) 2024-2026 Alain Prasquier - Supervaize.com. All rights reserved.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
-# If a copy of the MPL was not distributed with this file, you can obtain one at
-# https://mozilla.org/MPL/2.0/.
-
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,25 +11,30 @@ from supervaizer.agent import Agent
 from supervaizer.job import EntityStatus, Jobs
 
 
-def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
-    """
-    Create an A2A agent card for the given agent.
-
-    This follows the A2A protocol as defined in:
-    https://github.com/google/A2A/blob/main/specification/json/a2a.json
-
-    Args:
-        agent: The Agent instance
-        base_url: The base URL of the server
-
-    Returns:
-        A dictionary representing the agent card in A2A format
-    """
-    # Agent routes are mounted under the /api router's /supervaizer prefix.
-    agent_url = f"{base_url}/api/supervaizer{agent.path}"
-
-    # Build API endpoints object with OpenAPI integration
-    api_endpoints = [
+def _agent_api_endpoints(
+    agent: Agent, base_url: str, agent_url: str
+) -> list[dict[str, Any]]:
+    """Build the API endpoint block for an agent card."""
+    examples = [
+        {
+            "name": "Get agent info",
+            "description": "Retrieve information about the agent",
+            "request": {"method": "GET", "url": agent_url},
+        },
+        # v2-only agents have no v1 /jobs route.
+        *(
+            [
+                {
+                    "name": "Start a job",
+                    "description": "Start a new job with this agent",
+                    "request": {"method": "POST", "url": f"{agent_url}/jobs"},
+                }
+            ]
+            if agent.methods
+            else []
+        ),
+    ]
+    return [
         {
             "type": "json",
             "url": agent_url,
@@ -43,33 +42,14 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
             "description": f"RESTful API for {agent.name} agent",
             "openapi_url": f"{base_url}/openapi.json",
             "docs_url": f"{base_url}/docs",
-            "examples": [
-                {
-                    "name": "Get agent info",
-                    "description": "Retrieve information about the agent",
-                    "request": {"method": "GET", "url": agent_url},
-                },
-                # v2-only agents have no v1 /jobs route.
-                *(
-                    [
-                        {
-                            "name": "Start a job",
-                            "description": "Start a new job with this agent",
-                            "request": {"method": "POST", "url": f"{agent_url}/jobs"},
-                        }
-                    ]
-                    if agent.methods
-                    else []
-                ),
-            ],
+            "examples": examples,
         }
     ]
 
-    # Build the tools object based on agent methods
-    tools: list[dict[str, Any]] = []
 
-    # Add basic job tools. v2-only agents have no v1 job routes; the
-    # "supervaizer" v2 block of the card lists their actions instead.
+def _agent_card_tools(agent: Agent) -> list[dict[str, Any]]:
+    """Build the tools exposed by an agent card."""
+    tools: list[dict[str, Any]] = []
     if agent.methods:
         tools.append({
             "name": "job_start",
@@ -93,7 +73,6 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
             },
         })
 
-    # Add custom tools if available
     if agent.methods and agent.methods.custom:
         for name, method in agent.methods.custom.items():
             tools.append({
@@ -108,7 +87,12 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
                 },
             })
 
-    authentication = {
+    return tools
+
+
+def _agent_card_authentication() -> dict[str, str]:
+    """Return the shared API-key metadata for agent cards."""
+    return {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
@@ -117,11 +101,19 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
         ),
     }
 
+
+def _agent_card_version_info(agent: Agent) -> dict[str, Any]:
+    """Build version metadata, including release notes when declared."""
     version_info: dict[str, Any] = {"current": agent.version}
     if agent.release_notes_url:
         version_info["changelog_url"] = agent.release_notes_url
+    return version_info
 
-    # Create the main agent card
+
+def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
+    """Create an A2A agent card for the given agent."""
+    agent_url = f"{base_url}/api/supervaizer{agent.path}"
+
     agent_card = {
         "name": agent.name,
         "description": agent.description,
@@ -131,12 +123,12 @@ def create_agent_card(agent: Agent, base_url: str) -> dict[str, Any]:
             "email": "info@supervaize.com",
         },
         "version": agent.version,
-        "version_info": version_info,
+        "version_info": _agent_card_version_info(agent),
         "human_url": f"{agent_url}/{agent.instructions_path}",
         "contact_information": {"general": {"email": "support@supervaize.com"}},
-        "api_endpoints": api_endpoints,
-        "tools": tools,
-        "authentication": authentication,
+        "api_endpoints": _agent_api_endpoints(agent, base_url, agent_url),
+        "tools": _agent_card_tools(agent),
+        "authentication": _agent_card_authentication(),
     }
     if agent.supervaizer_v2_registration is not None:
         agent_card["supervaizer"] = {

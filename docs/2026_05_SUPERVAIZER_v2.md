@@ -310,6 +310,11 @@ Studio may load `job.start` before a Job exists. In that case the request can in
 
 Status convergence happens through `job.sync`. `job.sync` does not need to be strictly idempotent in the sense of byte-for-byte identical responses. It should be **convergent**: repeated calls for the same external state should lead Studio to the same Job/Case/Step projection.
 
+The job snapshot (`job_state.job`) is an open model. Studio reads two optional keys from it:
+
+- `information.cost.total_cost`: the cost of the job. Studio adds step costs up into each case cost, but it takes the job cost from this value.
+- `display`: agent vocabulary for job lists and the job title row. The keys are `entity_label`, `state_label` and `primary_action_label`, each a string of at most 120 characters. Studio replaces them on every `job_state` it receives and falls back to its own vocabulary when the job status has moved on since.
+
 ### Case
 
 A Case is a unit of work inside a Job. Cases declare a `lane`, which is a rendering hint.
@@ -396,7 +401,7 @@ An awaiting step can ask the operator for a file. The agent declares a field wit
 
 With `storage: "inline"`, the whole action JSON, content included, must stay under Studio's request body limit. Choose `studio` for files that can approach that limit.
 
-File fields are supported in `case.step.awaiting` steps only for now. The contract models already accept these keys as extra keys, so agents need no SDK change.
+File fields are supported in `case.step.awaiting` steps and in the `Form` components of a `job.configurator` document. The contract models already accept these keys as extra keys, so agents need no SDK change.
 
 ### Artifact
 
@@ -482,6 +487,8 @@ A dashboard declares:
 
 Each widget can reference data from a dataset, typed action, or inline sample data. Widgets carry a `visualization` object whose `type` is `table`, `metric`, `vega-lite`, or `custom`. For Vega-Lite charts, use `visualization.type = "vega-lite"` and place the Vega-Lite JSON spec in `visualization.spec`. Studio is responsible for rendering and validating the visualization; Supervaizer only transports the typed contract.
 
+The `mission.analytics` and `job.analytics` surfaces return a `Dashboard` A2UI document with `datasets` (each with optional KPI `metrics`), `controls` and `widgets`. Studio queries each dataset through its `dataset.<id>.query` action and reads the rows from the `dataset.queried` effect (`dataset`, `count`, `rows`). On `job.analytics` the request carries the `job_id`; the agent scopes each dataset to that job. The document shape, the metric reducers and the control types are in the [Job and mission analytics guide](https://docs.runwaize.com/docs/supervaizer-controller/job-analytics).
+
 Example:
 
 ```python
@@ -534,9 +541,13 @@ Common surface IDs:
 | `case.step.awaiting` | HITL form or review UI for an awaiting step. |
 | `case.step.detail` | Rich detail view for a step or artifact. |
 | `mission.analytics` | Mission-scoped dashboard over agent datasets. |
+| `job.analytics` | Job-scoped dashboard, shown on each job page. |
+| `job.configurator` | Agent-defined Configure screen of a job. |
 | `mission.agent.overview` | Optional agent overview and quick links. |
 | `mission.agent.resource.<resource_id>` | Studio-generated resource CRUD surface. |
 | `mission.agent.dataset.<dataset_id>` | Studio-generated dataset surface. |
+
+`job.configurator` returns a `Configurator` document: sections of trusted Studio components (`Form`, `ResourceList`, `TemplateComposer`, `Review`, `Table`), each wired to declared job-scoped actions by explicit bindings. Supervaizer transports the document untyped in `V2SurfaceResult.document`; Studio validates it and refuses a document that breaks its contract. The document shape, the revision and conflict rules and the schema versions are in the [Job Configurator guide](https://docs.runwaize.com/docs/supervaizer-controller/job-configurator).
 
 Mounted resource views use a resource-shaped URL in Studio but let the agent replace a whole view, such as `edit` or `import`, with a custom A2UI surface.
 
@@ -661,6 +672,11 @@ registration = build_v2_agent_registration(
     job_policy={"setup": {"plan": plan}},
 )
 ```
+
+Two Studio behaviors apply to these fields:
+
+- A required `select` field has no empty choice. Studio shows its `placeholder` until the user chooses.
+- For an agent that declares a setup plan, Studio adds the job name to the preview input as `name`, so the plan need not ask for one. A `name` value from the plan's own fields wins.
 
 ### Help actions and dry runs
 
