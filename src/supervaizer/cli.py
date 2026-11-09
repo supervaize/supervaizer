@@ -154,9 +154,7 @@ def _apply_start_environment(
     """Apply start settings: explicit CLI beats env file and shell; file beats Typer defaults."""
 
     def set_env(param: str, env_key: str, value: str) -> None:
-        if _cli_set_parameter(ctx, param):
-            os.environ[env_key] = value
-        elif env_key not in os.environ:
+        if _cli_set_parameter(ctx, param) or env_key not in os.environ:
             os.environ[env_key] = value
 
     set_env("host", "SUPERVAIZER_HOST", host)
@@ -262,7 +260,9 @@ def start(
         reload=reload,
         public_url=public_url,
     )
-    host, port, environment, persist, log_level, debug = _sync_start_runtime_from_environ()
+    host, port, environment, persist, log_level, debug = (
+        _sync_start_runtime_from_environ()
+    )
     explicit_public_url = _cli_set_parameter(ctx, "public_url")
     public_url = os.environ.get("SUPERVAIZER_PUBLIC_URL") or None
     if local:
