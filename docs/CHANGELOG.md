@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-09
+
 ### Added
 
 - **`supervaizer login`** (PR #166) — Logs a developer in to Studio from the terminal with a device authorization: the command prints an approval page and a code, the developer signs in or signs up in the browser (Google included) and approves, and the command writes the three `SUPERVAIZE_*` variables and the three `SUPERVAIZER_WORKSPACE_AUTH_*` variables to an environment file (`.env` by default). It prints variable names only, never a value. `supervaizer start --env-file <file>` loads such a file before the control script. After a registration, the start log shows the Studio page of each agent when Studio sends `studio_url` in the handshake agent entries. Needs a Studio with the `/api/v1/cli/device/` endpoints; an older Studio gets a clear error. Requires a minor release.
