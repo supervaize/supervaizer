@@ -14,6 +14,22 @@ Your job has two halves. First, make the developer decide what a mission, a job,
 1. **The contract is not in this skill.** Field names, document shapes, action ids, environment variables and code patterns live in the guides, the SDK and the Hello World example listed below. Read them each time. Do not write them from memory. When a reference and this skill disagree, the reference is right; tell the developer.
 2. **Decisions belong to the developer.** Never choose the mapping for them, and never fill a gap with a guess. Ask.
 
+## Integration Modes
+
+Pick a mode at the start. It controls how much of the interview you run, not whether you follow the contract references when you write code.
+
+| Mode | When | Interview | Build |
+| --- | --- | --- | --- |
+| **greenfield** | New integration, no v2 control script yet | Full rounds (below), one round at a time | After the developer confirms the summary |
+| **upgrade** | The project already has `supervaizer_control.py`, v1 `AgentMethod`, or partial v2 | Skip empty rounds: run `analyze-agent`, propose mission / job / case / step mapping and open topics in **one** message with recommendations and evidence from the code | After one confirm on that blob (corrections OK; do not restart round 1 from scratch) |
+| **recs-accepted** | The developer says “go with your recommendations”, “use your judgment”, or equivalent | Same as **upgrade**: one consolidated design message with numbered recommendations, then **one** confirm | Build after that single confirm |
+
+In **upgrade** and **recs-accepted**, you still ask when the code contradicts a recommendation or when an outside effect, cost, or human step is unclear. You do not re-run round 1–4 serially when the developer has already delegated the mapping to you.
+
+Record the confirmed design in `integration_spec.json` even in upgrade mode, so the next session can resume without another interview.
+
+In **upgrade** and **recs-accepted**, when the controller file already exists, still run `scaffold-integration` for the checklist but **do not** pass `--force`. The helper skips `supervaizer scaffold` when the file is present and returns `scaffolded_by: "skipped (controller already exists; extend in place)"`. Extend the existing control script; never overwrite it without an explicit developer request.
+
 ## Sources Of Truth
 
 Guides are at `https://docs.runwaize.com/docs/supervaizer-controller/<page>`. Hello World is at `https://github.com/runwaize/supervaize_hello_world`.
@@ -50,6 +66,8 @@ This skill lives in the SDK repository, in `skills/supervaizer-integration/`. In
 The helper script is in this skill's folder, not in the developer's project. Claude Code replaces `${CLAUDE_SKILL_DIR}` in the commands below with that folder. In another coding agent, replace it yourself with the absolute path of the folder that holds this `SKILL.md`.
 
 ## The Interview
+
+Use **greenfield** mode below unless **upgrade** or **recs-accepted** applies (see Integration Modes).
 
 Interview the developer until every decision below is made. Treat the design as a tree: each decision opens the decisions that depend on it.
 
@@ -129,10 +147,13 @@ Summarize the whole design in one message: mission, job, cases, steps, and each 
 
 ### 1. Install the SDK
 
-Install the SDK in the project's environment as the `quickstart` guide says. Do this first: the helper script and the `supervaizer` command need it. Then check the installed version against the SDK changelog.
+Install the SDK in the **project's** environment as the `quickstart` guide says. Do this first: the helper script and the `supervaizer` command need it. Then check the installed version against the SDK changelog.
+
+Run CLI and helper commands with that environment on `PATH` (activate the venv) or via `uv run supervaizer …` from the project root. If the default `.venv` is broken or on a volume where `uv sync` fails, use another venv (for example `.venv-sv`) and set `UV_PROJECT_ENVIRONMENT` to its path, or call `path/to/venv/bin/supervaizer` explicitly. The helper's `scaffold-integration` looks for `supervaizer` on `PATH`, then common project venvs, then `uv run supervaizer`.
 
 ```bash
 supervaizer --version
+# or: uv run supervaizer --version
 ```
 
 ### 2. Read the project
@@ -165,12 +186,14 @@ Fill every section of the spec from the interview. Put a decision that has no sl
 
 ### 5. Scaffold
 
+From the **agent project root**, with the project venv active or `uv` available:
+
 ```bash
 python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" scaffold-integration \
   --spec-file integration_spec.json --output-dir /path/to/agent --pretty
 ```
 
-The helper runs the SDK's `supervaizer scaffold` and prints a checklist built from the spec. Each item names its guide and its Hello World pattern.
+The helper runs the SDK's `supervaizer scaffold` when the controller file is missing (or when `--force` is set and the developer chose to replace it). If the controller already exists, it prints only the checklist. Each item names its guide and its Hello World pattern. If it says the `supervaizer` command was not found, install the SDK in that project and retry with the venv on `PATH` or from that directory with `uv` installed.
 
 ### 6. Build one topic at a time
 
@@ -199,11 +222,21 @@ python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" invoke-action --he
 
 Both commands fail when the controller answers with a JSON-RPC error. Give `--job-id`, `--case-id` or `--step-id` only for a surface or an action of that scope. For a mission-scoped action, give none.
 
+**`supervaizer/action.invoke` needs a `surface` field** in the JSON-RPC params (not only the action id). It must match the surface that owns the action (for example `job.start` for `job.start` / `job.start.preview`). The helper's `invoke-action` takes `--surface` (default `job.start`); copy Hello World `tests/` for in-process tests.
+
+**Smoke checklist (running controller):**
+
+1. `discover-controller --controller-url …` shows `/a2a`.
+2. `load-surface` for the start surface returns A2UI without JSON-RPC error.
+3. `invoke-action` with the correct `--surface` and `--action` (use `--dry-run` first if unsure).
+4. After you add or change surfaces or actions: restart the controller, then have a workspace admin **re-accept** the workspace grant in Studio.
+5. If the job uses Configure: prefer a draft start (`job.start` with empty cases / draft flow) so Studio opens Configure before run; read `job-configurator` for the pattern.
+
 Write tests that post the same requests to the server app. Copy the helpers from the Hello World `tests/` folder.
 
 ### 8. Connect to Studio
 
-Do this part with the developer. The account and the key are theirs.
+Do this part with the developer. The account and the key are theirs. Target **production Supervaize Studio** only, as in `quickstart`, the Studio account guide, and the CLI `login` section of `docs/2025_08_CLI.md`.
 
 **The short way: `supervaizer login`**
 
@@ -248,10 +281,10 @@ These steps need a person in a browser. Give the developer the list, then wait. 
 
 **The manual way: what you do**
 
-1. Check that the variables are present. This command prints names only, never values:
+1. Check that the variables are present. This command prints names and URL hostnames only, never secret values. For a Studio-connected controller, add `--probe-jwks` to confirm the JWKS endpoint returns HTTP 200:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" env-status --pretty
+   python "${CLAUDE_SKILL_DIR}/scripts/supervaize_cli_helper.py" env-status --pretty --probe-jwks
    ```
 
 2. Check that the control script reads these variables and gives them to the account object, as the scaffold does. The SDK server does not read them by itself.

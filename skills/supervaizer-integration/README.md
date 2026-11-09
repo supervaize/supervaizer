@@ -19,7 +19,9 @@ Or point your coding agent to [`SKILL.md`](./SKILL.md) in a checkout of this rep
 
 ## Helper
 
-`scripts/supervaize_cli_helper.py` analyzes an agent project, writes a blank design record (`spec-template`), runs `supervaizer scaffold` with a checklist of guides (`scaffold-integration`), and calls a running controller for smoke tests (`load-surface`, `invoke-action`). It needs only `typer`, which the SDK installs.
+`scripts/supervaize_cli_helper.py` analyzes an agent project, writes a blank design record (`spec-template`), runs `supervaizer scaffold` with a checklist of guides (`scaffold-integration` resolves the project venv or `uv run supervaizer`), checks Studio env vars and optional JWKS reachability (`env-status --probe-jwks`), and calls a running controller for smoke tests (`load-surface`, `invoke-action` with `--surface`). It needs only `typer`, which the SDK installs.
+
+The skill documents **greenfield**, **upgrade**, and **recs-accepted** integration modes and assumes production Supervaize Studio for login and registration.
 
 ```bash
 python scripts/supervaize_cli_helper.py --help
