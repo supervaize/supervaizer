@@ -199,3 +199,8 @@ gh-release:
 # open a PR that merges main back into develop, and refresh release notes from CHANGELOG.md.
 ship-reconcile:
     bash tools/reconcile-release-after-ship.sh
+
+# --index-only: do not rewrite AGENTS.md, CLAUDE.md or skills.
+# Refresh the local GitNexus code index (skips quietly when GitNexus is not installed)
+gitnexus-refresh:
+    @command -v gitnexus >/dev/null || { echo "gitnexus not installed, skipping"; exit 0; }; gitnexus analyze --index-only
