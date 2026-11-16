@@ -209,6 +209,7 @@ Rules that prevent the usual first errors:
 Add these when you need them:
 
 - Status convergence: declare `job_policy={"sync": {"action": "job.sync"}}` and register a `job.sync` handler.
+- Live job progress: Studio does not poll. Return `status="in_progress"` from `job.start`, create the case at once with one `in_progress` step, then call `await account.push_job_update(job_id, job=..., cases=[...])` at each phase. Send `awaiting` when a human must act. `stopped` means "not started". `account.request_job_refresh(job_id)` asks Studio to call `job.sync`. See [Job Progress Events](docs/2026_05_SUPERVAIZER_v2.md#job-progress-events).
 - Human review: return a step with `status="awaiting"` and an `awaiting` object. Declare the `case.step.awaiting` surface and the `step.awaiting.submit` action.
 - Business objects: declare `resources=[...]`. The SDK derives the `resource.<id>.<operation>` actions; you register their handlers.
 
