@@ -28,7 +28,7 @@ All notable changes to this project will be documented in this file.
 Name Stmts Miss Cover
 TOTAL 8789 522 94%
 
-Coverage HTML written to dir htmlcov  
+Coverage HTML written to dir htmlcov
 1614 passed in 122.43s (0:02:02)
 
 ## [1.11.1] - 2026-11-09
