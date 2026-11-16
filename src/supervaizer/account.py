@@ -20,7 +20,12 @@ from pydantic import ConfigDict, Field, field_validator
 from supervaizer.__version__ import VERSION
 from supervaizer.common import ApiError, ApiResult, ApiSuccess, SvBaseModel
 from supervaizer.context import ContextClient
-from supervaizer.contracts import BillableConsumption, ConsumptionReceipt
+from supervaizer.contracts import (
+    BillableConsumption,
+    ConsumptionReceipt,
+    V2CaseSnapshot,
+)
+from supervaizer.event import V2JobRefreshRequestedEvent, V2JobUpdatedEvent
 from supervaizer.telemetry import Telemetry
 
 if TYPE_CHECKING:
@@ -181,7 +186,7 @@ class Account(AccountAbstract):
 
     async def send_event(
         self,
-        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
+        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate", None],
         event: "Event",
     ) -> ApiResult:
         """Send an event to the Supervaize SaaS API.
@@ -202,13 +207,119 @@ class Account(AccountAbstract):
 
     def send_event_sync(
         self,
-        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate"],
+        sender: Union["Agent", "Job", "Server", "Case", "CaseNodeUpdate", None],
         event: "Event",
     ) -> ApiResult:
         """Send an event from sync-only contexts."""
         from supervaizer.account_service import send_event_sync as service_send_event
 
         return service_send_event(self, sender, event)
+
+    async def push_job_update(
+        self,
+        job_id: str,
+        *,
+        job: dict[str, Any] | None = None,
+        cases: Sequence[V2CaseSnapshot | dict[str, Any]] | None = None,
+        removed_cases: Sequence[dict[str, Any]] | None = None,
+        reason: str | None = None,
+    ) -> ApiResult:
+        """Push a Supervaizer v2 job progress patch to Studio.
+
+        Sends a ``supervaizer.v2.job.updated`` event. Studio applies it and
+        updates the open job page. Call it at each phase of a job.
+
+        Args:
+            job_id: Studio job id (``V2ActionRequest.job_id``).
+            job: Job patch: ``status``, ``information`` (``started_at``,
+                ``finished_at``, ``cost``, ``status_check``), ``metadata``,
+                ``details``.
+            cases: Case snapshots to create or update. A ``V2CaseSnapshot`` is
+                sent with the fields you set; omit ``steps`` to keep the steps.
+            removed_cases: ``{"id": ..., "reason": ...}`` for each removed case.
+            reason: Short text for the Studio event log.
+
+        Raises:
+            ValueError: when ``job_id`` is blank.
+            httpx.HTTPError: when the request fails, like ``send_event``.
+
+        Tested in tests/test_v2_job_events.py
+        """
+        event = V2JobUpdatedEvent(
+            job_id=job_id,
+            account=self,
+            job=job,
+            cases=cases,
+            removed_cases=removed_cases,
+            reason=reason,
+        )
+        return await self.send_event(sender=None, event=event)
+
+    def push_job_update_sync(
+        self,
+        job_id: str,
+        *,
+        job: dict[str, Any] | None = None,
+        cases: Sequence[V2CaseSnapshot | dict[str, Any]] | None = None,
+        removed_cases: Sequence[dict[str, Any]] | None = None,
+        reason: str | None = None,
+    ) -> ApiResult:
+        """Push a v2 job progress patch from sync-only contexts.
+
+        Same arguments, return value and errors as ``push_job_update``.
+        """
+        event = V2JobUpdatedEvent(
+            job_id=job_id,
+            account=self,
+            job=job,
+            cases=cases,
+            removed_cases=removed_cases,
+            reason=reason,
+        )
+        return self.send_event_sync(sender=None, event=event)
+
+    async def request_job_refresh(
+        self,
+        job_id: str,
+        *,
+        input: dict[str, Any] | None = None,
+        reason: str | None = None,
+    ) -> ApiResult:
+        """Ask Studio to call ``job.sync`` on this agent for one v2 job.
+
+        Sends a ``supervaizer.v2.job.refresh_requested`` event.
+
+        Args:
+            job_id: Studio job id (``V2ActionRequest.job_id``).
+            input: Passed to the ``job.sync`` action as its input.
+            reason: Short text for the Studio event log.
+
+        Raises:
+            ValueError: when ``job_id`` is blank.
+            httpx.HTTPError: when the request fails, like ``send_event``.
+
+        Tested in tests/test_v2_job_events.py
+        """
+        event = V2JobRefreshRequestedEvent(
+            job_id=job_id, account=self, input=input, reason=reason
+        )
+        return await self.send_event(sender=None, event=event)
+
+    def request_job_refresh_sync(
+        self,
+        job_id: str,
+        *,
+        input: dict[str, Any] | None = None,
+        reason: str | None = None,
+    ) -> ApiResult:
+        """Ask Studio for a ``job.sync`` from sync-only contexts.
+
+        Same arguments, return value and errors as ``request_job_refresh``.
+        """
+        event = V2JobRefreshRequestedEvent(
+            job_id=job_id, account=self, input=input, reason=reason
+        )
+        return self.send_event_sync(sender=None, event=event)
 
     async def report_consumption(
         self,

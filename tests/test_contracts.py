@@ -53,6 +53,7 @@ from supervaizer.contracts import (
     V2ReplaySafetyMetadata,
     V2ResourceDefinition,
     V2ResourceFieldDefinition,
+    V2StepSnapshot,
     V2SurfaceDefinition,
     V2SurfaceRequest,
     V2SurfaceResult,
@@ -170,6 +171,33 @@ def test_v2_case_snapshot_accepts_public_metadata() -> None:
     assert case.metadata == {
         "interview_url": "https://app.example.com/interview/tok-abc"
     }
+
+
+def test_v2_snapshot_optional_fields_stay_off_the_wire_when_unset() -> None:
+    bare = V2CaseSnapshot(
+        id="c", steps=[V2StepSnapshot(id="s", activity="operation", status="completed")]
+    ).model_dump(mode="json")
+    assert not {"started_at", "finished_at"} & bare.keys()
+    assert not {"cost", "is_final"} & bare["steps"][0].keys()
+
+    full = V2CaseSnapshot(
+        id="c",
+        started_at="2026-11-16T10:00:00Z",
+        finished_at="2026-11-16T10:05:00Z",
+        steps=[
+            V2StepSnapshot(
+                id="s",
+                activity="operation",
+                status="completed",
+                cost=0.25,
+                is_final=True,
+            )
+        ],
+    ).model_dump(mode="json")
+    assert full["started_at"] == "2026-11-16T10:00:00Z"
+    assert full["finished_at"] == "2026-11-16T10:05:00Z"
+    assert full["steps"][0]["cost"] == 0.25
+    assert full["steps"][0]["is_final"] is True
 
 
 def test_v2_action_result_validates_job_state() -> None:

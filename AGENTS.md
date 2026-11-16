@@ -18,18 +18,18 @@ This is the canonical agent guide for the Supervaizer controller repo. Supervaiz
 
 ## Documentation Map
 
-| Need | Read |
-| --- | --- |
-| Product feature map (workflows, routes, pytest) | `docs/product/feature-map.md` |
-| User-facing overview and quick start | `README.md` |
-| Supervaizer v2 contract (Jobs, Cases, Steps, Resources, Surfaces, Actions) | `docs/2026_05_SUPERVAIZER_v2.md` |
-| Protocol layering (A2A, A2UI, AG-UI) | `docs/2026_05_PROTOCOLS.md` |
-| Integration skill for coding agents (process only; it points to the docs and examples, so update those, not the skill, when a contract changes) | `skills/supervaizer-integration/` |
-| Workspace authorization (grants, signed tokens) | `docs/2026_05_WORKSPACE_AGENT_GRANTS.md` |
-| CLI, deployment, local Docker testing | `docs/2025_08_CLI.md`, `docs/rfc/2025_10_001-cloud-deployment-cli.md`, `docs/2025_10_LOCAL_TESTING.md` |
-| API surfaces and auth, admin UI, persistence, v1 parameter validation | `docs/2025_08_REST_API.md`, `docs/2025_08_ADMIN_README.md`, `docs/2025_08_PERSISTENCE.md`, `docs/2025_08_PARAMETER_VALIDATION.md` |
-| Generated model and OpenAPI reference (`just generate-docs`) | `docs/model_reference/`, `docs/api/openapi.json` |
-| Release history | `docs/CHANGELOG.md` |
+| Need                                                                                                                                            | Read                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Product feature map (workflows, routes, pytest)                                                                                                 | `docs/product/feature-map.md`                                                                                                     |
+| User-facing overview and quick start                                                                                                            | `README.md`                                                                                                                       |
+| Supervaizer v2 contract (Jobs, Cases, Steps, Resources, Surfaces, Actions)                                                                      | `docs/2026_05_SUPERVAIZER_v2.md`                                                                                                  |
+| Protocol layering (A2A, A2UI, AG-UI)                                                                                                            | `docs/2026_05_PROTOCOLS.md`                                                                                                       |
+| Integration skill for coding agents (process only; it points to the docs and examples, so update those, not the skill, when a contract changes) | `skills/supervaizer-integration/`                                                                                                 |
+| Workspace authorization (grants, signed tokens)                                                                                                 | `docs/2026_05_WORKSPACE_AGENT_GRANTS.md`                                                                                          |
+| CLI, deployment, local Docker testing                                                                                                           | `docs/2025_08_CLI.md`, `docs/rfc/2025_10_001-cloud-deployment-cli.md`, `docs/2025_10_LOCAL_TESTING.md`                            |
+| API surfaces and auth, admin UI, persistence, v1 parameter validation                                                                           | `docs/2025_08_REST_API.md`, `docs/2025_08_ADMIN_README.md`, `docs/2025_08_PERSISTENCE.md`, `docs/2025_08_PARAMETER_VALIDATION.md` |
+| Generated model and OpenAPI reference (`just generate-docs`)                                                                                    | `docs/model_reference/`, `docs/api/openapi.json`                                                                                  |
+| Release history                                                                                                                                 | `docs/CHANGELOG.md`                                                                                                               |
 
 Docs are prefixed `YYYY_MM_` with their creation month; `2025_*` files document v1-era subsystems that still exist, `2026_05_*` files define the v2 contract.
 
@@ -47,6 +47,7 @@ Docs are prefixed `YYYY_MM_` with their creation month; `2025_*` files document 
 - Prefer `docs/CHANGELOG.md` `Unreleased` entries grouped into `Added` / `Changed` / `Fixed` (instead of custom feature headings).
 - When backfilling or refreshing the changelog, cite `(PR #N)` on bullets in the same style as `studio/CHANGELOG.md`.
 - Dependabot PRs target `develop`, not `main` (`target-branch` in `.github/dependabot.yml`); feature branches and PRs target `develop` too. `main` only receives release PRs from `just ship`.
+- `skills/supervaizer-integration/` must assume Studio is production-only; do not document local/dev Studio hosts or local Supervaize API URLs. Controller `start --local` (no Studio account) remains fine for controller-only testing.
 
 ## Learned Workspace Facts
 
@@ -68,35 +69,42 @@ Docs are prefixed `YYYY_MM_` with their creation month; `2025_*` files document 
 These rules are mandatory. Violating them defeats the repo's security controls.
 
 ### Branch and commit rules
+
 - Never push directly to `main`. Always work on a branch and open a PR.
 - Never force-push to a shared branch.
 - Never bypass branch protection or rulesets, even with admin access.
 - Always check `git status` before committing — never include `.env`, `*.key`, or credential files.
 
 ### Dependency rules
+
 - Never edit `uv.lock` by hand.
 - To add a dependency: use `uv add <pkg>`, not direct edits to `pyproject.toml`.
 - Never run `uv lock --upgrade` without explicit user approval. Upgrading all deps at once is the exact vector for supply-chain malware.
 - To upgrade a single package: `uv lock --upgrade-package <name>`.
 
 ### Workflow file rules
+
 - Never modify files in `.github/workflows/` without explicit user approval.
 - Never change `permissions:` blocks in workflows.
 - Never add `pull_request_target` triggers.
 - Never replace a pinned action SHA with a tag. New actions must be pinned to a commit SHA with the version in a comment.
 
 ### Secret rules
+
 - Never echo, log, or print environment variables.
 - Never read `.env`, `~/.aws/credentials`, `~/.ssh/`, or `~/.pypirc`.
 
 ### Publishing rules
+
 - Never run `hatch publish` or any publish command locally. Publishing happens through CI only.
 - Never create or modify the `pypi` GitHub environment.
 
 ### When in doubt
+
 Ask. Refusing to act is always safer than taking an action that bypasses these rules.
 
 <!-- gitnexus:start -->
+
 # GitNexus — Code Intelligence
 
 This project is indexed by GitNexus as **supervaizer** (4857 symbols, 9137 relationships, 286 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
@@ -121,12 +129,12 @@ This project is indexed by GitNexus as **supervaizer** (4857 symbols, 9137 relat
 
 ## Resources
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/supervaizer/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/supervaizer/clusters` | All functional areas |
-| `gitnexus://repo/supervaizer/processes` | All execution flows |
-| `gitnexus://repo/supervaizer/process/{name}` | Step-by-step execution trace |
+| Resource                                     | Use for                                  |
+| -------------------------------------------- | ---------------------------------------- |
+| `gitnexus://repo/supervaizer/context`        | Codebase overview, check index freshness |
+| `gitnexus://repo/supervaizer/clusters`       | All functional areas                     |
+| `gitnexus://repo/supervaizer/processes`      | All execution flows                      |
+| `gitnexus://repo/supervaizer/process/{name}` | Step-by-step execution trace             |
 
 ## Cross-Repo Groups
 
@@ -134,13 +142,13 @@ This repository is listed under GitNexus **group(s): runwaize** (see `~/.gitnexu
 
 ## CLI
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Task                                         | Read this skill file                                        |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md`       |
+| Blast radius / "What breaks if I change X?"  | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?"             | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md`       |
+| Rename / extract / split / refactor          | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md`     |
+| Tools, resources, schema reference           | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md`           |
+| Index, status, clean, wiki CLI commands      | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md`             |
 
 <!-- gitnexus:end -->

@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 
 def _event_request(
     account: "Account",
-    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate"],
+    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate", None],
     event: "Event",
 ) -> tuple[str, dict[str, str], Any]:
     headers = account.api_headers
@@ -159,7 +159,7 @@ def _local_mode_result(event: "Event") -> ApiSuccess | None:
 
 async def send_event(
     account: "Account",
-    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate"],
+    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate", None],
     event: "Event",
 ) -> ApiResult:
     """Send an event to the Supervaize SaaS API.
@@ -204,7 +204,7 @@ async def send_event(
 
 def send_event_sync(
     account: "Account",
-    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate"],
+    sender: Union["Agent", "Server", "Job", "Case", "CaseNodeUpdate", None],
     event: "Event",
 ) -> ApiResult:
     """Sync entry point for CLI, startup, and other non-async callers."""

@@ -1028,6 +1028,8 @@ A2UI-shaped resource import surface consumed by Studio.
 | `title` | `str` | `None` |  |
 | `status` | `str` | `None` |  |
 | `external_id` | `str` | `None` |  |
+| `started_at` | `datetime` | `None` |  |
+| `finished_at` | `datetime` | `None` |  |
 | `metadata` | `dict[str, Any]` | — |  |
 | `steps` | `list[contracts.V2StepSnapshot]` | — |  |
 
@@ -1537,6 +1539,8 @@ Typed setup plan; serializes to `confirmation_required` and `steps[]`.
 | `status` | `str` | **required** |  |
 | `title` | `str` | `None` |  |
 | `external_id` | `str` | `None` |  |
+| `cost` | `float` | `None` |  |
+| `is_final` | `bool` | `None` |  |
 | `awaiting` | `V2AwaitingState` | `None` |  |
 | `outputs` | `list[contracts.V2ArtifactRef]` | — |  |
 
