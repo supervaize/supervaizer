@@ -183,6 +183,24 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
 - Verification: `tests/test_admin_routes.py`, `tests/test_routes.py`
 - Known caveats: `--local` is exempt from the launch check and ignores `supervisor_account`. Set `SUPERVAIZER_SERVER_ID` and `SUPERVAIZER_PRIVATE_KEY` when more than one process must keep the same identity.
 
+## Push v2 job progress to Studio
+
+- Purpose: Show the progress of a running v2 job in Studio without a manual update.
+- Entry points:
+  - `Account.push_job_update` / `push_job_update_sync` (event `supervaizer.v2.job.updated`)
+  - `Account.request_job_refresh` / `request_job_refresh_sync` (event `supervaizer.v2.job.refresh_requested`)
+- Access: The Studio account API key, as for all controller events.
+- Preconditions: The job is a Supervaizer v2 job in the account workspace. The agent has the Studio job id (`V2ActionRequest.job_id`).
+- Main flow:
+  1. Return `status="in_progress"` from `job.start` and create the case with one `in_progress` step.
+  2. Call `push_job_update` at each phase with the job patch and the changed cases.
+  3. Send `awaiting` when a human must act.
+- Expected result: Studio applies the patch and updates the open job page. After `request_job_refresh`, Studio calls `job.sync`.
+- Important states: A blank job id raises `ValueError`. Local mode sends nothing. `stopped` means "not started".
+- Source: `src/supervaizer/event.py`, `src/supervaizer/account.py`
+- Verification: `tests/test_v2_job_events.py`
+- Known caveats: Studio does not poll. An agent on an older SDK release shows no live progress.
+
 ## Report billable consumption to Studio
 
 - Purpose: Let an agent bill a workspace for the work it did, per SKU.

@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Job progress events for v2 agents** (PR #185) — A v2 agent can push its progress to Studio; Studio does not poll a running job. `Account.push_job_update(job_id, job=, cases=, removed_cases=, reason=)` sends `supervaizer.v2.job.updated` with a job, case and step patch. `Account.request_job_refresh(job_id, input=, reason=)` sends `supervaizer.v2.job.refresh_requested`, and Studio then calls `job.sync`. Both have a `_sync` variant and put the Studio job id in `source.job`. New exports: `V2JobUpdatedEvent`, `V2JobRefreshRequestedEvent`; `EventType` gains `V2_JOB_UPDATED` and `V2_JOB_REFRESH_REQUESTED`. The `sender` argument of `send_event` accepts `None`. `docs/2026_05_SUPERVAIZER_v2.md` states the status contract: `stopped` means "not started"; a running job or case is `in_progress` or `awaiting`. `V2CaseSnapshot` gains optional `started_at` and `finished_at`; `V2StepSnapshot` gains optional `cost` and `is_final`. Studio reads them, and an unset field is not sent. The Step section of the doc now gives `in_progress` as the status of a running step. Requires a minor release.
+
+### Changed
+
+- **Dependencies** — `uv.lock`: `opentelemetry-api` 1.45.2 (PR #183). GitHub Actions: `softprops/action-gh-release` 3.0.4 (PR #184). No runtime change.
+
+### Tests
+
+`uv run just test-cov -p no:sugar -q`
+
+| Status     | Count |
+| ---------- | ----- |
+| ✅ Passed  | 1614  |
+| 🤔 Skipped | 0     |
+| 🔴 Failed  | 0     |
+| ⏱️ in      | 61s   |
+
+Name Stmts Miss Cover
+TOTAL 8789 522 94%
+
+Coverage HTML written to dir htmlcov
+1614 passed in 122.43s (0:02:02)
+
 ## [1.11.1] - 2026-11-09
 
 ### Changed
