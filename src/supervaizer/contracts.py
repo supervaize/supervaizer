@@ -1983,6 +1983,9 @@ class V2StepSnapshot(ContractModel):
     status: str
     title: str | None = None
     external_id: str | None = None
+    # Optional; not sent when unset. Studio reads both.
+    cost: float | None = Field(default=None, exclude_if=_is_none)
+    is_final: bool | None = Field(default=None, exclude_if=_is_none)
     awaiting: V2AwaitingState | None = None
     outputs: list[V2ArtifactRef] = Field(default_factory=list)
 
@@ -1993,6 +1996,9 @@ class V2CaseSnapshot(ContractModel):
     title: str | None = None
     status: str | None = None
     external_id: str | None = None
+    # Optional; not sent when unset. Studio reads both.
+    started_at: datetime | None = Field(default=None, exclude_if=_is_none)
+    finished_at: datetime | None = Field(default=None, exclude_if=_is_none)
     metadata: dict[str, Any] = Field(default_factory=dict)
     steps: list[V2StepSnapshot] = Field(default_factory=list)
 

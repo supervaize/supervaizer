@@ -328,6 +328,8 @@ The default lane is `work`. Agents can declare standard or custom lanes:
 
 Studio renders unknown lanes generically.
 
+A case snapshot can carry optional `started_at` and `finished_at` datetimes. An unset value is not sent.
+
 ### Step
 
 A Step is an observable activity inside a Case.
@@ -335,7 +337,8 @@ A Step is an observable activity inside a Case.
 In the current SDK model:
 
 - `activity` is `operation` or `delegation`
-- `status` carries lifecycle state such as pending, active, awaiting, completed, failed, or cancelled (a free-form string; these values are the convention Studio renders)
+- `status` carries lifecycle state: `in_progress`, `awaiting`, `completed`, `failed` or `cancelled` (a free-form string; these values are the convention). Use `in_progress` for a running step, not `active`: Studio changes `active` to `in_progress` for a job and a case only, and keeps a step status as sent
+- `cost` (optional) is the cost of the step; `is_final` (optional) marks the step that carries the final output of the case. When `is_final` is not set, Studio treats a `completed` step with `outputs` as final
 - `awaiting` carries HITL state when Studio must collect operator input: a required `reason`, the `surface` and `action` to use, `fields`, and `reopenable` (default `False`) declaring whether an answered step may be reopened and resubmitted
 - `outputs` carries produced artifacts
 
