@@ -201,9 +201,14 @@ _EXPORTS: dict[str, tuple[str, str | None]] = {
     "V2JobSetupPolicy": ("supervaizer.contracts", "V2JobSetupPolicy"),
     "V2JobSyncPolicy": ("supervaizer.contracts", "V2JobSyncPolicy"),
     "V2JobSnapshot": ("supervaizer.contracts", "V2JobSnapshot"),
+    "V2JobRefreshRequestedEvent": (
+        "supervaizer.event",
+        "V2JobRefreshRequestedEvent",
+    ),
     "V2JobSource": ("supervaizer.contracts", "V2JobSource"),
     "V2JobStateSnapshot": ("supervaizer.contracts", "V2JobStateSnapshot"),
     "V2JobSyncResult": ("supervaizer.contracts", "V2JobSyncResult"),
+    "V2JobUpdatedEvent": ("supervaizer.event", "V2JobUpdatedEvent"),
     "V2MountedResourceViewDefinition": (
         "supervaizer.contracts",
         "V2MountedResourceViewDefinition",

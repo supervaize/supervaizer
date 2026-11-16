@@ -735,6 +735,53 @@ registration = build_v2_agent_registration(
 
 The payload intentionally contains references, not content. On receipt the agent fetches each item once through `ContextClient.open()` and freezes the returned content as its own snapshot with provenance (`ref`, `version`, content `hash`, `synced_at`). `ContextClient.open()` returns the item's current `version`; the agent MUST compare it against the assigned `version` and fail the whole assignment with an explicit error when they differ — the item changed between selection and sync, and the operator should re-assign. Agents must not silently store content under a version it does not match, and must not re-read Studio context during job execution; a new `context.assign` is the only refresh path.
 
+## Job Progress Events
+
+Studio does not poll a running job. The agent pushes its progress with two controller events. Both carry the Studio job id (`V2ActionRequest.job_id`) in `source.job`.
+
+| Event type | `Account` method | Use |
+| --- | --- | --- |
+| `supervaizer.v2.job.updated` | `push_job_update(job_id, job=, cases=, removed_cases=, reason=)` | Push a job, case and step patch. Studio applies it and updates the open job page. |
+| `supervaizer.v2.job.refresh_requested` | `request_job_refresh(job_id, input=, reason=)` | Ask Studio to call `job.sync`. `input` becomes the `job.sync` input. |
+
+Each method has a `_sync` variant for sync-only code. Local mode sends nothing.
+
+```python
+from supervaizer import V2CaseSnapshot, V2StepSnapshot
+
+await account.push_job_update(
+    request.job_id,
+    job={"status": "in_progress"},
+    cases=[
+        V2CaseSnapshot(
+            id="case-1",
+            title="Invoice 42",
+            status="in_progress",
+            steps=[
+                V2StepSnapshot(id="extract", activity="operation", status="in_progress")
+            ],
+        )
+    ],
+    reason="extraction started",
+)
+```
+
+`details` of `supervaizer.v2.job.updated`, all keys optional:
+
+- `job`: a patch with `status`, `information` (`started_at`, `finished_at`, `cost`, `status_check`), `metadata` and `details`.
+- `cases`: case snapshots to create or update. A `V2CaseSnapshot` is sent with the fields you set. Omit `steps` to keep the steps Studio has; `steps=[]` means the case has no step.
+- `removed_cases`: `{"id": ..., "reason": ...}` for each case to remove.
+- `reason`: a short text for the Studio event log.
+
+Rules for a live job page:
+
+- Return `status="in_progress"` from `job.start`. Create the case at once, with one `in_progress` step.
+- Push an update at each phase: a step ends, a step starts, a case ends, the job ends.
+- Send `awaiting` when a human must act, on the step (with its `awaiting` object), its case and the job.
+- `stopped` means "not started". A running job or case is `in_progress` or `awaiting`, never `stopped`.
+
+Job and case statuses that Studio reads: `stopped`, `in_progress`, `awaiting`, `cancelling`, `completed`, `failed`, `cancelled`. Studio ignores an unknown job or case status. Studio refuses the v1 event names (`agent.job.status`, `agent.case.update`, ...) for a v2 job.
+
 ## Sync and Offline Semantics
 
 Studio owns operator-facing job lifecycle, but the agent owns actual business state. `job.sync` is the reconciliation point between the two.

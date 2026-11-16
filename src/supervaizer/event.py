@@ -10,11 +10,12 @@
 # If a copy of the MPL was not distributed with this file, you can obtain one at
 # https://mozilla.org/MPL/2.0/.
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from supervaizer.__version__ import VERSION
 from supervaizer.common import SvBaseModel
-from supervaizer.contracts import EventType
+from supervaizer.contracts import EventType, V2CaseSnapshot
 from supervaizer.lifecycle import EntityStatus
 
 if TYPE_CHECKING:
@@ -166,4 +167,78 @@ class CaseUpdateEvent(Event):
             source={"job": case.job_id, "case": case.id},
             object_type="case",
             details=update.registration_info,
+        )
+
+
+def _v2_job_source(job_id: str) -> dict[str, Any]:
+    if not job_id or not job_id.strip():
+        raise ValueError("A Supervaizer v2 job event requires the Studio job id")
+    return {"job": job_id}
+
+
+class V2JobUpdatedEvent(Event):
+    """Push a Supervaizer v2 job, case and step patch to Studio.
+
+    Studio applies only the keys that are present. A case is sent with the
+    fields the agent set: a case without ``steps`` keeps its steps in Studio.
+
+    Tests in tests/test_v2_job_events.py
+    """
+
+    def __init__(
+        self,
+        job_id: str,
+        account: Any,
+        job: dict[str, Any] | None = None,
+        cases: Sequence[V2CaseSnapshot | dict[str, Any]] | None = None,
+        removed_cases: Sequence[dict[str, Any]] | None = None,
+        reason: str | None = None,
+    ) -> None:
+        details: dict[str, Any] = {}
+        if job is not None:
+            details["job"] = job
+        if cases is not None:
+            details["cases"] = [
+                case.model_dump(mode="json", exclude_unset=True)
+                if isinstance(case, V2CaseSnapshot)
+                else case
+                for case in cases
+            ]
+        if removed_cases is not None:
+            details["removed_cases"] = list(removed_cases)
+        if reason is not None:
+            details["reason"] = reason
+        super().__init__(
+            type=EventType.V2_JOB_UPDATED,
+            account=account,
+            source=_v2_job_source(job_id),
+            object_type="job",
+            details=details,
+        )
+
+
+class V2JobRefreshRequestedEvent(Event):
+    """Ask Studio to call ``job.sync`` on the agent for one job.
+
+    Tests in tests/test_v2_job_events.py
+    """
+
+    def __init__(
+        self,
+        job_id: str,
+        account: Any,
+        input: dict[str, Any] | None = None,
+        reason: str | None = None,
+    ) -> None:
+        details: dict[str, Any] = {}
+        if input is not None:
+            details["input"] = input
+        if reason is not None:
+            details["reason"] = reason
+        super().__init__(
+            type=EventType.V2_JOB_REFRESH_REQUESTED,
+            account=account,
+            source=_v2_job_source(job_id),
+            object_type="job",
+            details=details,
         )

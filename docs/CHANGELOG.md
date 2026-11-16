@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Job progress events for v2 agents** (PR #185) — A v2 agent can push its progress to Studio; Studio does not poll a running job. `Account.push_job_update(job_id, job=, cases=, removed_cases=, reason=)` sends `supervaizer.v2.job.updated` with a job, case and step patch. `Account.request_job_refresh(job_id, input=, reason=)` sends `supervaizer.v2.job.refresh_requested`, and Studio then calls `job.sync`. Both have a `_sync` variant and put the Studio job id in `source.job`. New exports: `V2JobUpdatedEvent`, `V2JobRefreshRequestedEvent`; `EventType` gains `V2_JOB_UPDATED` and `V2_JOB_REFRESH_REQUESTED`. The `sender` argument of `send_event` accepts `None`. `docs/2026_05_SUPERVAIZER_v2.md` states the status contract: `stopped` means "not started"; a running job or case is `in_progress` or `awaiting`. Requires a minor release.
+
 ## [1.11.1] - 2026-11-09
 
 ### Changed

@@ -136,6 +136,8 @@ class EventType(StrEnum):
     CASE_RESULT = "agent.case.result"
     CASE_UPDATE = "agent.case.update"
     CASE_ERROR = "agent.case.error"
+    V2_JOB_UPDATED = "supervaizer.v2.job.updated"
+    V2_JOB_REFRESH_REQUESTED = "supervaizer.v2.job.refresh_requested"
 
 
 class V2MissionContext(ContractModel):
