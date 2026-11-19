@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Dead code check with vulture** — `just vulture` runs [vulture](https://github.com/jendrikseipp/vulture) on `src/supervaizer` (config in `pyproject.toml` `[tool.vulture]`, exceptions in `vulture_whitelist.py`, `vulture` added to the `dev` extra). Removed dead private code: `Server._apply_workspace_authorization_handshake` and `Server._apply_workspace_authorization_agent_bindings` (no callers), the write-only `Agent._server_encrypted_parameters` private attribute, and the unreachable lines after `raise NotImplementedError` in the async branch of `Agent.job_start`. No public API or behavior change.
+
 ## [1.12.0] - 2026-11-16
 
 ### Added

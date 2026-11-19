@@ -74,7 +74,7 @@ dev = [
     "types-deprecated>=1.3.1",
     "types-PyYAML>=6.0.0",
     "types-python-slugify>=8.0.2.20240310",
-
+    "vulture>=2.16",
 ]
 
 [tool.pytest.ini_options]
@@ -139,6 +139,7 @@ extend-immutable-calls = ["fastapi.Body", "fastapi.Depends", "fastapi.Query"]
     "FURB162", # replace() keeps non-str input on the 400 path
 ]
 "src/supervaizer/deploy/templates/debug_env.py" = ["EXE001"] # shipped template
+"vulture_whitelist.py" = ["F821", "B018"] # vulture's `_.name` whitelist syntax
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -147,6 +148,21 @@ force-wrap-aliases = true
 [tool.ruff.format]
 # Match Cursor style: keep opening brace on same line as call, e.g. append({ ... })
 preview = true
+
+[tool.vulture]
+# `just vulture`. Framework-registered code (routes, validators, CLI
+# commands) is ignored by decorator; the rest is in vulture_whitelist.py.
+paths = ["src/supervaizer", "vulture_whitelist.py"]
+exclude = ["src/supervaizer/deploy/templates/"]
+min_confidence = 60
+ignore_decorators = [
+    "@router.*",
+    "@app.*",
+    "@*_app.*",
+    "@field_validator",
+    "@model_validator",
+    "@sv_server.*",
+]
 
 [tool.commitizen]
 name = "cz_gitmoji"
