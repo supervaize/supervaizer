@@ -39,6 +39,10 @@ test-no-cov *args:
 test-failed:
     uv run pytest --lf --no-cov
 
+# Find dead code (config in pyproject [tool.vulture], exceptions in vulture_whitelist.py)
+vulture *args:
+    uv run vulture {{args}}
+
 # Run mypy type checking
 mypy:
     uv run python -m pre_commit run mypy --all-files
