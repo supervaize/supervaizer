@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Dead private code removed** — `Server._apply_workspace_authorization_handshake` and `Server._apply_workspace_authorization_agent_bindings` (no callers; the `studio_handshake` functions stay), the write-only `Agent._server_encrypted_parameters` private attribute, and the unreachable lines after `raise NotImplementedError` in the async branch of `Agent.job_start`. Found with vulture. No public API or behavior change.
+
 ## [1.12.0] - 2026-11-16
 
 ### Added

@@ -29,7 +29,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    PrivateAttr,
     field_validator,
     model_validator,
 )
@@ -935,8 +934,6 @@ def _validated_server_agent_id(
 
 
 class Agent(AgentAbstract):
-    _server_encrypted_parameters: str | None = PrivateAttr(default=None)
-
     def __init__(
         self,
         name: str,
@@ -1182,7 +1179,6 @@ class Agent(AgentAbstract):
         self, server: "Server", server_encrypted_parameters: str | None
     ) -> None:
         if server_encrypted_parameters and self.parameters_setup:
-            self._server_encrypted_parameters = server_encrypted_parameters
             decrypted = server.decrypt(server_encrypted_parameters)
             self.parameters_setup.update_values_from_server(json.loads(decrypted))
         else:
@@ -1308,13 +1304,6 @@ class Agent(AgentAbstract):
                 # TODO: Implement async job execution & test
                 raise NotImplementedError(
                     "[Agent job_start] Async job execution is not implemented"
-                )
-                started = self._execute(action_method, params)
-                job_response = JobResponse(
-                    job_id=job.id,
-                    status=EntityStatus.IN_PROGRESS,
-                    message="Job started ",
-                    payload={"intermediary_deliverable": started},
                 )
             else:
                 job_response = self._execute(action_method, params)

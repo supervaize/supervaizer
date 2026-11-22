@@ -89,8 +89,6 @@ from supervaizer.server_info import (
 from supervaizer.server_registration import build_server_registration_info
 from supervaizer.storage import load_running_entities_on_startup
 from supervaizer.studio_handshake import (
-    apply_workspace_authorization_agent_bindings,
-    apply_workspace_authorization_handshake,
     validate_registration_handshake,
     validate_studio_a2a_workspace_authorization,
 )
@@ -743,16 +741,6 @@ class Server(ServerAbstract):
 
     def _validate_studio_a2a_workspace_authorization(self) -> None:
         validate_studio_a2a_workspace_authorization(self)
-
-    def _apply_workspace_authorization_handshake(
-        self, handshake: dict[str, Any]
-    ) -> None:
-        apply_workspace_authorization_handshake(self, handshake)
-
-    def _apply_workspace_authorization_agent_bindings(
-        self, agent_bindings: list[Any]
-    ) -> None:
-        apply_workspace_authorization_agent_bindings(self, agent_bindings)
 
     def decrypt(self, encrypted_parameters: str) -> str:
         """Decrypt parameters using the server's private key."""
