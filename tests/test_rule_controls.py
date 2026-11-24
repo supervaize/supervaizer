@@ -424,7 +424,7 @@ async def test_checkpoint_resume_resolves_matching_pending_decision(
         )
     )
 
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 @pytest.mark.asyncio
@@ -506,7 +506,7 @@ async def test_pause_resume_is_rejected_and_keeps_waiter_pending(
     assert not waiting.done()
 
     gate.resume(RuleCheckpointResume.model_validate(decision | {"status": "allow"}))
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 def _resume(checkpoint_id: str, case_id: str = "case-1") -> RuleCheckpointResume:
@@ -567,7 +567,7 @@ async def test_live_resume_for_another_case_does_not_release_gate(
     assert not waiting.done()
 
     resume_rule_checkpoint(_resume("checkpoint-bound"))
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 @pytest.mark.asyncio
@@ -587,7 +587,7 @@ async def test_mismatched_early_decision_is_discarded(account_fixture: Any) -> N
     assert not waiting.done()
 
     resume_rule_checkpoint(_resume("checkpoint-early"))
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 @pytest.mark.asyncio
@@ -619,12 +619,15 @@ async def test_resume_before_checkpoint_response_reaches_later_waiter(
         resume_rule_checkpoint(_resume("checkpoint-in-flight", "case-in-flight"))
         is None
     )
-    resumed = await _gate(account_fixture).wait_for_resume(
-        _paused("checkpoint-in-flight"),
-        "occurrence-1",
-        "before",
-        job_id="job-1",
-        case_id="case-in-flight",
+    resumed = await asyncio.wait_for(
+        _gate(account_fixture).wait_for_resume(
+            _paused("checkpoint-in-flight"),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-in-flight",
+        ),
+        timeout=2,
     )
 
     assert resumed.status == "allow"
@@ -683,7 +686,7 @@ async def test_resume_from_another_agent_does_not_release_gate(
     assert not waiting.done()
 
     resume_as("agent-1")
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 def test_persisted_resume_from_another_agent_is_rejected(
@@ -813,7 +816,7 @@ async def test_live_resume_is_persisted_before_the_waiter_wakes(
     assert stored["metadata"]["_rule_checkpoints"]["occurrence-1:before"]["status"] == (
         "allow"
     )
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 def test_retained_decisions_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -878,7 +881,7 @@ async def test_a2a_resume_handler_delivers_studio_payload(account_fixture: Any) 
     )
 
     assert result.effects[0].status == "allow"
-    assert (await waiting).status == "allow"
+    assert (await asyncio.wait_for(waiting, timeout=2)).status == "allow"
 
 
 @pytest.mark.asyncio
@@ -909,17 +912,20 @@ async def test_checkpoint_resume_retained_until_waiter_is_registered(
     )
     assert resume_rule_checkpoint(decision) is None
 
-    resumed = await gate.wait_for_resume(
-        RuleCheckpointResponse(
-            checkpoint_id="checkpoint-race",
-            status="pause",
-            snapshot_hash="snapshot-1",
-            input_hash="input-1",
+    resumed = await asyncio.wait_for(
+        gate.wait_for_resume(
+            RuleCheckpointResponse(
+                checkpoint_id="checkpoint-race",
+                status="pause",
+                snapshot_hash="snapshot-1",
+                input_hash="input-1",
+            ),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-1",
         ),
-        "occurrence-1",
-        "before",
-        job_id="job-1",
-        case_id="case-1",
+        timeout=2,
     )
     assert resumed.status == "allow"
 
@@ -980,17 +986,20 @@ async def test_persisted_resume_wakes_later_waiter(
         agent_slug="agent-1",
     )
 
-    resumed = await gate.wait_for_resume(
-        RuleCheckpointResponse(
-            checkpoint_id="checkpoint-race",
-            status="pause",
-            snapshot_hash="snapshot-1",
-            input_hash="input-1",
+    resumed = await asyncio.wait_for(
+        gate.wait_for_resume(
+            RuleCheckpointResponse(
+                checkpoint_id="checkpoint-race",
+                status="pause",
+                snapshot_hash="snapshot-1",
+                input_hash="input-1",
+            ),
+            "occurrence-1",
+            "before",
+            job_id="job-1",
+            case_id="case-race",
         ),
-        "occurrence-1",
-        "before",
-        job_id="job-1",
-        case_id="case-race",
+        timeout=2,
     )
 
     assert resumed.status == "allow"
@@ -1552,9 +1561,9 @@ def test_checkpoint_resume_reports_delivery_and_identifies_the_job(
 ) -> None:
     decision = _resume("checkpoint-report")
     response = RuleCheckpointResponse.model_validate(decision.model_dump())
-    resume = mocker.patch(
-        "supervaizer.server.resume_rule_checkpoint",
-        return_value=response if delivered else None,
+    resume = mocker.Mock(return_value=response if delivered else None)
+    mocker.patch.dict(
+        _rule_checkpoint_resume_handler.__globals__, {"resume_rule_checkpoint": resume}
     )
     request = V2ActionRequest(
         request_id="request-1",
