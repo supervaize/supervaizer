@@ -12,6 +12,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture
 
 from supervaizer.agent import Agent, AgentMethod, AgentMethods
 from supervaizer.common import ApiSuccess, encrypt_value
@@ -122,3 +123,38 @@ def test_job_start_uses_call_parameters_without_changing_the_job(
 
     assert seen == [call_parameters]
     assert job.agent_parameters is None
+
+
+def test_agent_updates_defined_parameters_from_encrypted_server_values(
+    mocker: MockerFixture,
+) -> None:
+    setup = ParametersSetup.from_list([Parameter(name="API_KEY", is_secret=True)])
+    agent = Agent(name="configured-agent", parameters_setup=setup)
+    server = mocker.Mock(spec=Server)
+    server.decrypt.return_value = json.dumps([
+        {"name": "API_KEY", "value": "test-secret"}
+    ])
+
+    agent.update_parameters_from_server(server, "encrypted-value")
+
+    server.decrypt.assert_called_once_with("encrypted-value")
+    assert agent._server_encrypted_parameters == "encrypted-value"
+    assert agent.parameters_setup is not None
+    assert agent.parameters_setup.value("API_KEY") == "test-secret"
+
+
+@pytest.mark.parametrize(
+    ("encrypted", "has_setup"), [(None, True), ("encrypted-value", False)]
+)
+def test_agent_skips_decryption_when_parameters_are_unavailable(
+    mocker: MockerFixture, encrypted: str | None, has_setup: bool
+) -> None:
+    setup = (
+        ParametersSetup.from_list([Parameter(name="API_KEY")]) if has_setup else None
+    )
+    agent = Agent(name="unconfigured-agent", parameters_setup=setup)
+    server = mocker.Mock(spec=Server)
+
+    agent.update_parameters_from_server(server, encrypted)
+
+    server.decrypt.assert_not_called()
