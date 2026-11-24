@@ -17,6 +17,7 @@ from supervaizer.studio_handshake import apply_workspace_authorization_agent_bin
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationClaims,
     WorkspaceAuthorizationError,
+    _validate_claim_times,
     _validate_claims_against_request,
 )
 
@@ -151,3 +152,26 @@ def test_agent_bindings_apply_earlier_identity_before_later_mismatch() -> None:
 
     assert alpha.server_agent_id == "studio-alpha"
     assert beta.server_agent_id == "studio-beta-old"
+
+
+@pytest.mark.parametrize(
+    ("expiry", "issued_at", "leeway", "expected_error"),
+    [
+        (95, 90, 5, None),
+        (94, 90, 5, "workspace_authorization_expired"),
+        (200, 105, 5, None),
+        (200, 106, 5, "workspace_authorization_not_yet_valid"),
+        (200, None, 5, None),
+    ],
+)
+def test_workspace_token_time_boundaries(
+    expiry: int, issued_at: int | None, leeway: int, expected_error: str | None
+) -> None:
+    claims = _claims(exp=expiry, iat=issued_at)
+
+    if expected_error is None:
+        _validate_claim_times(claims, leeway_seconds=leeway, now=100)
+    else:
+        with pytest.raises(WorkspaceAuthorizationError) as raised:
+            _validate_claim_times(claims, leeway_seconds=leeway, now=100)
+        assert raised.value.code == expected_error
