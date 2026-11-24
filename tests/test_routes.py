@@ -1051,3 +1051,43 @@ def test_data_resource_rejects_workspace_that_differs_from_token(
     assert response.status_code == 403
     assert "does not match the request" in response.json()["detail"]
     assert called is False
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_status", "expected_ids"),
+    [
+        ("skip=1&limit=1", 200, ["item-2"]),
+        ("skip=5&limit=2", 200, []),
+        ("skip=-1&limit=2", 422, []),
+        ("skip=0&limit=0", 422, []),
+    ],
+)
+def test_data_resource_list_pagination_and_bounds(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    query: str,
+    expected_status: int,
+    expected_ids: list[str],
+) -> None:
+    calls: list[str] = []
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        calls.append(context.workspace_id)
+        return [{"id": f"item-{index}"} for index in range(1, 5)]
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/?{query}",
+        headers=_data_resource_headers(server, agent, scope="resource.items.list"),
+    )
+
+    assert response.status_code == expected_status
+    if expected_status == 200:
+        assert [item["id"] for item in response.json()] == expected_ids
+        assert calls == ["workspace-1"]
+    else:
+        assert calls == []
