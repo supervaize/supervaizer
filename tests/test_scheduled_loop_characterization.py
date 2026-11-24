@@ -7,9 +7,11 @@
 """Characterize local scheduled-step polling and case scheduling behavior."""
 
 import asyncio
+import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from types import ModuleType
 from typing import Any, cast
 
 import pytest
@@ -371,3 +373,37 @@ async def test_scheduled_loop_continues_after_unrunnable_step(
     )
     assert next_step.scheduled_status == "completed"
     assert observed == [("owner.run", {"value": "ok"}, {"owner.run"}, "executing")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("owner_is_registered", [True, False])
+async def test_scheduled_loop_rejects_methods_not_declared_by_owner(
+    isolated_scheduled_state: None,
+    account_fixture: Account,
+    monkeypatch: pytest.MonkeyPatch,
+    owner_is_registered: bool,
+) -> None:
+    del isolated_scheduled_state
+    invoked: list[bool] = []
+    module = ModuleType("unlisted_scheduled_method")
+    module.__dict__["run"] = lambda: invoked.append(True)
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    job = _new_job("restricted-job", "owner-agent")
+    case = _new_case(account_fixture, job.id)
+    job.add_case_id(case.id)
+    step = _due_update(method=f"{module.__name__}.run")
+    case.updates = [step]
+    server = (
+        _server_for("owner-agent", {"different.method"})
+        if owner_is_registered
+        else _server_for("other-agent", {f"{module.__name__}.run"})
+    )
+    sleep, _calls = _cancel_after_iterations()
+    monkeypatch.setattr("supervaizer.scheduled_steps.asyncio.sleep", sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await _run_scheduled_step_loop(_as_server(server))
+
+    assert step.scheduled_status == "failed"
+    assert invoked == []
