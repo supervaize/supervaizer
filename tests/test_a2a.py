@@ -2428,3 +2428,19 @@ def test_a2a_workspace_authorization_rejects_non_base64_signature(
     assert error["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
     assert error["data"]["code"] == "workspace_authorization_malformed"
     assert called is False
+
+
+@pytest.mark.parametrize("body", [{"id": "bad-1"}, {"id": "bad-2", "method": 42}])
+def test_a2a_invalid_request_keeps_id_and_returns_validation_details(
+    server_fixture: Server, body: dict[str, object]
+) -> None:
+    response = TestClient(server_fixture.app).post(
+        "/a2a", headers=_a2a_write_headers(server_fixture), json=body
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == body["id"]
+    assert payload["error"]["code"] == JSON_RPC_INVALID_PARAMS
+    assert payload["error"]["message"] == "Invalid JSON-RPC request"
+    assert payload["error"]["data"]["errors"]
