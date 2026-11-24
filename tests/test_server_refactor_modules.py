@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -150,3 +151,24 @@ def test_registration_handshake_rejects_missing_response_object(
         RuntimeError, match="response did not include a response object"
     ):
         validate_registration_handshake(server_fixture, result)
+
+
+@pytest.mark.parametrize(
+    ("configured", "kept"),
+    [("studio-server-1", True), ("abcdef", True), ("abcde", False), (None, False)],
+)
+def test_server_identity_is_preserved_or_generated_once(
+    monkeypatch: pytest.MonkeyPatch, configured: str | None, kept: bool
+) -> None:
+    if configured is None:
+        monkeypatch.delenv("SUPERVAIZER_SERVER_ID", raising=False)
+    else:
+        monkeypatch.setenv("SUPERVAIZER_SERVER_ID", configured)
+
+    server_id = server_config._get_or_create_server_id()
+
+    if kept:
+        assert server_id == configured
+    else:
+        assert str(UUID(server_id)) == server_id
+    assert server_config._get_or_create_server_id() == server_id
