@@ -304,8 +304,8 @@ def log_access_denied_tailscale(ip: str, path: str, reason: str) -> None:  # <--
 
 
 def log_access_denied_api(key: str | None, path: str, reason: str) -> None:  # <-- ADDED
-    """Log an API-key access denial; key is truncated to avoid leaking secrets."""
-    key_preview = f"{key[:6]}..." if key and len(key) > 6 else (key or "<none>")
+    """Log an API-key access denial without exposing the key."""
+    key_preview = "***" if key else "<none>"
     log.bind(
         access_type="api",
         key_preview=key_preview,

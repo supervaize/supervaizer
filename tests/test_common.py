@@ -223,10 +223,10 @@ def test_configure_controller_logging_outputs_cloud_logging_json(
     payload = json.loads(output.getvalue())
     assert payload["severity"] == "WARNING"
     assert payload["message"] == (
-        "[access:api] denied key='abcdef...' path='/a2a' reason='invalid key'"
+        "[access:api] denied key='***' path='/a2a' reason='invalid key'"
     )
     assert payload["access_type"] == "api"
-    assert payload["key_preview"] == "abcdef..."
+    assert payload["key_preview"] == "***"
     assert payload["path"] == "/a2a"
     assert payload["reason"] == "invalid key"
 
@@ -377,3 +377,16 @@ def test_encrypt_decrypt_preserves_values_at_block_boundaries(value: str) -> Non
     encrypted = encrypt_value(value, private_key.public_key())
 
     assert decrypt_value(encrypted, private_key) == value
+
+
+@pytest.mark.parametrize("key", ["q7", "abcdef", "abcdef123456"])
+def test_denied_api_requests_never_log_key_material(key: str) -> None:
+    output = StringIO()
+    sink_id = configure_controller_logging("INFO", sink=output)
+    try:
+        log_access_denied_api(key, "/a2a", "invalid key")
+    finally:
+        log.remove(sink_id)
+
+    assert key not in output.getvalue()
+    assert "abcdef" not in output.getvalue()
