@@ -1557,14 +1557,33 @@ def test_resume_does_not_modify_case_from_another_job(
 
 @pytest.mark.parametrize("delivered", [True, False])
 def test_checkpoint_resume_reports_delivery_and_identifies_the_job(
-    mocker: MockerFixture, delivered: bool
+    account_fixture: Any, storage_manager: Any, delivered: bool
 ) -> None:
-    decision = _resume("checkpoint-report")
-    response = RuleCheckpointResponse.model_validate(decision.model_dump())
-    resume = mocker.Mock(return_value=response if delivered else None)
-    mocker.patch.dict(
-        _rule_checkpoint_resume_handler.__globals__, {"resume_rule_checkpoint": resume}
-    )
+    case_id = "case-report-delivered" if delivered else "case-report-pending"
+    checkpoint_id = f"checkpoint-report-{case_id}"
+    decision = _resume(checkpoint_id, case_id=case_id)
+    if delivered:
+        Case(
+            id=case_id,
+            job_id="job-1",
+            account=account_fixture,
+            name="Checkpoint report",
+            description="Report a delivered checkpoint decision",
+            status=EntityStatus.IN_PROGRESS,
+            metadata={
+                "_rule_checkpoint_agent_slug": "agent-1",
+                "_rule_checkpoints": {
+                    "occurrence-1:before": {
+                        "checkpoint_id": decision.checkpoint_id,
+                        "occurrence_id": decision.occurrence_id,
+                        "phase": decision.phase,
+                        "snapshot_hash": decision.snapshot_hash,
+                        "input_hash": decision.input_hash,
+                        "status": "pause",
+                    }
+                },
+            },
+        )
     request = V2ActionRequest(
         request_id="request-1",
         actor={"user_id": "studio"},
@@ -1574,17 +1593,16 @@ def test_checkpoint_resume_reports_delivery_and_identifies_the_job(
         surface="mission.agent",
         action="rule.checkpoint.resume",
         job_id="job-1",
-        case_id="case-1",
+        case_id=case_id,
         input=decision.model_dump(exclude={"job_id", "case_id", "agent_slug"}),
     )
 
     result = _rule_checkpoint_resume_handler(request)
 
-    resume.assert_called_once_with(decision)
     assert result.status == "ok"
     assert len(result.effects) == 1
     effect = result.effects[0]
     assert effect.type == "rule.checkpoint.resumed"
     assert effect.job_id == "job-1"
     assert effect.status == ("allow" if delivered else "pending_delivery")
-    assert effect.summary == {"checkpoint_id": "checkpoint-report"}
+    assert effect.summary == {"checkpoint_id": checkpoint_id}
