@@ -15,6 +15,7 @@ import json
 import threading
 import time
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -1669,7 +1670,13 @@ def test_a2a_controller_publishes_v2_action_effects(
     def start_job(_request: V2ActionRequest) -> V2ActionResult:
         return V2ActionResult(
             status="ok",
-            effects=[V2Effect(type="job.started", job_id="job-123")],
+            effects=[
+                V2Effect(
+                    type="job.started",
+                    job_id="job-123",
+                    data={"started_at": datetime(2026, 11, 25, 10, 30, tzinfo=UTC)},
+                )
+            ],
         )
 
     try:
@@ -1694,7 +1701,13 @@ def test_a2a_controller_publishes_v2_action_effects(
             "agent_slug": agent_slug,
             "action": "job.start",
             "request_id": "request-1",
-            "effects": [{"type": "job.started", "job_id": "job-123"}],
+            "effects": [
+                {
+                    "type": "job.started",
+                    "job_id": "job-123",
+                    "data": {"started_at": "2026-11-25T10:30:00Z"},
+                }
+            ],
         }
     finally:
         unsubscribe_v2_events(server_fixture, queue)
