@@ -208,3 +208,20 @@ def test_workspace_authorization_settings_preserve_configured_mapping() -> None:
     assert settings.enabled is True
     assert settings.issuer == "https://studio.example.test"
     assert settings.jwks_url == "https://studio.example.test/jwks"
+
+
+@pytest.mark.parametrize("field", ["id", "slug"])
+@pytest.mark.parametrize("value", [None, "", "   ", 123])
+def test_agent_bindings_reject_invalid_identity_before_applying_any(
+    field: str, value: Any
+) -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+    server = _server(agent)
+    invalid = {"id": "studio-agent-2", "slug": "other", field: value}
+
+    with pytest.raises(RuntimeError, match=f"missing {field}"):
+        apply_workspace_authorization_agent_bindings(
+            server, [{"id": "studio-agent-1", "slug": "agent"}, invalid]
+        )
+
+    assert agent.server_agent_id is None
