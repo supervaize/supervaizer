@@ -40,6 +40,14 @@ from supervaizer.rule_controls import (
 from supervaizer.server import _rule_checkpoint_resume_handler
 
 
+async def _guarded_step_with_timeout(*args: Any, **kwargs: Any) -> Any:
+    return await asyncio.wait_for(run_guarded_step(*args, **kwargs), timeout=2)
+
+
+async def _recovery_with_timeout(*args: Any, **kwargs: Any) -> Any:
+    return await asyncio.wait_for(recover_guarded_step(*args, **kwargs), timeout=2)
+
+
 def _response(status: str, snapshot_hash: str = "snapshot-1") -> Any:
     response = SimpleNamespace()
     response.raise_for_status = lambda: None
@@ -153,7 +161,7 @@ async def test_guarded_step_prevents_effect_before_allow(
     )
 
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -199,7 +207,7 @@ async def test_guarded_step_prevents_advancement_after_stop(
     )
 
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -318,7 +326,7 @@ async def test_checkpoint_failure_does_not_run_effect(
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -360,7 +368,7 @@ async def test_before_checkpoint_failure_retries_same_context_without_effect(
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -370,7 +378,7 @@ async def test_before_checkpoint_failure_retries_same_context_without_effect(
             after_context=lambda _: {},
         )
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1032,7 +1040,7 @@ async def test_started_effect_is_never_replayed_after_failure(
     )
 
     with pytest.raises(RuntimeError, match="effect failed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1042,7 +1050,7 @@ async def test_started_effect_is_never_replayed_after_failure(
             after_context=lambda _: {},
         )
     with pytest.raises(RuleCheckpointRecoveryRequired, match="claimed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1083,7 +1091,7 @@ async def test_lost_after_response_never_replays_completed_effect(
     )
 
     with pytest.raises(RuntimeError, match="Rule checkpoint request failed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1093,7 +1101,7 @@ async def test_lost_after_response_never_replays_completed_effect(
             after_context=lambda _: {},
         )
     with pytest.raises(RuleCheckpointRecoveryRequired, match="claimed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1148,7 +1156,7 @@ async def test_recovery_retries_pending_after_without_replaying_effect(
     )
 
     with pytest.raises(RuntimeError, match="transport lost"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
@@ -1159,7 +1167,7 @@ async def test_recovery_retries_pending_after_without_replaying_effect(
             advance=advance,
         )
     with pytest.raises(ValueError, match="context changed"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-1",
@@ -1169,7 +1177,7 @@ async def test_recovery_retries_pending_after_without_replaying_effect(
         )
 
     assert (
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-1",
@@ -1241,7 +1249,7 @@ async def test_persisted_before_allow_continues_without_rechecking(
         _persist=mocker.Mock(),
     )
     assert (
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=restarted_case,
             step_id="step-1",
@@ -1293,7 +1301,7 @@ async def test_persisted_before_allow_rejects_changed_step(
     )
 
     with pytest.raises(ValueError, match="step changed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="different-step",
@@ -1370,9 +1378,9 @@ async def test_concurrent_recovery_advances_only_once(
             advance=advance,
         )
     )
-    await started.wait()
+    await asyncio.wait_for(started.wait(), timeout=2)
     with pytest.raises(RuleCheckpointRecoveryRequired, match="active"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-1",
@@ -1381,9 +1389,9 @@ async def test_concurrent_recovery_advances_only_once(
             advance=advance,
         )
     release.set()
-    assert await recovery == "done"
+    assert await asyncio.wait_for(recovery, timeout=2) == "done"
     assert (
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             case=case,
             occurrence_id="occurrence-1",
             result="done",
@@ -1456,10 +1464,10 @@ async def test_recovery_cannot_advance_while_original_after_request_is_active(
             advance=advance,
         )
     )
-    await after_waiting.wait()
+    await asyncio.wait_for(after_waiting.wait(), timeout=2)
 
     with pytest.raises(RuleCheckpointRecoveryRequired, match="active"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-1",
@@ -1469,7 +1477,7 @@ async def test_recovery_cannot_advance_while_original_after_request_is_active(
         )
 
     release_after.set()
-    assert await original == "done"
+    assert await asyncio.wait_for(original, timeout=2) == "done"
     assert calls == ["effect", "advance"]
 
 
@@ -1498,7 +1506,7 @@ async def test_duplicate_completed_occurrence_never_replays_effect(
         ),
         agent_slug="agent-1",
     )
-    await run_guarded_step(
+    await _guarded_step_with_timeout(
         gate=gate,
         case=case,
         step_id="step-1",
@@ -1508,7 +1516,7 @@ async def test_duplicate_completed_occurrence_never_replays_effect(
         after_context=lambda _: {},
     )
     with pytest.raises(RuleCheckpointRecoveryRequired, match="claimed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="step-1",
