@@ -138,3 +138,15 @@ def test_validate_registration_handshake_function_accepts_key_match(
 
 def _scheduled_step_target(value: str) -> str:
     return f"scheduled-{value}"
+
+
+@pytest.mark.parametrize("detail", [None, {}, {"object": None}, {"object": "invalid"}])
+def test_registration_handshake_rejects_missing_response_object(
+    server_fixture: Server, detail: dict[str, Any] | None
+) -> None:
+    result = ApiSuccess(message="registered", detail=detail)
+
+    with pytest.raises(
+        RuntimeError, match="response did not include a response object"
+    ):
+        validate_registration_handshake(server_fixture, result)
