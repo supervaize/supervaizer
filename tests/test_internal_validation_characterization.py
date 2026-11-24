@@ -12,8 +12,11 @@ from typing import Any
 import pytest
 
 from supervaizer.common import ApiError
-from supervaizer.contracts import V2WorkspaceContext
-from supervaizer.studio_handshake import apply_workspace_authorization_agent_bindings
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings, V2WorkspaceContext
+from supervaizer.studio_handshake import (
+    apply_workspace_authorization_agent_bindings,
+    apply_workspace_authorization_handshake,
+)
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationClaims,
     WorkspaceAuthorizationError,
@@ -21,6 +24,19 @@ from supervaizer.workspace_authorization import (
     _validate_claims_against_request,
     get_workspace_authorization_settings,
 )
+
+
+@pytest.mark.parametrize("audience", [None, "", "   ", 123])
+def test_registration_rejects_invalid_workspace_audience(audience: Any) -> None:
+    settings = V2WorkspaceAuthorizationSettings(enabled=True, audience="expected")
+    server = SimpleNamespace(workspace_authorization=settings, agents=[])
+
+    with pytest.raises(RuntimeError, match="audience is missing"):
+        apply_workspace_authorization_handshake(
+            server, {"workspace_authorization": {"audience": audience, "agents": []}}
+        )
+
+    assert server.workspace_authorization is settings
 
 
 class _Response:
