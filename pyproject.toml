@@ -185,3 +185,21 @@ replace = 'current_version = "{new_version}"'
 filename = "docs/CHANGELOG.md"
 search = "## [Unreleased]"
 replace = "## [Unreleased]\n\n## [{new_version}] - {now:%Y-%m-%d}"
+
+[dependency-groups]
+dev = [
+    "mutmut>=3.8.1",
+]
+
+[tool.mutmut]
+process_isolation = "forkserver"
+forkserver_warmup = "collect"
+# The singleton decorator replaces classes before mutmut can register their methods.
+do_not_mutate = ["src/supervaizer/storage.py", "src/supervaizer/job.py", "src/supervaizer/case.py"]
+also_copy = ["tools", "skills", "docs", "README.md"]
+pytest_add_cli_args = ["-p", "no:sugar", "-p", "tools.mutmut_pytest"]
+# Mutmut wraps __init__, so these tests cannot access its original globals.
+pytest_add_cli_args_test_selection = [
+    "--deselect=tests/test_server.py::test_server_lifespan_cancels_scheduled_step_task",
+    "--deselect=tests/test_server.py::test_server_lifespan_leaves_shutdown_after_scheduler_timeout",
+]

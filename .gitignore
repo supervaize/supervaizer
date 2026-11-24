@@ -88,6 +88,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .metrics/
+mutants/
 cover/
 
 # Translations
