@@ -19,6 +19,7 @@ from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationError,
     _validate_claim_times,
     _validate_claims_against_request,
+    get_workspace_authorization_settings,
 )
 
 
@@ -175,3 +176,19 @@ def test_workspace_token_time_boundaries(
         with pytest.raises(WorkspaceAuthorizationError) as raised:
             _validate_claim_times(claims, leeway_seconds=leeway, now=100)
         assert raised.value.code == expected_error
+
+
+def test_workspace_authorization_settings_preserve_configured_mapping() -> None:
+    server = SimpleNamespace(
+        workspace_authorization={
+            "enabled": True,
+            "issuer": "https://studio.example.test",
+            "jwks_url": "https://studio.example.test/jwks",
+        }
+    )
+
+    settings = get_workspace_authorization_settings(server)
+
+    assert settings.enabled is True
+    assert settings.issuer == "https://studio.example.test"
+    assert settings.jwks_url == "https://studio.example.test/jwks"
