@@ -1091,3 +1091,33 @@ def test_data_resource_list_pagination_and_bounds(
         assert calls == ["workspace-1"]
     else:
         assert calls == []
+
+
+@pytest.mark.parametrize("read_only", [True, False])
+def test_data_resource_omits_unavailable_write_routes(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    read_only: bool,
+) -> None:
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=lambda data: {**data, "id": "1"},
+        on_update=(lambda item_id, data: {**data, "id": item_id})
+        if read_only
+        else None,
+        on_delete=(lambda item_id: True) if read_only else None,
+        read_only=read_only,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+
+    paths = server.app.openapi()["paths"]
+    collection = paths[f"/api/agents/{agent.slug}/data/items/"]
+    item = paths.get(f"/api/agents/{agent.slug}/data/items/{{item_id}}", {})
+    assert ("post" in collection) is not read_only
+    assert "put" not in item
+    assert "delete" not in item
