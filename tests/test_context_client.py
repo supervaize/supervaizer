@@ -212,3 +212,47 @@ def test_context_open_helper_rejects_wrong_workspace_before_request(
         )
 
     post.assert_not_called()
+
+
+def test_context_search_helper_rejects_wrong_workspace_before_request(
+    account_fixture: Account, mocker: Any
+) -> None:
+    post = mocker.patch("supervaizer.context._sync_httpx_client.post")
+
+    with pytest.raises(ValueError, match="does not match account.workspace_id"):
+        context.search(
+            account=account_fixture,
+            query="policy",
+            expected_workspace_id="other-workspace",
+        )
+
+    post.assert_not_called()
+
+
+def test_context_client_uses_search_and_open_limits_by_default(
+    account_fixture: Account, mocker: Any
+) -> None:
+    post = mocker.patch(
+        "supervaizer.context._sync_httpx_client.post",
+        side_effect=[
+            _Response({"query": "policy", "results": []}),
+            _Response({
+                "ref": "context-ref",
+                "title": "Policy",
+                "scope": "workspace",
+                "source_type": "text",
+                "version": 1,
+                "content": "Policy text",
+            }),
+        ],
+    )
+    client = ContextClient(account_fixture)
+
+    client.search(query="policy")
+    client.open(ref="context-ref")
+
+    assert post.call_args_list[0].kwargs["json"] == {"query": "policy", "limit": 5}
+    assert post.call_args_list[1].kwargs["json"] == {
+        "ref": "context-ref",
+        "max_chars": 3000,
+    }
