@@ -15,7 +15,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
-from supervaizer import Account, ApiError, ApiSuccess
+from supervaizer import Account, Agent, ApiError, ApiSuccess
 from supervaizer.event import Event
 from supervaizer.server import Server
 from supervaizer.telemetry import (
@@ -431,3 +431,38 @@ def test_register_server_sync_sends_server_identity_and_public_url(
     assert event.payload["workspace"] == account_fixture.workspace_id
     assert event.details["server_id"] == server_fixture.server_id
     assert event.details["url"] == server_fixture.public_url
+
+
+@pytest.mark.parametrize("polling", [True, False])
+def test_register_agent_sync_sends_agent_and_polling_mode(
+    account_fixture: Account,
+    agent_fixture: Agent,
+    mocker: MockerFixture,
+    polling: bool,
+) -> None:
+    expected = ApiSuccess(message="registered", detail={"status": "registered"})
+    send = mocker.patch(
+        "supervaizer.account_service.send_event_sync", return_value=expected
+    )
+
+    result = account_fixture.register_agent_sync(agent_fixture, polling=polling)
+
+    assert result is expected
+    send.assert_called_once()
+    account, sender, event = send.call_args.args
+    assert account is account_fixture
+    assert sender is agent_fixture
+    assert event.type.value == "agent.register"
+    assert event.payload["workspace"] == account_fixture.workspace_id
+    assert event.source == {"agent": agent_fixture.slug}
+    assert event.details["polling"] is polling
+
+
+def test_register_agent_sync_defaults_to_polling(
+    account_fixture: Account, agent_fixture: Agent, mocker: MockerFixture
+) -> None:
+    send = mocker.patch("supervaizer.account_service.send_event_sync")
+
+    account_fixture.register_agent_sync(agent_fixture)
+
+    assert send.call_args.args[2].details["polling"] is True
