@@ -410,3 +410,24 @@ async def test_account_register_server_success(
     assert result.message == "Event SERVER_REGISTER sent"
     # Verify that send_event was called
     mock_send_event.assert_called_once()
+
+
+def test_register_server_sync_sends_server_identity_and_public_url(
+    account_fixture: Account, server_fixture: Server, mocker: MockerFixture
+) -> None:
+    expected = ApiSuccess(message="registered", detail={"status": "registered"})
+    send = mocker.patch(
+        "supervaizer.account_service.send_event_sync", return_value=expected
+    )
+
+    result = account_fixture.register_server_sync(server_fixture)
+
+    assert result is expected
+    send.assert_called_once()
+    account, sender, event = send.call_args.args
+    assert account is account_fixture
+    assert sender is server_fixture
+    assert event.type.value == "server.register"
+    assert event.payload["workspace"] == account_fixture.workspace_id
+    assert event.details["server_id"] == server_fixture.server_id
+    assert event.details["url"] == server_fixture.public_url
