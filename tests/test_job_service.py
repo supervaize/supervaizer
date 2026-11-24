@@ -541,3 +541,18 @@ async def test_service_job_custom_with_empty_decrypted_params(
     mock_decrypt_value.assert_called_once_with(
         encrypted_params, server_fixture.private_key
     )
+
+
+def test_finished_job_sends_its_event_with_job_as_sender(
+    server_fixture: "Server", job_fixture: Job, mocker: MockerFixture
+) -> None:
+    send = mocker.patch("supervaizer.account_service.send_event_sync")
+
+    service_job_finished(job=job_fixture, server=server_fixture)
+
+    send.assert_called_once()
+    account, sender, event = send.call_args.args
+    assert account is server_fixture.supervisor_account
+    assert sender is job_fixture
+    assert event.source == {"job": job_fixture.id}
+    assert event.details == job_fixture.registration_info
