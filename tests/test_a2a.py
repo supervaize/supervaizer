@@ -812,6 +812,45 @@ def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     assert captured == {"grant_id": "grant-1", "workspace_ref": "agent-workspace-1"}
 
 
+def test_a2a_workspace_authorization_rejects_untrusted_signature(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        ed25519.Ed25519PrivateKey.generate(),
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-untrusted-signature",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_bad_signature"
+    )
+    assert called is False
+
+
 def test_a2a_workspace_authorization_uses_studio_server_audience(
     server_fixture: Server,
 ) -> None:

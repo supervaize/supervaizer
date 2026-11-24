@@ -472,7 +472,7 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
         server,
         key,
         agent_slug=agent.slug,
-        scopes=["resource.items.list"],
+        scopes=["resource.items.list", "resource.items.read"],
         workspace_id="team-1",
         workspace_slug="team-slug",
     )
@@ -494,6 +494,10 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
     assert context.workspace_slug == "team-slug"
     assert context.workspace_authorization is not None
     assert context.workspace_authorization.grant_id == "grant-1"
+    assert context.workspace_authorization.scopes == [
+        "resource.items.list",
+        "resource.items.read",
+    ]
     assert context.workspace_authorization.agent_workspace_ref == "agent-workspace-1"
 
 
