@@ -860,3 +860,53 @@ def test_data_resource_permission_error_becomes_403(
 
     assert response.status_code == 403
     assert response.json()["detail"] == "workspace denied"
+
+
+@pytest.mark.parametrize(
+    ("item_id", "scope", "expected_status"),
+    [
+        ("item-1", "resource.items.get", 200),
+        ("missing", "resource.items.get", 404),
+        ("item-1", "resource.items.list", 403),
+    ],
+)
+def test_data_resource_get_checks_scope_and_passes_workspace_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    item_id: str,
+    scope: str,
+    expected_status: int,
+) -> None:
+    received: list[tuple[str, DataResourceContext]] = []
+
+    def on_get(item_id: str, *, context: DataResourceContext) -> dict[str, Any] | None:
+        received.append((item_id, context))
+        return (
+            {"id": item_id, "owner": context.workspace_id}
+            if item_id != "missing"
+            else None
+        )
+
+    resource = DataResource(
+        name="items", fields=[], on_list=list, on_get=on_get, read_only=True
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/{item_id}",
+        headers=_data_resource_headers(server, agent, scope=scope),
+    )
+
+    assert response.status_code == expected_status
+    if expected_status == 403:
+        assert received == []
+    else:
+        assert len(received) == 1
+        assert received[0][0] == item_id
+        assert received[0][1].workspace_id == "workspace-1"
+        if expected_status == 200:
+            assert response.json() == {"id": item_id, "owner": "workspace-1"}
+        else:
+            assert response.json()["detail"] == "items 'missing' not found"
