@@ -222,3 +222,44 @@ def test_update_agent_uses_slug_and_forwards_configured_parameters(
     assert agent.server_agent_status == "ready"
     assert agent.server_agent_onboarding_status == "configured"
     update_parameters.assert_called_once_with(server, "encrypted")
+
+
+def test_agent_chat_calls_the_declared_method_with_message_and_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: dict[str, str] = {}
+    module = ModuleType("agent_chat_test_module")
+
+    def chat(context: str, message: str) -> JobResponse:
+        received.update(context=context, message=message)
+        return JobResponse(
+            job_id="job-1",
+            status=EntityStatus.COMPLETED,
+            message="answered",
+            payload={"reply": "hello"},
+        )
+
+    module.__dict__["chat"] = chat
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    path = f"{module.__name__}.chat"
+    method = AgentMethod(name="chat", method=path)
+    agent = Agent(
+        name="Chat Agent", methods=AgentMethods(job_start=method, chat=method)
+    )
+
+    result = agent.chat(context="case context", message="question")
+
+    assert result.payload == {"reply": "hello"}
+    assert received == {"context": "case context", "message": "question"}
+
+
+@pytest.mark.parametrize("has_methods", [True, False])
+def test_agent_chat_requires_a_configured_chat_method(has_methods: bool) -> None:
+    agent = (
+        _agent("agent_lifecycle_module.run")
+        if has_methods
+        else Agent(name="No methods")
+    )
+
+    with pytest.raises(ValueError, match="Chat method not configured"):
+        agent.chat(context="case context", message="question")
