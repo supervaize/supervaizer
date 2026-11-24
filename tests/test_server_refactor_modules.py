@@ -205,3 +205,41 @@ def test_server_identity_is_preserved_or_generated_once(
     else:
         assert str(UUID(server_id)) == server_id
     assert server_config._get_or_create_server_id() == server_id
+
+
+def test_workspace_authorization_reads_configured_public_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY", "public-key-from-studio"
+    )
+
+    settings = server_config._resolve_workspace_authorization_settings(None)
+
+    assert settings.public_key_pem == "public-key-from-studio"
+
+
+def test_explicit_workspace_authorization_overrides_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER", "environment-issuer")
+    monkeypatch.setenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY", "environment-key")
+
+    settings = server_config._resolve_workspace_authorization_settings({
+        "enabled": True,
+        "issuer": "explicit-issuer",
+        "public_key_pem": "explicit-key",
+    })
+
+    assert settings.enabled is True
+    assert settings.issuer == "explicit-issuer"
+    assert settings.public_key_pem == "explicit-key"
+
+
+def test_controller_key_fingerprint_is_stable_and_does_not_expose_key() -> None:
+    assert (
+        server_config._controller_key_fingerprint("example-controller-key")
+        == "215345834bf2"
+    )
+    assert server_config._controller_key_fingerprint("") is None
+    assert server_config._controller_key_fingerprint(None) is None
