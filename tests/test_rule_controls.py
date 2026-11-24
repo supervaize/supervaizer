@@ -1544,3 +1544,38 @@ def test_resume_does_not_modify_case_from_another_job(
     assert (
         case.metadata["_rule_checkpoints"]["occurrence-1:before"]["status"] == "pause"
     )
+
+
+@pytest.mark.parametrize("delivered", [True, False])
+def test_checkpoint_resume_reports_delivery_and_identifies_the_job(
+    mocker: MockerFixture, delivered: bool
+) -> None:
+    decision = _resume("checkpoint-report")
+    response = RuleCheckpointResponse.model_validate(decision.model_dump())
+    resume = mocker.patch(
+        "supervaizer.server.resume_rule_checkpoint",
+        return_value=response if delivered else None,
+    )
+    request = V2ActionRequest(
+        request_id="request-1",
+        actor={"user_id": "studio"},
+        workspace={"id": "workspace-1"},
+        mission_id="mission-1",
+        agent_slug="agent-1",
+        surface="mission.agent",
+        action="rule.checkpoint.resume",
+        job_id="job-1",
+        case_id="case-1",
+        input=decision.model_dump(exclude={"job_id", "case_id", "agent_slug"}),
+    )
+
+    result = _rule_checkpoint_resume_handler(request)
+
+    resume.assert_called_once_with(decision)
+    assert result.status == "ok"
+    assert len(result.effects) == 1
+    effect = result.effects[0]
+    assert effect.type == "rule.checkpoint.resumed"
+    assert effect.job_id == "job-1"
+    assert effect.status == ("allow" if delivered else "pending_delivery")
+    assert effect.summary == {"checkpoint_id": "checkpoint-report"}
