@@ -10,12 +10,45 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import supervaizer.server as server_module
 from supervaizer import Server, scheduled_steps, server_config, server_info
 from supervaizer.common import ApiSuccess
 from supervaizer.server_registration import build_server_registration_info
 from supervaizer.studio_handshake import validate_registration_handshake
+
+
+def test_server_key_generation_preserves_identity_during_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SUPERVAIZER_PRIVATE_KEY", raising=False)
+
+    generated = server_config._get_or_create_private_key()
+    reloaded = server_config._get_or_create_private_key()
+
+    assert generated.key_size == 2048
+    assert (
+        reloaded.public_key().public_numbers()
+        == generated.public_key().public_numbers()
+    )
+
+
+def test_server_uses_configured_private_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    supplied = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = supplied.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    monkeypatch.setenv("SUPERVAIZER_PRIVATE_KEY", pem.decode("utf-8"))
+
+    loaded = server_config._get_or_create_private_key()
+
+    assert (
+        loaded.public_key().public_numbers() == supplied.public_key().public_numbers()
+    )
 
 
 def test_server_module_reexports_scheduled_step_helpers() -> None:
