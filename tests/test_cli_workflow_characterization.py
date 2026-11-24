@@ -8,7 +8,8 @@
 
 import os
 from pathlib import Path
-from typing import cast
+from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import mock_open, patch
 
 import pytest
@@ -174,3 +175,46 @@ def test_local_start_parses_mocked_configuration_without_overriding_existing_val
 
     mocked_file.assert_called_once_with(str(tmp_path / ".env"))
     launch.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (None, False),
+        (SimpleNamespace(name="DEFAULT"), False),
+        (SimpleNamespace(name="ENVIRONMENT"), False),
+        (SimpleNamespace(name="COMMANDLINE"), True),
+        (object(), False),
+    ],
+)
+def test_cli_detects_only_explicit_command_line_options(
+    mocker: MockerFixture, source: Any, expected: bool
+) -> None:
+    context = mocker.Mock()
+    context.get_parameter_source.return_value = source
+
+    assert cli._cli_set_parameter(context, "host") is expected
+    context.get_parameter_source.assert_called_once_with("host")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, False),
+        ("", False),
+        ("false", False),
+        ("0", False),
+        ("TRUE", True),
+        ("1", True),
+        ("YES", True),
+    ],
+)
+def test_cli_environment_flags_accept_supported_values(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, expected: bool
+) -> None:
+    if value is None:
+        monkeypatch.delenv("SUPERVAIZER_TEST_FLAG", raising=False)
+    else:
+        monkeypatch.setenv("SUPERVAIZER_TEST_FLAG", value)
+
+    assert cli._env_flag_is_true("SUPERVAIZER_TEST_FLAG") is expected
