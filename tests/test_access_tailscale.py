@@ -12,8 +12,10 @@
 
 """Tests for require_tailscale dependency."""
 
+import ipaddress
 from unittest.mock import patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -160,3 +162,27 @@ class TestRequireTailscale:
             response = client.get("/protected")
 
         assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("peer", "forwarded", "expected_status"),
+    [
+        ("10.0.0.1", "100.64.0.1", 200),
+        ("10.0.0.1", "198.51.100.1", 403),
+        ("10.0.0.1", "", 403),
+        ("198.51.100.1", "100.64.0.1", 403),
+        ("100.64.0.1", "198.51.100.1", 200),
+    ],
+)
+def test_tailscale_access_uses_forwarded_ip_only_from_trusted_proxy(
+    monkeypatch: pytest.MonkeyPatch, peer: str, forwarded: str, expected_status: int
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_LOCAL_MODE", "false")
+    monkeypatch.setattr(
+        "supervaizer.access.client_ip.TRUSTED_PROXIES",
+        [ipaddress.ip_network("10.0.0.0/8")],
+    )
+    client = TestClient(_make_app(peer), client=(peer, 12345))
+    response = client.get("/protected", headers={"X-Forwarded-For": forwarded})
+
+    assert response.status_code == expected_status
