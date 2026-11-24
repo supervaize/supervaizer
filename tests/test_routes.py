@@ -952,3 +952,66 @@ def test_data_resource_import_requires_its_scope_and_passes_records(
     else:
         assert response.status_code == 403
         assert received == []
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+@pytest.mark.parametrize("authorized", [True, False])
+def test_data_resource_writes_check_scope_and_pass_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    operation: str,
+    authorized: bool,
+) -> None:
+    calls: list[tuple[str, str, str]] = []
+
+    def on_create(
+        data: dict[str, Any], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        calls.append(("create", data["name"], context.workspace_id))
+        return {"id": "item-1", **data}
+
+    def on_update(
+        item_id: str, data: dict[str, Any], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        calls.append(("update", item_id, context.workspace_id))
+        return {"id": item_id, **data}
+
+    def on_delete(item_id: str, *, context: DataResourceContext) -> bool:
+        calls.append(("delete", item_id, context.workspace_id))
+        return True
+
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=on_create,
+        on_update=on_update,
+        on_delete=on_delete,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    scope = f"resource.items.{operation}" if authorized else "resource.items.list"
+    path = f"/api/agents/{agent.slug}/data/items/"
+    if operation != "create":
+        path += "item-1"
+    response = TestClient(server.app).request(
+        {"create": "POST", "update": "PUT", "delete": "DELETE"}[operation],
+        path,
+        headers=_data_resource_headers(server, agent, scope=scope),
+        json={"name": "example"} if operation != "delete" else None,
+    )
+
+    if not authorized:
+        assert response.status_code == 403
+        assert calls == []
+    else:
+        assert response.status_code == (201 if operation == "create" else 200)
+        assert calls == [
+            (operation, "example" if operation == "create" else "item-1", "workspace-1")
+        ]
+        if operation == "delete":
+            assert response.json() == {"deleted": True}
+        else:
+            assert response.json() == {"id": "item-1", "name": "example"}
