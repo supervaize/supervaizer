@@ -327,3 +327,47 @@ async def test_scheduled_loop_recovers_after_a_polling_error(
 
     assert calls == 2
     assert sleep_calls == [60, 60, 60]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first_problem", ["missing-method", "orphan"])
+async def test_scheduled_loop_continues_after_unrunnable_step(
+    isolated_scheduled_state: None,
+    account_fixture: Account,
+    monkeypatch: pytest.MonkeyPatch,
+    first_problem: str,
+) -> None:
+    del isolated_scheduled_state
+    first_case = _new_case(account_fixture, "orphan-job", "first-case")
+    first = _due_update(
+        method=None if first_problem == "missing-method" else "owner.run"
+    )
+    first_case.updates = [first]
+    job = _new_job("next-job", "owner-agent")
+    next_case = _new_case(account_fixture, job.id, "next-case")
+    job.add_case_id(next_case.id)
+    next_step = _due_update(method="owner.run", params={"value": "ok"})
+    next_case.updates = [next_step]
+    observed: list[tuple[str, dict[str, Any], set[str] | None, str | None]] = []
+
+    def execute(
+        method: str, params: dict[str, Any], allowed_methods: set[str] | None
+    ) -> None:
+        observed.append((method, params, allowed_methods, next_step.scheduled_status))
+
+    sleep, _calls = _cancel_after_iterations()
+    monkeypatch.setattr("supervaizer.scheduled_steps.asyncio.sleep", sleep)
+    monkeypatch.setattr(
+        "supervaizer.scheduled_steps._execute_scheduled_method", execute
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await _run_scheduled_step_loop(
+            _as_server(_server_for("owner-agent", {"owner.run"}))
+        )
+
+    assert first.scheduled_status == (
+        "pending" if first_problem == "missing-method" else "failed"
+    )
+    assert next_step.scheduled_status == "completed"
+    assert observed == [("owner.run", {"value": "ok"}, {"owner.run"}, "executing")]
