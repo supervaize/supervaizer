@@ -2505,3 +2505,44 @@ def test_a2a_workspace_authorization_rejects_unusable_jwks(
     )
     assert response.json()["error"]["data"]["code"] == expected_code
     assert called is False
+
+
+@pytest.mark.parametrize("claim", ["workspace_id", "workspace_slug"])
+def test_a2a_rejects_token_for_a_different_workspace(
+    server_fixture: Server, claim: str
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides={claim: "other-workspace"},
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-mismatch",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_wrong_workspace"
+    )
+    assert called is False
