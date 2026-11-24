@@ -390,3 +390,18 @@ def test_denied_api_requests_never_log_key_material(key: str) -> None:
 
     assert key not in output.getvalue()
     assert "abcdef" not in output.getvalue()
+
+
+@pytest.mark.parametrize("key", [None, ""])
+def test_denied_api_request_logs_absent_key_without_key_material(
+    key: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(STRUCTURED_LOG_FORMAT_ENV, "json")
+    output = StringIO()
+    sink_id = configure_controller_logging("INFO", sink=output)
+    try:
+        log_access_denied_api(key, "/a2a", "invalid key")
+    finally:
+        log.remove(sink_id)
+
+    assert json.loads(output.getvalue())["key_preview"] == "<none>"
