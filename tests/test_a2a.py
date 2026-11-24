@@ -1646,6 +1646,7 @@ def test_a2a_controller_action_errors_do_not_leak_exception_details(
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["id"] == "rpc-error-1"
     assert payload["error"]["code"] == JSON_RPC_INTERNAL_ERROR
     assert payload["error"]["data"] == {
         "agent_slug": agent_slug,
