@@ -2546,3 +2546,100 @@ def test_a2a_rejects_token_for_a_different_workspace(
         == "workspace_authorization_wrong_workspace"
     )
     assert called is False
+
+
+def test_a2a_awaits_async_action_handler_with_verified_workspace(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    received: list[str] = []
+
+    async def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.workspace_authorization is not None
+        received.append(request.workspace_authorization.grant_id)
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-async-action",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-async-action"
+    assert response.json()["result"]["status"] == "ok"
+    assert received == ["grant-1"]
+
+
+def test_a2a_authorization_error_preserves_json_rpc_request_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, "invalid-token"),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-rejected-token",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-rejected-token"
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"] == "workspace_authorization_malformed"
+    )
+
+
+def test_a2a_awaits_async_surface_handler_with_verified_workspace(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    received: list[str] = []
+
+    async def load_surface(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.workspace_authorization is not None
+        received.append(request.workspace_authorization.grant_id)
+        return {"surface": "job.start", "document": {"type": "Form"}}
+
+    register_v2_surface_handler(server_fixture, "job.start", load_surface)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_SURFACE_LOAD_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-async-surface",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-async-surface"
+    assert response.json()["result"]["document"] == {"type": "Form"}
+    assert received == ["grant-1"]
