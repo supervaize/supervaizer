@@ -241,3 +241,67 @@ def test_display_health_results_prints_table(mocker: MockerFixture) -> None:
     display_health_results(results)
 
     console.print.assert_called_once()
+
+
+def test_health_check_keeps_service_base_path(mocker: MockerFixture) -> None:
+    _, client = mock_sync_health_client(mocker, httpx.Response(200))
+    config = HealthCheckConfig(endpoints=["/health"])
+
+    result = HealthVerifier(config).verify_health(
+        "https://service.test/TeamX/", "api-key"
+    )
+
+    assert result.status == HealthStatus.HEALTHY
+    client.get.assert_called_once_with(
+        "https://service.test/TeamX/health", headers={"X-API-Key": "api-key"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_health_check_keeps_service_base_path(
+    mocker: MockerFixture,
+) -> None:
+    _, client = mock_async_health_client(mocker, httpx.Response(200))
+    config = HealthCheckConfig(endpoints=["/health"])
+
+    result = await HealthVerifier(config)._verify_health_async(
+        "https://service.test/TeamX/", "api-key"
+    )
+
+    assert result.status == HealthStatus.HEALTHY
+    client.get.assert_awaited_once_with(
+        "https://service.test/TeamX/health", headers={"X-API-Key": "api-key"}
+    )
+
+
+def test_health_check_does_not_sleep_after_last_attempt(mocker: MockerFixture) -> None:
+    sleep = mocker.patch("supervaizer.deploy.health.time.sleep")
+    _, client = mock_sync_health_client(
+        mocker, httpx.Response(503), httpx.Response(503)
+    )
+    config = HealthCheckConfig(max_retries=2, base_delay=2)
+
+    result = HealthVerifier(config).verify_health("https://service.test")
+
+    assert result.status == HealthStatus.UNHEALTHY
+    assert client.get.call_count == 2
+    sleep.assert_called_once_with(2)
+
+
+@pytest.mark.asyncio
+async def test_async_health_check_does_not_sleep_after_last_attempt(
+    mocker: MockerFixture,
+) -> None:
+    sleep = mocker.patch("supervaizer.deploy.health.asyncio.sleep")
+    _, client = mock_async_health_client(
+        mocker, httpx.Response(503), httpx.Response(503)
+    )
+    config = HealthCheckConfig(max_retries=2, base_delay=2)
+
+    result = await HealthVerifier(config)._verify_health_async(
+        "https://service.test", None
+    )
+
+    assert result.status == HealthStatus.UNHEALTHY
+    assert client.get.await_count == 2
+    sleep.assert_awaited_once_with(2)
