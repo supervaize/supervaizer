@@ -282,3 +282,18 @@ def test_report_consumption_accepts_dict_records(
     assert json.loads(route.calls.last.request.content)["records"][0]["quantity"] == (
         "3.5"
     )
+
+
+@pytest.mark.asyncio
+async def test_async_consumption_uses_explicit_workspace_for_url_and_header(
+    account_fixture: Account, respx_mock: Any
+) -> None:
+    route = respx_mock.post(_url(account_fixture, "guest-ws"))
+    route.respond(200, json={"results": RESULTS[:1]})
+
+    receipts = await account_fixture.report_consumption(
+        [_record("s1:minute")], agent_slug="aidan", workspace_id="guest-ws"
+    )
+
+    assert _statuses(receipts) == [("s1:minute", "accepted")]
+    assert route.calls.last.request.headers["workspace"] == "guest-ws"
