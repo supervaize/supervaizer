@@ -1015,3 +1015,39 @@ def test_data_resource_writes_check_scope_and_pass_context(
             assert response.json() == {"deleted": True}
         else:
             assert response.json() == {"id": "item-1", "name": "example"}
+
+
+@pytest.mark.parametrize(
+    ("header", "value"),
+    [
+        ("X-Supervaize-Workspace-Id", "other-workspace"),
+        ("X-Supervaize-Workspace-Slug", "other-slug"),
+    ],
+)
+def test_data_resource_rejects_workspace_that_differs_from_token(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    header: str,
+    value: str,
+) -> None:
+    called = False
+
+    def on_list() -> list[dict[str, Any]]:
+        nonlocal called
+        called = True
+        return []
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    headers = _data_resource_headers(server, agent, scope="resource.items.list")
+    headers[header] = value
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/", headers=headers
+    )
+
+    assert response.status_code == 403
+    assert "does not match the request" in response.json()["detail"]
+    assert called is False
