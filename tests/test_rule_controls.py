@@ -1509,3 +1509,38 @@ async def test_duplicate_completed_occurrence_never_replays_effect(
             after_context=lambda _: {},
         )
     effect.assert_awaited_once()
+
+
+def test_resume_does_not_modify_case_from_another_job(
+    account_fixture: Any, storage_manager: Any, mocker: MockerFixture
+) -> None:
+    state = {
+        "checkpoint_id": "checkpoint-job-boundary",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    case = Case(
+        id="case-job-boundary",
+        job_id="job-1",
+        account=account_fixture,
+        name="Job-boundary case",
+        description="A decision must not update another job's case",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"occurrence-1:before": state},
+        },
+    )
+    retain = mocker.patch("supervaizer.rule_controls._retain_decision")
+    decision = _resume("checkpoint-job-boundary", case_id=case.id).model_copy(
+        update={"job_id": "other-job"}
+    )
+
+    assert resume_rule_checkpoint(decision) is None
+    retain.assert_called_once_with(decision)
+    assert (
+        case.metadata["_rule_checkpoints"]["occurrence-1:before"]["status"] == "pause"
+    )
