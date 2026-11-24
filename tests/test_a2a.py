@@ -2444,3 +2444,64 @@ def test_a2a_invalid_request_keeps_id_and_returns_validation_details(
     assert payload["error"]["code"] == JSON_RPC_INVALID_PARAMS
     assert payload["error"]["message"] == "Invalid JSON-RPC request"
     assert payload["error"]["data"]["errors"]
+
+
+@pytest.mark.parametrize("case", ["invalid-keys", "unknown-kid"])
+def test_a2a_workspace_authorization_rejects_unusable_jwks(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    key = ed25519.Ed25519PrivateKey.generate()
+    jwks_url = f"https://studio.example.test/.well-known/{case}.json"
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url=jwks_url,
+        leeway_seconds=0,
+    )
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    def get_jwks(url: str, *, timeout: int) -> _JwksResponse:
+        assert url == jwks_url
+        assert timeout == 5
+        keys: object = (
+            {}
+            if case == "invalid-keys"
+            else [_ed25519_jwk(key.public_key(), kid="other")]
+        )
+        return _JwksResponse({"keys": keys})
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", get_jwks)
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="requested-key",
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-unusable-jwks",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    expected_code = (
+        "workspace_authorization_invalid_jwks"
+        if case == "invalid-keys"
+        else "workspace_authorization_unknown_kid"
+    )
+    assert response.json()["error"]["data"]["code"] == expected_code
+    assert called is False
