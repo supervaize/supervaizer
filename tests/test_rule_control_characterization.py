@@ -326,3 +326,43 @@ async def test_recovery_rejects_changed_snapshot_or_after_context(
             result="result",
             after_context=lambda value: {"sent": value},
         )
+
+
+@pytest.mark.asyncio
+async def test_before_checkpoint_is_persisted_before_request(
+    isolated_rule_case_state: None,
+    account_fixture: Account,
+    storage_manager: StorageManager,
+    mocker: MockerFixture,
+) -> None:
+    del isolated_rule_case_state
+    case = _case(account_fixture, "before-persistence-case")
+    gate = _gate(account_fixture)
+    proposed = {"draft": "hello"}
+
+    async def checkpoint(**_kwargs: object) -> RuleCheckpointResponse:
+        saved = storage_manager.get_object_by_id("Case", case.id)
+        assert saved["metadata"]["_rule_checkpoints"]["occurrence-1:before"] == {
+            "occurrence_id": "occurrence-1",
+            "phase": "before",
+            "snapshot_hash": "snapshot-1",
+            "step_id": "send-message",
+            "context_hash": _checkpoint_input_hash(proposed),
+            "status": "checking",
+        }
+        raise RuntimeError("checkpoint unavailable")
+
+    mocker.patch.object(gate, "checkpoint", side_effect=checkpoint)
+    effect = mocker.AsyncMock()
+    with pytest.raises(RuntimeError, match="checkpoint unavailable"):
+        await run_guarded_step(
+            gate=gate,
+            case=case,
+            step_id="send-message",
+            occurrence_id="occurrence-1",
+            before_context=proposed,
+            effect=effect,
+            after_context=lambda result: {"sent": result},
+        )
+
+    effect.assert_not_awaited()
