@@ -910,3 +910,45 @@ def test_data_resource_get_checks_scope_and_passes_workspace_context(
             assert response.json() == {"id": item_id, "owner": "workspace-1"}
         else:
             assert response.json()["detail"] == "items 'missing' not found"
+
+
+@pytest.mark.parametrize("scope", ["resource.items.import", "resource.items.create"])
+def test_data_resource_import_requires_its_scope_and_passes_records(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    scope: str,
+) -> None:
+    received: list[tuple[list[dict[str, Any]], str]] = []
+
+    def on_import(
+        records: list[dict[str, Any]], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        received.append((records, context.workspace_id))
+        return {"imported": len(records)}
+
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=lambda data: data,
+        importable=True,
+        on_import=on_import,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    records = [{"id": "item-1"}, {"id": "item-2"}]
+    response = TestClient(server.app).post(
+        f"/api/agents/{agent.slug}/data/items/import/",
+        headers=_data_resource_headers(server, agent, scope=scope),
+        json=records,
+    )
+
+    if scope == "resource.items.import":
+        assert response.status_code == 200
+        assert response.json() == {"imported": 2}
+        assert received == [(records, "workspace-1")]
+    else:
+        assert response.status_code == 403
+        assert received == []
