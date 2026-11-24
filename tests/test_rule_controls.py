@@ -215,6 +215,52 @@ async def test_guarded_step_prevents_advancement_after_stop(
     assert post.await_args_list[1].kwargs["json"]["occurrence_id"] == "occurrence-1"
 
 
+def test_resume_finds_and_persists_the_matching_checkpoint_after_another(
+    account_fixture: Any, storage_manager: Any
+) -> None:
+    earlier = {
+        "checkpoint_id": "checkpoint-other",
+        "occurrence_id": "occurrence-other",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    matching = {
+        "checkpoint_id": "checkpoint-target",
+        "occurrence_id": "occurrence-1",
+        "phase": "before",
+        "snapshot_hash": "snapshot-1",
+        "input_hash": "input-1",
+        "status": "pause",
+    }
+    case = Case(
+        id="case-multiple-checkpoints",
+        job_id="job-1",
+        account=account_fixture,
+        name="Multiple checkpoints",
+        description="Resume only the matching checkpoint",
+        status=EntityStatus.IN_PROGRESS,
+        metadata={
+            "_rule_checkpoint_agent_slug": "agent-1",
+            "_rule_checkpoints": {"other:before": earlier, "target:before": matching},
+        },
+    )
+
+    result = resume_rule_checkpoint(
+        _resume("checkpoint-target", "case-multiple-checkpoints")
+    )
+
+    assert result is not None
+    assert result.status == "allow"
+    checkpoints = storage_manager.get_object_by_id("Case", case.id)["metadata"][
+        "_rule_checkpoints"
+    ]
+    assert checkpoints["other:before"]["status"] == "pause"
+    assert checkpoints["target:before"]["status"] == "allow"
+    assert checkpoints["target:before"]["decision_id"] == "decision-1"
+
+
 @pytest.mark.asyncio
 async def test_checkpoint_rejects_snapshot_mismatch(
     account_fixture: Any, mocker: MockerFixture
