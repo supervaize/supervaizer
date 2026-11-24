@@ -17,6 +17,9 @@ Studio reads `source.job`, `details.job`, `details.cases`,
 (`apps/sv_entities/services/event_processor.py`).
 """
 
+import json
+from datetime import UTC, datetime
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -159,3 +162,24 @@ def test_account_sync_helpers_use_send_event_sync(
     assert sent[0]["details"] == {"removed_cases": [{"id": "case-0"}]}
     assert sent[1]["details"] == {"input": {"cursor": "abc"}}
     assert all(body["source"] == {"job": JOB_ID} for body in sent)
+
+
+def test_job_update_serializes_case_timestamps_for_studio(
+    account_fixture: Account,
+) -> None:
+    event = V2JobUpdatedEvent(
+        job_id=JOB_ID,
+        account=account_fixture,
+        cases=[
+            V2CaseSnapshot(
+                id="case-1",
+                status="in_progress",
+                started_at=datetime(2026, 11, 25, 10, 30, tzinfo=UTC),
+            )
+        ],
+    )
+
+    assert event.details["cases"] == [
+        {"id": "case-1", "status": "in_progress", "started_at": "2026-11-25T10:30:00Z"}
+    ]
+    json.dumps(event.payload)

@@ -20,16 +20,19 @@ def test_async_workspace_verification_honors_optional_configuration() -> None:
     server = SimpleNamespace(workspace_authorization=None)
     workspace = V2WorkspaceContext(id="workspace-1")
 
-    assert asyncio.run(
-        verify_workspace_authorization_for_request_async(
-            server=server,
-            token=None,
-            required_scopes=["read"],
-            request_workspace=workspace,
-            agent_slug="agent",
-            require_configured=False,
+    assert (
+        asyncio.run(
+            verify_workspace_authorization_for_request_async(
+                server=server,
+                token=None,
+                required_scopes=["read"],
+                request_workspace=workspace,
+                agent_slug="agent",
+                require_configured=False,
+            )
         )
-    ) is None
+        is None
+    )
     with pytest.raises(WorkspaceAuthorizationError) as raised:
         asyncio.run(
             verify_workspace_authorization_for_request_async(
