@@ -19,7 +19,10 @@ import pytest
 from supervaizer import Account, Case, CaseNodeUpdate, EntityStatus, Job, JobContext
 from supervaizer.case import Cases
 from supervaizer.job import Jobs
-from supervaizer.scheduled_steps import _run_scheduled_step_loop
+from supervaizer.scheduled_steps import (
+    _execute_scheduled_method,
+    _run_scheduled_step_loop,
+)
 from supervaizer.server import Server
 from supervaizer.storage import StorageManager
 
@@ -407,3 +410,28 @@ async def test_scheduled_loop_rejects_methods_not_declared_by_owner(
 
     assert step.scheduled_status == "failed"
     assert invoked == []
+
+
+@pytest.mark.parametrize("allowed", [True, False])
+def test_scheduled_method_enforces_owning_agent_allowlist(
+    monkeypatch: pytest.MonkeyPatch, allowed: bool
+) -> None:
+    called: list[str] = []
+    module = ModuleType("scheduled_allowlist_test")
+
+    def run(value: str) -> str:
+        called.append(value)
+        return "done"
+
+    module.__dict__["run"] = run
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    method = "scheduled_allowlist_test.run"
+    allowlist = {method} if allowed else set()
+
+    if allowed:
+        assert _execute_scheduled_method(method, {"value": "safe"}, allowlist) == "done"
+        assert called == ["safe"]
+    else:
+        with pytest.raises(ValueError, match="not an allowed agent method"):
+            _execute_scheduled_method(method, {"value": "unsafe"}, allowlist)
+        assert called == []
