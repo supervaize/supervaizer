@@ -368,3 +368,12 @@ def test_sv_base_model_with_type_objects() -> None:
     json_fields = json_data["payload"]["supervaizer_form"]["answer"]["fields"]
     assert json_fields[0]["type"] == "bool"
     assert json_fields[1]["type"] == "int"
+
+
+@pytest.mark.parametrize("value", ["", "x" * 15, "x" * 16, "x" * 17, "é" * 8])
+def test_encrypt_decrypt_preserves_values_at_block_boundaries(value: str) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    encrypted = encrypt_value(value, private_key.public_key())
+
+    assert decrypt_value(encrypted, private_key) == value
