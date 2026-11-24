@@ -35,6 +35,38 @@ def test_redact_generic_and_qualified_token_fields(field_name: str) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("header", "value", "redacted"),
+    [
+        ("Authorization", "Bearer first second", "Bearer ***"),
+        ("Proxy-Authorization", "Basic first second", "Basic ***"),
+        ("X-API-Key", "first second", "***"),
+        ("Secret", "first second", "***"),
+        ("X-Request-ID", "request-1", "request-1"),
+    ],
+)
+def test_event_curl_redacts_credentials(header: str, value: str, redacted: str) -> None:
+    curl = account_service._event_curl(
+        "https://studio.example.test/events", {header: value}
+    )
+
+    assert f"{header}: {redacted}" in curl
+    if header != "X-Request-ID":
+        assert "first" not in curl
+        assert "second" not in curl
+
+
+@pytest.mark.parametrize(
+    "field_name", ["x-api-key", "Authorization", "proxy_authorization", "secret"]
+)
+def test_redact_credentials_in_nested_event_payloads(field_name: str) -> None:
+    payload = {"records": [{field_name: "credential", "state": "done"}]}
+
+    assert account_service._redact_sensitive_value(payload) == {
+        "records": [{field_name: "***", "state": "done"}]
+    }
+
+
 @pytest.mark.asyncio
 async def test_send_event_success(
     account_fixture: Account,
