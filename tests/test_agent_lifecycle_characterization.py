@@ -13,12 +13,19 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from pytest_mock import MockerFixture
 
-from supervaizer.agent import Agent, AgentMethod, AgentMethods
+from supervaizer.agent import (
+    Agent,
+    AgentMethod,
+    AgentMethods,
+    _apply_job_start_response,
+)
 from supervaizer.common import ApiSuccess
 from supervaizer.examples import hello_world_agent
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.server import Server
 
 
 def _context() -> JobContext:
@@ -263,3 +270,48 @@ def test_agent_chat_requires_a_configured_chat_method(has_methods: bool) -> None
 
     with pytest.raises(ValueError, match="Chat method not configured"):
         agent.chat(context="case context", message="question")
+
+
+@pytest.mark.parametrize(
+    ("status", "records_response", "finishes"),
+    [
+        (EntityStatus.AWAITING, True, False),
+        (EntityStatus.IN_PROGRESS, False, False),
+        (EntityStatus.COMPLETED, True, True),
+        (EntityStatus.FAILED, True, True),
+    ],
+)
+def test_job_start_response_sends_confirmation_and_tracks_lifecycle(
+    server_fixture: Server,
+    job_fixture: Job,
+    mocker: MockerFixture,
+    status: EntityStatus,
+    records_response: bool,
+    finishes: bool,
+) -> None:
+    response = JobResponse(
+        job_id=job_fixture.id,
+        status=status,
+        message="agent response",
+        payload={"result": "ready"},
+    )
+    send = mocker.patch("supervaizer.account_service.send_event_sync")
+    finished = mocker.patch("supervaizer.agent.service_job_finished")
+    mocker.patch("supervaizer.job.storage_manager.save_object")
+    job_fixture.responses = []
+
+    _apply_job_start_response(job_fixture, response, server_fixture)
+
+    send.assert_called_once()
+    account, sender, event = send.call_args.args
+    assert account is server_fixture.supervisor_account
+    assert sender is job_fixture
+    assert event.type.value == "agent.job.start.confirmation"
+    assert event.source == {"job": job_fixture.id}
+    assert event.payload["workspace"] == account.workspace_id
+    assert event.details["metadata"] == {"result": "ready"}
+    assert job_fixture.responses == ([response] if records_response else [])
+    if finishes:
+        finished.assert_called_once_with(job_fixture, server=server_fixture)
+    else:
+        finished.assert_not_called()
