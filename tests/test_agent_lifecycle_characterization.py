@@ -16,6 +16,7 @@ import pytest
 
 from supervaizer.agent import Agent, AgentMethod, AgentMethods
 from supervaizer.common import ApiSuccess
+from supervaizer.examples import hello_world_agent
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
 
@@ -88,6 +89,36 @@ def test_execute_rejects_declared_method_that_returns_wrong_public_type(
         TypeError, match="Method run must return a JobResponse object, got str"
     ):
         agent._execute(f"{module.__name__}.run")
+
+
+def test_execute_nested_module_keeps_parameters_out_of_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: dict[str, Any] = {}
+    messages: list[str] = []
+
+    def run(**params: Any) -> JobResponse:
+        received.update(params)
+        return JobResponse(
+            job_id="job-1", status=EntityStatus.COMPLETED, message="done", payload={}
+        )
+
+    monkeypatch.setattr(hello_world_agent, "test_nested_action", run, raising=False)
+    monkeypatch.setattr("supervaizer.agent.log.debug", messages.append)
+    path = "supervaizer.examples.hello_world_agent.test_nested_action"
+    agent = _agent(path)
+    params = {
+        "prompt": "visible prompt",
+        "agent_parameters": [{"name": "API_KEY", "value": "test-secret-value"}],
+    }
+
+    response = agent._execute(path, params)
+
+    assert response.status == EntityStatus.COMPLETED
+    assert received == params
+    assert any("visible prompt" in message for message in messages)
+    assert all("test-secret-value" not in message for message in messages)
+    assert all("agent_parameters" not in message for message in messages)
 
 
 def test_job_start_forwards_parameters_updates_metadata_and_finishes_job(
