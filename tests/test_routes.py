@@ -1121,3 +1121,19 @@ def test_data_resource_omits_unavailable_write_routes(
     assert ("post" in collection) is not read_only
     assert "put" not in item
     assert "delete" not in item
+
+
+def test_data_resource_passes_request_id_to_callback(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        {"X-Supervaize-Request-Id": "request-123"},
+    )
+
+    assert response.status_code == 200
+    assert captured["context"].request_id == "request-123"
