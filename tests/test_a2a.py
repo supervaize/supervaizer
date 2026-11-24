@@ -2644,3 +2644,28 @@ def test_a2a_awaits_async_surface_handler_with_verified_workspace(
     assert response.json()["id"] == "rpc-async-surface"
     assert response.json()["result"]["document"] == {"type": "Form"}
     assert received == ["grant-1"]
+
+
+def test_a2a_surface_authorization_error_preserves_json_rpc_request_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, "invalid-token"),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-rejected-surface-token",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-rejected-surface-token"
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"] == "workspace_authorization_malformed"
+    )
