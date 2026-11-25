@@ -954,6 +954,61 @@ def test_data_resource_import_requires_its_scope_and_passes_records(
         assert received == []
 
 
+@pytest.mark.parametrize("operation", ["create", "update", "delete", "import"])
+@pytest.mark.parametrize("key_scope", ["read", "write"])
+def test_data_resource_writes_require_write_api_key_scope(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    mocker: Any,
+    operation: str,
+    key_scope: str,
+) -> None:
+    callbacks = {
+        "create": mocker.Mock(return_value={"id": "item-1"}),
+        "update": mocker.Mock(return_value={"id": "item-1"}),
+        "delete": mocker.Mock(return_value=True),
+        "import": mocker.Mock(return_value={"imported": 1}),
+    }
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=callbacks["create"],
+        on_update=callbacks["update"],
+        on_delete=callbacks["delete"],
+        importable=True,
+        on_import=callbacks["import"],
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    headers = _data_resource_headers(server, agent, scope=f"resource.items.{operation}")
+    headers["X-API-Key"] = "scope-test-key"
+    mocker.patch.dict(
+        "supervaizer.access.api_auth.API_KEYS", {"scope-test-key": {"scope": key_scope}}
+    )
+    path = f"/api/agents/{agent.slug}/data/items/"
+    suffix = {"create": "", "update": "item-1", "delete": "item-1", "import": "import/"}
+    payload = [{"id": "item-1"}] if operation == "import" else {"name": "example"}
+    response = TestClient(server.app).request(
+        {"create": "POST", "update": "PUT", "delete": "DELETE", "import": "POST"}[
+            operation
+        ],
+        path + suffix[operation],
+        headers=headers,
+        json=payload if operation != "delete" else None,
+    )
+
+    if key_scope == "read":
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Insufficient scope"
+        callbacks[operation].assert_not_called()
+    else:
+        assert response.status_code == (201 if operation == "create" else 200)
+        callbacks[operation].assert_called_once()
+
+
 @pytest.mark.parametrize("operation", ["create", "update", "delete"])
 @pytest.mark.parametrize("authorized", [True, False])
 def test_data_resource_writes_check_scope_and_pass_context(
