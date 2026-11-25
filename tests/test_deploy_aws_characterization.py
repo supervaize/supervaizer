@@ -24,6 +24,29 @@ def _client_error(code: str, operation: str) -> ClientError:
     return ClientError({"Error": {"Code": code}}, operation)
 
 
+def test_aws_account_id_uses_current_sts_identity(mocker: MockerFixture) -> None:
+    sts = mocker.Mock()
+    sts.get_caller_identity.return_value = {"Account": "123456789012"}
+    client = mocker.patch.object(aws_app_runner.boto3, "client", return_value=sts)
+    driver = AWSAppRunnerDriver.__new__(AWSAppRunnerDriver)
+
+    assert driver._get_account_id() == "123456789012"
+    client.assert_called_once_with("sts")
+    sts.get_caller_identity.assert_called_once_with()
+
+
+def test_aws_account_id_does_not_fall_back_when_sts_fails(
+    mocker: MockerFixture,
+) -> None:
+    sts = mocker.Mock()
+    sts.get_caller_identity.side_effect = RuntimeError("STS unavailable")
+    mocker.patch.object(aws_app_runner.boto3, "client", return_value=sts)
+    driver = AWSAppRunnerDriver.__new__(AWSAppRunnerDriver)
+
+    with pytest.raises(RuntimeError, match="STS unavailable"):
+        driver._get_account_id()
+
+
 class TestAWSAppRunnerCharacterization:
     """Describe the current public AWS driver contract without AWS access."""
 
