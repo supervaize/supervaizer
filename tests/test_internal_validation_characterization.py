@@ -223,6 +223,21 @@ def test_agent_bindings_accept_duplicate_matching_ids() -> None:
     assert agent.server_agent_id == "studio-agent-1"
 
 
+@pytest.mark.parametrize("invalid_binding", [None, "invalid", []])
+def test_agent_bindings_reject_non_object_before_applying_any(
+    invalid_binding: Any,
+) -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    with pytest.raises(RuntimeError, match="binding must be an object"):
+        apply_workspace_authorization_agent_bindings(
+            _server(agent),
+            [{"id": "studio-agent-1", "slug": "agent"}, invalid_binding],
+        )
+
+    assert agent.server_agent_id is None
+
+
 @pytest.mark.parametrize(
     ("expiry", "issued_at", "leeway", "expected_error"),
     [
