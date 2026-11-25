@@ -539,6 +539,32 @@ def _list_items_with_headers(
     return response, captured
 
 
+@pytest.mark.parametrize(
+    ("headers", "claim"),
+    [
+        ({"X-Supervaize-Workspace-Id": "other-team"}, "workspace_id"),
+        ({"X-Supervaize-Workspace-Id": ""}, "workspace_id"),
+        ({"X-Supervaize-Workspace-Slug": "other-slug"}, "workspace_slug"),
+    ],
+)
+def test_data_resource_rejects_workspace_header_mismatch(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    headers: dict[str, str],
+    claim: str,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, headers
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == (
+        f"Workspace authorization token {claim} does not match the request"
+    )
+    assert captured == {}
+
+
 def test_data_resource_mission_metadata_header_sets_context_mission(
     account_fixture: Account,
     agent_method_fixture: AgentMethod,
