@@ -194,6 +194,35 @@ def test_agent_bindings_apply_earlier_identity_before_later_mismatch() -> None:
     assert beta.server_agent_id == "studio-beta-old"
 
 
+def test_agent_bindings_reject_conflicting_ids_for_same_slug() -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    with pytest.raises(RuntimeError, match="conflicting.*agent"):
+        apply_workspace_authorization_agent_bindings(
+            _server(agent),
+            [
+                {"id": "studio-agent-1", "slug": "agent"},
+                {"id": "studio-agent-2", "slug": "agent"},
+            ],
+        )
+
+    assert agent.server_agent_id is None
+
+
+def test_agent_bindings_accept_duplicate_matching_ids() -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    apply_workspace_authorization_agent_bindings(
+        _server(agent),
+        [
+            {"id": "studio-agent-1", "slug": "agent"},
+            {"id": "studio-agent-1", "slug": "agent"},
+        ],
+    )
+
+    assert agent.server_agent_id == "studio-agent-1"
+
+
 @pytest.mark.parametrize(
     ("expiry", "issued_at", "leeway", "expected_error"),
     [

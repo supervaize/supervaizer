@@ -148,6 +148,11 @@ def _agent_bindings_by_slug(agent_bindings: list[Any]) -> dict[str, str]:
                 "Studio registration handshake failed: workspace authorization agent "
                 "binding is missing slug."
             )
+        if agent_slug in bindings_by_slug and bindings_by_slug[agent_slug] != agent_id:
+            raise RuntimeError(
+                "Studio registration handshake failed: conflicting workspace "
+                f"authorization agent ids for slug={agent_slug}."
+            )
         bindings_by_slug[agent_slug] = agent_id
     return bindings_by_slug
 
