@@ -27,6 +27,39 @@ from supervaizer.deploy.drivers.cloud_run import CloudRunDriver
 from supervaizer.deploy.drivers.do_app_platform import DOAppPlatformDriver
 
 
+@pytest.mark.parametrize("healthy", [True, False])
+def test_enhanced_driver_health_forwards_request_settings(
+    mocker: MockerFixture, healthy: bool
+) -> None:
+    verify = mocker.patch(
+        "supervaizer.deploy.health.verify_service_health", return_value=healthy
+    )
+    driver = mocker.Mock(spec=BaseDriver)
+
+    result = BaseDriver.verify_health_enhanced(
+        driver,
+        "https://controller.example.test",
+        api_key="test-key",
+        timeout=17,
+        max_retries=3,
+    )
+
+    assert result is healthy
+    verify.assert_called_once_with("https://controller.example.test", "test-key", 17, 3)
+
+
+def test_enhanced_driver_health_uses_default_request_settings(
+    mocker: MockerFixture,
+) -> None:
+    verify = mocker.patch(
+        "supervaizer.deploy.health.verify_service_health", return_value=True
+    )
+    driver = mocker.Mock(spec=BaseDriver)
+
+    assert BaseDriver.verify_health_enhanced(driver, "https://controller.example.test")
+    verify.assert_called_once_with("https://controller.example.test", None, 60, 5)
+
+
 class TestBaseDriver:
     """Test base driver functionality."""
 
