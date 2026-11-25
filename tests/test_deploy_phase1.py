@@ -76,6 +76,25 @@ def test_deployment_state_migration_preserves_existing_provider_metadata(
     )
 
 
+def test_deployment_state_migration_handles_version_boundaries(tmp_path: Path) -> None:
+    manager = StateManager(tmp_path / ".deployment")
+    versionless = {"service_name": "service"}
+    current = {"version": 2, "service_name": "service"}
+
+    migrated = manager.migrate_state(versionless)
+
+    assert migrated == {
+        "service_name": "service",
+        "version": 2,
+        "api_key_generated": False,
+        "rsa_key_generated": False,
+        "provider_data": {},
+    }
+    assert manager.migrate_state(current) == current
+    with pytest.raises(ValueError, match="Unsupported state version: 3"):
+        manager.migrate_state({"version": 3})
+
+
 class TestDockerManager:
     """Test Docker manager functionality."""
 
