@@ -19,6 +19,8 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
+from supervaizer.access import api_auth
+
 # Test keys injected via API_KEYS patch — not hard-coded in production code.
 _TEST_KEYS = {
     "test-read-key": {"scope": "read"},
@@ -148,3 +150,44 @@ class TestRequireScope:
         client = TestClient(app)
         response = client.get("/guarded")
         assert response.status_code == 401
+
+
+@pytest.mark.parametrize("required_scope", ["read", "write"])
+@pytest.mark.parametrize("metadata", [{}, {"scope": "unknown"}])
+def test_key_with_missing_or_unknown_scope_is_denied(
+    required_scope: str, metadata: dict[str, str]
+) -> None:
+    with patch.dict(
+        "supervaizer.access.api_auth.API_KEYS", {"invalid-scope": metadata}
+    ):
+        client = TestClient(_make_app(required_scope=required_scope))
+        response = client.get("/guarded", headers={"X-API-Key": "invalid-scope"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Insufficient scope"
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_missing_or_blank_environment_key_registers_no_key(
+    monkeypatch: pytest.MonkeyPatch, value: str | None
+) -> None:
+    monkeypatch.setattr(api_auth, "API_KEYS", {})
+    if value is None:
+        monkeypatch.delenv("SUPERVAIZER_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("SUPERVAIZER_API_KEY", value)
+
+    api_auth._load_env_key()
+
+    assert api_auth.API_KEYS == {}
+
+
+def test_environment_key_is_trimmed_and_has_write_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_auth, "API_KEYS", {})
+    monkeypatch.setenv("SUPERVAIZER_API_KEY", "  test-configured-key  ")
+
+    api_auth._load_env_key()
+
+    assert api_auth.API_KEYS == {"test-configured-key": {"scope": "write"}}

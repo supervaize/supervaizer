@@ -7,14 +7,49 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import supervaizer.server as server_module
 from supervaizer import Server, scheduled_steps, server_config, server_info
 from supervaizer.common import ApiSuccess
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings
 from supervaizer.server_registration import build_server_registration_info
 from supervaizer.studio_handshake import validate_registration_handshake
+
+
+def test_server_key_generation_preserves_identity_during_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SUPERVAIZER_PRIVATE_KEY", raising=False)
+
+    generated = server_config._get_or_create_private_key()
+    reloaded = server_config._get_or_create_private_key()
+
+    assert generated.key_size == 2048
+    assert (
+        reloaded.public_key().public_numbers()
+        == generated.public_key().public_numbers()
+    )
+
+
+def test_server_uses_configured_private_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    supplied = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = supplied.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    monkeypatch.setenv("SUPERVAIZER_PRIVATE_KEY", pem.decode("utf-8"))
+
+    loaded = server_config._get_or_create_private_key()
+
+    assert (
+        loaded.public_key().public_numbers() == supplied.public_key().public_numbers()
+    )
 
 
 def test_server_module_reexports_scheduled_step_helpers() -> None:
@@ -138,3 +173,110 @@ def test_validate_registration_handshake_function_accepts_key_match(
 
 def _scheduled_step_target(value: str) -> str:
     return f"scheduled-{value}"
+
+
+@pytest.mark.parametrize("detail", [None, {}, {"object": None}, {"object": "invalid"}])
+def test_registration_handshake_rejects_missing_response_object(
+    server_fixture: Server, detail: dict[str, Any] | None
+) -> None:
+    result = ApiSuccess(message="registered", detail=detail)
+
+    with pytest.raises(
+        RuntimeError, match="response did not include a response object"
+    ):
+        validate_registration_handshake(server_fixture, result)
+
+
+@pytest.mark.parametrize(
+    ("configured", "kept"),
+    [("studio-server-1", True), ("abcdef", True), ("abcde", False), (None, False)],
+)
+def test_server_identity_is_preserved_or_generated_once(
+    monkeypatch: pytest.MonkeyPatch, configured: str | None, kept: bool
+) -> None:
+    if configured is None:
+        monkeypatch.delenv("SUPERVAIZER_SERVER_ID", raising=False)
+    else:
+        monkeypatch.setenv("SUPERVAIZER_SERVER_ID", configured)
+
+    server_id = server_config._get_or_create_server_id()
+
+    if kept:
+        assert server_id == configured
+    else:
+        assert str(UUID(server_id)) == server_id
+    assert server_config._get_or_create_server_id() == server_id
+
+
+def test_workspace_authorization_reads_configured_public_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY", "public-key-from-studio"
+    )
+
+    settings = server_config._resolve_workspace_authorization_settings(None)
+
+    assert settings.public_key_pem == "public-key-from-studio"
+
+
+def test_explicit_workspace_authorization_overrides_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPERVAIZER_WORKSPACE_AUTH_ISSUER", "environment-issuer")
+    monkeypatch.setenv("SUPERVAIZER_WORKSPACE_AUTH_PUBLIC_KEY", "environment-key")
+
+    settings = server_config._resolve_workspace_authorization_settings({
+        "enabled": True,
+        "issuer": "explicit-issuer",
+        "public_key_pem": "explicit-key",
+    })
+
+    assert settings.enabled is True
+    assert settings.issuer == "explicit-issuer"
+    assert settings.public_key_pem == "explicit-key"
+
+
+def test_controller_key_fingerprint_is_stable_and_does_not_expose_key() -> None:
+    assert (
+        server_config._controller_key_fingerprint("example-controller-key")
+        == "215345834bf2"
+    )
+    assert server_config._controller_key_fingerprint("") is None
+    assert server_config._controller_key_fingerprint(None) is None
+
+
+def test_server_handshake_applies_audience_and_agent_bindings(
+    server_fixture: Server,
+) -> None:
+    assert server_fixture.agents
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True
+    )
+    bindings = []
+    for agent in server_fixture.agents:
+        agent.server_agent_id = None
+        bindings.append({"slug": agent.slug, "id": f"studio-{agent.slug}"})
+
+    server_fixture._apply_workspace_authorization_handshake({
+        "workspace_authorization": {"audience": "studio-audience", "agents": bindings}
+    })
+
+    assert server_fixture.workspace_authorization.audience == "studio-audience"
+    assert [agent.server_agent_id for agent in server_fixture.agents] == [
+        item["id"] for item in bindings
+    ]
+
+
+def test_server_applies_workspace_agent_bindings(server_fixture: Server) -> None:
+    assert server_fixture.agents
+    bindings = []
+    for agent in server_fixture.agents:
+        agent.server_agent_id = None
+        bindings.append({"slug": agent.slug, "id": f"studio-{agent.slug}"})
+
+    server_fixture._apply_workspace_authorization_agent_bindings(bindings)
+
+    assert [agent.server_agent_id for agent in server_fixture.agents] == [
+        item["id"] for item in bindings
+    ]

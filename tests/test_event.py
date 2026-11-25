@@ -14,6 +14,8 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
+
 from supervaizer import (
     Account,
     Agent,
@@ -29,7 +31,7 @@ from supervaizer import (
     Server,
     ServerRegisterEvent,
 )
-from supervaizer.job import Job, JobContext
+from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
 
 
@@ -158,3 +160,40 @@ def test_event_payload_json_encodable_with_metadata_datetime(
     case_event = CaseStartEvent(case=case, account=account_fixture)
     json.dumps(case_event.payload)
     assert case_event.details["metadata"]["at"] == dt.isoformat()
+
+
+@pytest.mark.parametrize(
+    ("job_status", "response_statuses", "expected_type"),
+    [
+        (EntityStatus.COMPLETED, [], EventType.JOB_END),
+        (EntityStatus.FAILED, [], EventType.JOB_ERROR),
+        (
+            EntityStatus.FAILED,
+            [EntityStatus.FAILED, EntityStatus.COMPLETED],
+            EventType.JOB_END,
+        ),
+        (
+            EntityStatus.COMPLETED,
+            [EntityStatus.COMPLETED, EntityStatus.FAILED],
+            EventType.JOB_ERROR,
+        ),
+    ],
+)
+def test_job_finished_event_uses_latest_response_status(
+    job_fixture: Job,
+    account_fixture: Account,
+    job_status: EntityStatus,
+    response_statuses: list[EntityStatus],
+    expected_type: EventType,
+) -> None:
+    job_fixture.status = job_status
+    job_fixture.responses = [
+        JobResponse(job_id=job_fixture.id, status=status, message="finished")
+        for status in response_statuses
+    ]
+
+    event = JobFinishedEvent(job=job_fixture, account=account_fixture)
+
+    assert event.type == expected_type
+    assert event.source == {"job": job_fixture.id}
+    assert event.details == job_fixture.registration_info

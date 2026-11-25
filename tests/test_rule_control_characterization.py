@@ -6,8 +6,9 @@
 
 """Characterize rule checkpoint gates around effects and recovery."""
 
+import asyncio
 from collections.abc import Iterator
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from pytest_mock import MockerFixture
@@ -25,6 +26,14 @@ from supervaizer.rule_controls import (
     run_guarded_step,
 )
 from supervaizer.storage import StorageManager
+
+
+async def _guarded_step_with_timeout(*args: Any, **kwargs: Any) -> Any:
+    return await asyncio.wait_for(run_guarded_step(*args, **kwargs), timeout=2)
+
+
+async def _recovery_with_timeout(*args: Any, **kwargs: Any) -> Any:
+    return await asyncio.wait_for(recover_guarded_step(*args, **kwargs), timeout=2)
 
 
 @pytest.fixture
@@ -111,7 +120,7 @@ async def test_guarded_step_waits_for_before_resume_then_records_after_and_advan
     async def advance(result: str) -> None:
         events.append(f"advance:{result}")
 
-    result = await run_guarded_step(
+    result = await _guarded_step_with_timeout(
         gate=gate,
         case=case,
         step_id="send-message",
@@ -165,7 +174,7 @@ async def test_guarded_step_blocks_after_effect_without_advancing(
         advanced.append(result)
 
     with pytest.raises(RuleCheckpointBlocked, match="stop"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="send-message",
@@ -204,7 +213,7 @@ async def test_guarded_step_effect_error_requires_explicit_recovery(
         raise RuntimeError("effect failed")
 
     with pytest.raises(RuntimeError, match="effect failed"):
-        await run_guarded_step(
+        await _guarded_step_with_timeout(
             gate=gate,
             case=case,
             step_id="send-message",
@@ -215,7 +224,7 @@ async def test_guarded_step_effect_error_requires_explicit_recovery(
         )
 
     with pytest.raises(RuleCheckpointRecoveryRequired, match="not ready"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             case=case,
             occurrence_id="occurrence-3",
             result="unreachable",
@@ -225,6 +234,38 @@ async def test_guarded_step_effect_error_requires_explicit_recovery(
     assert after["status"] == "pending"
     assert after["effect_started"] is True
     assert "effect_completed" not in after
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("effect_state", ["effect_started", "effect_completed"])
+async def test_guarded_step_refuses_to_replay_an_orphaned_effect(
+    isolated_rule_case_state: None,
+    account_fixture: Account,
+    mocker: MockerFixture,
+    effect_state: str,
+) -> None:
+    del isolated_rule_case_state
+    case = _case(account_fixture, "orphaned-effect-case")
+    gate = _gate(account_fixture)
+    case.metadata["_rule_checkpoints"] = {
+        "orphaned:after": {effect_state: True},
+    }
+    checkpoint = mocker.patch.object(gate, "checkpoint", new=mocker.AsyncMock())
+    effect = mocker.AsyncMock(return_value="result")
+
+    with pytest.raises(RuleCheckpointRecoveryRequired, match="explicit recovery"):
+        await _guarded_step_with_timeout(
+            gate=gate,
+            case=case,
+            step_id="send-message",
+            occurrence_id="orphaned",
+            before_context={"draft": "hello"},
+            effect=effect,
+            after_context=lambda value: {"sent": value},
+        )
+
+    checkpoint.assert_not_awaited()
+    effect.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -260,7 +301,7 @@ async def test_recovery_rechecks_pending_after_then_advances_once(
     async def advance(result: str) -> None:
         advanced.append(result)
 
-    result = await recover_guarded_step(
+    result = await _recovery_with_timeout(
         gate=gate,
         case=case,
         occurrence_id="occurrence-4",
@@ -268,7 +309,7 @@ async def test_recovery_rechecks_pending_after_then_advances_once(
         after_context=lambda value: {"sent": value},
         advance=advance,
     )
-    repeated = await recover_guarded_step(
+    repeated = await _recovery_with_timeout(
         case=case,
         occurrence_id="occurrence-4",
         result="result",
@@ -277,9 +318,18 @@ async def test_recovery_rechecks_pending_after_then_advances_once(
 
     after = case.metadata["_rule_checkpoints"]["occurrence-4:after"]
     assert result == repeated == "result"
-    assert checkpoint.await_count == 1
+    checkpoint.assert_awaited_once_with(
+        occurrence_id="occurrence-4",
+        phase="after",
+        job_id="rule-job",
+        case_id="recovery-case",
+        step_id="send-message",
+        context=context,
+    )
     assert advanced == ["result"]
     assert after["status"] == "allow"
+    assert after["occurrence_id"] == "occurrence-4"
+    assert after["phase"] == "after"
     assert after["advancement_started"] is True
     assert after["advancement_completed"] is True
 
@@ -307,7 +357,7 @@ async def test_recovery_rejects_changed_snapshot_or_after_context(
     }
 
     with pytest.raises(ValueError, match="snapshot changed"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-5",
@@ -319,10 +369,50 @@ async def test_recovery_rejects_changed_snapshot_or_after_context(
         "snapshot-1"
     )
     with pytest.raises(ValueError, match="context changed"):
-        await recover_guarded_step(
+        await _recovery_with_timeout(
             gate=gate,
             case=case,
             occurrence_id="occurrence-5",
             result="result",
             after_context=lambda value: {"sent": value},
         )
+
+
+@pytest.mark.asyncio
+async def test_before_checkpoint_is_persisted_before_request(
+    isolated_rule_case_state: None,
+    account_fixture: Account,
+    storage_manager: StorageManager,
+    mocker: MockerFixture,
+) -> None:
+    del isolated_rule_case_state
+    case = _case(account_fixture, "before-persistence-case")
+    gate = _gate(account_fixture)
+    proposed = {"draft": "hello"}
+
+    async def checkpoint(**_kwargs: object) -> RuleCheckpointResponse:
+        saved = storage_manager.get_object_by_id("Case", case.id)
+        assert saved["metadata"]["_rule_checkpoints"]["occurrence-1:before"] == {
+            "occurrence_id": "occurrence-1",
+            "phase": "before",
+            "snapshot_hash": "snapshot-1",
+            "step_id": "send-message",
+            "context_hash": _checkpoint_input_hash(proposed),
+            "status": "checking",
+        }
+        raise RuntimeError("checkpoint unavailable")
+
+    mocker.patch.object(gate, "checkpoint", side_effect=checkpoint)
+    effect = mocker.AsyncMock()
+    with pytest.raises(RuntimeError, match="checkpoint unavailable"):
+        await _guarded_step_with_timeout(
+            gate=gate,
+            case=case,
+            step_id="send-message",
+            occurrence_id="occurrence-1",
+            before_context=proposed,
+            effect=effect,
+            after_context=lambda result: {"sent": result},
+        )
+
+    effect.assert_not_awaited()

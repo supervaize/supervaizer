@@ -7,9 +7,11 @@
 """Characterize local scheduled-step polling and case scheduling behavior."""
 
 import asyncio
+import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from types import ModuleType
 from typing import Any, cast
 
 import pytest
@@ -17,7 +19,10 @@ import pytest
 from supervaizer import Account, Case, CaseNodeUpdate, EntityStatus, Job, JobContext
 from supervaizer.case import Cases
 from supervaizer.job import Jobs
-from supervaizer.scheduled_steps import _run_scheduled_step_loop
+from supervaizer.scheduled_steps import (
+    _execute_scheduled_method,
+    _run_scheduled_step_loop,
+)
 from supervaizer.server import Server
 from supervaizer.storage import StorageManager
 
@@ -327,3 +332,106 @@ async def test_scheduled_loop_recovers_after_a_polling_error(
 
     assert calls == 2
     assert sleep_calls == [60, 60, 60]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first_problem", ["missing-method", "orphan"])
+async def test_scheduled_loop_continues_after_unrunnable_step(
+    isolated_scheduled_state: None,
+    account_fixture: Account,
+    monkeypatch: pytest.MonkeyPatch,
+    first_problem: str,
+) -> None:
+    del isolated_scheduled_state
+    first_case = _new_case(account_fixture, "orphan-job", "first-case")
+    first = _due_update(
+        method=None if first_problem == "missing-method" else "owner.run"
+    )
+    first_case.updates = [first]
+    job = _new_job("next-job", "owner-agent")
+    next_case = _new_case(account_fixture, job.id, "next-case")
+    job.add_case_id(next_case.id)
+    next_step = _due_update(method="owner.run", params={"value": "ok"})
+    next_case.updates = [next_step]
+    observed: list[tuple[str, dict[str, Any], set[str] | None, str | None]] = []
+
+    def execute(
+        method: str, params: dict[str, Any], allowed_methods: set[str] | None
+    ) -> None:
+        observed.append((method, params, allowed_methods, next_step.scheduled_status))
+
+    sleep, _calls = _cancel_after_iterations()
+    monkeypatch.setattr("supervaizer.scheduled_steps.asyncio.sleep", sleep)
+    monkeypatch.setattr(
+        "supervaizer.scheduled_steps._execute_scheduled_method", execute
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await _run_scheduled_step_loop(
+            _as_server(_server_for("owner-agent", {"owner.run"}))
+        )
+
+    assert first.scheduled_status == (
+        "pending" if first_problem == "missing-method" else "failed"
+    )
+    assert next_step.scheduled_status == "completed"
+    assert observed == [("owner.run", {"value": "ok"}, {"owner.run"}, "executing")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("owner_is_registered", [True, False])
+async def test_scheduled_loop_rejects_methods_not_declared_by_owner(
+    isolated_scheduled_state: None,
+    account_fixture: Account,
+    monkeypatch: pytest.MonkeyPatch,
+    owner_is_registered: bool,
+) -> None:
+    del isolated_scheduled_state
+    invoked: list[bool] = []
+    module = ModuleType("unlisted_scheduled_method")
+    module.__dict__["run"] = lambda: invoked.append(True)
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    job = _new_job("restricted-job", "owner-agent")
+    case = _new_case(account_fixture, job.id)
+    job.add_case_id(case.id)
+    step = _due_update(method=f"{module.__name__}.run")
+    case.updates = [step]
+    server = (
+        _server_for("owner-agent", {"different.method"})
+        if owner_is_registered
+        else _server_for("other-agent", {f"{module.__name__}.run"})
+    )
+    sleep, _calls = _cancel_after_iterations()
+    monkeypatch.setattr("supervaizer.scheduled_steps.asyncio.sleep", sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await _run_scheduled_step_loop(_as_server(server))
+
+    assert step.scheduled_status == "failed"
+    assert invoked == []
+
+
+@pytest.mark.parametrize("allowed", [True, False])
+def test_scheduled_method_enforces_owning_agent_allowlist(
+    monkeypatch: pytest.MonkeyPatch, allowed: bool
+) -> None:
+    called: list[str] = []
+    module = ModuleType("scheduled_allowlist_test")
+
+    def run(value: str) -> str:
+        called.append(value)
+        return "done"
+
+    module.__dict__["run"] = run
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    method = "scheduled_allowlist_test.run"
+    allowlist = {method} if allowed else set()
+
+    if allowed:
+        assert _execute_scheduled_method(method, {"value": "safe"}, allowlist) == "done"
+        assert called == ["safe"]
+    else:
+        with pytest.raises(ValueError, match="not an allowed agent method"):
+            _execute_scheduled_method(method, {"value": "unsafe"}, allowlist)
+        assert called == []

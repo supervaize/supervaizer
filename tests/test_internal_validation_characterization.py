@@ -12,13 +12,54 @@ from typing import Any
 import pytest
 
 from supervaizer.common import ApiError
-from supervaizer.contracts import V2WorkspaceContext
-from supervaizer.studio_handshake import apply_workspace_authorization_agent_bindings
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings, V2WorkspaceContext
+from supervaizer.studio_handshake import (
+    apply_workspace_authorization_agent_bindings,
+    apply_workspace_authorization_handshake,
+)
 from supervaizer.workspace_authorization import (
     WorkspaceAuthorizationClaims,
     WorkspaceAuthorizationError,
+    _validate_claim_times,
     _validate_claims_against_request,
+    get_workspace_authorization_settings,
 )
+
+
+@pytest.mark.parametrize("audience", [None, "", "   ", 123])
+def test_registration_rejects_invalid_workspace_audience(audience: Any) -> None:
+    settings = V2WorkspaceAuthorizationSettings(enabled=True, audience="expected")
+    server = SimpleNamespace(workspace_authorization=settings, agents=[])
+
+    with pytest.raises(RuntimeError, match="audience is missing"):
+        apply_workspace_authorization_handshake(
+            server, {"workspace_authorization": {"audience": audience, "agents": []}}
+        )
+
+    assert server.workspace_authorization is settings
+
+
+@pytest.mark.parametrize(
+    "configured_audience", [None, "studio-audience", "other-audience"]
+)
+def test_registration_checks_configured_workspace_audience(
+    configured_audience: str | None,
+) -> None:
+    settings = V2WorkspaceAuthorizationSettings(
+        enabled=True, audience=configured_audience
+    )
+    server = SimpleNamespace(workspace_authorization=settings, agents=[])
+    handshake = {
+        "workspace_authorization": {"audience": "studio-audience", "agents": []}
+    }
+
+    if configured_audience == "other-audience":
+        with pytest.raises(RuntimeError, match="audience does not match"):
+            apply_workspace_authorization_handshake(server, handshake)
+        assert server.workspace_authorization is settings
+    else:
+        apply_workspace_authorization_handshake(server, handshake)
+        assert server.workspace_authorization.audience == "studio-audience"
 
 
 class _Response:
@@ -151,3 +192,103 @@ def test_agent_bindings_apply_earlier_identity_before_later_mismatch() -> None:
 
     assert alpha.server_agent_id == "studio-alpha"
     assert beta.server_agent_id == "studio-beta-old"
+
+
+def test_agent_bindings_reject_conflicting_ids_for_same_slug() -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    with pytest.raises(RuntimeError, match="conflicting.*agent"):
+        apply_workspace_authorization_agent_bindings(
+            _server(agent),
+            [
+                {"id": "studio-agent-1", "slug": "agent"},
+                {"id": "studio-agent-2", "slug": "agent"},
+            ],
+        )
+
+    assert agent.server_agent_id is None
+
+
+def test_agent_bindings_accept_duplicate_matching_ids() -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    apply_workspace_authorization_agent_bindings(
+        _server(agent),
+        [
+            {"id": "studio-agent-1", "slug": "agent"},
+            {"id": "studio-agent-1", "slug": "agent"},
+        ],
+    )
+
+    assert agent.server_agent_id == "studio-agent-1"
+
+
+@pytest.mark.parametrize("invalid_binding", [None, "invalid", []])
+def test_agent_bindings_reject_non_object_before_applying_any(
+    invalid_binding: Any,
+) -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+
+    with pytest.raises(RuntimeError, match="binding must be an object"):
+        apply_workspace_authorization_agent_bindings(
+            _server(agent),
+            [{"id": "studio-agent-1", "slug": "agent"}, invalid_binding],
+        )
+
+    assert agent.server_agent_id is None
+
+
+@pytest.mark.parametrize(
+    ("expiry", "issued_at", "leeway", "expected_error"),
+    [
+        (95, 90, 5, None),
+        (94, 90, 5, "workspace_authorization_expired"),
+        (200, 105, 5, None),
+        (200, 106, 5, "workspace_authorization_not_yet_valid"),
+        (200, None, 5, None),
+    ],
+)
+def test_workspace_token_time_boundaries(
+    expiry: int, issued_at: int | None, leeway: int, expected_error: str | None
+) -> None:
+    claims = _claims(exp=expiry, iat=issued_at)
+
+    if expected_error is None:
+        _validate_claim_times(claims, leeway_seconds=leeway, now=100)
+    else:
+        with pytest.raises(WorkspaceAuthorizationError) as raised:
+            _validate_claim_times(claims, leeway_seconds=leeway, now=100)
+        assert raised.value.code == expected_error
+
+
+def test_workspace_authorization_settings_preserve_configured_mapping() -> None:
+    server = SimpleNamespace(
+        workspace_authorization={
+            "enabled": True,
+            "issuer": "https://studio.example.test",
+            "jwks_url": "https://studio.example.test/jwks",
+        }
+    )
+
+    settings = get_workspace_authorization_settings(server)
+
+    assert settings.enabled is True
+    assert settings.issuer == "https://studio.example.test"
+    assert settings.jwks_url == "https://studio.example.test/jwks"
+
+
+@pytest.mark.parametrize("field", ["id", "slug"])
+@pytest.mark.parametrize("value", [None, "", "   ", 123])
+def test_agent_bindings_reject_invalid_identity_before_applying_any(
+    field: str, value: Any
+) -> None:
+    agent = SimpleNamespace(slug="agent", server_agent_id=None)
+    server = _server(agent)
+    invalid = {"id": "studio-agent-2", "slug": "other", field: value}
+
+    with pytest.raises(RuntimeError, match=f"missing {field}"):
+        apply_workspace_authorization_agent_bindings(
+            server, [{"id": "studio-agent-1", "slug": "agent"}, invalid]
+        )
+
+    assert agent.server_agent_id is None

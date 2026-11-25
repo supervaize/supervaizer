@@ -11,6 +11,7 @@ Tests for deployment CLI Phase 1 functionality.
 import json
 import subprocess
 import tempfile
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,73 @@ from supervaizer.deploy.state import (
     StateManager,
 )
 from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
+
+
+def test_deployment_state_round_trip_preserves_aware_timestamps(tmp_path: Path) -> None:
+    created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone(timedelta(hours=2)))
+    state = DeploymentState(
+        service_name="test-service",
+        platform="cloud-run",
+        environment="dev",
+        region="us-central1",
+        image_tag="test:latest",
+        created_at=created,
+    )
+    manager = StateManager(tmp_path / ".deployment")
+    before_save = datetime.now(UTC)
+
+    manager.save_state(state)
+    after_save = datetime.now(UTC)
+    loaded = manager.load_state()
+
+    assert loaded is not None
+    assert loaded.created_at.isoformat() == created.isoformat()
+    assert loaded.updated_at.tzinfo == UTC
+    assert before_save <= loaded.updated_at <= after_save
+
+
+@pytest.mark.parametrize("has_existing_flags", [False, True])
+def test_deployment_state_migration_preserves_existing_provider_metadata(
+    tmp_path: Path, has_existing_flags: bool
+) -> None:
+    manager = StateManager(tmp_path / ".deployment")
+    original: dict[str, object] = {"version": 1, "service_name": "service"}
+    if has_existing_flags:
+        original.update({
+            "api_key_generated": True,
+            "rsa_key_generated": True,
+            "provider_data": {"resource_id": "resource-1"},
+        })
+    snapshot = original.copy()
+
+    migrated = manager.migrate_state(original)
+
+    assert original == snapshot
+    assert migrated["version"] == 2
+    assert migrated["api_key_generated"] is has_existing_flags
+    assert migrated["rsa_key_generated"] is has_existing_flags
+    assert migrated["provider_data"] == (
+        {"resource_id": "resource-1"} if has_existing_flags else {}
+    )
+
+
+def test_deployment_state_migration_handles_version_boundaries(tmp_path: Path) -> None:
+    manager = StateManager(tmp_path / ".deployment")
+    versionless = {"service_name": "service"}
+    current = {"version": 2, "service_name": "service"}
+
+    migrated = manager.migrate_state(versionless)
+
+    assert migrated == {
+        "service_name": "service",
+        "version": 2,
+        "api_key_generated": False,
+        "rsa_key_generated": False,
+        "provider_data": {},
+    }
+    assert manager.migrate_state(current) == current
+    with pytest.raises(ValueError, match="Unsupported state version: 3"):
+        manager.migrate_state({"version": 3})
 
 
 class TestDockerManager:

@@ -472,7 +472,7 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
         server,
         key,
         agent_slug=agent.slug,
-        scopes=["resource.items.list"],
+        scopes=["resource.items.list", "resource.items.read"],
         workspace_id="team-1",
         workspace_slug="team-slug",
     )
@@ -494,6 +494,10 @@ def test_data_resource_workspace_authorization_valid_token_sets_context(
     assert context.workspace_slug == "team-slug"
     assert context.workspace_authorization is not None
     assert context.workspace_authorization.grant_id == "grant-1"
+    assert context.workspace_authorization.scopes == [
+        "resource.items.list",
+        "resource.items.read",
+    ]
     assert context.workspace_authorization.agent_workspace_ref == "agent-workspace-1"
 
 
@@ -533,6 +537,32 @@ def _list_items_with_headers(
         },
     )
     return response, captured
+
+
+@pytest.mark.parametrize(
+    ("headers", "claim"),
+    [
+        ({"X-Supervaize-Workspace-Id": "other-team"}, "workspace_id"),
+        ({"X-Supervaize-Workspace-Id": ""}, "workspace_id"),
+        ({"X-Supervaize-Workspace-Slug": "other-slug"}, "workspace_slug"),
+    ],
+)
+def test_data_resource_rejects_workspace_header_mismatch(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    headers: dict[str, str],
+    claim: str,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, headers
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == (
+        f"Workspace authorization token {claim} does not match the request"
+    )
+    assert captured == {}
 
 
 def test_data_resource_mission_metadata_header_sets_context_mission(
@@ -856,3 +886,335 @@ def test_data_resource_permission_error_becomes_403(
 
     assert response.status_code == 403
     assert response.json()["detail"] == "workspace denied"
+
+
+@pytest.mark.parametrize(
+    ("item_id", "scope", "expected_status"),
+    [
+        ("item-1", "resource.items.get", 200),
+        ("missing", "resource.items.get", 404),
+        ("item-1", "resource.items.list", 403),
+    ],
+)
+def test_data_resource_get_checks_scope_and_passes_workspace_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    item_id: str,
+    scope: str,
+    expected_status: int,
+) -> None:
+    received: list[tuple[str, DataResourceContext]] = []
+
+    def on_get(item_id: str, *, context: DataResourceContext) -> dict[str, Any] | None:
+        received.append((item_id, context))
+        return (
+            {"id": item_id, "owner": context.workspace_id}
+            if item_id != "missing"
+            else None
+        )
+
+    resource = DataResource(
+        name="items", fields=[], on_list=list, on_get=on_get, read_only=True
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/{item_id}",
+        headers=_data_resource_headers(server, agent, scope=scope),
+    )
+
+    assert response.status_code == expected_status
+    if expected_status == 403:
+        assert received == []
+    else:
+        assert len(received) == 1
+        assert received[0][0] == item_id
+        assert received[0][1].workspace_id == "workspace-1"
+        if expected_status == 200:
+            assert response.json() == {"id": item_id, "owner": "workspace-1"}
+        else:
+            assert response.json()["detail"] == "items 'missing' not found"
+
+
+@pytest.mark.parametrize("scope", ["resource.items.import", "resource.items.create"])
+def test_data_resource_import_requires_its_scope_and_passes_records(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    scope: str,
+) -> None:
+    received: list[tuple[list[dict[str, Any]], str]] = []
+
+    def on_import(
+        records: list[dict[str, Any]], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        received.append((records, context.workspace_id))
+        return {"imported": len(records)}
+
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=lambda data: data,
+        importable=True,
+        on_import=on_import,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    records = [{"id": "item-1"}, {"id": "item-2"}]
+    response = TestClient(server.app).post(
+        f"/api/agents/{agent.slug}/data/items/import/",
+        headers=_data_resource_headers(server, agent, scope=scope),
+        json=records,
+    )
+
+    if scope == "resource.items.import":
+        assert response.status_code == 200
+        assert response.json() == {"imported": 2}
+        assert received == [(records, "workspace-1")]
+    else:
+        assert response.status_code == 403
+        assert received == []
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete", "import"])
+@pytest.mark.parametrize("key_scope", ["read", "write"])
+def test_data_resource_writes_require_write_api_key_scope(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    mocker: Any,
+    operation: str,
+    key_scope: str,
+) -> None:
+    callbacks = {
+        "create": mocker.Mock(return_value={"id": "item-1"}),
+        "update": mocker.Mock(return_value={"id": "item-1"}),
+        "delete": mocker.Mock(return_value=True),
+        "import": mocker.Mock(return_value={"imported": 1}),
+    }
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=callbacks["create"],
+        on_update=callbacks["update"],
+        on_delete=callbacks["delete"],
+        importable=True,
+        on_import=callbacks["import"],
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    headers = _data_resource_headers(server, agent, scope=f"resource.items.{operation}")
+    headers["X-API-Key"] = "scope-test-key"
+    mocker.patch.dict(
+        "supervaizer.access.api_auth.API_KEYS", {"scope-test-key": {"scope": key_scope}}
+    )
+    path = f"/api/agents/{agent.slug}/data/items/"
+    suffix = {"create": "", "update": "item-1", "delete": "item-1", "import": "import/"}
+    payload = [{"id": "item-1"}] if operation == "import" else {"name": "example"}
+    response = TestClient(server.app).request(
+        {"create": "POST", "update": "PUT", "delete": "DELETE", "import": "POST"}[
+            operation
+        ],
+        path + suffix[operation],
+        headers=headers,
+        json=payload if operation != "delete" else None,
+    )
+
+    if key_scope == "read":
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Insufficient scope"
+        callbacks[operation].assert_not_called()
+    else:
+        assert response.status_code == (201 if operation == "create" else 200)
+        callbacks[operation].assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+@pytest.mark.parametrize("authorized", [True, False])
+def test_data_resource_writes_check_scope_and_pass_context(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    operation: str,
+    authorized: bool,
+) -> None:
+    calls: list[tuple[str, str, str]] = []
+
+    def on_create(
+        data: dict[str, Any], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        calls.append(("create", data["name"], context.workspace_id))
+        return {"id": "item-1", **data}
+
+    def on_update(
+        item_id: str, data: dict[str, Any], *, context: DataResourceContext
+    ) -> dict[str, Any]:
+        calls.append(("update", item_id, context.workspace_id))
+        return {"id": item_id, **data}
+
+    def on_delete(item_id: str, *, context: DataResourceContext) -> bool:
+        calls.append(("delete", item_id, context.workspace_id))
+        return True
+
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=on_create,
+        on_update=on_update,
+        on_delete=on_delete,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    scope = f"resource.items.{operation}" if authorized else "resource.items.list"
+    path = f"/api/agents/{agent.slug}/data/items/"
+    if operation != "create":
+        path += "item-1"
+    response = TestClient(server.app).request(
+        {"create": "POST", "update": "PUT", "delete": "DELETE"}[operation],
+        path,
+        headers=_data_resource_headers(server, agent, scope=scope),
+        json={"name": "example"} if operation != "delete" else None,
+    )
+
+    if not authorized:
+        assert response.status_code == 403
+        assert calls == []
+    else:
+        assert response.status_code == (201 if operation == "create" else 200)
+        assert calls == [
+            (operation, "example" if operation == "create" else "item-1", "workspace-1")
+        ]
+        if operation == "delete":
+            assert response.json() == {"deleted": True}
+        else:
+            assert response.json() == {"id": "item-1", "name": "example"}
+
+
+@pytest.mark.parametrize(
+    ("header", "value"),
+    [
+        ("X-Supervaize-Workspace-Id", "other-workspace"),
+        ("X-Supervaize-Workspace-Slug", "other-slug"),
+    ],
+)
+def test_data_resource_rejects_workspace_that_differs_from_token(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    header: str,
+    value: str,
+) -> None:
+    called = False
+
+    def on_list() -> list[dict[str, Any]]:
+        nonlocal called
+        called = True
+        return []
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    headers = _data_resource_headers(server, agent, scope="resource.items.list")
+    headers[header] = value
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/", headers=headers
+    )
+
+    assert response.status_code == 403
+    assert "does not match the request" in response.json()["detail"]
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_status", "expected_ids"),
+    [
+        ("skip=1&limit=1", 200, ["item-2"]),
+        ("skip=5&limit=2", 200, []),
+        ("skip=-1&limit=2", 422, []),
+        ("skip=0&limit=0", 422, []),
+    ],
+)
+def test_data_resource_list_pagination_and_bounds(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    query: str,
+    expected_status: int,
+    expected_ids: list[str],
+) -> None:
+    calls: list[str] = []
+
+    def on_list(*, context: DataResourceContext) -> list[dict[str, Any]]:
+        calls.append(context.workspace_id)
+        return [{"id": f"item-{index}"} for index in range(1, 5)]
+
+    resource = DataResource(name="items", fields=[], on_list=on_list, read_only=True)
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+    response = TestClient(server.app).get(
+        f"/api/agents/{agent.slug}/data/items/?{query}",
+        headers=_data_resource_headers(server, agent, scope="resource.items.list"),
+    )
+
+    assert response.status_code == expected_status
+    if expected_status == 200:
+        assert [item["id"] for item in response.json()] == expected_ids
+        assert calls == ["workspace-1"]
+    else:
+        assert calls == []
+
+
+@pytest.mark.parametrize("read_only", [True, False])
+def test_data_resource_omits_unavailable_write_routes(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+    read_only: bool,
+) -> None:
+    resource = DataResource(
+        name="items",
+        fields=[],
+        on_list=list,
+        on_create=lambda data: {**data, "id": "1"},
+        on_update=(lambda item_id, data: {**data, "id": item_id})
+        if read_only
+        else None,
+        on_delete=(lambda item_id: True) if read_only else None,
+        read_only=read_only,
+    )
+    server, agent = _make_data_resource_server(
+        account_fixture, agent_method_fixture, parameters_setup_fixture, resource
+    )
+
+    paths = server.app.openapi()["paths"]
+    collection = paths[f"/api/agents/{agent.slug}/data/items/"]
+    item = paths.get(f"/api/agents/{agent.slug}/data/items/{{item_id}}", {})
+    assert ("post" in collection) is not read_only
+    assert "put" not in item
+    assert "delete" not in item
+
+
+def test_data_resource_passes_request_id_to_callback(
+    account_fixture: Account,
+    agent_method_fixture: AgentMethod,
+    parameters_setup_fixture: ParametersSetup,
+) -> None:
+    response, captured = _list_items_with_headers(
+        account_fixture,
+        agent_method_fixture,
+        parameters_setup_fixture,
+        {"X-Supervaize-Request-Id": "request-123"},
+    )
+
+    assert response.status_code == 200
+    assert captured["context"].request_id == "request-123"

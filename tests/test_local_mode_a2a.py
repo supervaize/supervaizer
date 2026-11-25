@@ -234,3 +234,36 @@ def test_local_mode_with_configured_auth_still_requires_token(
         input={"count": 1},
     )
     _assert_auth_error(payload, "workspace_authorization_missing")
+
+
+@pytest.mark.parametrize(
+    ("action_input", "status", "case_ids"),
+    [
+        ({"count": 2}, "completed", ["hello-case-1", "hello-case-2"]),
+        ({"enable_human_review": True}, "awaiting", ["hello-review-1"]),
+    ],
+)
+def test_local_hello_world_sync_returns_current_job_state(
+    local_server: Server,
+    action_input: dict[str, Any],
+    status: str,
+    case_ids: list[str],
+) -> None:
+    slug = local_server.agents[0].slug
+    payload = _rpc(
+        local_server,
+        SUPERVAIZER_ACTION_INVOKE_METHOD,
+        slug,
+        action="job.sync",
+        input=action_input,
+        job_id="job-1",
+    )
+
+    result = payload["result"]
+    assert result["status"] == "ok"
+    assert result["effects"][0]["type"] == "job.synced"
+    assert result["effects"][0]["job_id"] == "job-1"
+    assert result["effects"][0]["status"] == status
+    assert result["job_state"]["job"]["id"] == "job-1"
+    assert result["job_state"]["job"]["status"] == status
+    assert [case["id"] for case in result["job_state"]["cases"]] == case_ids

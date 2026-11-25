@@ -223,10 +223,10 @@ def test_configure_controller_logging_outputs_cloud_logging_json(
     payload = json.loads(output.getvalue())
     assert payload["severity"] == "WARNING"
     assert payload["message"] == (
-        "[access:api] denied key='abcdef...' path='/a2a' reason='invalid key'"
+        "[access:api] denied key='***' path='/a2a' reason='invalid key'"
     )
     assert payload["access_type"] == "api"
-    assert payload["key_preview"] == "abcdef..."
+    assert payload["key_preview"] == "***"
     assert payload["path"] == "/a2a"
     assert payload["reason"] == "invalid key"
 
@@ -368,3 +368,40 @@ def test_sv_base_model_with_type_objects() -> None:
     json_fields = json_data["payload"]["supervaizer_form"]["answer"]["fields"]
     assert json_fields[0]["type"] == "bool"
     assert json_fields[1]["type"] == "int"
+
+
+@pytest.mark.parametrize("value", ["", "x" * 15, "x" * 16, "x" * 17, "é" * 8])
+def test_encrypt_decrypt_preserves_values_at_block_boundaries(value: str) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    encrypted = encrypt_value(value, private_key.public_key())
+
+    assert decrypt_value(encrypted, private_key) == value
+
+
+@pytest.mark.parametrize("key", ["q7", "abcdef", "abcdef123456"])
+def test_denied_api_requests_never_log_key_material(key: str) -> None:
+    output = StringIO()
+    sink_id = configure_controller_logging("INFO", sink=output)
+    try:
+        log_access_denied_api(key, "/a2a", "invalid key")
+    finally:
+        log.remove(sink_id)
+
+    assert key not in output.getvalue()
+    assert "abcdef" not in output.getvalue()
+
+
+@pytest.mark.parametrize("key", [None, ""])
+def test_denied_api_request_logs_absent_key_without_key_material(
+    key: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(STRUCTURED_LOG_FORMAT_ENV, "json")
+    output = StringIO()
+    sink_id = configure_controller_logging("INFO", sink=output)
+    try:
+        log_access_denied_api(key, "/a2a", "invalid key")
+    finally:
+        log.remove(sink_id)
+
+    assert json.loads(output.getvalue())["key_preview"] == "<none>"

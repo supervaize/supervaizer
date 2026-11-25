@@ -15,8 +15,10 @@ import json
 import threading
 import time
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import jsonschema
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -772,6 +774,53 @@ def test_a2a_workspace_binding_create_surface_bootstraps_without_token(
     assert captured == {"workspace_authorization": None}
 
 
+@pytest.mark.parametrize("kind", ["action", "surface"])
+def test_a2a_bootstrap_ignores_client_supplied_workspace_authorization(
+    server_fixture: Server, mocker: Any, kind: str
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    forged = {
+        "grant_id": "forged-grant",
+        "workspace_id": "forged-workspace",
+        "agent_id": "forged-agent",
+        "agent_slug": agent.slug,
+        "server_id": server_fixture.server_id,
+        "scopes": ["*"],
+    }
+    if kind == "action":
+        name = "workspace_binding.options"
+        method = SUPERVAIZER_ACTION_INVOKE_METHOD
+        params = _v2_action_payload(action=name, agent_slug=agent.slug)
+        handler = mocker.Mock(return_value=V2ActionResult(status="ok"))
+        register_v2_action_handler(server_fixture, name, handler)
+    else:
+        name = "workspace_binding.create"
+        method = SUPERVAIZER_SURFACE_LOAD_METHOD
+        params = _v2_surface_payload(surface=name, agent_slug=agent.slug)
+        handler = mocker.Mock(
+            return_value={"surface": name, "document": {"type": "Form"}}
+        )
+        register_v2_surface_handler(server_fixture, name, handler)
+    params["workspace_authorization"] = forged
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-forged-auth",
+            "method": method,
+            "params": params,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "result" in response.json()
+    handler.assert_called_once()
+    assert handler.call_args.args[0].workspace_authorization is None
+
+
 def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     server_fixture: Server,
 ) -> None:
@@ -810,6 +859,45 @@ def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     assert response.status_code == 200
     assert response.json()["result"]["status"] == "ok"
     assert captured == {"grant_id": "grant-1", "workspace_ref": "agent-workspace-1"}
+
+
+def test_a2a_workspace_authorization_rejects_untrusted_signature(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        ed25519.Ed25519PrivateKey.generate(),
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-untrusted-signature",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_bad_signature"
+    )
+    assert called is False
 
 
 def test_a2a_workspace_authorization_uses_studio_server_audience(
@@ -1606,6 +1694,7 @@ def test_a2a_controller_action_errors_do_not_leak_exception_details(
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["id"] == "rpc-error-1"
     assert payload["error"]["code"] == JSON_RPC_INTERNAL_ERROR
     assert payload["error"]["data"] == {
         "agent_slug": agent_slug,
@@ -1628,7 +1717,13 @@ def test_a2a_controller_publishes_v2_action_effects(
     def start_job(_request: V2ActionRequest) -> V2ActionResult:
         return V2ActionResult(
             status="ok",
-            effects=[V2Effect(type="job.started", job_id="job-123")],
+            effects=[
+                V2Effect(
+                    type="job.started",
+                    job_id="job-123",
+                    data={"started_at": datetime(2026, 11, 25, 10, 30, tzinfo=UTC)},
+                )
+            ],
         )
 
     try:
@@ -1653,7 +1748,13 @@ def test_a2a_controller_publishes_v2_action_effects(
             "agent_slug": agent_slug,
             "action": "job.start",
             "request_id": "request-1",
-            "effects": [{"type": "job.started", "job_id": "job-123"}],
+            "effects": [
+                {
+                    "type": "job.started",
+                    "job_id": "job-123",
+                    "data": {"started_at": "2026-11-25T10:30:00Z"},
+                }
+            ],
         }
     finally:
         unsubscribe_v2_events(server_fixture, queue)
@@ -2203,3 +2304,585 @@ def test_a2a_schema_conformance(agent_fixture: Agent) -> None:
         jsonschema.validate(instance=agents_list, schema=a2a_agents_list_schema)
     except jsonschema.exceptions.ValidationError as e:
         pytest.fail(f"Agents list does not conform to schema: {e}")
+
+
+@pytest.mark.parametrize("includes_server", [True, False])
+def test_a2a_workspace_authorization_checks_list_audience(
+    server_fixture: Server, includes_server: bool
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    audiences = ["supervaizer-server:other"]
+    if includes_server:
+        audiences.append(f"supervaizer-server:{server_fixture.server_id}")
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides={"aud": audiences},
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-list-audience",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert called is includes_server
+    if includes_server:
+        assert response.json()["result"]["status"] == "ok"
+    else:
+        assert response.json()["error"]["data"]["code"] == (
+            "workspace_authorization_wrong_audience"
+        )
+
+
+@pytest.mark.parametrize("kid", [None, "", 123])
+def test_a2a_workspace_authorization_rejects_invalid_jwks_key_id(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch, kid: object
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url="https://studio.example.test/.well-known/jwks.json",
+        leeway_seconds=0,
+    )
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    def unexpected_fetch(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("Invalid key identifiers must not trigger a JWKS fetch")
+
+    monkeypatch.setattr(
+        "supervaizer.workspace_authorization.httpx.get", unexpected_fetch
+    )
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        ed25519.Ed25519PrivateKey.generate(),
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        header_overrides={"kid": kid},
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-invalid-key-id",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_missing_kid"
+    )
+    assert called is False
+
+
+def test_a2a_workspace_authorization_jwks_outage_fails_closed(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url="https://studio.example.test/.well-known/unavailable-jwks.json",
+        leeway_seconds=0,
+    )
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    def unavailable(url: str, *, timeout: int) -> None:
+        assert url == "https://studio.example.test/.well-known/unavailable-jwks.json"
+        assert timeout == 5
+        raise httpx.ConnectError("private network detail")
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", unavailable)
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        ed25519.Ed25519PrivateKey.generate(),
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="unavailable-key",
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-jwks-outage",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    error = response.json()["error"]
+    assert error["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert error["data"]["code"] == "workspace_authorization_jwks_unavailable"
+    assert "private network detail" not in response.text
+    assert called is False
+
+
+def test_a2a_workspace_authorization_rejects_non_base64_signature(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token + "!!!!"),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-non-base64-signature",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    error = response.json()["error"]
+    assert error["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert error["data"]["code"] == "workspace_authorization_malformed"
+    assert called is False
+
+
+@pytest.mark.parametrize("body", [{"id": "bad-1"}, {"id": "bad-2", "method": 42}])
+def test_a2a_invalid_request_keeps_id_and_returns_validation_details(
+    server_fixture: Server, body: dict[str, object]
+) -> None:
+    response = TestClient(server_fixture.app).post(
+        "/a2a", headers=_a2a_write_headers(server_fixture), json=body
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == body["id"]
+    assert payload["error"]["code"] == JSON_RPC_INVALID_PARAMS
+    assert payload["error"]["message"] == "Invalid JSON-RPC request"
+    assert payload["error"]["data"]["errors"]
+
+
+@pytest.mark.parametrize("case", ["invalid-keys", "unknown-kid"])
+def test_a2a_workspace_authorization_rejects_unusable_jwks(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    key = ed25519.Ed25519PrivateKey.generate()
+    jwks_url = f"https://studio.example.test/.well-known/{case}.json"
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url=jwks_url,
+        leeway_seconds=0,
+    )
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    def get_jwks(url: str, *, timeout: int) -> _JwksResponse:
+        assert url == jwks_url
+        assert timeout == 5
+        keys: object = (
+            {}
+            if case == "invalid-keys"
+            else [_ed25519_jwk(key.public_key(), kid="other")]
+        )
+        return _JwksResponse({"keys": keys})
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", get_jwks)
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="requested-key",
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-unusable-jwks",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    expected_code = (
+        "workspace_authorization_invalid_jwks"
+        if case == "invalid-keys"
+        else "workspace_authorization_unknown_kid"
+    )
+    assert response.json()["error"]["data"]["code"] == expected_code
+    assert called is False
+
+
+@pytest.mark.parametrize("payload", [[], None, "invalid"])
+def test_a2a_rejects_non_object_jwks_payload(
+    server_fixture: Server, mocker: Any, payload: object
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    key = ed25519.Ed25519PrivateKey.generate()
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url="https://studio.example.test/.well-known/non-object.json",
+        leeway_seconds=0,
+    )
+    jwks_response = mocker.Mock()
+    jwks_response.json.return_value = payload
+    mocker.patch(
+        "supervaizer.workspace_authorization.httpx.get", return_value=jwks_response
+    )
+    handler = mocker.Mock(return_value=V2ActionResult(status="ok"))
+    register_v2_action_handler(server_fixture, "job.start", handler)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="requested-key",
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-non-object-jwks",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_invalid_jwks"
+    )
+    handler.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("claim_overrides", "expected_code"),
+    [
+        (
+            {"iss": "https://another-issuer.example.test"},
+            "workspace_authorization_wrong_issuer",
+        ),
+        ({"iss": None}, "workspace_authorization_invalid_claims"),
+        ({"scopes": "job.start"}, "workspace_authorization_invalid_claims"),
+    ],
+)
+def test_a2a_rejects_untrusted_issuer_and_invalid_claims(
+    server_fixture: Server,
+    mocker: Any,
+    claim_overrides: dict[str, object],
+    expected_code: str,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    handler = mocker.Mock(return_value=V2ActionResult(status="ok"))
+    register_v2_action_handler(server_fixture, "job.start", handler)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides=claim_overrides,
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-invalid-claims",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"]["data"]["code"] == expected_code
+    handler.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["url", "kid"])
+def test_a2a_jwks_cache_separates_urls_and_key_ids(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    first_key = ed25519.Ed25519PrivateKey.generate()
+    second_key = ed25519.Ed25519PrivateKey.generate()
+    first_url = f"https://studio.example.test/{change}/first-jwks"
+    second_url = (
+        f"https://studio.example.test/{change}/second-jwks"
+        if change == "url"
+        else first_url
+    )
+    first_kid = "first-key"
+    second_kid = "first-key" if change == "url" else "second-key"
+    requests: list[str] = []
+
+    def get_jwks(url: str, timeout: int) -> _JwksResponse:
+        assert timeout == 5
+        requests.append(url)
+        keys = [_ed25519_jwk(first_key.public_key(), kid=first_kid)]
+        if change == "kid" or url == second_url:
+            if change == "url":
+                keys.clear()
+            keys.append(_ed25519_jwk(second_key.public_key(), kid=second_kid))
+        return _JwksResponse({"keys": keys})
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", get_jwks)
+    register_v2_action_handler(
+        server_fixture, "job.start", lambda _request: V2ActionResult(status="ok")
+    )
+    client = TestClient(server_fixture.app)
+    for url, kid, key in [
+        (first_url, first_kid, first_key),
+        (second_url, second_kid, second_key),
+        (first_url, first_kid, first_key),
+    ]:
+        server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+            enabled=True,
+            issuer="https://studio.example.test",
+            jwks_url=url,
+            leeway_seconds=0,
+        )
+        token = _workspace_authorization_eddsa_token(
+            server_fixture,
+            key,
+            agent_slug=agent.slug,
+            scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+            kid=kid,
+        )
+        response = client.post(
+            "/a2a",
+            headers=_a2a_workspace_headers(server_fixture, token),
+            json={
+                "jsonrpc": "2.0",
+                "id": "rpc-jwks-cache",
+                "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+                "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["result"]["status"] == "ok"
+
+    assert requests == [first_url, second_url]
+
+
+@pytest.mark.parametrize("claim", ["workspace_id", "workspace_slug"])
+def test_a2a_rejects_token_for_a_different_workspace(
+    server_fixture: Server, claim: str
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    called = False
+
+    def start_job(_request: V2ActionRequest) -> V2ActionResult:
+        nonlocal called
+        called = True
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        claim_overrides={claim: "other-workspace"},
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-workspace-auth-mismatch",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_wrong_workspace"
+    )
+    assert called is False
+
+
+def test_a2a_awaits_async_action_handler_with_verified_workspace(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    received: list[str] = []
+
+    async def start_job(request: V2ActionRequest) -> V2ActionResult:
+        assert request.workspace_authorization is not None
+        received.append(request.workspace_authorization.grant_id)
+        return V2ActionResult(status="ok")
+
+    register_v2_action_handler(server_fixture, "job.start", start_job)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-async-action",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-async-action"
+    assert response.json()["result"]["status"] == "ok"
+    assert received == ["grant-1"]
+
+
+def test_a2a_authorization_error_preserves_json_rpc_request_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, "invalid-token"),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-rejected-token",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-rejected-token"
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"] == "workspace_authorization_malformed"
+    )
+
+
+def test_a2a_awaits_async_surface_handler_with_verified_workspace(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    key = _enable_workspace_authorization_eddsa(server_fixture)
+    received: list[str] = []
+
+    async def load_surface(request: V2SurfaceRequest) -> dict[str, object]:
+        assert request.workspace_authorization is not None
+        received.append(request.workspace_authorization.grant_id)
+        return {"surface": "job.start", "document": {"type": "Form"}}
+
+    register_v2_surface_handler(server_fixture, "job.start", load_surface)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_SURFACE_LOAD_METHOD, "job.start"],
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-async-surface",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-async-surface"
+    assert response.json()["result"]["document"] == {"type": "Form"}
+    assert received == ["grant-1"]
+
+
+def test_a2a_surface_authorization_error_preserves_json_rpc_request_id(
+    server_fixture: Server,
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, "invalid-token"),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-rejected-surface-token",
+            "method": SUPERVAIZER_SURFACE_LOAD_METHOD,
+            "params": _v2_surface_payload(surface="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "rpc-rejected-surface-token"
+    assert response.json()["error"]["code"] == JSON_RPC_WORKSPACE_AUTHORIZATION_FAILED
+    assert (
+        response.json()["error"]["data"]["code"] == "workspace_authorization_malformed"
+    )

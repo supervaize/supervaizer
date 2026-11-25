@@ -71,3 +71,18 @@ def test_update_skips_falsey_studio_account_without_lookup() -> None:
     updated = agent.update_agent_from_server(_server(FalseyAccount()))
 
     assert updated is None
+
+
+@pytest.mark.parametrize("wrapper", ["object", "agent", "data"])
+def test_update_reads_supported_studio_agent_response_shapes(wrapper: str) -> None:
+    agent = Agent(name="Identity Edge Agent")
+    account = Mock()
+    account.get_agent_by.return_value = _success({
+        wrapper: {"id": "studio-agent-1", "status": "ready"}
+    })
+
+    updated = agent.update_agent_from_server(_server(account))
+
+    assert updated is agent
+    assert agent.server_agent_id == "studio-agent-1"
+    assert agent.server_agent_status == "ready"

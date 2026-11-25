@@ -1421,3 +1421,22 @@ def test_v2_context_assignment_item_rejects_unknown_scope() -> None:
             scope="missions",
             title="January brief",
         )
+
+
+def test_resource_import_defaults_to_csv_with_required_columns() -> None:
+    document = V2A2UIResourceImportDocument.model_validate({
+        "id": "items-import",
+        "title": "Import items",
+        "resource": "items",
+        "columns": [{"id": "name"}],
+        "submit": {"action": "resource.items.import"},
+    })
+
+    assert document.model_dump(mode="json")["accepted_formats"] == ["csv"]
+    with pytest.raises(ValidationError, match="csv must declare columns"):
+        V2A2UIResourceImportDocument.model_validate({
+            "id": "items-import",
+            "title": "Import items",
+            "resource": "items",
+            "submit": {"action": "resource.items.import"},
+        })

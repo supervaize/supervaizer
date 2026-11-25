@@ -12,9 +12,18 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from supervaizer.case import Case, CaseNodeUpdate, Cases
-from supervaizer.examples.hello_world_agent import _job_id_from_params, job_start
+from supervaizer.examples.hello_world_agent import (
+    HITL_POLL_INTERVAL,
+    _job_id_from_params,
+    _job_options,
+    _wait_for_human_review,
+    handle_v2_action,
+    human_answer,
+    job_start,
+)
 from supervaizer.job import Job, JobContext, Jobs
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import StorageManager
@@ -65,6 +74,56 @@ def _only_case(job_id: str) -> Case:
     cases = list(Cases().get_job_cases(job_id).values())
     assert len(cases) == 1
     return cases[0]
+
+
+@pytest.mark.parametrize("human_review", [True, False])
+def test_v2_job_sync_reports_matching_effect_and_job_state(human_review: bool) -> None:
+    result = handle_v2_action({
+        "action": "job.sync",
+        "job_id": "job-1",
+        "agent_slug": "hello-agent",
+        "mission_id": "mission-1",
+        "input": {"enable_human_review": human_review, "count": 2},
+    })
+
+    status = "awaiting" if human_review else "completed"
+    assert result["status"] == "ok"
+    assert result["effects"] == [
+        {
+            "type": "job.synced",
+            "job_id": "job-1",
+            "status": status,
+            "message": "Awaiting human review" if human_review else "Completed",
+        }
+    ]
+    state = result["job_state"]
+    assert state["job"]["id"] == "job-1"
+    assert state["job"]["agent_slug"] == "hello-agent"
+    assert state["job"]["mission_id"] == "mission-1"
+    assert state["job"]["status"] == status
+    assert [case["status"] for case in state["cases"]] == [status] * (
+        1 if human_review else 2
+    )
+
+
+@pytest.mark.parametrize(
+    ("params", "job_id"),
+    [
+        (
+            {"job_id": "explicit-job", "context": {"job_id": "other-job"}},
+            "explicit-job",
+        ),
+        ({"context": {"job_id": "context-job"}}, "context-job"),
+    ],
+)
+def test_human_answer_preserves_job_case_and_fields(
+    params: dict[str, Any], job_id: str
+) -> None:
+    response = human_answer(case_id="case-1", fields={"approved": True}, **params)
+
+    assert response.job_id == job_id
+    assert response.status == EntityStatus.IN_PROGRESS
+    assert response.payload == {"case_id": "case-1", "answer": {"approved": True}}
 
 
 @pytest.mark.parametrize(
@@ -215,6 +274,7 @@ def test_job_start_stops_while_waiting_for_human_review(
 
     def stop_while_awaiting(duration: float) -> None:
         sleep_calls.append(duration)
+        assert len(sleep_calls) <= 3, "Review continued after the job stopped"
         if duration != 1.0:
             return
         case = _only_case(job.id)
@@ -284,3 +344,56 @@ def test_job_start_continues_after_any_human_review_answer(
     ]
     assert case.updates[3].payload == {"approved": approved}
     assert case.final_delivery == {"result": "Case 1 completed"}
+
+
+@pytest.mark.parametrize(
+    ("fields", "review_enabled", "steps"),
+    [
+        ({}, False, ["Begin", "Progress", "End"]),
+        (
+            {"Enable human review": "yes"},
+            True,
+            ["Begin", "Progress", "Human Review", "End"],
+        ),
+    ],
+)
+def test_job_options_only_wait_for_review_when_enabled(
+    fields: dict[str, Any], review_enabled: bool, steps: list[str]
+) -> None:
+    job_id, count, enabled, selected_steps = _job_options({"fields": fields})
+
+    assert job_id == "local-job"
+    assert count == 1
+    assert enabled is review_enabled
+    assert selected_steps == steps
+
+
+def test_human_review_stops_when_the_owning_job_stops(mocker: MockerFixture) -> None:
+    case = mocker.Mock(spec=Case)
+    case.status = EntityStatus.AWAITING
+    stopped = mocker.patch(
+        "supervaizer.examples.hello_world_agent._is_job_stopped",
+        side_effect=lambda job_id: job_id == "job-1",
+    )
+    sleep = mocker.patch(
+        "supervaizer.examples.hello_world_agent.time.sleep",
+        side_effect=AssertionError("A stopped job must not wait"),
+    )
+
+    assert _wait_for_human_review(case, 1, "job-1") is True
+    stopped.assert_called_once_with("job-1")
+    sleep.assert_not_called()
+
+
+def test_human_review_polls_until_the_job_stops(mocker: MockerFixture) -> None:
+    case = mocker.Mock(spec=Case)
+    case.status = EntityStatus.AWAITING
+    stopped = mocker.patch(
+        "supervaizer.examples.hello_world_agent._is_job_stopped",
+        side_effect=[False, True],
+    )
+    sleep = mocker.patch("supervaizer.examples.hello_world_agent.time.sleep")
+
+    assert _wait_for_human_review(case, 1, "job-1") is True
+    assert stopped.call_count == 2
+    sleep.assert_called_once_with(HITL_POLL_INTERVAL)

@@ -39,6 +39,14 @@ test-no-cov *args:
 test-failed:
     uv run pytest --lf --no-cov
 
+# Run mutation tests
+mutmut:
+    uv run mutmut run
+
+# Show mutation test results
+mutmut-results:
+    uv run mutmut results
+
 # Run mypy type checking
 mypy:
     uv run python -m pre_commit run mypy --all-files

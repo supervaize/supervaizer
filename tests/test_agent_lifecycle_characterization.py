@@ -13,11 +13,19 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from pytest_mock import MockerFixture
 
-from supervaizer.agent import Agent, AgentMethod, AgentMethods
+from supervaizer.agent import (
+    Agent,
+    AgentMethod,
+    AgentMethods,
+    _apply_job_start_response,
+)
 from supervaizer.common import ApiSuccess
+from supervaizer.examples import hello_world_agent
 from supervaizer.job import Job, JobContext, JobResponse
 from supervaizer.lifecycle import EntityStatus
+from supervaizer.server import Server
 
 
 def _context() -> JobContext:
@@ -88,6 +96,36 @@ def test_execute_rejects_declared_method_that_returns_wrong_public_type(
         TypeError, match="Method run must return a JobResponse object, got str"
     ):
         agent._execute(f"{module.__name__}.run")
+
+
+def test_execute_nested_module_keeps_parameters_out_of_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: dict[str, Any] = {}
+    messages: list[str] = []
+
+    def run(**params: Any) -> JobResponse:
+        received.update(params)
+        return JobResponse(
+            job_id="job-1", status=EntityStatus.COMPLETED, message="done", payload={}
+        )
+
+    monkeypatch.setattr(hello_world_agent, "test_nested_action", run, raising=False)
+    monkeypatch.setattr("supervaizer.agent.log.debug", messages.append)
+    path = "supervaizer.examples.hello_world_agent.test_nested_action"
+    agent = _agent(path)
+    params = {
+        "prompt": "visible prompt",
+        "agent_parameters": [{"name": "API_KEY", "value": "test-secret-value"}],
+    }
+
+    response = agent._execute(path, params)
+
+    assert response.status == EntityStatus.COMPLETED
+    assert received == params
+    assert any("visible prompt" in message for message in messages)
+    assert all("test-secret-value" not in message for message in messages)
+    assert all("agent_parameters" not in message for message in messages)
 
 
 def test_job_start_forwards_parameters_updates_metadata_and_finishes_job(
@@ -191,3 +229,89 @@ def test_update_agent_uses_slug_and_forwards_configured_parameters(
     assert agent.server_agent_status == "ready"
     assert agent.server_agent_onboarding_status == "configured"
     update_parameters.assert_called_once_with(server, "encrypted")
+
+
+def test_agent_chat_calls_the_declared_method_with_message_and_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: dict[str, str] = {}
+    module = ModuleType("agent_chat_test_module")
+
+    def chat(context: str, message: str) -> JobResponse:
+        received.update(context=context, message=message)
+        return JobResponse(
+            job_id="job-1",
+            status=EntityStatus.COMPLETED,
+            message="answered",
+            payload={"reply": "hello"},
+        )
+
+    module.__dict__["chat"] = chat
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    path = f"{module.__name__}.chat"
+    method = AgentMethod(name="chat", method=path)
+    agent = Agent(
+        name="Chat Agent", methods=AgentMethods(job_start=method, chat=method)
+    )
+
+    result = agent.chat(context="case context", message="question")
+
+    assert result.payload == {"reply": "hello"}
+    assert received == {"context": "case context", "message": "question"}
+
+
+@pytest.mark.parametrize("has_methods", [True, False])
+def test_agent_chat_requires_a_configured_chat_method(has_methods: bool) -> None:
+    agent = (
+        _agent("agent_lifecycle_module.run")
+        if has_methods
+        else Agent(name="No methods")
+    )
+
+    with pytest.raises(ValueError, match="Chat method not configured"):
+        agent.chat(context="case context", message="question")
+
+
+@pytest.mark.parametrize(
+    ("status", "records_response", "finishes"),
+    [
+        (EntityStatus.AWAITING, True, False),
+        (EntityStatus.IN_PROGRESS, False, False),
+        (EntityStatus.COMPLETED, True, True),
+        (EntityStatus.FAILED, True, True),
+    ],
+)
+def test_job_start_response_sends_confirmation_and_tracks_lifecycle(
+    server_fixture: Server,
+    job_fixture: Job,
+    mocker: MockerFixture,
+    status: EntityStatus,
+    records_response: bool,
+    finishes: bool,
+) -> None:
+    response = JobResponse(
+        job_id=job_fixture.id,
+        status=status,
+        message="agent response",
+        payload={"result": "ready"},
+    )
+    send = mocker.patch("supervaizer.account_service.send_event_sync")
+    finished = mocker.patch("supervaizer.agent.service_job_finished")
+    mocker.patch("supervaizer.job.storage_manager.save_object")
+    job_fixture.responses = []
+
+    _apply_job_start_response(job_fixture, response, server_fixture)
+
+    send.assert_called_once()
+    account, sender, event = send.call_args.args
+    assert account is server_fixture.supervisor_account
+    assert sender is job_fixture
+    assert event.type.value == "agent.job.start.confirmation"
+    assert event.source == {"job": job_fixture.id}
+    assert event.payload["workspace"] == account.workspace_id
+    assert event.details["metadata"] == {"result": "ready"}
+    assert job_fixture.responses == ([response] if records_response else [])
+    if finishes:
+        finished.assert_called_once_with(job_fixture, server=server_fixture)
+    else:
+        finished.assert_not_called()

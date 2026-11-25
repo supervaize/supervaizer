@@ -268,3 +268,30 @@ def test_parameters_setup_validation_non_dict_input():
     assert result["valid"] is False
     assert "Parameters must be a dictionary" in result["errors"][0]
     assert "parameters" in result["invalid_parameters"]
+
+
+def test_parameters_setup_loads_dictionary_definitions() -> None:
+    setup = ParametersSetup.from_list([
+        {"name": "username", "value": "alice", "is_required": True},
+        {"name": "region", "value": "west"},
+    ])
+
+    assert setup is not None
+    assert setup.value("username") == "alice"
+    assert setup.value("region") == "west"
+    assert setup.definitions["username"].is_required is True
+
+
+def test_parameter_validation_reports_all_invalid_values() -> None:
+    setup = ParametersSetup.from_list([
+        Parameter(name="required", is_required=True),
+        Parameter(name="known"),
+    ])
+    assert setup is not None
+
+    result = setup.validate_parameters({"unknown": "value", "known": 123})
+
+    assert result["valid"] is False
+    assert set(result["invalid_parameters"]) == {"required", "unknown", "known"}
+    assert len(result["errors"]) == 3
+    assert all(isinstance(error, str) and error for error in result["errors"])

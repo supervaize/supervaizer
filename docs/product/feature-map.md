@@ -178,7 +178,7 @@ Protocol and model detail stays in [Supervaizer v2](../2026_05_SUPERVAIZER_v2.md
   2. Start the server.
   3. Confirm registration on `/manage/server`.
 - Expected result: Studio receives `server.register`. `details.server_id` is the stable server identity. `details.url` is `public_url`.
-- Important states: Missing workspace-auth trust material aborts launch with `Studio-registered Supervaizer v2 A2A requires workspace authorization`. A workspace id that does not match the API key's workspace can make `SERVER_REGISTER` return HTTP 403. Local mode skips registration.
+- Important states: Missing workspace-auth trust material aborts launch with `Studio-registered Supervaizer v2 A2A requires workspace authorization`. Conflicting Studio agent IDs for one slug fail registration. A workspace id that does not match the API key's workspace can make `SERVER_REGISTER` return HTTP 403. Local mode skips registration.
 - Source: `src/supervaizer/account.py`, `src/supervaizer/server.py`, `src/supervaizer/studio_handshake.py`
 - Verification: `tests/test_admin_routes.py`, `tests/test_routes.py`
 - Known caveats: `--local` is exempt from the launch check and ignores `supervisor_account`. Set `SUPERVAIZER_SERVER_ID` and `SUPERVAIZER_PRIVATE_KEY` when more than one process must keep the same identity.

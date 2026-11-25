@@ -12,7 +12,7 @@
 
 
 import pytest
-from httpx import ConnectError, Headers, HTTPStatusError
+from httpx import ConnectError, Headers, HTTPStatusError, Request, Response
 from pytest_mock import MockerFixture
 
 from supervaizer import Account, ApiSuccess, account_service
@@ -32,6 +32,38 @@ def test_redact_generic_and_qualified_token_fields(field_name: str) -> None:
 
     assert account_service._redact_sensitive_value(payload) == {
         "job": {"metadata": {field_name: "***", "state": "done"}}
+    }
+
+
+@pytest.mark.parametrize(
+    ("header", "value", "redacted"),
+    [
+        ("Authorization", "Bearer first second", "Bearer ***"),
+        ("Proxy-Authorization", "Basic first second", "Basic ***"),
+        ("X-API-Key", "first second", "***"),
+        ("Secret", "first second", "***"),
+        ("X-Request-ID", "request-1", "request-1"),
+    ],
+)
+def test_event_curl_redacts_credentials(header: str, value: str, redacted: str) -> None:
+    curl = account_service._event_curl(
+        "https://studio.example.test/events", {header: value}
+    )
+
+    assert f"{header}: {redacted}" in curl
+    if header != "X-Request-ID":
+        assert "first" not in curl
+        assert "second" not in curl
+
+
+@pytest.mark.parametrize(
+    "field_name", ["x-api-key", "Authorization", "proxy_authorization", "secret"]
+)
+def test_redact_credentials_in_nested_event_payloads(field_name: str) -> None:
+    payload = {"records": [{field_name: "credential", "state": "done"}]}
+
+    assert account_service._redact_sensitive_value(payload) == {
+        "records": [{field_name: "***", "state": "done"}]
     }
 
 
@@ -187,6 +219,37 @@ def test_send_event_sync_url_error(
         send_event_sync(
             account=account_fixture, sender=server_fixture, event=event_fixture
         )
+
+
+@pytest.mark.parametrize("request_id", [None, "r" * 81])
+def test_send_event_sync_keeps_http_error_without_exposing_response_headers(
+    account_fixture: Account,
+    event_fixture: Event,
+    server_fixture: Server,
+    mocker: MockerFixture,
+    request_id: str | None,
+) -> None:
+    headers = {"X-Private-Token": "do-not-log-this"}
+    if request_id is not None:
+        headers["X-Request-ID"] = request_id
+    response = Response(
+        503, headers=headers, request=Request("POST", "https://studio.test")
+    )
+    mocker.patch(
+        "supervaizer.account_service._sync_httpx_client.post", return_value=response
+    )
+    logger = mocker.patch("supervaizer.account_service.log")
+
+    with pytest.raises(HTTPStatusError) as raised:
+        send_event_sync(account_fixture, server_fixture, event_fixture)
+
+    assert raised.value.response is response
+    messages = [str(call.args[0]) for call in logger.error.call_args_list]
+    expected_id = request_id[:80] if request_id else "unavailable"
+    assert any(
+        f"status=503 request_id={expected_id!r}" in message for message in messages
+    )
+    assert all("do-not-log-this" not in message for message in messages)
 
 
 def test_send_event_sync_local_mode_skips_http(
