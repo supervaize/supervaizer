@@ -305,3 +305,35 @@ async def test_async_health_check_does_not_sleep_after_last_attempt(
     assert result.status == HealthStatus.UNHEALTHY
     assert client.get.await_count == 2
     sleep.assert_awaited_once_with(2)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(HealthStatus.HEALTHY, True), (HealthStatus.UNHEALTHY, False)],
+)
+def test_simple_health_check_forwards_configuration_and_returns_status(
+    mocker: MockerFixture, status: HealthStatus, expected: bool
+) -> None:
+    verifier_class = mocker.patch(
+        "supervaizer.deploy.health.HealthVerifier", autospec=True
+    )
+    verifier = verifier_class.return_value
+    verifier.verify_health.return_value = HealthCheckResult(
+        status=status, response_time=0
+    )
+
+    result = verify_service_health(
+        "https://service.test", "api-key", timeout=3, max_retries=2
+    )
+
+    config = verifier_class.call_args.args[0]
+    assert config.timeout == 3
+    assert config.max_retries == 2
+    verifier.verify_health.assert_called_once_with("https://service.test", "api-key")
+    assert result is expected
+
+
+def test_health_verifier_preserves_explicit_configuration() -> None:
+    config = HealthCheckConfig(timeout=3, max_retries=2)
+
+    assert HealthVerifier(config).config is config

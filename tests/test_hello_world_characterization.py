@@ -14,7 +14,11 @@ from typing import Any
 import pytest
 
 from supervaizer.case import Case, CaseNodeUpdate, Cases
-from supervaizer.examples.hello_world_agent import _job_id_from_params, job_start
+from supervaizer.examples.hello_world_agent import (
+    _job_id_from_params,
+    _job_options,
+    job_start,
+)
 from supervaizer.job import Job, JobContext, Jobs
 from supervaizer.lifecycle import EntityStatus
 from supervaizer.storage import StorageManager
@@ -284,3 +288,25 @@ def test_job_start_continues_after_any_human_review_answer(
     ]
     assert case.updates[3].payload == {"approved": approved}
     assert case.final_delivery == {"result": "Case 1 completed"}
+
+
+@pytest.mark.parametrize(
+    ("fields", "review_enabled", "steps"),
+    [
+        ({}, False, ["Begin", "Progress", "End"]),
+        (
+            {"Enable human review": "yes"},
+            True,
+            ["Begin", "Progress", "Human Review", "End"],
+        ),
+    ],
+)
+def test_job_options_only_wait_for_review_when_enabled(
+    fields: dict[str, Any], review_enabled: bool, steps: list[str]
+) -> None:
+    job_id, count, enabled, selected_steps = _job_options({"fields": fields})
+
+    assert job_id == "local-job"
+    assert count == 1
+    assert enabled is review_enabled
+    assert selected_steps == steps

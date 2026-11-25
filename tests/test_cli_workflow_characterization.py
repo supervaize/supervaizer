@@ -218,3 +218,13 @@ def test_cli_environment_flags_accept_supported_values(
         monkeypatch.setenv("SUPERVAIZER_TEST_FLAG", value)
 
     assert cli._env_flag_is_true("SUPERVAIZER_TEST_FLAG") is expected
+
+
+@pytest.mark.parametrize("local", [True, False])
+def test_existing_control_script_does_not_use_local_fallback(
+    tmp_path: Path, local: bool
+) -> None:
+    script = tmp_path / "controller.py"
+    script.write_text("# test control script\n")
+
+    assert cli._resolve_start_script(str(script), local) == (str(script), False)
