@@ -20,6 +20,7 @@ from supervaizer.examples.hello_world_agent import (
     _job_id_from_params,
     _job_options,
     _wait_for_human_review,
+    handle_v2_action,
     job_start,
 )
 from supervaizer.job import Job, JobContext, Jobs
@@ -72,6 +73,36 @@ def _only_case(job_id: str) -> Case:
     cases = list(Cases().get_job_cases(job_id).values())
     assert len(cases) == 1
     return cases[0]
+
+
+@pytest.mark.parametrize("human_review", [True, False])
+def test_v2_job_sync_reports_matching_effect_and_job_state(human_review: bool) -> None:
+    result = handle_v2_action({
+        "action": "job.sync",
+        "job_id": "job-1",
+        "agent_slug": "hello-agent",
+        "mission_id": "mission-1",
+        "input": {"enable_human_review": human_review, "count": 2},
+    })
+
+    status = "awaiting" if human_review else "completed"
+    assert result["status"] == "ok"
+    assert result["effects"] == [
+        {
+            "type": "job.synced",
+            "job_id": "job-1",
+            "status": status,
+            "message": "Awaiting human review" if human_review else "Completed",
+        }
+    ]
+    state = result["job_state"]
+    assert state["job"]["id"] == "job-1"
+    assert state["job"]["agent_slug"] == "hello-agent"
+    assert state["job"]["mission_id"] == "mission-1"
+    assert state["job"]["status"] == status
+    assert [case["status"] for case in state["cases"]] == [status] * (
+        1 if human_review else 2
+    )
 
 
 @pytest.mark.parametrize(
