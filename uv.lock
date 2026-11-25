@@ -2260,6 +2260,7 @@ dev = [
 [package.dev-dependencies]
 dev = [
     { name = "mutmut" },
+    { name = "supervaizer", extra = ["dev"] },
 ]
 
 [package.metadata]
@@ -2310,7 +2311,10 @@ requires-dist = [
 provides-extras = ["deploy", "dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "mutmut", specifier = ">=3.8.1" }]
+dev = [
+    { name = "mutmut", specifier = ">=3.8.1" },
+    { name = "supervaizer", extras = ["dev"], editable = "." },
+]
 
 [[package]]
 name = "termcolor"

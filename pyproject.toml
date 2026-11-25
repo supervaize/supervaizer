@@ -189,6 +189,7 @@ replace = "## [Unreleased]\n\n## [{new_version}] - {now:%Y-%m-%d}"
 [dependency-groups]
 dev = [
     "mutmut>=3.8.1",
+    "supervaizer[dev]",
 ]
 
 [tool.mutmut]
@@ -203,3 +204,6 @@ pytest_add_cli_args_test_selection = [
     "--deselect=tests/test_server.py::test_server_lifespan_cancels_scheduled_step_task",
     "--deselect=tests/test_server.py::test_server_lifespan_leaves_shutdown_after_scheduler_timeout",
 ]
+
+[tool.uv.sources]
+supervaizer = { workspace = true }
