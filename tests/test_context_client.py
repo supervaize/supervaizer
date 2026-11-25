@@ -256,3 +256,23 @@ def test_context_client_uses_search_and_open_limits_by_default(
         "ref": "context-ref",
         "max_chars": 3000,
     }
+
+
+def test_context_open_helper_uses_default_content_limit(
+    account_fixture: Account, mocker: Any
+) -> None:
+    post = mocker.patch(
+        "supervaizer.context._sync_httpx_client.post",
+        return_value=_Response({
+            "ref": "context-ref",
+            "title": "Policy",
+            "scope": "workspace",
+            "source_type": "text",
+            "version": 1,
+            "content": "Policy text",
+        }),
+    )
+
+    context.open(account=account_fixture, ref="context-ref")
+
+    assert post.call_args.kwargs["json"] == {"ref": "context-ref", "max_chars": 3000}
