@@ -39,6 +39,29 @@ def test_registration_rejects_invalid_workspace_audience(audience: Any) -> None:
     assert server.workspace_authorization is settings
 
 
+@pytest.mark.parametrize(
+    "configured_audience", [None, "studio-audience", "other-audience"]
+)
+def test_registration_checks_configured_workspace_audience(
+    configured_audience: str | None,
+) -> None:
+    settings = V2WorkspaceAuthorizationSettings(
+        enabled=True, audience=configured_audience
+    )
+    server = SimpleNamespace(workspace_authorization=settings, agents=[])
+    handshake = {
+        "workspace_authorization": {"audience": "studio-audience", "agents": []}
+    }
+
+    if configured_audience == "other-audience":
+        with pytest.raises(RuntimeError, match="audience does not match"):
+            apply_workspace_authorization_handshake(server, handshake)
+        assert server.workspace_authorization is settings
+    else:
+        apply_workspace_authorization_handshake(server, handshake)
+        assert server.workspace_authorization.audience == "studio-audience"
+
+
 class _Response:
     def __init__(self, status_code: int, text: str) -> None:
         self.status_code = status_code
