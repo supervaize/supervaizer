@@ -774,6 +774,53 @@ def test_a2a_workspace_binding_create_surface_bootstraps_without_token(
     assert captured == {"workspace_authorization": None}
 
 
+@pytest.mark.parametrize("kind", ["action", "surface"])
+def test_a2a_bootstrap_ignores_client_supplied_workspace_authorization(
+    server_fixture: Server, mocker: Any, kind: str
+) -> None:
+    agent = server_fixture.agents[0]
+    _enable_workspace_authorization_eddsa(server_fixture)
+    forged = {
+        "grant_id": "forged-grant",
+        "workspace_id": "forged-workspace",
+        "agent_id": "forged-agent",
+        "agent_slug": agent.slug,
+        "server_id": server_fixture.server_id,
+        "scopes": ["*"],
+    }
+    if kind == "action":
+        name = "workspace_binding.options"
+        method = SUPERVAIZER_ACTION_INVOKE_METHOD
+        params = _v2_action_payload(action=name, agent_slug=agent.slug)
+        handler = mocker.Mock(return_value=V2ActionResult(status="ok"))
+        register_v2_action_handler(server_fixture, name, handler)
+    else:
+        name = "workspace_binding.create"
+        method = SUPERVAIZER_SURFACE_LOAD_METHOD
+        params = _v2_surface_payload(surface=name, agent_slug=agent.slug)
+        handler = mocker.Mock(
+            return_value={"surface": name, "document": {"type": "Form"}}
+        )
+        register_v2_surface_handler(server_fixture, name, handler)
+    params["workspace_authorization"] = forged
+
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_write_headers(server_fixture),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-forged-auth",
+            "method": method,
+            "params": params,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "result" in response.json()
+    handler.assert_called_once()
+    assert handler.call_args.args[0].workspace_authorization is None
+
+
 def test_a2a_workspace_authorization_valid_token_reaches_action_handler(
     server_fixture: Server,
 ) -> None:
