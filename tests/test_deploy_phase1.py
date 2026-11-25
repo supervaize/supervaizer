@@ -51,6 +51,31 @@ def test_deployment_state_round_trip_preserves_aware_timestamps(tmp_path: Path) 
     assert before_save <= loaded.updated_at <= after_save
 
 
+@pytest.mark.parametrize("has_existing_flags", [False, True])
+def test_deployment_state_migration_preserves_existing_provider_metadata(
+    tmp_path: Path, has_existing_flags: bool
+) -> None:
+    manager = StateManager(tmp_path / ".deployment")
+    original: dict[str, object] = {"version": 1, "service_name": "service"}
+    if has_existing_flags:
+        original.update({
+            "api_key_generated": True,
+            "rsa_key_generated": True,
+            "provider_data": {"resource_id": "resource-1"},
+        })
+    snapshot = original.copy()
+
+    migrated = manager.migrate_state(original)
+
+    assert original == snapshot
+    assert migrated["version"] == 2
+    assert migrated["api_key_generated"] is has_existing_flags
+    assert migrated["rsa_key_generated"] is has_existing_flags
+    assert migrated["provider_data"] == (
+        {"resource_id": "resource-1"} if has_existing_flags else {}
+    )
+
+
 class TestDockerManager:
     """Test Docker manager functionality."""
 
