@@ -318,9 +318,18 @@ async def test_recovery_rechecks_pending_after_then_advances_once(
 
     after = case.metadata["_rule_checkpoints"]["occurrence-4:after"]
     assert result == repeated == "result"
-    assert checkpoint.await_count == 1
+    checkpoint.assert_awaited_once_with(
+        occurrence_id="occurrence-4",
+        phase="after",
+        job_id="rule-job",
+        case_id="recovery-case",
+        step_id="send-message",
+        context=context,
+    )
     assert advanced == ["result"]
     assert after["status"] == "allow"
+    assert after["occurrence_id"] == "occurrence-4"
+    assert after["phase"] == "after"
     assert after["advancement_started"] is True
     assert after["advancement_completed"] is True
 
