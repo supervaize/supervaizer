@@ -76,6 +76,19 @@ def test_provider_health_checks_forward_timeout_and_result(
     verify.assert_called_once_with("https://controller.example.test", timeout=17)
 
 
+@pytest.mark.parametrize(
+    "driver_class", [CloudRunDriver, AWSAppRunnerDriver, DOAppPlatformDriver]
+)
+def test_provider_health_checks_use_default_timeout(
+    mocker: MockerFixture, driver_class: type[BaseDriver]
+) -> None:
+    driver = driver_class.__new__(driver_class)
+    verify = mocker.patch.object(driver, "verify_health_enhanced", return_value=True)
+
+    assert driver.verify_health("https://controller.example.test")
+    verify.assert_called_once_with("https://controller.example.test", timeout=60)
+
+
 class TestBaseDriver:
     """Test base driver functionality."""
 
