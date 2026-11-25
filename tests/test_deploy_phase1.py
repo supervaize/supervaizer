@@ -11,6 +11,7 @@ Tests for deployment CLI Phase 1 functionality.
 import json
 import subprocess
 import tempfile
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,29 @@ from supervaizer.deploy.state import (
     StateManager,
 )
 from supervaizer.deploy.utils import create_deployment_directory, get_git_sha
+
+
+def test_deployment_state_round_trip_preserves_aware_timestamps(tmp_path: Path) -> None:
+    created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone(timedelta(hours=2)))
+    state = DeploymentState(
+        service_name="test-service",
+        platform="cloud-run",
+        environment="dev",
+        region="us-central1",
+        image_tag="test:latest",
+        created_at=created,
+    )
+    manager = StateManager(tmp_path / ".deployment")
+    before_save = datetime.now(UTC)
+
+    manager.save_state(state)
+    after_save = datetime.now(UTC)
+    loaded = manager.load_state()
+
+    assert loaded is not None
+    assert loaded.created_at.isoformat() == created.isoformat()
+    assert loaded.updated_at.tzinfo == UTC
+    assert before_save <= loaded.updated_at <= after_save
 
 
 class TestDockerManager:
