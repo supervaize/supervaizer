@@ -21,6 +21,7 @@ from supervaizer.examples.hello_world_agent import (
     _job_options,
     _wait_for_human_review,
     handle_v2_action,
+    human_answer,
     job_start,
 )
 from supervaizer.job import Job, JobContext, Jobs
@@ -103,6 +104,26 @@ def test_v2_job_sync_reports_matching_effect_and_job_state(human_review: bool) -
     assert [case["status"] for case in state["cases"]] == [status] * (
         1 if human_review else 2
     )
+
+
+@pytest.mark.parametrize(
+    ("params", "job_id"),
+    [
+        (
+            {"job_id": "explicit-job", "context": {"job_id": "other-job"}},
+            "explicit-job",
+        ),
+        ({"context": {"job_id": "context-job"}}, "context-job"),
+    ],
+)
+def test_human_answer_preserves_job_case_and_fields(
+    params: dict[str, Any], job_id: str
+) -> None:
+    response = human_answer(case_id="case-1", fields={"approved": True}, **params)
+
+    assert response.job_id == job_id
+    assert response.status == EntityStatus.IN_PROGRESS
+    assert response.payload == {"case_id": "case-1", "answer": {"approved": True}}
 
 
 @pytest.mark.parametrize(
