@@ -337,3 +337,20 @@ def test_health_verifier_preserves_explicit_configuration() -> None:
     config = HealthCheckConfig(timeout=3, max_retries=2)
 
     assert HealthVerifier(config).config is config
+
+
+def test_public_async_health_wrapper_uses_override_and_key(
+    mocker: MockerFixture,
+) -> None:
+    client_class, client = mock_async_health_client(mocker, httpx.Response(200))
+    config = HealthCheckConfig(timeout=7, endpoints=["/ready"])
+
+    result = HealthVerifier().verify_health_async(
+        "https://service.test", "api-key", config
+    )
+
+    assert result.status == HealthStatus.HEALTHY
+    client_class.assert_called_once_with(timeout=7)
+    client.get.assert_awaited_once_with(
+        "https://service.test/ready", headers={"X-API-Key": "api-key"}
+    )
