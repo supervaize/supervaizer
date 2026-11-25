@@ -237,6 +237,38 @@ async def test_guarded_step_effect_error_requires_explicit_recovery(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("effect_state", ["effect_started", "effect_completed"])
+async def test_guarded_step_refuses_to_replay_an_orphaned_effect(
+    isolated_rule_case_state: None,
+    account_fixture: Account,
+    mocker: MockerFixture,
+    effect_state: str,
+) -> None:
+    del isolated_rule_case_state
+    case = _case(account_fixture, "orphaned-effect-case")
+    gate = _gate(account_fixture)
+    case.metadata["_rule_checkpoints"] = {
+        "orphaned:after": {effect_state: True},
+    }
+    checkpoint = mocker.patch.object(gate, "checkpoint", new=mocker.AsyncMock())
+    effect = mocker.AsyncMock(return_value="result")
+
+    with pytest.raises(RuleCheckpointRecoveryRequired, match="explicit recovery"):
+        await _guarded_step_with_timeout(
+            gate=gate,
+            case=case,
+            step_id="send-message",
+            occurrence_id="orphaned",
+            before_context={"draft": "hello"},
+            effect=effect,
+            after_context=lambda value: {"sent": value},
+        )
+
+    checkpoint.assert_not_awaited()
+    effect.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_recovery_rechecks_pending_after_then_advances_once(
     isolated_rule_case_state: None,
     account_fixture: Account,
