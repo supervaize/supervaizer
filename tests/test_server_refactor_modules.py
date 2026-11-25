@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import supervaizer.server as server_module
 from supervaizer import Server, scheduled_steps, server_config, server_info
 from supervaizer.common import ApiSuccess
+from supervaizer.contracts import V2WorkspaceAuthorizationSettings
 from supervaizer.server_registration import build_server_registration_info
 from supervaizer.studio_handshake import validate_registration_handshake
 
@@ -243,3 +244,39 @@ def test_controller_key_fingerprint_is_stable_and_does_not_expose_key() -> None:
     )
     assert server_config._controller_key_fingerprint("") is None
     assert server_config._controller_key_fingerprint(None) is None
+
+
+def test_server_handshake_applies_audience_and_agent_bindings(
+    server_fixture: Server,
+) -> None:
+    assert server_fixture.agents
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True
+    )
+    bindings = []
+    for agent in server_fixture.agents:
+        agent.server_agent_id = None
+        bindings.append({"slug": agent.slug, "id": f"studio-{agent.slug}"})
+
+    server_fixture._apply_workspace_authorization_handshake({
+        "workspace_authorization": {"audience": "studio-audience", "agents": bindings}
+    })
+
+    assert server_fixture.workspace_authorization.audience == "studio-audience"
+    assert [agent.server_agent_id for agent in server_fixture.agents] == [
+        item["id"] for item in bindings
+    ]
+
+
+def test_server_applies_workspace_agent_bindings(server_fixture: Server) -> None:
+    assert server_fixture.agents
+    bindings = []
+    for agent in server_fixture.agents:
+        agent.server_agent_id = None
+        bindings.append({"slug": agent.slug, "id": f"studio-{agent.slug}"})
+
+    server_fixture._apply_workspace_authorization_agent_bindings(bindings)
+
+    assert [agent.server_agent_id for agent in server_fixture.agents] == [
+        item["id"] for item in bindings
+    ]
