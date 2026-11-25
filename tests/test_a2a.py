@@ -2611,6 +2611,73 @@ def test_a2a_rejects_untrusted_issuer_and_invalid_claims(
     handler.assert_not_called()
 
 
+@pytest.mark.parametrize("change", ["url", "kid"])
+def test_a2a_jwks_cache_separates_urls_and_key_ids(
+    server_fixture: Server, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    first_key = ed25519.Ed25519PrivateKey.generate()
+    second_key = ed25519.Ed25519PrivateKey.generate()
+    first_url = f"https://studio.example.test/{change}/first-jwks"
+    second_url = (
+        f"https://studio.example.test/{change}/second-jwks"
+        if change == "url"
+        else first_url
+    )
+    first_kid = "first-key"
+    second_kid = "first-key" if change == "url" else "second-key"
+    requests: list[str] = []
+
+    def get_jwks(url: str, timeout: int) -> _JwksResponse:
+        assert timeout == 5
+        requests.append(url)
+        keys = [_ed25519_jwk(first_key.public_key(), kid=first_kid)]
+        if change == "kid" or url == second_url:
+            if change == "url":
+                keys.clear()
+            keys.append(_ed25519_jwk(second_key.public_key(), kid=second_kid))
+        return _JwksResponse({"keys": keys})
+
+    monkeypatch.setattr("supervaizer.workspace_authorization.httpx.get", get_jwks)
+    register_v2_action_handler(
+        server_fixture, "job.start", lambda _request: V2ActionResult(status="ok")
+    )
+    client = TestClient(server_fixture.app)
+    for url, kid, key in [
+        (first_url, first_kid, first_key),
+        (second_url, second_kid, second_key),
+        (first_url, first_kid, first_key),
+    ]:
+        server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+            enabled=True,
+            issuer="https://studio.example.test",
+            jwks_url=url,
+            leeway_seconds=0,
+        )
+        token = _workspace_authorization_eddsa_token(
+            server_fixture,
+            key,
+            agent_slug=agent.slug,
+            scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+            kid=kid,
+        )
+        response = client.post(
+            "/a2a",
+            headers=_a2a_workspace_headers(server_fixture, token),
+            json={
+                "jsonrpc": "2.0",
+                "id": "rpc-jwks-cache",
+                "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+                "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["result"]["status"] == "ok"
+
+    assert requests == [first_url, second_url]
+
+
 @pytest.mark.parametrize("claim", ["workspace_id", "workspace_slug"])
 def test_a2a_rejects_token_for_a_different_workspace(
     server_fixture: Server, claim: str
