@@ -514,6 +514,11 @@ def _load_public_key_from_jwks(
             "workspace_authorization_jwks_unavailable",
             "Workspace authorization JWKS could not be loaded",
         ) from exc
+    if not isinstance(jwks, dict):
+        raise WorkspaceAuthorizationError(
+            "workspace_authorization_invalid_jwks",
+            "Workspace authorization JWKS payload must be a JSON object",
+        )
     keys = jwks.get("keys", [])
     if not isinstance(keys, list):
         raise WorkspaceAuthorizationError(

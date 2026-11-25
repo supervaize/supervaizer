@@ -2521,6 +2521,52 @@ def test_a2a_workspace_authorization_rejects_unusable_jwks(
     assert called is False
 
 
+@pytest.mark.parametrize("payload", [[], None, "invalid"])
+def test_a2a_rejects_non_object_jwks_payload(
+    server_fixture: Server, mocker: Any, payload: object
+) -> None:
+    agent = server_fixture.agents[0]
+    agent.server_agent_id = "studio-agent-1"
+    key = ed25519.Ed25519PrivateKey.generate()
+    server_fixture.workspace_authorization = V2WorkspaceAuthorizationSettings(
+        enabled=True,
+        issuer="https://studio.example.test",
+        jwks_url="https://studio.example.test/.well-known/non-object.json",
+        leeway_seconds=0,
+    )
+    jwks_response = mocker.Mock()
+    jwks_response.json.return_value = payload
+    mocker.patch(
+        "supervaizer.workspace_authorization.httpx.get", return_value=jwks_response
+    )
+    handler = mocker.Mock(return_value=V2ActionResult(status="ok"))
+    register_v2_action_handler(server_fixture, "job.start", handler)
+    token = _workspace_authorization_eddsa_token(
+        server_fixture,
+        key,
+        agent_slug=agent.slug,
+        scopes=[SUPERVAIZER_ACTION_INVOKE_METHOD, "job.start"],
+        kid="requested-key",
+    )
+    response = TestClient(server_fixture.app).post(
+        "/a2a",
+        headers=_a2a_workspace_headers(server_fixture, token),
+        json={
+            "jsonrpc": "2.0",
+            "id": "rpc-non-object-jwks",
+            "method": SUPERVAIZER_ACTION_INVOKE_METHOD,
+            "params": _v2_action_payload(action="job.start", agent_slug=agent.slug),
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.json()["error"]["data"]["code"]
+        == "workspace_authorization_invalid_jwks"
+    )
+    handler.assert_not_called()
+
+
 @pytest.mark.parametrize("claim", ["workspace_id", "workspace_slug"])
 def test_a2a_rejects_token_for_a_different_workspace(
     server_fixture: Server, claim: str
