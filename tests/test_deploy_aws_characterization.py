@@ -129,12 +129,20 @@ class TestAWSAppRunnerCharacterization:
         mocker.patch.object(
             driver, "_create_or_update_secrets", side_effect=ValueError("bad secret")
         )
+        create_service = mocker.patch.object(
+            driver,
+            "_create_or_update_service",
+            side_effect=AssertionError(
+                "Service creation must not follow a secret error"
+            ),
+        )
 
         result = driver.deploy_service("agent", "prod", "image:next")
 
         assert result.success is False
         assert result.error_message == "bad secret"
         assert result.error_details == {"exception_type": "ValueError"}
+        create_service.assert_not_called()
 
     @pytest.mark.parametrize("keep_secrets", [False, True])
     def test_destroy_removes_service_repository_and_optional_secrets(
@@ -317,3 +325,41 @@ class TestAWSAppRunnerCharacterization:
             )
             with pytest.raises(TimeoutError, match="did not become ready"):
                 driver._wait_for_service_ready("arn:service", 1)
+
+
+def test_deploy_passes_secret_references_to_app_runner(mocker: MockerFixture) -> None:
+    mocker.patch.object(aws_app_runner.boto3, "client", return_value=mocker.Mock())
+    driver = AWSAppRunnerDriver("us-east-1", "account")
+    create_secrets = mocker.patch.object(
+        driver,
+        "_create_or_update_secrets",
+        return_value={"SUPERVAIZER_API_KEY": "arn:key"},
+    )
+    create_service = mocker.patch.object(
+        driver, "_create_or_update_service", return_value="arn:service"
+    )
+    mocker.patch.object(
+        driver, "_wait_for_service_ready", return_value="https://app.aws"
+    )
+    mocker.patch.object(driver, "_set_public_url")
+    mocker.patch.object(driver, "verify_health", return_value=True)
+
+    result = driver.deploy_service(
+        "agent",
+        "prod",
+        "image:next",
+        env_vars={"MODE": "prod"},
+        secrets={"SUPERVAIZER_API_KEY": "test-api-key"},
+    )
+
+    assert result.success is True
+    create_secrets.assert_called_once_with(
+        "agent-prod", {"SUPERVAIZER_API_KEY": "test-api-key"}
+    )
+    create_service.assert_called_once_with(
+        "agent-prod",
+        "image:next",
+        8000,
+        {"MODE": "prod"},
+        {"SUPERVAIZER_API_KEY": "arn:key"},
+    )
