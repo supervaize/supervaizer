@@ -12,11 +12,14 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from supervaizer.case import Case, CaseNodeUpdate, Cases
 from supervaizer.examples.hello_world_agent import (
+    HITL_POLL_INTERVAL,
     _job_id_from_params,
     _job_options,
+    _wait_for_human_review,
     job_start,
 )
 from supervaizer.job import Job, JobContext, Jobs
@@ -219,6 +222,7 @@ def test_job_start_stops_while_waiting_for_human_review(
 
     def stop_while_awaiting(duration: float) -> None:
         sleep_calls.append(duration)
+        assert len(sleep_calls) <= 3, "Review continued after the job stopped"
         if duration != 1.0:
             return
         case = _only_case(job.id)
@@ -310,3 +314,34 @@ def test_job_options_only_wait_for_review_when_enabled(
     assert count == 1
     assert enabled is review_enabled
     assert selected_steps == steps
+
+
+def test_human_review_stops_when_the_owning_job_stops(mocker: MockerFixture) -> None:
+    case = mocker.Mock(spec=Case)
+    case.status = EntityStatus.AWAITING
+    stopped = mocker.patch(
+        "supervaizer.examples.hello_world_agent._is_job_stopped",
+        side_effect=lambda job_id: job_id == "job-1",
+    )
+    sleep = mocker.patch(
+        "supervaizer.examples.hello_world_agent.time.sleep",
+        side_effect=AssertionError("A stopped job must not wait"),
+    )
+
+    assert _wait_for_human_review(case, 1, "job-1") is True
+    stopped.assert_called_once_with("job-1")
+    sleep.assert_not_called()
+
+
+def test_human_review_polls_until_the_job_stops(mocker: MockerFixture) -> None:
+    case = mocker.Mock(spec=Case)
+    case.status = EntityStatus.AWAITING
+    stopped = mocker.patch(
+        "supervaizer.examples.hello_world_agent._is_job_stopped",
+        side_effect=[False, True],
+    )
+    sleep = mocker.patch("supervaizer.examples.hello_world_agent.time.sleep")
+
+    assert _wait_for_human_review(case, 1, "job-1") is True
+    assert stopped.call_count == 2
+    sleep.assert_called_once_with(HITL_POLL_INTERVAL)
